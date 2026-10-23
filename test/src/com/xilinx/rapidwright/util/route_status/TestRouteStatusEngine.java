@@ -22,13 +22,24 @@
 
 package com.xilinx.rapidwright.util.route_status;
 
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetType;
+import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFDirection;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPort;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.ReportRouteStatus;
@@ -37,12 +48,15 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -652,6 +666,151 @@ public class TestRouteStatusEngine {
         Assertions.assertFalse(rrs.isFullyRouted());
     }
 
+    @Test
+    public void testReportVivadoRouteStatusRoutingOnAlias() {
+        // Nets whose routing is stored under the name of another of their segments only: Vivado
+        // uses that routing
+        Design design = RapidWrightDCP.loadDCP("picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp");
+        for (int i = 0; i < 5; i++) {
+            Net net = design.getNet("picoblaze_0_12/in_port[" + i + "]");
+            Net alias = design.createNet("picoblaze_0_12/processor/Q[" + i + "]");
+            alias.setPIPs(new ArrayList<>(net.getPIPs()));
+            net.setPIPs(new ArrayList<>());
+        }
+        ReportRouteStatusResult rrs = ReportRouteStatus.reportVivadoRouteStatus(design, true);
+        Assertions.assertEquals(
+                "Design Route Status\n" +
+                "                                               :      # nets :\n" +
+                "   ------------------------------------------- : ----------- :\n" +
+                "   # of logical nets.......................... :        1505 :\n" +
+                "       # of nets with no placed pins.......... :           1 :\n" +
+                "       # of nets not needing routing.......... :         697 :\n" +
+                "           # of internally routed nets........ :         476 :\n" +
+                "           # of nets with no loads............ :         188 :\n" +
+                "           # of implicitly routed ports....... :          33 :\n" +
+                "       # of routable nets..................... :         805 :\n" +
+                "           # of unrouted nets................. :          33 :\n" +
+                "           # of fully routed nets............. :         772 :\n" +
+                "       # of nets with routing errors.......... :           2 :\n" +
+                "           # of nets with some unplaced pins.. :           2 :\n" +
+                "           # of nets with some unrouted pins.. :           2 :\n" +
+                "   ------------------------------------------- : ----------- :",
+                rrs.toString());
+        assertNetStatuses(rrs, new String[]{"picoblaze_0_12/in_port[0]=HAS_ROUTING,ROUTED"});
+    }
+
+    @Test
+    public void testReportVivadoRouteStatusRemovedBidirectionalPIPs() {
+        // Bidirectional PIPs that are not stored with a net do not connect its routing (unlike
+        // those joining global clock routing)
+        Design design = RapidWrightDCP.loadDCP("picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp");
+        String[][] removed = {
+                {"picoblaze_1_12/processor/data_path_loop[0].output_data.sy_kk_mux_lut/O5",
+                        "INT_X11Y62/INT.INT_NODE_IMUX_37_INT_OUT0<<->>BYPASS_W8"},
+                {"picoblaze_0_13/processor/data_path_loop[0].lsb_shift_rotate.shift_rotate_lut/O5",
+                        "INT_X5Y65/INT.INT_NODE_IMUX_5_INT_OUT0<<->>BYPASS_E8"},
+                {"picoblaze_0_12/processor/active_interrupt_lut/O5",
+                        "INT_X5Y64/INT.INT_NODE_IMUX_37_INT_OUT0<<->>BYPASS_W8"},
+                {"picoblaze_1_13/processor/active_interrupt_lut/O5",
+                        "INT_X9Y69/INT.INT_NODE_IMUX_37_INT_OUT0<<->>BYPASS_W8"},
+                {"picoblaze_0_12/processor/data_path_loop[0].second_operand.out_port_lut/O6",
+                        "INT_X6Y64/INT.INT_NODE_IMUX_18_INT_OUT0<<->>BYPASS_E14"}};
+        for (String[] netPIP : removed) {
+            Net net = design.getNet(netPIP[0]);
+            PIP pip = net.getPIPs().stream().filter((p) -> p.toString().equals(netPIP[1])).findFirst().get();
+            Assertions.assertTrue(pip.isBidirectional());
+            net.removePIP(pip);
+        }
+        ReportRouteStatusResult rrs = ReportRouteStatus.reportVivadoRouteStatus(design, true);
+        Assertions.assertEquals(
+                "Design Route Status\n" +
+                "                                               :      # nets :\n" +
+                "   ------------------------------------------- : ----------- :\n" +
+                "   # of logical nets.......................... :        1505 :\n" +
+                "       # of nets with no placed pins.......... :           1 :\n" +
+                "       # of nets not needing routing.......... :         697 :\n" +
+                "           # of internally routed nets........ :         476 :\n" +
+                "           # of nets with no loads............ :         188 :\n" +
+                "           # of implicitly routed ports....... :          33 :\n" +
+                "       # of routable nets..................... :         805 :\n" +
+                "           # of unrouted nets................. :          33 :\n" +
+                "           # of fully routed nets............. :         767 :\n" +
+                "       # of nets with routing errors.......... :           7 :\n" +
+                "           # of nets with some unplaced pins.. :           2 :\n" +
+                "           # of nets with some unrouted pins.. :           6 :\n" +
+                "           # of nets with antennas/islands.... :           5 :\n" +
+                "   ------------------------------------------- : ----------- :",
+                rrs.toString());
+        assertNetStatuses(rrs, new String[]{
+                // (a reversed PIP)
+                "picoblaze_1_12/processor/data_path_loop[0].output_data.sy_kk_mux_lut/O5=ANTENNAS,HAS_ROUTING",
+                "picoblaze_0_12/processor/active_interrupt_lut/O5=PARTIAL,ANTENNAS,HAS_ROUTING"});
+    }
+
+    /**
+     * An input of a LUT tied to GND, with its routing and site pin removed: with its site routing
+     * kept, it is an unrouted load of GND, whether tied in its parent cell or (through a port of that
+     * cell) further up. Without site routing, it is not a load.
+     */
+    @ParameterizedTest(name = "hierarchical={0} keepSiteRouting={1}")
+    @CsvSource({"false,true", "true,true", "false,false", "true,false"})
+    public void testReportVivadoRouteStatusUnroutedStaticTie(boolean hierarchical, boolean keepSiteRouting) {
+        Design design = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
+        Cell cell = design.getCell("u_ila_0/inst/i_0");
+        Net gnd = design.getGndNet();
+        SiteInst si = cell.getSiteInst();
+        BELPin lutPin = cell.getBEL().getPin("A6");
+        BELPin sitePort = null;
+        for (BELPin p : si.getSiteWirePins(lutPin.getSiteWireIndex())) {
+            if (p.isSitePort()) {
+                sitePort = p;
+            }
+        }
+        SitePinInst spi = si.getSitePinInst(sitePort.getName());
+        Assertions.assertSame(gnd, spi.getNet());
+        if (hierarchical) {
+            // Tie the LUT input to GND through a new input port of its parent cell
+            EDIFHierCellInst parent = cell.getEDIFHierCellInst().getParent();
+            EDIFPort port = parent.getCellType().createPort("tie", EDIFDirection.INPUT, 1);
+            EDIFNet inner = parent.getCellType().createNet("tie");
+            inner.createPortInst(port);
+            EDIFPortInst input = cell.getEDIFCellInst().getPortInst("I0");
+            Assertions.assertTrue(input.getNet().isGND());
+            input.getNet().removePortInst(input);
+            inner.addPortInst(input);
+            EDIFTools.getStaticNet(NetType.GND, parent.getParent(), design.getNetlist()).getNet()
+                    .createPortInst(port, parent.getInst());
+        }
+        DesignTools.unroutePins(gnd, Collections.singletonList(spi));
+        List<PIP> pips = new ArrayList<>(gnd.getPIPs());
+        gnd.removePin(spi);
+        si.removePin(spi);
+        gnd.setPIPs(pips);
+        if (keepSiteRouting) {
+            si.routeIntraSiteNet(gnd, sitePort, lutPin);
+        }
+        ReportRouteStatusResult rrs = ReportRouteStatus.reportVivadoRouteStatus(design, true);
+        Assertions.assertEquals(
+                "Design Route Status\n" +
+                "                                               :      # nets :\n" +
+                "   ------------------------------------------- : ----------- :\n" +
+                "   # of logical nets.......................... :        8682 :\n" +
+                "       # of nets not needing routing.......... :        3680 :\n" +
+                "           # of internally routed nets........ :        3591 :\n" +
+                "           # of nets with no loads............ :          89 :\n" +
+                "       # of routable nets..................... :        5002 :\n" +
+                (keepSiteRouting
+                ? "           # of fully routed nets............. :        5001 :\n" +
+                  "       # of nets with routing errors.......... :           1 :\n" +
+                  "           # of nets with some unrouted pins.. :           1 :\n"
+                : "           # of fully routed nets............. :        5002 :\n" +
+                  "       # of nets with routing errors.......... :           0 :\n") +
+                "   ------------------------------------------- : ----------- :",
+                rrs.toString());
+        assertNetStatuses(rrs, new String[]{"GLOBAL_LOGIC0=" + (keepSiteRouting ? "PARTIAL," : "") + "HAS_ROUTING"
+                + (keepSiteRouting ? "" : ",ROUTED")});
+    }
+
     private static int bits(NetRouteStatus... statuses) {
         int bits = 0;
         for (NetRouteStatus s : statuses) {
@@ -696,5 +855,36 @@ public class TestRouteStatusEngine {
         Assertions.assertEquals("n1", mutator.addSecondDriver(target));
         Assertions.assertEquals(2, sub.getNet("n0").getPortInsts().size());
         Assertions.assertSame(u0.getCellType(), sub);
+    }
+
+    @Test
+    public void testAntennaSkipsGapMarkers() {
+        // The routing of clk has explicit gaps, marked by PIPs without an end node
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        Assertions.assertTrue(design.getNet("clk").getPIPs().stream().anyMatch((p) -> p.getEndNode() == null));
+        // (adds an antenna to every routed net)
+        new RouteStatusMutator(design, 1).apply("antenna:100000");
+    }
+
+    @Test
+    public void testMultidriverUsesCurrentConnectivity() {
+        // After its driver moved to another net, a net has no driver to give that net another one
+        Design design = new Design("top", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFCell lut = netlist.getHDIPrimitive(Unisim.LUT1);
+        Net[] nets = new Net[3];
+        for (int i = 0; i < nets.length; i++) {
+            top.createNet("n" + i).createPortInst("O", lut.createCellInst("lut" + i, top));
+            nets[i] = design.createNet(netlist.getHierNetFromName("n" + i));
+        }
+        RouteStatusMutator mutator = new RouteStatusMutator(design, 1);
+        String donor = mutator.addSecondDriver(nets[0]);
+        Assertions.assertNotNull(donor);
+        Assertions.assertEquals(2, top.getNet("n0").getPortInsts().size());
+        Assertions.assertTrue(top.getNet(donor).getPortInsts().isEmpty());
+
+        Assertions.assertNull(mutator.addSecondDriver(design.getNet(donor)));
+        Assertions.assertEquals(2, top.getNet("n0").getPortInsts().size());
     }
 }

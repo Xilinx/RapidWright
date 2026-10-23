@@ -32,7 +32,6 @@ import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
-import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.util.ReportRouteStatus;
@@ -325,6 +324,10 @@ public class RouteStatusMutator {
         Collections.shuffle(pips, random);
         for (PIP pip : pips) {
             Node node = pip.getEndNode();
+            if (node == null) {
+                // A PIP marking an explicit gap
+                continue;
+            }
             for (PIP downhill : node.getAllDownhillPIPs()) {
                 Node end = downhill.getEndNode();
                 if (end == null || usedNodes.contains(end) || end.isTied() || downhill.isRouteThru()) {
@@ -346,10 +349,11 @@ public class RouteStatusMutator {
      */
     String addSecondDriver(Net net) {
         EDIFHierNet hierNet = net.getLogicalHierNet();
-        List<EDIFHierPortInst> pins = (hierNet == null) ? null : design.getNetlist().getPhysicalPins(hierNet);
-        if (pins == null) {
+        if (hierNet == null) {
             return null;
         }
+        // (from the current connectivity, which earlier mutations may have changed)
+        List<EDIFHierPortInst> pins = RouteStatusNetlist.getFlatLeafPortInsts(hierNet);
         EDIFHierPortInst driver = null;
         for (EDIFHierPortInst ehpi : pins) {
             if (ehpi.isOutput()) {
@@ -386,17 +390,13 @@ public class RouteStatusMutator {
     }
 
     private boolean disconnectLogical(Net net, boolean driver) {
-        EDIFNetlist netlist = design.getNetlist();
         EDIFHierNet hierNet = net.getLogicalHierNet();
         if (hierNet == null) {
             return false;
         }
-        List<EDIFHierPortInst> pins = netlist.getPhysicalPins(hierNet);
-        if (pins == null) {
-            return false;
-        }
         boolean changed = false;
-        for (EDIFHierPortInst ehpi : new ArrayList<>(pins)) {
+        // (from the current connectivity, which earlier mutations may have changed)
+        for (EDIFHierPortInst ehpi : RouteStatusNetlist.getFlatLeafPortInsts(hierNet)) {
             if (ehpi.isOutput() != driver) {
                 continue;
             }

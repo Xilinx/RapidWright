@@ -38,7 +38,8 @@ import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
-import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPort;
@@ -240,9 +241,16 @@ public class RouteStatusEngine {
                 entryName.add(net.getName());
             } else if (aliasOrPhysicalOnly[i] > 0) {
                 int entry = aliasOrPhysicalOnly[i] - 1;
-                if (entryNet.get(entry) == null && net.hasPIPs()) {
-                    // The routing of a net stored under the name of another of its segments
+                Net named = entryNet.get(entry);
+                if (net.hasPIPs() && (named == null || !named.hasPIPs())) {
+                    // The routing of a net stored under the name of another of its segments, which
+                    // Vivado uses when the net named after the flat net has none. (When several
+                    // physical nets of a flat net have routing, Vivado keeps that of one of them,
+                    // in an order not known here: that of the net named after the flat net is used.)
                     entryNet.set(entry, net);
+                    if (named != null) {
+                        aliasNets.computeIfAbsent(entry, (k) -> new ArrayList<>()).add(named);
+                    }
                 } else {
                     aliasNets.computeIfAbsent(entry, (k) -> new ArrayList<>()).add(net);
                 }
@@ -301,7 +309,7 @@ public class RouteStatusEngine {
         Arrays.sort(partitionPinKeys);
         computeSitePinKeys();
         for (int t = 0; t < 2; t++) {
-            if (staticEntry[t] >= 0 && staticLoads[t] <= MAX_STATIC_LOADS_CHECKED) {
+            if (staticEntry[t] >= 0) {
                 addStaticLoadSitePins(staticEntry[t], staticFlats.get(t));
             }
         }
@@ -430,30 +438,36 @@ public class RouteStatusEngine {
         return rrs;
     }
 
-    /** Static nets with more loads than this are not checked for loads without site routing */
-    private static final int MAX_STATIC_LOADS_CHECKED = 100000;
-
     /**
-     * Adds the input site pins of the placed LUT loads of a routed static net that its site routing
-     * does not tie (i.e. LUT inputs tied to it in the netlist only) as sinks of the static net, which
-     * need routing.
+     * Adds the input site pins of the placed LUT loads of a routed static net whose site wires carry
+     * another net (i.e. LUT inputs tied to it in the netlist only) as sinks of the static net, which
+     * need routing. (Vivado does not count such an input without any site routing as a load.)
      */
     private void addStaticLoadSitePins(int entry, List<RouteStatusNetlist.FlatNet> flats) {
         Net net = entryNet.get(entry);
         if (net == null || !net.hasPIPs()) {
             return;
         }
+        // The pins are looked at by segment (rather than by flat net, as a static net may be one
+        // huge flat net)
+        List<EDIFHierNet> segments = Collections.synchronizedList(new ArrayList<>());
+        parallelFor(flats.size(), (f) -> segments.addAll(flats.get(f).getSegments(design)));
         List<Long> keys = Collections.synchronizedList(new ArrayList<>());
-        parallelFor(flats.size(), (f) -> {
-            for (RouteStatusNetlist.LeafPin pin : flats.get(f).getLeafPins(design)) {
-                if (pin.isOutput() || !pin.isPlaced() || !pin.cell.getBEL().isLUT()) {
+        parallelFor(segments.size(), (i) -> {
+            for (EDIFHierPortInst p : RouteStatusNetlist.getLeafPortInsts(segments.get(i))) {
+                if (p.isOutput() || !mayBePlacedOnLUT(p.getPortInst().getCellInst().getCellType().getName())) {
+                    continue;
+                }
+                Cell cell = p.getPhysicalCell(design);
+                if (cell == null || !cell.isPlaced() || !cell.getBEL().isLUT()) {
                     // (other cells may have their inputs tied to constants inside their sites)
                     continue;
                 }
-                SiteInst si = pin.cell.getSiteInst();
-                for (String physPin : pin.getPhysicalPins()) {
-                    BELPin belPin = pin.cell.getBEL().getPin(physPin);
-                    if (belPin == null || si.getNetFromSiteWireIndex(belPin.getSiteWireIndex()) == net) {
+                SiteInst si = cell.getSiteInst();
+                for (String physPin : RouteStatusNetlist.getPhysicalPins(cell, p.getPortInst().getName())) {
+                    BELPin belPin = cell.getBEL().getPin(physPin);
+                    Net siteWireNet = (belPin == null) ? null : si.getNetFromSiteWireIndex(belPin.getSiteWireIndex());
+                    if (siteWireNet == null || siteWireNet == net) {
                         continue;
                     }
                     for (BELPin sitePort : si.getSiteWirePins(belPin.getSiteWireIndex())) {
@@ -478,6 +492,12 @@ public class RouteStatusEngine {
             merged[n + i] = keys.get(i);
         }
         sitePinKeys[entry] = sortedDistinct(merged, merged.length);
+    }
+
+    /** Checks whether a cell of the given type may be placed on a LUT BEL (excluding common types that are not). */
+    private static boolean mayBePlacedOnLUT(String type) {
+        return !(type.startsWith("FD") || type.startsWith("CARRY") || type.startsWith("MUXF") || type.startsWith("DSP")
+                || type.startsWith("RAMB") || type.startsWith("FIFO"));
     }
 
     /** Sorted keys of the nodes of the partition pins, and the nets they are on */
@@ -653,13 +673,14 @@ public class RouteStatusEngine {
             staleKeys = getStaleSitePinKeys(net, null);
         }
         boolean placedSource = flat != null && (flat.leafDrivers > flat.unplacedLeafDrivers || flat.placedPortDrivers > 0);
-        graph.analyze(net, isStatic, sitePinKeys[entry], staleKeys, partitionPinKeys, placedSource);
+        List<Net> aliases = aliasNets.get(entry);
+        graph.analyze(net, aliases, isStatic, sitePinKeys[entry], staleKeys, partitionPinKeys, placedSource);
         if (graph.reachedSinks < graph.sinks && sitePinKeys[entry] != null && staleKeys == null) {
             // Site routing is sometimes left behind (e.g. static ties for LUT pins, or where
             // routing bounces through a site pin) where no placed cell uses it: such site pins
             // are not loads
-            graph.analyze(net, isStatic, sitePinKeys[entry], getStaleSitePinKeys(net, isStatic ? net.getType() : null),
-                    partitionPinKeys, placedSource);
+            graph.analyze(net, aliases, isStatic, sitePinKeys[entry],
+                    getStaleSitePinKeys(net, isStatic ? net.getType() : null), partitionPinKeys, placedSource);
         }
         if (graph.locked) {
             s |= LOCKED_NODES;
@@ -862,13 +883,15 @@ public class RouteStatusEngine {
         }
 
         /**
+         * @param aliases The other physical nets of the flat net (named after other segments), whose
+         * site pins and site routing count too, or null.
          * @param partitionPinKeys Sorted keys of the nodes of the design's partition pins, where
          * routing continues in (or comes from) another partition.
          * @param placedSource Whether the net has a placed source (which routing from a partition
          * pin does not connect).
          */
-        void analyze(Net net, boolean isStatic, long[] sitePinSinkKeys, long[] staleKeys, long[] partitionPinKeys,
-                     boolean placedSource) {
+        void analyze(Net net, List<Net> aliases, boolean isStatic, long[] sitePinSinkKeys, long[] staleKeys,
+                     long[] partitionPinKeys, boolean placedSource) {
             // (the results of any previous analysis are replaced)
             sinks = 0;
             reachedSinks = 0;
@@ -884,13 +907,21 @@ public class RouteStatusEngine {
             // Sinks are the input site pins of the net, whether or not they have a SitePinInst
             // (those of unrouted sinks are not stored in a DCP), as found in its site routing
             List<SitePinInst> pins = net.getPins();
+            if (aliases != null) {
+                pins = new ArrayList<>(pins);
+                for (Net alias : aliases) {
+                    pins.addAll(alias.getPins());
+                }
+            }
             int extra = (sitePinSinkKeys == null) ? 0 : sitePinSinkKeys.length;
             long[] sinkKeys = new long[pins.size() + extra];
             int numSinks = 0;
             for (SitePinInst spi : pins) {
                 Node node = spi.getConnectedNode();
+                // (the net, or an alias)
+                Net owner = spi.getNet();
                 if (spi.isOutPin()) {
-                    if (!isStatic && !isDrivenBySiteRouting(net, spi)) {
+                    if (!isStatic && !isDrivenBySiteRouting(owner, spi)) {
                         // An output pin the site routing of the net does not lead to (e.g. one
                         // inferred from routing that starts there) drives nothing
                         continue;
@@ -899,7 +930,7 @@ public class RouteStatusEngine {
                     if (i >= 0 && !visited[i]) {
                         visited[i] = true;
                         queue[tail++] = i;
-                    } else if (i < 0 && !isStatic && spi == net.getSource()) {
+                    } else if (i < 0 && !isStatic && spi == owner.getSource()) {
                         // The source pin is not routed
                         unroutedSource = true;
                     }
@@ -937,7 +968,7 @@ public class RouteStatusEngine {
                     continue;
                 }
                 Node node = nodeObjects[i];
-                if (isStatic ? node.isTied() : isSiteRoutedOutputPinNode(net, node)) {
+                if (isStatic ? node.isTied() : isSiteRoutedOutputPinNode(net, aliases, node)) {
                     // Tied nodes of static nets, and site output pins (driven by the site routing
                     // of the net) without a SitePinInst
                     visited[i] = true;
@@ -1018,11 +1049,12 @@ public class RouteStatusEngine {
                         }
                     }
                 }
-                // Unreached routing may still be joined to the rest by a bidirectional PIP that is
-                // not stored with the net (e.g. between the halves of a clock distribution row)
+                // Unreached global (clock) routing may still be joined to the rest by a
+                // bidirectional PIP that is not stored with the net (e.g. between the halves of a
+                // clock distribution row). Other bidirectional PIPs only connect if stored.
                 changed = false;
                 for (int i = 0; i < distinct; i++) {
-                    if (visited[i]) {
+                    if (visited[i] || !nodeObjects[i].getIntentCode().toString().contains("GLOBAL")) {
                         continue;
                     }
                     for (PIP pip : nodeObjects[i].getAllUphillPIPs()) {
@@ -1161,16 +1193,41 @@ public class RouteStatusEngine {
         return sitePin.startsWith("ADDR") && sitePin.endsWith("L15");
     }
 
-    /** Checks whether a logical pin of a cell is tied to a static source of the given type. */
+    /**
+     * Checks whether a logical pin of a cell is tied to a static source of the given type, either
+     * in the cell's parent or, through ports of hierarchical cells, further up. (Pins inside a
+     * macro tied through the macro's ports are tied off inside their site: not followed.)
+     */
     private static boolean isTiedTo(Cell cell, String logicalPin, NetType staticType) {
-        EDIFCellInst eci;
+        EDIFHierCellInst inst;
         // The logical cell may be looked up by name, which is not thread safe
         synchronized (RouteStatusEngine.class) {
-            eci = cell.getEDIFCellInst();
+            inst = cell.getEDIFHierCellInst();
         }
-        EDIFPortInst epi = (eci == null) ? null : eci.getPortInst(logicalPin);
+        EDIFPortInst epi = (inst == null) ? null : inst.getInst().getPortInst(logicalPin);
         EDIFNet net = (epi == null) ? null : epi.getNet();
-        return net != null && (staticType == NetType.GND ? net.isGND() : net.isVCC());
+        EDIFHierCellInst parent = (inst == null) ? null : inst.getParent();
+        while (net != null) {
+            if (staticType == NetType.GND ? net.isGND() : net.isVCC()) {
+                return true;
+            }
+            if (parent == null || parent.isTopLevelInst()
+                    || parent.getCellType().getLibrary().isHDIPrimitivesLibrary()) {
+                return false;
+            }
+            // Continue with the net that a port of the parent cell on this net connects to
+            EDIFPortInst port = null;
+            for (EDIFPortInst p : net.getPortInsts()) {
+                if (p.isTopLevelPort()) {
+                    port = p;
+                    break;
+                }
+            }
+            EDIFPortInst outer = (port == null) ? null : parent.getInst().getPortInst(port.getName());
+            net = (outer == null) ? null : outer.getNet();
+            parent = parent.getParent();
+        }
+        return false;
     }
 
     /** Checks whether a site is an I/O site (with a pad). */
@@ -1240,6 +1297,24 @@ public class RouteStatusEngine {
     private static boolean isSiteRoutedOutputPinNode(Net net, Node node) {
         SitePin sitePin = node.getSitePin();
         return sitePin != null && !sitePin.isInput() && isSitePinUsedBy(net, node);
+    }
+
+    /**
+     * Checks whether a node is that of an output site pin driven by the site routing of a net, or
+     * of one of its aliases.
+     */
+    private static boolean isSiteRoutedOutputPinNode(Net net, List<Net> aliases, Node node) {
+        if (isSiteRoutedOutputPinNode(net, node)) {
+            return true;
+        }
+        if (aliases != null) {
+            for (Net alias : aliases) {
+                if (isSiteRoutedOutputPinNode(alias, node)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static boolean isSitePinNode(Node node) {

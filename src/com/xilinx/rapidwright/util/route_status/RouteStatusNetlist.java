@@ -147,6 +147,69 @@ class RouteStatusNetlist {
         return (physPins == null) ? Collections.emptySet() : physPins;
     }
 
+    /**
+     * Gets the segments (hierarchical nets) of the flat net a segment is part of, following the
+     * current connectivity through the ports of hierarchical cells. Unlike
+     * {@link EDIFNetlist#getPhysicalPins(EDIFHierNet)}, nothing is cached, and nets with no or
+     * several drivers are fine.
+     */
+    static List<EDIFHierNet> getSegments(EDIFHierNet start) {
+        List<EDIFHierNet> segments = new ArrayList<>();
+        Deque<EDIFHierNet> queue = new ArrayDeque<>();
+        Set<EDIFHierNet> visited = new HashSet<>();
+        queue.add(start);
+        while (!queue.isEmpty()) {
+            EDIFHierNet hn = queue.poll();
+            if (!visited.add(hn)) {
+                continue;
+            }
+            segments.add(hn);
+            for (EDIFHierPortInst p : hn.getPortInsts()) {
+                EDIFCellInst eci = p.getPortInst().getCellInst();
+                if (eci == null) {
+                    if (hn.getHierarchicalInst().isTopLevelInst()) {
+                        // A top level port
+                        continue;
+                    }
+                    EDIFHierPortInst up = p.getPortInParent();
+                    if (up != null && up.getNet() != null) {
+                        queue.add(up.getHierarchicalNet());
+                    }
+                } else if (!eci.getCellType().isLeafCellOrBlackBox()) {
+                    EDIFHierNet internal = p.getInternalNet();
+                    if (internal != null) {
+                        queue.add(internal);
+                    }
+                }
+            }
+        }
+        return segments;
+    }
+
+    /** Gets the pins on leaf cells (or black boxes) of a segment. */
+    static List<EDIFHierPortInst> getLeafPortInsts(EDIFHierNet segment) {
+        List<EDIFHierPortInst> pins = new ArrayList<>();
+        for (EDIFHierPortInst p : segment.getPortInsts()) {
+            EDIFCellInst eci = p.getPortInst().getCellInst();
+            if (eci != null && eci.getCellType().isLeafCellOrBlackBox()) {
+                pins.add(p);
+            }
+        }
+        return pins;
+    }
+
+    /**
+     * Gets the pins on leaf cells (or black boxes) of the flat net a segment is part of, from the
+     * current connectivity (see {@link #getSegments(EDIFHierNet)}).
+     */
+    static List<EDIFHierPortInst> getFlatLeafPortInsts(EDIFHierNet segment) {
+        List<EDIFHierPortInst> pins = new ArrayList<>();
+        for (EDIFHierNet hn : getSegments(segment)) {
+            pins.addAll(getLeafPortInsts(hn));
+        }
+        return pins;
+    }
+
     /** A pin on a leaf cell, with its cell (null if there is none). */
     static class LeafPin {
         final EDIFHierPortInst pin;
@@ -510,47 +573,15 @@ class RouteStatusNetlist {
             synchronized (netlist) {
                 inst = instName.isEmpty() ? netlist.getTopHierCellInst() : netlist.getHierCellInstFromName(instName);
             }
-            List<EDIFHierNet> segments = new ArrayList<>();
-            Deque<EDIFHierNet> queue = new ArrayDeque<>();
-            Set<EDIFHierNet> visited = new HashSet<>();
-            queue.add(new EDIFHierNet(inst, net));
-            while (!queue.isEmpty()) {
-                EDIFHierNet hn = queue.poll();
-                if (!visited.add(hn)) {
-                    continue;
-                }
-                segments.add(hn);
-                for (EDIFHierPortInst p : hn.getPortInsts()) {
-                    EDIFCellInst eci = p.getPortInst().getCellInst();
-                    if (eci == null) {
-                        if (hn.getHierarchicalInst().isTopLevelInst()) {
-                            // A top level port
-                            continue;
-                        }
-                        EDIFHierPortInst up = p.getPortInParent();
-                        if (up != null && up.getNet() != null) {
-                            queue.add(up.getHierarchicalNet());
-                        }
-                    } else if (!eci.getCellType().isLeafCellOrBlackBox()) {
-                        EDIFHierNet internal = p.getInternalNet();
-                        if (internal != null) {
-                            queue.add(internal);
-                        }
-                    }
-                }
-            }
-            return segments;
+            return RouteStatusNetlist.getSegments(new EDIFHierNet(inst, net));
         }
 
         /** Gets the pins on leaf cells of all the segments of this flat net, with their cells. */
         List<LeafPin> getLeafPins(Design design) {
             List<LeafPin> pins = new ArrayList<>();
             for (EDIFHierNet hn : getSegments(design)) {
-                for (EDIFHierPortInst p : hn.getPortInsts()) {
-                    EDIFCellInst eci = p.getPortInst().getCellInst();
-                    if (eci != null && eci.getCellType().isLeafCellOrBlackBox()) {
-                        pins.add(new LeafPin(p, design.getCell(p.getFullHierarchicalInstName())));
-                    }
+                for (EDIFHierPortInst p : getLeafPortInsts(hn)) {
+                    pins.add(new LeafPin(p, p.getPhysicalCell(design)));
                 }
             }
             return pins;
