@@ -1161,13 +1161,26 @@ public class DesignTools {
             Net vccCell = cell.getVccNet();
             Net gndCell = cell.getGndNet();
             for (SiteInst si : cell.getSiteInsts()) {
+                // The new names of the site's cells. Renaming a cell may also rename the routethru
+                // cells and alternate pin mappings in its site that carry its name, so those already
+                // carrying a new name are not prefixed again
+                Set<String> newNames = new HashSet<>();
                 for (Cell c : new ArrayList<>(si.getCells())) {
-                    c.updateName(hierarchicalCellName + "/" + c.getName());
-                    if (!c.isRoutethru())
+                    if (!c.isRoutethru()) {
+                        c.updateName(hierarchicalCellName + "/" + c.getName());
+                        newNames.add(c.getName());
                         design.addCell(c);
-                    else {
-                        for (Entry<String, AltPinMapping> p : c.getAltPinMappings().entrySet()) {
-                            p.getValue().setAltCellName(hierarchicalCellName + "/" + p.getValue().getAltCellName());
+                    }
+                }
+                for (Cell c : si.getCells()) {
+                    if (c.isRoutethru()) {
+                        if (!newNames.contains(c.getName())) {
+                            c.updateName(hierarchicalCellName + "/" + c.getName());
+                        }
+                        for (AltPinMapping m : c.getAltPinMappings().values()) {
+                            if (!newNames.contains(m.getAltCellName())) {
+                                m.setAltCellName(hierarchicalCellName + "/" + m.getAltCellName());
+                            }
                         }
                     }
                 }

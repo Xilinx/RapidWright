@@ -722,6 +722,41 @@ public class TestDesignTools {
     }
 
     /**
+     * A routethru cell carries the name of the cell it serves, and so may an alternate pin mapping.
+     * Both are given the black box's prefix once, whichever order the site's cells come in, and
+     * whether or not renaming the cell they serve already renamed them.
+     */
+    @Test
+    public void testPopulateBlackBoxRoutethruNames() {
+        Design design = new Design("shell", "xcvu3p");
+        createBlackBox(design.getTopEDIFCell(), "bb", EDIFDirection.INPUT);
+
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT);
+        Cell lut = circuit.createAndPlaceCell(circuit.getTopEDIFCell(), "lut", Unisim.LUT1,
+                "SLICE_X5Y0/A6LUT");
+        SiteInst si = lut.getSiteInst();
+        // Placed as the checkpoint reader places them, on either side of the LUT in the site
+        List<Cell> routethrus = new ArrayList<>();
+        for (String belName : new String[] {"A5LUT", "B6LUT"}) {
+            BEL bel = si.getBEL(belName);
+            Cell rt = new Cell("lut", bel);
+            rt.setRoutethru(true);
+            rt.setSiteInst(si);
+            rt.addAltPinMapping("A1", new AltPinMapping("I0", "lut", "LUT1"));
+            si.getCellMap().put(bel.getName(), rt);
+            routethrus.add(rt);
+        }
+
+        populateBlackBox(design, "bb", circuit, false);
+
+        Assertions.assertSame(lut, design.getCell("bb/lut"));
+        for (Cell rt : routethrus) {
+            Assertions.assertEquals("bb/lut", rt.getName());
+            Assertions.assertEquals("bb/lut", rt.getAltPinMappings().get("A1").getAltCellName());
+        }
+    }
+
+    /**
      * A net merged onto another is deleted from the design, but the change tracking keeps it, so
      * getModifiedNets() ends up holding nets getNets() does not. Whoever walks the modified set --
      * an incremental bitstream writer, for one -- then reads a net that no longer exists. What it
