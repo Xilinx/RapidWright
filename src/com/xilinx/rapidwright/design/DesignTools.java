@@ -1332,7 +1332,8 @@ public class DesignTools {
         // shell also holds the shell's, on sites such as the GCLK_DELAYs of the clock spines, where
         // it can name a different net than the shell or another circuit does: there, as Vivado's
         // link_design does, the attribute of the circuit that names a net of its own -- one under
-        // its black box -- is the one kept
+        // its black box, once resolved, so not a port's net merged onto the shell's -- is the one
+        // kept
         for (Entry<String, Design> b : blackBoxes.entrySet()) {
             final String cellPrefix = b.getKey() + EDIFTools.EDIF_HIER_SEP;
             Map<Site, SiteConfig> belAttrs = b.getValue().getBELAttrs();
@@ -1341,11 +1342,6 @@ public class DesignTools {
                 for (Entry<BEL, Map<String, BELAttr>> e : siteConfig.getBELAttributes().entrySet()) {
                     for (BELAttr attr : e.getValue().values()) {
                         Net net = attr.getNet();
-                        boolean ownNet = net != null && net.getName().startsWith(cellPrefix);
-                        if (!ownNet && hasBELAttr(design, siteConfig.getSite(), e.getKey(),
-                                attr.getName())) {
-                            continue;
-                        }
                         if (net != null && net.isStaticNet()) {
                             net = design.getStaticNet(net.getType());
                         } else if (mergedInto.containsKey(net)) {
@@ -1363,6 +1359,11 @@ public class DesignTools {
                             if (named != null) {
                                 net = named;
                             }
+                        }
+                        boolean ownNet = net != null && net.getName().startsWith(cellPrefix);
+                        if (!ownNet && hasBELAttr(design, siteConfig.getSite(), e.getKey(),
+                                attr.getName())) {
+                            continue;
                         }
                         design.addBELAttr(net, siteConfig.getSite(), siteConfig.getSiteTypeEnum(),
                                 e.getKey(), attr.getName(), attr.getValue());
