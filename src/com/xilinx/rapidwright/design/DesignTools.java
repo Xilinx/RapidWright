@@ -1343,6 +1343,16 @@ public class DesignTools {
                             // was removed may have been given one since, by a later port's net
                             // being renamed to it. If not, the attribute keeps no net
                             net = design.getNet(mergedInto.get(net));
+                        } else if (net != null && design.getNet(net.getName()) != net) {
+                            // A net the design does not hold, such as a context net dropped
+                            // above, which the reader creates for a net named as in the full
+                            // design: the design's net of that name is taken instead, which is
+                            // written out under the same name. With none, the attribute keeps the
+                            // net it had
+                            Net named = design.getNet(net.getName());
+                            if (named != null) {
+                                net = named;
+                            }
                         }
                         design.addBELAttr(net, siteConfig.getSite(), siteConfig.getSiteTypeEnum(),
                                 e.getKey(), attr.getName(), attr.getValue());
