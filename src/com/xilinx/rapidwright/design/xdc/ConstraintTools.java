@@ -100,7 +100,10 @@ public class ConstraintTools {
      * are left out:
      * <ul>
      * <li>commands whose {@code src_info} has {@code save:NONE}: constraints of the context, or that
-     * Vivado added itself, such as the shell's pblocks and site {@code PROHIBIT}s;</li>
+     * Vivado added itself, such as the shell's pblocks and site {@code PROHIBIT}s. A
+     * {@code create_pblock} of a pblock that the design does not create is kept, though: the context
+     * can create pblocks nested in the partition's, for cells of the module, which the design's
+     * checkpoint, written without the module, does not have;</li>
      * <li>commands under a {@code current_instance} that is not the circuit's cell or a cell inside
      * it;</li>
      * <li>{@code HD.RECONFIGURABLE} on the circuit's design;</li>
@@ -145,6 +148,17 @@ public class ConstraintTools {
             }
         }
 
+        // The pblocks the design creates, which the circuits' context constraints create again
+        Set<String> pblocks = new HashSet<>();
+        for (ConstraintGroup cg : ConstraintGroup.values()) {
+            for (String line : design.getXDCConstraints(cg)) {
+                String pblock = getCreatedPblock(line.trim());
+                if (pblock != null) {
+                    pblocks.add(pblock);
+                }
+            }
+        }
+
         int added = 0;
         for (Map.Entry<String, Design> e : blackBoxes.entrySet()) {
             Design cell = e.getValue();
@@ -152,7 +166,7 @@ public class ConstraintTools {
             for (ConstraintGroup cg : ConstraintGroup.values()) {
                 groups.put(cg, XDCCommand.split(cell.getXDCConstraints(cg)));
             }
-            BlackBoxScope scope = new BlackBoxScope(netlist, e.getKey(), topPorts, groups.values());
+            BlackBoxScope scope = new BlackBoxScope(netlist, e.getKey(), topPorts, pblocks, groups.values());
 
             List<XDCCommand> normal = groups.get(ConstraintGroup.NORMAL);
             if (!normal.isEmpty()) {
@@ -182,6 +196,17 @@ public class ConstraintTools {
 
     /** A Tcl word naming one object: braced, quoted, or bare with any [<n>] bus bit suffixes */
     private static final String NAME_WORD = "(\\{[^}]*\\}|\"[^\"]*\"|(?:[^\\s\\[\\]{}\"]|\\[\\d+\\])+)";
+
+    /**
+     * @return The name of the pblock a command creates, or null if it is not a create_pblock.
+     */
+    private static String getCreatedPblock(String cmd) {
+        if (!cmd.startsWith("create_pblock ")) return null;
+        for (String word : XDCTools.splitWords(cmd.substring("create_pblock".length()))) {
+            if (!word.startsWith("-")) return XDCTools.unquotedName(word);
+        }
+        return null;
+    }
 
     private static final Pattern ADD_TOP_TO_PBLOCK =
             Pattern.compile("^add_cells_to_pblock\\s+\\[get_pblocks\\s+" + NAME_WORD + "\\s*\\]\\s+-top\\b");
@@ -290,12 +315,15 @@ public class ConstraintTools {
         private final Set<String> topPorts;
         /** The pblocks the circuit adds its top cell to */
         private final Set<String> ownPblocks = new HashSet<>();
+        /** The pblocks the design creates, including those the circuits' constraints added */
+        private final Set<String> pblocks;
         /** The names of the black box's pins, by their own name and by the name of their bus */
         private final Map<String, List<String>> pins = new HashMap<>();
 
-        BlackBoxScope(EDIFNetlist netlist, String boxName, Set<String> topPorts,
+        BlackBoxScope(EDIFNetlist netlist, String boxName, Set<String> topPorts, Set<String> pblocks,
                 Collection<List<XDCCommand>> groups) {
             this.netlist = netlist;
+            this.pblocks = pblocks;
             this.box = netlist.getHierCellInstFromName(boxName);
             this.boxName = box.getFullHierarchicalInstName();
             this.topPorts = topPorts;
@@ -339,13 +367,17 @@ public class ConstraintTools {
                     current = currentInstance(current, c.text);
                     continue;
                 }
+                String createdPblock = getCreatedPblock(c.text);
                 boolean drop = current == null
-                        || c.saveNone
+                        || (c.saveNone && (createdPblock == null || pblocks.contains(createdPblock)))
                         || c.text.startsWith("set_property SRC_FILE_INFO ")
                         || modifiesPblock(c.text)
                         || (skipPblocks && PBLOCK_COMMAND.matcher(c.text).find())
                         || (c.text.contains("HD.RECONFIGURABLE") && c.text.contains("[current_design]"));
                 if (drop) continue;
+                if (createdPblock != null) {
+                    pblocks.add(createdPblock);
+                }
                 out.kept++;
                 String scope = current.equals(boxName) && namesOnlyDevicePins(c.text) ? "" : current;
                 if (!scope.equals(written)) {
