@@ -46,12 +46,14 @@ import com.xilinx.rapidwright.util.ReportRouteStatus;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -522,6 +524,30 @@ public class TestRouteStatusEngine {
                                 "addr_IBUF[4]=UNROUTED",
                                 "GLOBAL_LOGIC0=HAS_ROUTING,ROUTED",
                                 "GLOBAL_LOGIC1=HAS_ROUTING,ROUTED"}),
+                // (removing the physical nets of block RAM pins leaves invalid site programming in
+                // 7-series block RAM sites, and nets without a physical net to slice loads have none)
+                Arguments.of("bug709.dcp", "removenet:0.05", 1L,
+                        "Design Route Status\n" +
+                        "                                               :      # nets :\n" +
+                        "   ------------------------------------------- : ----------- :\n" +
+                        "   # of logical nets.......................... :         534 :\n" +
+                        "       # of nets not needing routing.......... :         141 :\n" +
+                        "           # of internally routed nets........ :         120 :\n" +
+                        "           # of nets with no loads............ :          21 :\n" +
+                        "       # of routable nets..................... :         393 :\n" +
+                        "           # of fully routed nets............. :         338 :\n" +
+                        "       # of nets with routing errors.......... :          64 :\n" +
+                        "           # of nets with some unrouted pins.. :          29 :\n" +
+                        "           # of nets with resource conflicts.. :          64 :\n" +
+                        "           # of nets with antennas/islands.... :          53 :\n" +
+                        "   ------------------------------------------- : ----------- :",
+                        new String[]{"addr_read[0]=CONFLICTS,ANTENNAS,HAS_ROUTING",
+                                "addr_write[0]=PARTIAL,CONFLICTS,ANTENNAS,HAS_ROUTING",
+                                "doutb[0]=PARTIAL,CONFLICTS,ANTENNAS,HAS_ROUTING",
+                                "doutb[2]=CONFLICTS,NOLOADS",
+                                "vcnt[8]_i_1_n_0=NOLOADS",
+                                "GLOBAL_LOGIC0=CONFLICTS,HAS_ROUTING",
+                                "GLOBAL_LOGIC1=CONFLICTS,HAS_ROUTING"}),
                 Arguments.of("microblazeAndILA_3pblocks.dcp", "removenet:0.05", 1L,
                         "Design Route Status\n" +
                         "                                               :      # nets :\n" +
@@ -603,6 +629,38 @@ public class TestRouteStatusEngine {
         ReportRouteStatusResult rrs = ReportRouteStatus.reportVivadoRouteStatus(design, true);
         Assertions.assertEquals(vivadoSummary, rrs.toString());
         assertNetStatuses(rrs, netStatuses);
+    }
+
+    @Test
+    public void testReportVivadoRouteStatusRemovedSinkPinsRoundTrip(@TempDir Path tempDir) {
+        // Removing sink pins leaves invalid site programming in 7-series block RAM sites; a net left
+        // without site pins or routing, driven from such a site, has no loads where its other loads
+        // have no site routing of it (as written to, and read back from, a checkpoint)
+        Design design = RapidWrightDCP.loadDCP("bug709.dcp");
+        new RouteStatusMutator(design, 1).apply("removesinkpin:0.05");
+        Path dcp = tempDir.resolve("bug709_removesinkpin.dcp");
+        design.writeCheckpoint(dcp);
+        ReportRouteStatusResult rrs = ReportRouteStatus.reportVivadoRouteStatus(Design.readCheckpoint(dcp), true);
+        Assertions.assertEquals("Design Route Status\n" +
+                "                                               :      # nets :\n" +
+                "   ------------------------------------------- : ----------- :\n" +
+                "   # of logical nets.......................... :         534 :\n" +
+                "       # of nets not needing routing.......... :         121 :\n" +
+                "           # of internally routed nets........ :         120 :\n" +
+                "           # of nets with no loads............ :           1 :\n" +
+                "       # of routable nets..................... :         413 :\n" +
+                "           # of unrouted nets................. :          12 :\n" +
+                "           # of fully routed nets............. :         338 :\n" +
+                "       # of nets with routing errors.......... :          64 :\n" +
+                "           # of nets with some unrouted pins.. :          37 :\n" +
+                "           # of nets with resource conflicts.. :          64 :\n" +
+                "           # of nets with antennas/islands.... :          53 :\n" +
+                "   ------------------------------------------- : ----------- :", rrs.toString());
+        assertNetStatuses(rrs, new String[]{"doutb[2]=CONFLICTS,NOLOADS",
+                "addr_read[11]=PARTIAL,CONFLICTS",
+                "color[1]=PARTIAL,CONFLICTS",
+                "GLOBAL_LOGIC0=CONFLICTS,HAS_ROUTING",
+                "GLOBAL_LOGIC1=CONFLICTS,HAS_ROUTING"});
     }
 
     private static void assertNetStatuses(ReportRouteStatusResult rrs, String[] netStatuses) {
@@ -809,6 +867,130 @@ public class TestRouteStatusEngine {
                 rrs.toString());
         assertNetStatuses(rrs, new String[]{"GLOBAL_LOGIC0=" + (keepSiteRouting ? "PARTIAL," : "") + "HAS_ROUTING"
                 + (keepSiteRouting ? "" : ",ROUTED")});
+    }
+
+    /**
+     * A PIP stored twice in a net: Vivado gets its end node twice in the route tree, the second time
+     * as a leaf. That is a conflict, and an antenna unless the node is a load site pin.
+     */
+    @ParameterizedTest(name = "toLoad={0}")
+    @ValueSource(booleans = {false, true})
+    public void testReportVivadoRouteStatusDuplicatePIP(boolean toLoad) {
+        Design design = RapidWrightDCP.loadDCP("picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp");
+        String[][] duplicated = toLoad
+                ? new String[][]{{"picoblaze_0_12/in_port[0]", "INT_X6Y64/INT.INT_NODE_IMUX_13_INT_OUT0->>IMUX_E33"},
+                        {"picoblaze_0_12/in_port[1]", "INT_X7Y64/INT.INT_NODE_IMUX_37_INT_OUT1->>IMUX_W23"},
+                        {"picoblaze_0_12/in_port[5]", "INT_X7Y60/INT.INODE_W_5_FT1->>IMUX_W0"}}
+                : new String[][]{{"picoblaze_0_12/in_port[0]", "INT_X7Y63/INT.LOGIC_OUTS_W14->INT_NODE_SDQ_65_INT_OUT0"},
+                        {"picoblaze_0_12/in_port[1]", "INT_X6Y60/INT.LOGIC_OUTS_E10->INT_NODE_SDQ_12_INT_OUT1"},
+                        {"picoblaze_0_12/in_port[5]", "INT_X6Y60/INT.LOGIC_OUTS_E6->INT_NODE_SDQ_4_INT_OUT0"}};
+        for (String[] netPIP : duplicated) {
+            Net net = design.getNet(netPIP[0]);
+            PIP pip = net.getPIPs().stream().filter((p) -> p.toString().equals(netPIP[1])).findFirst().get();
+            net.addPIP(new PIP(pip));
+        }
+        ReportRouteStatusResult rrs = ReportRouteStatus.reportVivadoRouteStatus(design, true);
+        Assertions.assertEquals(
+                "Design Route Status\n" +
+                "                                               :      # nets :\n" +
+                "   ------------------------------------------- : ----------- :\n" +
+                "   # of logical nets.......................... :        1505 :\n" +
+                "       # of nets with no placed pins.......... :           1 :\n" +
+                "       # of nets not needing routing.......... :         697 :\n" +
+                "           # of internally routed nets........ :         476 :\n" +
+                "           # of nets with no loads............ :         188 :\n" +
+                "           # of implicitly routed ports....... :          33 :\n" +
+                "       # of routable nets..................... :         805 :\n" +
+                "           # of unrouted nets................. :          33 :\n" +
+                "           # of fully routed nets............. :         769 :\n" +
+                "       # of nets with routing errors.......... :           5 :\n" +
+                "           # of nets with some unplaced pins.. :           2 :\n" +
+                "           # of nets with some unrouted pins.. :           2 :\n" +
+                "           # of nets with resource conflicts.. :           3 :\n" +
+                (toLoad ? "" : "           # of nets with antennas/islands.... :           3 :\n") +
+                "   ------------------------------------------- : ----------- :",
+                rrs.toString());
+        assertNetStatuses(rrs, new String[]{"picoblaze_0_12/in_port[0]=CONFLICTS," + (toLoad ? "" : "ANTENNAS,") + "HAS_ROUTING"});
+    }
+
+    /**
+     * A netlist with nets but no primitives (here a wire from an input to an output port, or a
+     * black box between them): Vivado lists GLOBAL_LOGIC0 as internally routed, without counting it.
+     */
+    @ParameterizedTest(name = "blackBox={0}")
+    @ValueSource(booleans = {false, true})
+    public void testReportVivadoRouteStatusNoPrimitives(boolean blackBox) {
+        Design design = new Design("top", "xck26-sfvc784-2LV-c");
+        design.setAutoIOBuffers(false);
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = netlist.getTopCell();
+        EDIFPort in = top.createPort("in", EDIFDirection.INPUT, 1);
+        EDIFPort out = top.createPort("out", EDIFDirection.OUTPUT, 1);
+        EDIFNet inNet = top.createNet("in");
+        inNet.createPortInst(in);
+        if (blackBox) {
+            EDIFCell bb = new EDIFCell(netlist.getWorkLibrary(), "black_box");
+            bb.createPort("I", EDIFDirection.INPUT, 1);
+            bb.createPort("O", EDIFDirection.OUTPUT, 1);
+            EDIFCellInst inst = bb.createCellInst("bb", top);
+            inNet.createPortInst("I", inst);
+            EDIFNet outNet = top.createNet("out");
+            outNet.createPortInst("O", inst);
+            outNet.createPortInst(out);
+        } else {
+            inNet.createPortInst(out);
+        }
+        ReportRouteStatusResult rrs = ReportRouteStatus.reportVivadoRouteStatus(design, true);
+        Assertions.assertEquals(
+                "Design Route Status\n" +
+                "                                               :      # nets :\n" +
+                "   ------------------------------------------- : ----------- :\n" +
+                (blackBox
+                ? "   # of logical nets.......................... :           2 :\n" +
+                  "       # of nets not needing routing.......... :           2 :\n" +
+                  "           # of internally routed nets........ :           1 :\n" +
+                  "           # of implicitly routed ports....... :           1 :\n"
+                : "   # of logical nets.......................... :           1 :\n" +
+                  "       # of nets not needing routing.......... :           1 :\n" +
+                  "           # of internally routed nets........ :           1 :\n") +
+                "       # of routable nets..................... :           0 :\n" +
+                "       # of nets with routing errors.......... :           0 :\n" +
+                "   ------------------------------------------- : ----------- :",
+                rrs.toString());
+        assertNetStatuses(rrs, blackBox
+                ? new String[]{"GLOBAL_LOGIC0=INTRASITE", "in=INTRASITE", "out=HIERPORT"}
+                : new String[]{"GLOBAL_LOGIC0=INTRASITE", "in=INTRASITE"});
+    }
+
+    @Test
+    public void testReportVivadoRouteStatusBlackBoxNoLoads() {
+        // A net driven by a black box only, without loads, has no loads (not internally routed)
+        Design design = RapidWrightDCP.loadDCP("design_with_backslash_2022.1.dcp");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = netlist.getTopCell();
+        EDIFCell bb = new EDIFCell(netlist.getWorkLibrary(), "black_box");
+        bb.createPort("I", EDIFDirection.INPUT, 1);
+        bb.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFCellInst inst = bb.createCellInst("bb", top);
+        EDIFNet noLoad = top.createNet("bb_noload");
+        noLoad.createPortInst("O", inst);
+        top.getNets().stream().filter((n) -> !n.isGND() && !n.isVCC() && n.getPortInsts().size() > 1 && n != noLoad)
+                .findFirst().get().createPortInst("I", inst);
+        ReportRouteStatusResult rrs = ReportRouteStatus.reportVivadoRouteStatus(design, true);
+        Assertions.assertEquals(
+                "Design Route Status\n" +
+                "                                               :      # nets :\n" +
+                "   ------------------------------------------- : ----------- :\n" +
+                "   # of logical nets.......................... :           6 :\n" +
+                "       # of nets not needing routing.......... :           5 :\n" +
+                "           # of nets with no loads............ :           1 :\n" +
+                "           # of implicitly routed ports....... :           4 :\n" +
+                "       # of routable nets..................... :           1 :\n" +
+                "           # of fully routed nets............. :           1 :\n" +
+                "       # of nets with routing errors.......... :           0 :\n" +
+                "   ------------------------------------------- : ----------- :",
+                rrs.toString());
+        assertNetStatuses(rrs, new String[]{"bb_noload=NOLOADS", "o=HIERPORT,NOLOADS"});
     }
 
     private static int bits(NetRouteStatus... statuses) {

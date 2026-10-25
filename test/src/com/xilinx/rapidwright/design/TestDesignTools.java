@@ -45,12 +45,14 @@ import org.junit.jupiter.params.provider.ValueSource;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.UtilizationType;
 import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
@@ -2822,5 +2824,49 @@ public class TestDesignTools {
         
         Assertions.assertFalse(c.isPlaced());
         Assertions.assertNull(c.getBEL());
+    }
+
+    @Test
+    public void testFullyUnplaceCellDrivingCellInSite() {
+        // A LUT driving a flip-flop in its site through the site routing: unplacing the LUT removes
+        // its site routing to the flip-flop too (else Vivado places the LUT there again)
+        Design d = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        Cell lut = null;
+        BELPin ffD = null;
+        for (Cell c : d.getCells()) {
+            if (!c.isPlaced() || c.isRoutethru() || !c.getBEL().isLUT() || !c.getBELName().endsWith("6LUT")) {
+                continue;
+            }
+            SiteInst si = c.getSiteInst();
+            BELPin o6 = c.getBEL().getPin("O6");
+            Net net = si.getNetFromSiteWire(o6.getSiteWireName());
+            if (net == null) {
+                continue;
+            }
+            for (BELPin p : si.getSiteWirePins(o6.getSiteWireName())) {
+                SitePIP pip = p.getBEL().getBELClass() == BELClass.RBEL ? si.getUsedSitePIP(p) : null;
+                if (pip == null) {
+                    continue;
+                }
+                for (BELPin q : si.getSiteWirePins(pip.getOutputPin().getSiteWireName())) {
+                    if (q.getBEL().isFF() && q.getName().equals("D") && si.getCell(q.getBEL()) != null) {
+                        lut = c;
+                        ffD = q;
+                    }
+                }
+            }
+            if (lut != null) {
+                break;
+            }
+        }
+        Assertions.assertNotNull(lut);
+        SiteInst si = lut.getSiteInst();
+        String o6Wire = lut.getBEL().getPin("O6").getSiteWireName();
+
+        DesignTools.fullyUnplaceCell(lut, null);
+
+        Assertions.assertFalse(lut.isPlaced());
+        Assertions.assertNull(si.getNetFromSiteWire(o6Wire));
+        Assertions.assertNull(si.getNetFromSiteWire(ffD.getSiteWireName()));
     }
 }

@@ -229,8 +229,7 @@ public class EDIFPort extends EDIFPropertyObject {
      */
     public String getPortInstNameFromPort(int index) {
         if (!isBus()) return getBusName();
-        index = getPortIndexFromNameIndex(index);
-        return getBusName(true) + index + "]";
+        return getBusName(true) + getNameIndexFromPortIndex(index) + "]";
     }
 
     /**
@@ -274,6 +273,18 @@ public class EDIFPort extends EDIFPropertyObject {
      */
     public int getPortIndexFromNameIndex(int namedIndex) {
         return isLittleEndian() ? getLeft() - namedIndex : namedIndex - getLeft();
+    }
+
+    /**
+     * Gets the named index (as it appears in the port instance name) of the internal port index of
+     * this port: the inverse of {@link #getPortIndexFromNameIndex(int)}. Given a bussed port
+     * 'bus[4:0]', port index 3 is named 'bus[1]'; given 'bus[2:5]', port index 1 is named 'bus[3]'.
+     *
+     * @param portIndex The internal port index.
+     * @return The named index.
+     */
+    public int getNameIndexFromPortIndex(int portIndex) {
+        return isLittleEndian() ? getLeft() - portIndex : getLeft() + portIndex;
     }
 
     public static final byte[] EXPORT_CONST_PORT_BEGIN = "(port ".getBytes(StandardCharsets.UTF_8);

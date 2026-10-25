@@ -267,6 +267,16 @@ public class RouteStatusMutator {
                     }
                     siteInsts.sort(Comparator.comparing(SiteInst::getName));
                     for (SiteInst si : pick(siteInsts, amount)) {
+                        // (its cells are removed first, as removeSiteInst() leaves them in the design)
+                        for (Cell cell : new ArrayList<>(si.getCells())) {
+                            if (design.getCell(cell.getName()) == cell) {
+                                if (cell.getBEL() == null) {
+                                    // (not on a BEL of the site, so only in the design)
+                                    cell.setSiteInst(null);
+                                }
+                                design.removeCell(cell);
+                            }
+                        }
                         design.removeSiteInst(si);
                         log.add(kind + " " + si);
                     }

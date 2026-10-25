@@ -25,7 +25,11 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.PartitionPin;
 import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
+import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
@@ -129,6 +133,31 @@ class RouteStatusNetlist {
         }
     }
 
+    /**
+     * Gets the input site pin feeding a BEL input pin directly or through a routing BEL (e.g. an
+     * optional inverter), or null.
+     */
+    static String getSitePinFeeding(SiteInst si, BELPin belPin) {
+        for (BELPin p : si.getSiteWirePins(belPin.getSiteWireName())) {
+            if (p.isSitePort() && p.isOutput()) {
+                return p.getName();
+            }
+            if (p.isOutput() && p.getBEL().getBELClass() == BELClass.RBEL) {
+                for (BELPin in : p.getBEL().getPins()) {
+                    if (!in.isInput()) {
+                        continue;
+                    }
+                    for (BELPin q : si.getSiteWirePins(in.getSiteWireName())) {
+                        if (q.isSitePort() && q.isOutput()) {
+                            return q.getName();
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
     static boolean hasPhysicalPin(Cell cell, String logicalPin) {
         if (cell == null) {
             // Top level port
@@ -145,6 +174,22 @@ class RouteStatusNetlist {
             physPins = cell.getAllPhysicalPinMappings(logicalPin);
         }
         return (physPins == null) ? Collections.emptySet() : physPins;
+    }
+
+    /** The names of all primitives */
+    private static final Set<String> UNISIM_NAMES = new HashSet<>();
+    static {
+        for (Unisim u : Unisim.values()) {
+            UNISIM_NAMES.add(u.name());
+        }
+    }
+
+    /**
+     * Checks whether a cell is a primitive: one of the primitives library, or (as Vivado also takes
+     * it, e.g. in netlists written by Yosys) a leaf cell of another library named after a primitive.
+     */
+    static boolean isPrimitive(EDIFCell cell) {
+        return cell.isPrimitive() || (cell.getCellInsts().isEmpty() && UNISIM_NAMES.contains(cell.getName()));
     }
 
     /**
@@ -256,6 +301,8 @@ class RouteStatusNetlist {
         int blackBoxDrivers;
         /** Input (or inout) pins of black boxes, which are not counted as pins either */
         int blackBoxLoads;
+        /** Inout pins of black boxes (also counted in {@link #blackBoxLoads}), which may drive too */
+        int blackBoxInouts;
         /** Top level ports with partition pins */
         int partitionPinPorts;
         /** GND or VCC if driven by a static source primitive */
@@ -275,6 +322,7 @@ class RouteStatusNetlist {
             unplacedPortLoads += other.unplacedPortLoads;
             blackBoxDrivers += other.blackBoxDrivers;
             blackBoxLoads += other.blackBoxLoads;
+            blackBoxInouts += other.blackBoxInouts;
             partitionPinPorts += other.partitionPinPorts;
             if (staticType == null) {
                 staticType = other.staticType;
@@ -295,6 +343,7 @@ class RouteStatusNetlist {
             unplacedPortLoads = 0;
             blackBoxDrivers = 0;
             blackBoxLoads = 0;
+            blackBoxInouts = 0;
             partitionPinPorts = 0;
             staticType = null;
         }
@@ -320,6 +369,11 @@ class RouteStatusNetlist {
          */
         String undrivenPrefix;
         EDIFNet undrivenNet;
+        /** The segment inside a LUT6_2 macro with the smallest (local) name, which names a net without a driver */
+        String macroPrefix;
+        EDIFNet macroNet;
+        /** The leaf loads on segments inside LUT6_2 macros */
+        int macroLeafLoads;
 
         FlatNet(String prefix, EDIFNet net) {
             this.prefix = prefix;
@@ -353,6 +407,26 @@ class RouteStatusNetlist {
         String portOnlyPrefix;
         EDIFNet portOnlyNet;
 
+        /**
+         * For a flat net without leaf pins (so far): whether a segment is fed by an output port of
+         * a child but not connected to an output port of its cell (where the output ports from a
+         * port only output end), and the segment with the smallest (local) name
+         */
+        boolean hasOutputChainEnd;
+        String smallestPrefix;
+        EDIFNet smallestNet;
+
+        private void nameSmallest(String prefix, EDIFNet net) {
+            if (net == null || leafDrivers + leafLoads + leafInouts > 0) {
+                return;
+            }
+            int c = (smallestNet == null) ? -1 : net.getName().compareTo(smallestNet.getName());
+            if (c < 0 || (c == 0 && (prefix + net.getName()).compareTo(smallestPrefix + smallestNet.getName()) < 0)) {
+                smallestPrefix = prefix;
+                smallestNet = net;
+            }
+        }
+
         private void namePortOnly(String prefix, EDIFNet net) {
             if (net == null) {
                 return;
@@ -366,16 +440,43 @@ class RouteStatusNetlist {
         /** Applies the naming by a port only output, once all segments have been added. */
         void finishNaming() {
             if (portOnlyNet != null && namedBy == NAMED_BY_SEGMENT && leafDrivers + leafLoads + leafInouts == 0) {
-                name(NAMED_BY_DANGLING_OUTPUT, portOnlyPrefix, portOnlyNet);
-            } else if (undrivenNet != null && namedBy == NAMED_BY_SEGMENT && leafLoads + leafInouts > 0 && leafDrivers == 0
+                if (hasOutputChainEnd && smallestNet != null && !hasTopPorts()) {
+                    // When the output ports from the port only output end in a segment (feeding
+                    // other cells), the segment with the smallest name names the net
+                    name(NAMED_BY_DANGLING_OUTPUT, smallestPrefix, smallestNet);
+                } else {
+                    name(NAMED_BY_DANGLING_OUTPUT, portOnlyPrefix, portOnlyNet);
+                }
+            } else if (namedBy == NAMED_BY_SEGMENT && leafLoads + leafInouts > 0 && leafDrivers == 0
                     && placedPortDrivers + unplacedPortDrivers + blackBoxDrivers == 0) {
-                prefix = undrivenPrefix;
-                net = undrivenNet;
+                if (undrivenNet != null) {
+                    prefix = undrivenPrefix;
+                    net = undrivenNet;
+                } else if (macroNet != null) {
+                    prefix = macroPrefix;
+                    net = macroNet;
+                }
             }
             portOnlyPrefix = null;
             portOnlyNet = null;
             undrivenPrefix = null;
             undrivenNet = null;
+            macroPrefix = null;
+            macroNet = null;
+            smallestPrefix = null;
+            smallestNet = null;
+        }
+
+        private void nameMacro(String prefix, EDIFNet net) {
+            if (net == null) {
+                return;
+            }
+            // (the smallest local name, then full name)
+            int c = (macroNet == null) ? -1 : net.getName().compareTo(macroNet.getName());
+            if (c < 0 || (c == 0 && (prefix + net.getName()).compareTo(macroPrefix + macroNet.getName()) < 0)) {
+                macroPrefix = prefix;
+                macroNet = net;
+            }
         }
 
         private void nameUndriven(String prefix, EDIFNet net) {
@@ -401,8 +502,14 @@ class RouteStatusNetlist {
             if (t.ownPortOnlyOutput) {
                 nameUndriven(prefix, net);
             }
+            if (t.insideMacro && net.getParentCell().getName().equals("LUT6_2")) {
+                nameMacro(prefix, net);
+                macroLeafLoads += t.leafLoads;
+            }
             segments++;
             addConnections(t);
+            hasOutputChainEnd |= t.childOutputOnly;
+            nameSmallest(prefix, net);
             if (t.namedBy > NAMED_BY_SEGMENT) {
                 name(t.namedBy, prefix, net);
             }
@@ -415,6 +522,12 @@ class RouteStatusNetlist {
             name(other.namedBy, other.prefix, other.net);
             namePortOnly(other.portOnlyPrefix, other.portOnlyNet);
             nameUndriven(other.undrivenPrefix, other.undrivenNet);
+            nameMacro(other.macroPrefix, other.macroNet);
+            macroLeafLoads += other.macroLeafLoads;
+            hasOutputChainEnd |= other.hasOutputChainEnd;
+            if (other.leafDrivers + other.leafLoads + other.leafInouts == 0) {
+                nameSmallest(other.smallestPrefix, other.smallestNet);
+            }
             other.mergedInto = this;
         }
 
@@ -506,7 +619,7 @@ class RouteStatusNetlist {
         static final int RESET_PIN = 2;
 
         /**
-         * Gets the kinds of control pins (clock or write enable, set/reset) among the placed leaf
+         * Gets the kinds of control pins (clock, write or clock buffer enable, set/reset) among the placed leaf
          * loads, whose site pins follow from the placement alone.
          * @return A combination of {@link #ENABLE_PIN} and {@link #RESET_PIN}.
          */
@@ -518,7 +631,7 @@ class RouteStatusNetlist {
                 }
                 boolean ff = pin.cell.getBEL().isFF();
                 for (String physPin : pin.getPhysicalPins()) {
-                    if (ff ? physPin.equals("CE") : physPin.startsWith("WE")) {
+                    if (ff ? physPin.equals("CE") : (physPin.startsWith("WE") || physPin.equals("CE"))) {
                         kinds |= ENABLE_PIN;
                     } else if (ff ? physPin.equals("SR") : physPin.startsWith("RST")) {
                         kinds |= RESET_PIN;
@@ -526,6 +639,78 @@ class RouteStatusNetlist {
                 }
             }
             return kinds;
+        }
+
+        /**
+         * Checks whether any placed load in a site that is neither a slice, a clock buffer nor the
+         * driver's has an input site pin reached through general routing (not only through a
+         * dedicated connection, e.g. from an OLOGIC to its IOB, or a DSP cascade).
+         */
+        boolean hasRoutedHardBlockLoad(Design design) {
+            return hasRoutedHardBlockLoad(design, Collections.emptySet());
+        }
+
+        /** As {@link #hasRoutedHardBlockLoad(Design)}, ignoring loads in some sites */
+        boolean hasRoutedHardBlockLoad(Design design, Set<SiteInst> ignoredSites) {
+            SiteInst driverSite = null;
+            for (LeafPin pin : getLeafPins(design)) {
+                if (pin.isOutput() && pin.isPlaced()) {
+                    driverSite = pin.cell.getSiteInst();
+                }
+            }
+            for (LeafPin pin : getLeafPins(design)) {
+                if (pin.isOutput() || !pin.isPlaced()) {
+                    continue;
+                }
+                SiteInst si = pin.cell.getSiteInst();
+                String type = si.getSiteTypeEnum().name();
+                if (si == driverSite || type.startsWith("SLICE") || type.startsWith("BUF") || ignoredSites.contains(si)) {
+                    // (nor clock buffers, whose inputs are reached through clock routing)
+                    continue;
+                }
+                for (String physPin : pin.getPhysicalPins()) {
+                    BELPin belPin = pin.cell.getBEL().getPin(physPin);
+                    String sitePin = (belPin == null) ? null : getSitePinFeeding(si, belPin);
+                    Node node = (sitePin == null) ? null : si.getSite().getConnectedNode(si.getPrimarySitePinName(sitePin));
+                    if (node != null && isReachedByGeneralRouting(node)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Checks whether a site pin node is reached through general routing: whether the nodes
+         * leading to it (within a few steps, not through the pins of other sites, except Versal
+         * interface sites) include interconnect tile wires. Otherwise it is only reached through
+         * dedicated connections (e.g. from an OLOGIC to its IOB, or clock routing to a BUFG).
+         */
+        static boolean isReachedByGeneralRouting(Node node) {
+            if (node == null) {
+                return false;
+            }
+            List<Node> frontier = Collections.singletonList(node);
+            Set<Node> visited = new HashSet<>(frontier);
+            for (int depth = 0; depth < 4 && !frontier.isEmpty(); depth++) {
+                List<Node> next = new ArrayList<>();
+                for (Node n : frontier) {
+                    for (Node up : n.getAllUphillNodes()) {
+                        if (!visited.add(up)) {
+                            continue;
+                        }
+                        if (up.getTile().getTileTypeEnum().name().startsWith("INT")) {
+                            return true;
+                        }
+                        SitePin sitePin = up.getSitePin();
+                        if (sitePin == null || sitePin.getSite().getSiteTypeEnum().name().startsWith("IRI")) {
+                            next.add(up);
+                        }
+                    }
+                }
+                frontier = next;
+            }
+            return false;
         }
 
         /** Checks whether any load pin (placed or not) has a physical pin, i.e. needs a connection. */
@@ -536,6 +721,24 @@ class RouteStatusNetlist {
                 }
             }
             return false;
+        }
+
+        /**
+         * Checks whether all loads are CLRB_LEAF pins of clock buffers (e.g. MBUFGCE), which have
+         * no physical pin: they reach the CLR_B pins of the leaf clock dividers through routing.
+         */
+        boolean hasOnlyLeafClockClearLoads(Design design) {
+            boolean any = false;
+            for (LeafPin pin : getLeafPins(design)) {
+                if (pin.isOutput()) {
+                    continue;
+                }
+                if (!pin.getName().equals("CLRB_LEAF") || !pin.pin.getCellType().getName().startsWith("MBUFG")) {
+                    return false;
+                }
+                any = true;
+            }
+            return any;
         }
 
         /** Checks whether any placed load is on a LUT input. */
@@ -599,6 +802,11 @@ class RouteStatusNetlist {
         boolean portOnlyOutput;
         /** Whether connected to nothing but an output port of its cell */
         boolean ownPortOnlyOutput;
+        /** Whether fed by an output port of a child, but not connected to an output port of its cell */
+        boolean childOutputOnly;
+        /** Whether inside a macro primitive */
+        boolean insideMacro;
+
     }
 
     /** Connection kinds of a port instance on a net, as precomputed per cell definition */
@@ -610,6 +818,7 @@ class RouteStatusNetlist {
     /** Pins of black boxes (leaf cells that are not primitives) are not counted */
     private static final byte BLACK_BOX = 5;
     private static final byte BLACK_BOX_OUTPUT = 6;
+    private static final byte BLACK_BOX_INOUT = 7;
 
     /** Flags of a port instance on a net, combined with its connection kind */
     private static final byte KIND_MASK = 0x0f;
@@ -619,6 +828,8 @@ class RouteStatusNetlist {
     private static final byte PORT_ONLY = 0x20;
     /** A hierarchical inout port that dangles inside the child */
     private static final byte DANGLING_INOUT = 0x40;
+    /** A hierarchical output port */
+    private static final byte CHILD_OUTPUT = (byte) 0x80;
 
     /** The connectivity of a (non-leaf) cell definition, precomputed once for all its instances. */
     private static class CellInfo {
@@ -693,7 +904,7 @@ class RouteStatusNetlist {
                 String typeName = type.getName();
                 childIsWeakDriver[i] = childIsLeaf[i] && (typeName.equals("PULLUP") || typeName.equals("PULLDOWN")
                         || typeName.equals("KEEPER"));
-                childIsBlackBox[i] = childIsLeaf[i] && !type.isPrimitive();
+                childIsBlackBox[i] = childIsLeaf[i] && !isPrimitive(type);
                 if (!childIsLeaf[i]) {
                     childOffsets[i] = netlist.getPortOffsets(type);
                     CellInfo childInfo = netlist.getCellInfo(type);
@@ -809,16 +1020,16 @@ class RouteStatusNetlist {
                     }
                     int c = childIndex.get(eci);
                     childIdx[i] = c;
-                    if (childIsLeaf[c] && !eci.getCellType().isPrimitive()) {
-                        kinds[i] = epi.isOutput() ? BLACK_BOX_OUTPUT : BLACK_BOX;
+                    if (childIsBlackBox[c]) {
+                        kinds[i] = epi.isOutput() ? BLACK_BOX_OUTPUT : epi.isInput() ? BLACK_BOX : BLACK_BOX_INOUT;
                     } else if (childIsLeaf[c]) {
                         chunk.leafPinNames[i] = epi.getName();
                         if (epi.isOutput()) {
                             kinds[i] = LEAF_OUTPUT;
                             EDIFCell type = eci.getCellType();
                             String typeName = type.getName();
-                            if ((typeName.equals("GND") || typeName.equals("VCC")) && type.isStaticSource()) {
-                                staticTypes[n] = type.isGNDSource() ? NetType.GND : NetType.VCC;
+                            if ((typeName.equals("GND") || typeName.equals("VCC")) && isPrimitive(type)) {
+                                staticTypes[n] = typeName.equals("GND") ? NetType.GND : NetType.VCC;
                             }
                         } else {
                             kinds[i] = epi.isInput() ? LEAF_INPUT : LEAF_INOUT;
@@ -828,6 +1039,7 @@ class RouteStatusNetlist {
                         slots[i] = slot;
                         byte kind = HIER;
                         if (epi.isOutput()) {
+                            kind |= CHILD_OUTPUT;
                             if (!childConnected[c][slot]) {
                                 kind |= DANGLING;
                             }
@@ -1358,9 +1570,17 @@ class RouteStatusNetlist {
                 t.staticType = info.staticTypes[n];
                 t.namedBy = NAMED_BY_SEGMENT;
                 t.portOnlyOutput = false;
+                t.insideMacro = info.insideMacro;
                 t.ownPortOnlyOutput = last == first + 1 && kinds[first] == OWN_PORT && info.ownOutputs[slots[first]];
+                boolean childOutput = false;
+                boolean ownOutput = false;
                 for (int p = first; p < last; p++) {
                     byte kind = kinds[p];
+                    if ((kind & CHILD_OUTPUT) != 0) {
+                        childOutput = true;
+                    } else if (kind == OWN_PORT && info.ownOutputs[slots[p]]) {
+                        ownOutput = true;
+                    }
                     switch (kind & KIND_MASK) {
                         case OWN_PORT:
                             if (isTop) {
@@ -1369,6 +1589,10 @@ class RouteStatusNetlist {
                             break;
                         case BLACK_BOX:
                             t.blackBoxLoads++;
+                            break;
+                        case BLACK_BOX_INOUT:
+                            t.blackBoxLoads++;
+                            t.blackBoxInouts++;
                             break;
                         case BLACK_BOX_OUTPUT:
                             t.blackBoxDrivers++;
@@ -1412,6 +1636,7 @@ class RouteStatusNetlist {
                             }
                     }
                 }
+                t.childOutputOnly = childOutput && !ownOutput;
                 if (local) {
                     flat.addUnsynchronized(t, prefix, net);
                 } else {
