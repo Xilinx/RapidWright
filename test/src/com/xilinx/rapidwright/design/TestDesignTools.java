@@ -1167,6 +1167,46 @@ public class TestDesignTools {
     }
 
     /**
+     * A circuit written against an abstract shell can hold attributes on the boundary of another
+     * black box being filled, naming a net under it, such as a clock delay on a flip-flop that
+     * captures a signal crossing into that box. That box's own circuit decides there, as in
+     * link_design, whichever order the black boxes are filled in.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testPopulateBlackBoxBELAttrsOnOtherBox(boolean otherFirst) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", createBlackBox(top, "bb0", EDIFDirection.INPUT));
+        in.createPortInst("I", createBlackBox(top, "bb1", EDIFDirection.INPUT));
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, null);
+
+        Site site = design.getDevice().getSite("SLICE_X2Y0");
+        BEL bel = site.getBEL("AFF");
+        Map<String, Design> circuits = new HashMap<>();
+        for (String box : new String[] {"bb0", "bb1"}) {
+            Design circuit = createCircuit("c_" + box, EDIFDirection.INPUT);
+            EDIFCell circuitTop = circuit.getTopEDIFCell();
+            circuitTop.createNet("I").createPortInst(circuitTop.getPort("I"));
+            circuits.put(box, circuit);
+        }
+        // The first circuit's view of a net under the second box, named as in the full design
+        Net otherNet = new Net("bb1/clk");
+        circuits.get("bb0").addNet(otherNet);
+        circuits.get("bb0").addBELAttr(otherNet, site, site.getSiteTypeEnum(), bel, "CLK_DLY_VAL", "4'h0");
+
+        Map<String, Design> blackBoxes = new LinkedHashMap<>();
+        for (String box : otherFirst ? new String[] {"bb1", "bb0"} : new String[] {"bb0", "bb1"}) {
+            blackBoxes.put(box, circuits.get(box));
+        }
+        populateBlackBox(design, blackBoxes, false);
+
+        SiteConfig siteConfig = design.getBELAttrs() == null ? null : design.getBELAttrs().get(site);
+        Assertions.assertTrue(siteConfig == null || siteConfig.getBELAttribute(bel, "CLK_DLY_VAL") == null);
+    }
+
+    /**
      * A BEL attribute can be on a context net, one of the empty nets named as in the full design
      * that are dropped rather than moved in, as the reader creates one for a net named so. The
      * attribute goes onto the design's net of that name instead: a copy of the circuit's own net

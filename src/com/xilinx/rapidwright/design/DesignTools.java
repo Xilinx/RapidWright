@@ -1333,7 +1333,9 @@ public class DesignTools {
         // it can name a different net than the shell or another circuit does: there, as Vivado's
         // link_design does, the attribute of the circuit that names a net of its own -- one under
         // its black box, once resolved, so not a port's net merged onto the shell's -- is the one
-        // kept
+        // kept. The shell can also hold another black box's boundary, so a circuit can name a net
+        // under another black box being filled: that box's own circuit decides there, as in
+        // link_design
         for (Entry<String, Design> b : blackBoxes.entrySet()) {
             final String cellPrefix = b.getKey() + EDIFTools.EDIF_HIER_SEP;
             Map<Site, SiteConfig> belAttrs = b.getValue().getBELAttrs();
@@ -1342,6 +1344,7 @@ public class DesignTools {
                 for (Entry<BEL, Map<String, BELAttr>> e : siteConfig.getBELAttributes().entrySet()) {
                     for (BELAttr attr : e.getValue().values()) {
                         Net net = attr.getNet();
+                        String circuitNetName = net == null ? null : net.getName();
                         if (net != null && net.isStaticNet()) {
                             net = design.getStaticNet(net.getType());
                         } else if (mergedInto.containsKey(net)) {
@@ -1361,6 +1364,9 @@ public class DesignTools {
                             }
                         }
                         boolean ownNet = net != null && net.getName().startsWith(cellPrefix);
+                        if (!ownNet && isUnderOtherBox(circuitNetName, b.getKey(), blackBoxes.keySet())) {
+                            continue;
+                        }
                         if (!ownNet && hasBELAttr(design, siteConfig.getSite(), e.getKey(),
                                 attr.getName())) {
                             continue;
@@ -1380,6 +1386,19 @@ public class DesignTools {
         for (Net target : mergedOnto) {
             removeDuplicatePIPs(target);
         }
+    }
+
+    /**
+     * @return True if a name is of an object under one of the black boxes other than the given one.
+     */
+    private static boolean isUnderOtherBox(String name, String box, Set<String> boxes) {
+        if (name == null) return false;
+        for (String other : boxes) {
+            if (!other.equals(box) && name.startsWith(other + EDIFTools.EDIF_HIER_SEP)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
