@@ -26,9 +26,11 @@ import static com.xilinx.rapidwright.util.route_status.VersalRules.isVersalClock
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -42,6 +44,7 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SitePin;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
@@ -51,6 +54,17 @@ import com.xilinx.rapidwright.util.Utils;
  * Checks of the site pins and site routing of nets (as stored in a checkpoint), as Vivado makes them.
  */
 final class SiteRouting {
+
+    /** The site types of I/O sites (with a pad) */
+    private static final Set<SiteTypeEnum> IO_SITE_TYPES = getSiteTypes((n) -> n.contains("IOB") || n.contains("HRIO")
+            || n.contains("HPIO") || n.contains("HDIO") || n.contains("XPIO"));
+
+    /** The site types of block RAMs (and their FIFOs) */
+    private static final Set<SiteTypeEnum> BLOCK_RAM_SITE_TYPES = getSiteTypes((n) -> n.startsWith("RAMB")
+            || n.startsWith("FIFO"));
+
+    /** The site types of clock buffers */
+    private static final Set<SiteTypeEnum> CLOCK_BUFFER_SITE_TYPES = getSiteTypes((n) -> n.startsWith("BUF"));
 
     private SiteRouting() {
     }
@@ -218,9 +232,33 @@ final class SiteRouting {
 
     /** Checks whether a site is an I/O site (with a pad). */
     static boolean isIOSite(SiteInst si) {
-        String type = si.getSiteTypeEnum().name();
-        return type.contains("IOB") || type.contains("HRIO") || type.contains("HPIO") || type.contains("HDIO")
-                || type.contains("XPIO");
+        return IO_SITE_TYPES.contains(si.getSiteTypeEnum());
+    }
+
+    /** Checks whether a site is that of a block RAM (or its FIFO). */
+    static boolean isBlockRamSite(SiteInst si) {
+        return BLOCK_RAM_SITE_TYPES.contains(si.getSiteTypeEnum());
+    }
+
+    /** Checks whether a site is that of a clock buffer. */
+    static boolean isClockBufferSite(SiteInst si) {
+        return CLOCK_BUFFER_SITE_TYPES.contains(si.getSiteTypeEnum());
+    }
+
+    /** Gets the site types whose names match. */
+    static Set<SiteTypeEnum> getSiteTypes(Predicate<String> name) {
+        Set<SiteTypeEnum> types = EnumSet.noneOf(SiteTypeEnum.class);
+        for (SiteTypeEnum type : SiteTypeEnum.values()) {
+            if (name.test(type.name())) {
+                types.add(type);
+            }
+        }
+        return types;
+    }
+
+    /** Checks whether a series is UltraScale or UltraScale+. */
+    static boolean isUltraScale(Series series) {
+        return series == Series.UltraScale || series == Series.UltraScalePlus;
     }
 
     /**
@@ -255,11 +293,11 @@ final class SiteRouting {
      */
     static boolean isDrivenBySiteRouting(Net net, SitePinInst spi) {
         SiteInst si = spi.getSiteInst();
-        if (si == null || !si.getSiteTypeEnum().name().startsWith("SLICE")) {
+        if (si == null || !Utils.isSLICE(si)) {
             return true;
         }
         Series series = si.getDesign().getSeries();
-        if (series == Series.UltraScale || series == Series.UltraScalePlus) {
+        if (isUltraScale(series)) {
             Integer siteWire = spi.getSiteWireIndex();
             return siteWire == null || siteWire < 0
                     || (si.getNetFromSiteWireIndex(siteWire) == net && isSiteWireDriven(si, net, siteWire, 0));
@@ -408,11 +446,11 @@ final class SiteRouting {
             return false;
         }
         Series series = net.getDesign().getSeries();
-        if (series != Series.UltraScale && series != Series.UltraScalePlus) {
+        if (!isUltraScale(series)) {
             return true;
         }
         SiteInst si = net.getDesign().getSiteInstFromSite(sitePin.getSite());
-        if (!si.getSiteTypeEnum().name().startsWith("SLICE")) {
+        if (!Utils.isSLICE(si)) {
             return true;
         }
         return isSiteWireDriven(si, net, getSitePortPin(si, sitePin).getSiteWireIndex(), 0);
@@ -447,6 +485,29 @@ final class SiteRouting {
      */
     static String getPrimarySitePinName(SiteInst si, String pinName) {
         return (si.getSiteTypeEnum() == si.getSite().getSiteTypeEnum()) ? pinName : si.getPrimarySitePinName(pinName);
+    }
+
+    /** Gets the node of a site pin of a site instance (named as in the type of the site instance), or null. */
+    static Node getSitePinNode(SiteInst si, String pinName) {
+        int pinIndex = si.getSite().getPinIndex(getPrimarySitePinName(si, pinName));
+        return (pinIndex < 0) ? null : si.getSite().getConnectedNode(pinIndex);
+    }
+
+    /**
+     * Gets the nodes of the site pins whose port BELs are on a site wire: of the input site pins, whose
+     * port BELs drive the site wire, or of the output site pins, driven by the site wire.
+     */
+    static List<Node> getSitePinNodes(SiteInst si, int siteWireIndex, boolean input) {
+        List<Node> nodes = new ArrayList<>(1);
+        for (BELPin port : si.getSiteWirePins(siteWireIndex)) {
+            if (port.isSitePort() && (input ? port.isOutput() : port.isInput())) {
+                Node node = getSitePinNode(si, port.getBELName());
+                if (node != null) {
+                    nodes.add(node);
+                }
+            }
+        }
+        return nodes;
     }
 
     /** Checks whether a site pin node is driven by routing (not only by the pins of other sites) */

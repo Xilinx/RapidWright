@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.util.route_status;
 
 import java.util.Arrays;
+import java.util.Collection;
 
 import com.xilinx.rapidwright.device.Node;
 
@@ -35,10 +36,12 @@ final class NodeKeys {
     private NodeKeys() {
     }
 
+    /** Gets the key of a node. */
     static long nodeKey(Node node) {
         return ((long) node.getTile().getUniqueAddress() << 32) | (node.getWireIndex() & 0xffffffffL);
     }
 
+    /** Sorts the first n keys of an array (in place) and gets the distinct ones. */
     static long[] sortedDistinct(long[] keys, int n) {
         if (n == 1) {
             return (keys.length == 1) ? keys : Arrays.copyOf(keys, 1);
@@ -61,5 +64,15 @@ final class NodeKeys {
         long[] c = Arrays.copyOf(a, a.length + b.length);
         System.arraycopy(b, 0, c, a.length, b.length);
         return c;
+    }
+
+    /** Gets the sorted distinct keys of a collection of keys. */
+    static long[] toSortedDistinct(Collection<Long> keys) {
+        long[] array = new long[keys.size()];
+        int i = 0;
+        for (long key : keys) {
+            array[i++] = key;
+        }
+        return sortedDistinct(array, array.length);
     }
 }

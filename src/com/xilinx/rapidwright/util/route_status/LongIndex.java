@@ -24,7 +24,11 @@ package com.xilinx.rapidwright.util.route_status;
 
 import java.util.Arrays;
 
-/** Assigns consecutive indices to distinct long keys, in an open addressing table. */
+/**
+ * Assigns consecutive indices to distinct long keys, in an open addressing table. It indexes the
+ * nodes of the routing of each net (see {@link RouteGraph}): a {@code Map<Long, Integer>} would box
+ * each key and index.
+ */
 final class LongIndex {
 
     private final long[] table;

@@ -32,7 +32,9 @@ import static com.xilinx.rapidwright.util.route_status.VersalRules.isLeafClockCl
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
@@ -88,6 +90,17 @@ final class RouteGraph {
      * gets such a node once more in the route tree, as a leaf: a conflict with itself.
      */
     boolean[] drivenAgain;
+
+    /** The intent codes of global (clock) routing */
+    private static final Set<IntentCode> GLOBAL_INTENT_CODES = EnumSet.noneOf(IntentCode.class);
+
+    static {
+        for (IntentCode ic : IntentCode.values()) {
+            if (ic.name().contains("GLOBAL")) {
+                GLOBAL_INTENT_CODES.add(ic);
+            }
+        }
+    }
 
     RouteGraph(Net net) {
         Edges edges = readEdges(net.getPIPs());
@@ -250,7 +263,7 @@ final class RouteGraph {
                 // may be the direction they are used in, unless explicitly stored as reversed)
                 fanoutStart[endIdx[e] + 1]++;
                 driven[startIdx[e]] = true;
-                if (!edges.isReversed[e] && edges.endNodes[e].getIntentCode().toString().contains("GLOBAL")) {
+                if (!edges.isReversed[e] && isGlobal(edges.endNodes[e])) {
                     hasForwardFanout[endIdx[e]] = true;
                 }
             }
@@ -292,6 +305,11 @@ final class RouteGraph {
                 }
             }
         }
+    }
+
+    /** Checks whether a node is part of global (clock) routing. */
+    private static boolean isGlobal(Node node) {
+        return GLOBAL_INTENT_CODES.contains(node.getIntentCode());
     }
 
     private int indexOf(Node node) {
@@ -576,7 +594,7 @@ final class RouteGraph {
             onlyBack = fanouts[f] == search.parent[i];
         }
         return onlyBack || (!hasForwardFanout[i] && (from == to || (search.isStale != null && search.isStale[i])
-                || !(isSitePinUsedBy(net, nodeObjects[i]) || nodeObjects[i].getIntentCode().toString().contains("GLOBAL"))));
+                || !(isSitePinUsedBy(net, nodeObjects[i]) || isGlobal(nodeObjects[i]))));
     }
 
     /**
@@ -588,7 +606,7 @@ final class RouteGraph {
     private boolean joinUnstoredBidirectional(Search search) {
         boolean joined = false;
         for (int i = 0; i < nodes.length; i++) {
-            if (search.visited[i] || !nodeObjects[i].getIntentCode().toString().contains("GLOBAL")) {
+            if (search.visited[i] || !isGlobal(nodeObjects[i])) {
                 continue;
             }
             for (PIP pip : nodeObjects[i].getAllUphillPIPs()) {

@@ -44,12 +44,11 @@ import static com.xilinx.rapidwright.util.route_status.NetStatus.has;
 import static com.xilinx.rapidwright.util.route_status.NodeKeys.concat;
 import static com.xilinx.rapidwright.util.route_status.NodeKeys.nodeKey;
 import static com.xilinx.rapidwright.util.route_status.NodeKeys.sortedDistinct;
-import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.hasPhysicalPin;
-import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.isPrimitive;
 import static com.xilinx.rapidwright.util.route_status.SitePinClaims.getStaleSitePinKeys;
 import static com.xilinx.rapidwright.util.route_status.SiteRouting.hasStaleSitePin;
 import static com.xilinx.rapidwright.util.route_status.SiteRouting.isHardBlockCell;
 import static com.xilinx.rapidwright.util.route_status.SiteRouting.isIOSite;
+import static com.xilinx.rapidwright.util.route_status.SiteRouting.isUltraScale;
 import static com.xilinx.rapidwright.util.route_status.SiteRouting.storedPins;
 import static com.xilinx.rapidwright.util.route_status.SiteRouting.usesOutputSitePin;
 
@@ -681,7 +680,7 @@ public final class RouteStatusEngine {
      */
     private int getMissingTies() {
         Series series = design.getDevice().getSeries();
-        if (series == Series.UltraScale || series == Series.UltraScalePlus) {
+        if (isUltraScale(series)) {
             return UltraScaleRules.getMissingSliceControlTies(design, new StaticRouting(design));
         }
         return (series == Series.Series7) ? series7.getMissingTies(new StaticRouting(design)) : 0;

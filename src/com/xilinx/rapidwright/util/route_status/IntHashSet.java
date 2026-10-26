@@ -22,7 +22,11 @@
 
 package com.xilinx.rapidwright.util.route_status;
 
-/** A set of ints, in one open addressing table (0 marks empty slots, so is kept aside). */
+/**
+ * A set of ints, in one open addressing table (0 marks empty slots, so is kept aside). It holds the
+ * hash codes of the names of all physical nets, and is queried for every net segment of the netlist:
+ * a {@code Set<Integer>} would box each of them.
+ */
 final class IntHashSet {
 
     private final int[] table;

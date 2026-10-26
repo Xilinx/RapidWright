@@ -23,12 +23,10 @@
 package com.xilinx.rapidwright.util.route_status;
 
 import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.getLeafPortInsts;
-import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.getPhysicalPins;
 import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.getSegments;
 import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.getSitePinFeeding;
 import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.hasPhysicalPin;
-import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.isBusBit;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.getPrimarySitePinName;
+import static com.xilinx.rapidwright.util.route_status.SiteRouting.isClockBufferSite;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -46,6 +44,7 @@ import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.util.Utils;
 
 /** A flat (parent) net, i.e. a set of electrically connected net segments. */
 final class FlatNet extends Connections {
@@ -56,6 +55,12 @@ final class FlatNet extends Connections {
     static final int NAMED_BY_INOUT = 2;
     static final int NAMED_BY_DANGLING_INOUT = 3;
     static final int NAMED_BY_DRIVER = 4;
+
+    /** The prefix of the names of the types of interconnect tiles, whose wires are general routing */
+    private static final String INTERCONNECT_TILE_PREFIX = "INT";
+
+    /** The prefix of the names of the types of (Versal) interface sites, which routing passes through */
+    private static final String INTERFACE_SITE_PREFIX = "IRI";
 
     /** Hierarchical prefix (instance path plus '/', or empty) and net naming this flat net */
     String prefix;
@@ -369,8 +374,7 @@ final class FlatNet extends Connections {
                 continue;
             }
             SiteInst si = pin.cell.getSiteInst();
-            String type = si.getSiteTypeEnum().name();
-            if (si == driverSite || type.startsWith("SLICE") || type.startsWith("BUF") || ignoredSites.contains(si)) {
+            if (si == driverSite || Utils.isSLICE(si) || isClockBufferSite(si) || ignoredSites.contains(si)) {
                 // (nor clock buffers, whose inputs are reached through clock routing)
                 continue;
             }
@@ -405,11 +409,11 @@ final class FlatNet extends Connections {
                     if (!visited.add(up)) {
                         continue;
                     }
-                    if (up.getTile().getTileTypeEnum().name().startsWith("INT")) {
+                    if (up.getTile().getTileTypeEnum().name().startsWith(INTERCONNECT_TILE_PREFIX)) {
                         return true;
                     }
                     SitePin sitePin = up.getSitePin();
-                    if (sitePin == null || sitePin.getSite().getSiteTypeEnum().name().startsWith("IRI")) {
+                    if (sitePin == null || sitePin.getSite().getSiteTypeEnum().name().startsWith(INTERFACE_SITE_PREFIX)) {
                         next.add(up);
                     }
                 }

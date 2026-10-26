@@ -30,11 +30,11 @@ import static com.xilinx.rapidwright.util.route_status.NetStatus.has;
 import static com.xilinx.rapidwright.util.route_status.NodeKeys.concat;
 import static com.xilinx.rapidwright.util.route_status.NodeKeys.nodeKey;
 import static com.xilinx.rapidwright.util.route_status.NodeKeys.sortedDistinct;
+import static com.xilinx.rapidwright.util.route_status.NodeKeys.toSortedDistinct;
 import static com.xilinx.rapidwright.util.route_status.RouteStatusEngine.parallelFor;
-import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.getLeafPortInsts;
-import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.getPhysicalPins;
-import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.getSegments;
 import static com.xilinx.rapidwright.util.route_status.SiteRouting.getPrimarySitePinName;
+import static com.xilinx.rapidwright.util.route_status.SiteRouting.getSitePinNode;
+import static com.xilinx.rapidwright.util.route_status.SiteRouting.getSitePinNodes;
 import static com.xilinx.rapidwright.util.route_status.SiteRouting.isCascadeAddressPin;
 import static com.xilinx.rapidwright.util.route_status.SiteRouting.reachesPlacedCellPin;
 import static com.xilinx.rapidwright.util.route_status.SiteRouting.storedPins;
@@ -294,7 +294,7 @@ final class SitePinClaims {
         // huge flat net)
         List<EDIFHierNet> segments = Collections.synchronizedList(new ArrayList<>());
         parallelFor(flats.size(), (f) -> segments.addAll(flats.get(f).getSegments(design)));
-        List<Long> keys = Collections.synchronizedList(new ArrayList<>());
+        List<Long> found = Collections.synchronizedList(new ArrayList<>());
         parallelFor(segments.size(), (i) -> {
             for (EDIFHierPortInst p : RouteStatusNetlist.getLeafPortInsts(segments.get(i))) {
                 if (p.isOutput() || !mayBePlacedOnLUT(p.getPortInst().getCellInst().getCellType().getName())) {
@@ -312,42 +312,35 @@ final class SitePinClaims {
                     if (siteWireNet == null || siteWireNet == net) {
                         continue;
                     }
-                    for (BELPin sitePort : si.getSiteWirePins(belPin.getSiteWireIndex())) {
-                        // The port BEL of an input site pin drives the site wire
-                        if (sitePort.isSitePort() && sitePort.isOutput()) {
-                            Node node = si.getSite().getConnectedNode(sitePort.getBELName());
-                            if (node != null) {
-                                keys.add(nodeKey(node));
-                            }
-                        }
+                    for (Node node : getSitePinNodes(si, belPin.getSiteWireIndex(), true)) {
+                        found.add(nodeKey(node));
                     }
                 }
             }
         });
-        if (keys.isEmpty()) {
+        if (found.isEmpty()) {
             return;
         }
+        long[] keys = toSortedDistinct(found);
         if (!onlyIfRouted) {
             // (these site pins conflict with the routing of other nets using them)
-            long[] ties = new long[keys.size()];
-            for (int i = 0; i < ties.length; i++) {
-                ties[i] = keys.get(i);
-            }
-            entries.staticTieKeys.put(entry, sortedDistinct(ties, ties.length));
+            entries.staticTieKeys.put(entry, keys);
         }
-        long[] old = entries.sitePinKeys[entry];
-        int n = (old == null) ? 0 : old.length;
-        long[] merged = Arrays.copyOf(old == null ? new long[0] : old, n + keys.size());
-        for (int i = 0; i < keys.size(); i++) {
-            merged[n + i] = keys.get(i);
-        }
+        long[] merged = concat(entries.sitePinKeys[entry], keys);
         entries.sitePinKeys[entry] = sortedDistinct(merged, merged.length);
     }
 
+    /** Prefixes of the types of common cells that are not placed on LUT BELs */
+    private static final String[] NON_LUT_CELL_TYPE_PREFIXES = {"FD", "CARRY", "MUXF", "DSP", "RAMB", "FIFO"};
+
     /** Checks whether a cell of the given type may be placed on a LUT BEL (excluding common types that are not). */
     private static boolean mayBePlacedOnLUT(String type) {
-        return !(type.startsWith("FD") || type.startsWith("CARRY") || type.startsWith("MUXF") || type.startsWith("DSP")
-                || type.startsWith("RAMB") || type.startsWith("FIFO"));
+        for (String prefix : NON_LUT_CELL_TYPE_PREFIXES) {
+            if (type.startsWith(prefix)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -380,12 +373,7 @@ final class SitePinClaims {
                     }
                 }
                 if (nodes.isEmpty()) {
-                    for (BELPin sitePort : si.getSiteWirePins(belPin.getSiteWireIndex())) {
-                        // The port BEL of an output site pin is driven by the site wire
-                        if (sitePort.isSitePort() && sitePort.isInput()) {
-                            nodes.add(si.getSite().getConnectedNode(sitePort.getBELName()));
-                        }
-                    }
+                    nodes = getSitePinNodes(si, belPin.getSiteWireIndex(), false);
                 }
                 for (Node node : nodes) {
                     if (node != null && graph.index.get(nodeKey(node)) < 0) {
@@ -401,8 +389,7 @@ final class SitePinClaims {
         if (keys.isEmpty()) {
             return 0;
         }
-        long[] array = keys.stream().mapToLong(Long::longValue).toArray();
-        entries.driverPinKeys[entry] = sortedDistinct(array, array.length);
+        entries.driverPinKeys[entry] = toSortedDistinct(keys);
         return flags | DRIVER_PIN_UNROUTED;
     }
 
@@ -429,24 +416,13 @@ final class SitePinClaims {
                     if (belPin == null || si.getNetFromSiteWireIndex(belPin.getSiteWireIndex()) == null) {
                         continue;
                     }
-                    for (BELPin sitePort : si.getSiteWirePins(belPin.getSiteWireIndex())) {
-                        // The port BEL of an input site pin drives the site wire
-                        if (sitePort.isSitePort() && sitePort.isOutput()) {
-                            int pinIndex = si.getSite().getPinIndex(getPrimarySitePinName(si, sitePort.getBELName()));
-                            Node node = (pinIndex < 0) ? null : si.getSite().getConnectedNode(pinIndex);
-                            if (node != null) {
-                                keys.add(nodeKey(node));
-                            }
-                        }
+                    for (Node node : getSitePinNodes(si, belPin.getSiteWireIndex(), true)) {
+                        keys.add(nodeKey(node));
                     }
                 }
             }
             if (!keys.isEmpty()) {
-                long[] array = new long[keys.size()];
-                for (int k = 0; k < array.length; k++) {
-                    array[k] = keys.get(k);
-                }
-                long[] merged = concat(entries.driverPinKeys[i], array);
+                long[] merged = concat(entries.driverPinKeys[i], toSortedDistinct(keys));
                 entries.driverPinKeys[i] = sortedDistinct(merged, merged.length);
                 entries.status[i] |= LOGICAL_ONLY;
             }
@@ -505,8 +481,7 @@ final class SitePinClaims {
                         // Versal, which ties it off at the inverter behind the pin instead)
                         continue;
                     }
-                    int pinIndex = si.getSite().getPinIndex(getPrimarySitePinName(si, pin.getBELName()));
-                    Node node = (pinIndex < 0) ? null : si.getSite().getConnectedNode(pinIndex);
+                    Node node = getSitePinNode(si, pin.getBELName());
                     if (node != null) {
                         keys.add(nodeKey(node));
                     }
@@ -527,11 +502,6 @@ final class SitePinClaims {
                 }
             }
         }
-        long[] result = new long[keys.size()];
-        for (int i = 0; i < result.length; i++) {
-            result[i] = keys.get(i);
-        }
-        Arrays.sort(result);
-        return result;
+        return toSortedDistinct(keys);
     }
 }

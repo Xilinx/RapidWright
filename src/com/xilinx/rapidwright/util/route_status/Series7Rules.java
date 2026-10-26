@@ -31,9 +31,8 @@ import static com.xilinx.rapidwright.util.route_status.NetStatus.ROUTED;
 import static com.xilinx.rapidwright.util.route_status.NetStatus.UNROUTED;
 import static com.xilinx.rapidwright.util.route_status.NetStatus.has;
 import static com.xilinx.rapidwright.util.route_status.RouteStatusEngine.parallelFor;
-import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.getSegments;
-import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.getStaticType;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.getPrimarySitePinName;
+import static com.xilinx.rapidwright.util.route_status.SiteRouting.isBlockRamSite;
+import static com.xilinx.rapidwright.util.route_status.SiteRouting.isClockBufferSite;
 import static com.xilinx.rapidwright.util.route_status.SiteRouting.isReachableThroughRouting;
 import static com.xilinx.rapidwright.util.route_status.SiteRouting.storedPins;
 
@@ -131,9 +130,8 @@ final class Series7Rules {
     private Map<SiteInst, List<EDIFHierPortInst>> findInvalidSites() {
         Map<SiteInst, List<EDIFHierPortInst>> invalidSitePins = new IdentityHashMap<>();
         for (SiteInst si : design.getSiteInsts()) {
-            String type = si.getSiteTypeEnum().name();
             boolean routethruInvalid = routethruInvalidSites.contains(si);
-            if (!type.startsWith("RAMB") && !type.startsWith("FIFO") && !routethruInvalid) {
+            if (!isBlockRamSite(si) && !routethruInvalid) {
                 continue;
             }
             List<EDIFHierPortInst> pins = new ArrayList<>();
@@ -324,8 +322,7 @@ final class Series7Rules {
     int getMissingTies(StaticRouting staticRouting) {
         int ties = 0;
         for (SiteInst si : design.getSiteInsts()) {
-            String type = si.getSiteTypeEnum().name();
-            if (Utils.isSLICE(si) || type.startsWith("RAMB") || type.startsWith("FIFO") || type.startsWith("BUF")) {
+            if (Utils.isSLICE(si) || isBlockRamSite(si) || isClockBufferSite(si)) {
                 // (block RAMs whose pins lack site routing are invalid instead, see markInvalidSites(),
                 // and the inputs of clock buffers are reached through clock routing)
                 continue;

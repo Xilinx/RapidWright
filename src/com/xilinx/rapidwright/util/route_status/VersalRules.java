@@ -24,12 +24,14 @@ package com.xilinx.rapidwright.util.route_status;
 
 import static com.xilinx.rapidwright.util.route_status.NodeKeys.concat;
 import static com.xilinx.rapidwright.util.route_status.NodeKeys.sortedDistinct;
+import static com.xilinx.rapidwright.util.route_status.SiteRouting.getSiteTypes;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -56,6 +58,13 @@ final class VersalRules {
     /** The outputs of such clock buffers */
     private static final String[] SHARED_ROUTING_OUTPUTS = {"O1", "O2", "O3", "O4"};
 
+    /** The site types of the global clock buffers */
+    private static final Set<SiteTypeEnum> GLOBAL_CLOCK_BUFFER_SITE_TYPES = getSiteTypes((n) -> n.startsWith("BUFG"));
+
+    /** The site types of the clock management sites */
+    private static final Set<SiteTypeEnum> CLOCKING_SITE_TYPES = getSiteTypes((n) -> n.startsWith("MMCM")
+            || n.startsWith("XPLL") || n.startsWith("DPLL"));
+
     private VersalRules() {
     }
 
@@ -70,7 +79,7 @@ final class VersalRules {
                                                          RouteStatusNetlist flatNetlist) {
         Map<Integer, Integer> shared = new HashMap<>();
         for (SiteInst si : design.getSiteInsts()) {
-            if (!si.getSiteTypeEnum().name().startsWith("BUFG")) {
+            if (!GLOBAL_CLOCK_BUFFER_SITE_TYPES.contains(si.getSiteTypeEnum())) {
                 continue;
             }
             for (Cell cell : si.getCells()) {
@@ -131,8 +140,7 @@ final class VersalRules {
         if (si.getSite().getTile().getDevice().getSeries() != Series.Versal) {
             return false;
         }
-        String type = si.getSiteTypeEnum().name();
-        return type.startsWith("MMCM") || type.startsWith("XPLL") || type.startsWith("DPLL");
+        return CLOCKING_SITE_TYPES.contains(si.getSiteTypeEnum());
     }
 
     /**

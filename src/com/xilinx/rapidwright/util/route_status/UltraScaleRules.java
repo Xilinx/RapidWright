@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.util.route_status;
 
 import static com.xilinx.rapidwright.util.route_status.SiteRouting.isTiedTo;
+import static com.xilinx.rapidwright.util.route_status.SiteRouting.isUltraScale;
 
 import java.util.HashMap;
 import java.util.List;
@@ -151,7 +152,7 @@ final class UltraScaleRules {
      */
     static boolean hasOnlyLoadsInDriverSite(Design design, FlatNet flat) {
         Series series = design.getDevice().getSeries();
-        if ((series != Series.UltraScale && series != Series.UltraScalePlus) || flat.leafDrivers != 1
+        if (!isUltraScale(series) || flat.leafDrivers != 1
                 || flat.unplacedLeafPins > 0 || flat.leafInouts > 0 || flat.hasTopPorts()) {
             return false;
         }

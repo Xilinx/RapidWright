@@ -86,6 +86,12 @@ import com.xilinx.rapidwright.util.ReportRouteStatus;
  * the counts of its drivers and loads, the placement of the leaf cells it connects to, and the top
  * level ports it connects to. Built in one top-down pass over the hierarchy (in parallel over
  * subtrees), without materializing hierarchical net objects.
+ *
+ * {@link EDIFNetlist#getParentNetMap()} and {@link EDIFNetlist#getPhysicalPins(EDIFHierNet)} are not
+ * used: their maps are cached, and go stale after logical edits (e.g. disconnecting a driver), they
+ * cannot represent the nets with several drivers or none that the report must classify, and they
+ * build an object per hierarchical net, which costs time and memory on large designs. Neither do
+ * they give the counts and the naming that Vivado's report uses.
  */
 final class RouteStatusNetlist {
 
@@ -225,18 +231,6 @@ final class RouteStatusNetlist {
         return pins;
     }
 
-    /**
-     * Gets the pins on leaf cells (or black boxes) of the flat net a segment is part of, from the
-     * current connectivity (see {@link #getSegments(EDIFHierNet)}).
-     */
-    static List<EDIFHierPortInst> getFlatLeafPortInsts(EDIFHierNet segment) {
-        List<EDIFHierPortInst> pins = new ArrayList<>();
-        for (EDIFHierNet hn : getSegments(segment)) {
-            pins.addAll(getLeafPortInsts(hn));
-        }
-        return pins;
-    }
-
     /** The connections of one net segment, tallied before being added to its flat net. */
     static class Tally extends Connections {
         int namedBy;
@@ -290,7 +284,10 @@ final class RouteStatusNetlist {
     /** Net segments whose full names have the hash code of a name of interest (in one list per task) */
     private final Queue<List<Segment>> segmentsOfInterest = new ConcurrentLinkedQueue<>();
 
-    /** Open addressing table of the segments of interest by hash code */
+    /**
+     * Open addressing table of the segments of interest by hash code (as in {@link CellIndex}, to look
+     * them up without building their full names)
+     */
     private Segment[] segmentTable;
 
     static class Segment {
@@ -310,10 +307,6 @@ final class RouteStatusNetlist {
         boolean names(FlatNet flat) {
             return flat.net == net && flat.prefix.equals(prefix);
         }
-    }
-
-    RouteStatusNetlist(Design design) {
-        this(design, null, false);
     }
 
     /**
@@ -516,7 +509,9 @@ final class RouteStatusNetlist {
 
     /**
      * The cells of the design by the hash codes of their names, to look up leaf cells without
-     * building their full names.
+     * building their full names (the hash code of a full name is combined from those of its parts,
+     * see {@link #pow31(int)}): a map by name would need the full name of each of the millions of
+     * leaf cells visited.
      */
     private static class CellIndex {
         private final int[] hashes;
