@@ -955,7 +955,9 @@ public class DesignTools {
      * <p>
      * Once the boxes are filled, the early and late constraints of each circuit are added to the
      * design, scoped to its black box, as
-     * {@link ConstraintTools#addBlackBoxConstraints(Design, Map)} describes.
+     * {@link ConstraintTools#addBlackBoxConstraints(Design, Map)} describes. A caller should
+     * therefore not copy a circuit's constraints into the design itself, nor call that method for
+     * these boxes: either adds every command a second time.
      * <p>
      * Every entry is vetted before anything is modified, but there is no rollback once insertion has
      * begun: a failure part way through -- a site overlap, say -- leaves the boxes filled so far in
