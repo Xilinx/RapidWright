@@ -1068,6 +1068,38 @@ public class TestReportRouteStatus {
     }
 
     /**
+     * Routing to an input site pin of a net (with a SitePinInst, with or without site routing of the
+     * net) whose site routing reaches no placed cell is an antenna, even where all loads of the net
+     * are routed (Vivado reports both the same).
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testReportRouteStatusRoutingToStaleSitePin(boolean siteRouted) {
+        Design design = RapidWrightDCP.loadDCP("picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp");
+        Net net = design.getNet("picoblaze_0_12/processor/alu_result_3");
+        SiteInst si = design.getSiteInstFromSiteName("SLICE_X8Y60");
+        Assertions.assertNull(si.getCell("E6LUT"));
+        net.addPIP(design.getDevice().getPIP("INT_X5Y60/INT.INT_NODE_IMUX_32_INT_OUT0->>IMUX_W2"));
+        BELPin e1 = si.getBEL("E1").getPin("E1");
+        si.routeIntraSiteNet(net, e1, e1);
+        net.createPin("E1", si);
+        if (!siteRouted) {
+            si.unrouteIntraSiteNet(e1, e1);
+            Assertions.assertNull(si.getNetFromSiteWire("E1"));
+        }
+        ReportRouteStatusResult rrs = ReportRouteStatus.reportRouteStatus(design, true);
+        Assertions.assertEquals(PICOBLAZE4_SUMMARY_HEAD +
+                "           # of fully routed nets............. :         771 :\n" +
+                "       # of nets with routing errors.......... :           3 :\n" +
+                "           # of nets with some unplaced pins.. :           2 :\n" +
+                "           # of nets with some unrouted pins.. :           2 :\n" +
+                "           # of nets with antennas/islands.... :           1 :\n" +
+                "   ------------------------------------------- : ----------- :",
+                rrs.toString());
+        assertNetStatuses(rrs, new String[]{"picoblaze_0_12/processor/alu_result_3=ANTENNAS,HAS_ROUTING"});
+    }
+
+    /**
      * Writing a checkpoint leaves the macro primitives of the netlist collapsed, while the placed
      * cells are those of their expansion: the route status is the same as before writing, and the
      * netlist is left as the write left it.

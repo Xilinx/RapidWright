@@ -1368,6 +1368,11 @@ public class ReportRouteStatus {
                 // are not loads
                 graph.analyze(net, aliases, isStatic, sitePinKeys[entry],
                         getStaleSitePinKeys(net, isStatic ? net.getType() : null), partitionPinKeys, placedSource);
+            } else if (graph.leafSinks != null && staleKeys == null && hasStaleSitePin(net, graph.leafSinks)) {
+                // Neither is a site pin (even with a SitePinInst) where routing ends, if the net's site
+                // routing from it reaches no placed cell: the routing to it is an antenna
+                graph.analyze(net, aliases, isStatic, sitePinKeys[entry], getStaleSitePinKeys(net, null),
+                        partitionPinKeys, placedSource);
             }
             if (graph.locked) {
                 s |= LOCKED_NODES;
@@ -1476,6 +1481,8 @@ public class ReportRouteStatus {
             boolean rooted;
             /** The sinks that the routing leads to without being reached from a source (e.g. on islands) */
             int islandSinks;
+            /** The nodes of the sinks where the routing ends (without stale site pins excluded), or null */
+            List<Node> leafSinks;
             /**
              * Per node: whether more than one PIP (or the same PIP more than once) drives it. Vivado
              * gets such a node once more in the route tree, as a leaf: a conflict with itself.
@@ -1673,6 +1680,7 @@ public class ReportRouteStatus {
                 unroutedSource = false;
                 undrivenSource = false;
                 islandSinks = 0;
+                leafSinks = null;
                 int distinct = nodes.length;
                 boolean[] isSink = new boolean[distinct];
                 boolean[] visited = new boolean[distinct];
@@ -1839,6 +1847,11 @@ public class ReportRouteStatus {
                                     && !gapMarkers && !(isPartitionPin != null && isPartitionPin[i])
                                     && !isLeafClockClearPin(nodeObjects[i]) && !routethruEnd[i]) {
                                 antennas = true;
+                            } else if (isSink[i] && !isStatic && from == to && staleKeys == null) {
+                                if (leafSinks == null) {
+                                    leafSinks = new ArrayList<>();
+                                }
+                                leafSinks.add(nodeObjects[i]);
                             }
                         }
                         for (int f = from; f < to; f++) {
@@ -1925,6 +1938,19 @@ public class ReportRouteStatus {
                         if (node != null) {
                             keys.add(nodeKey(node));
                         }
+                    }
+                }
+            }
+            if (staticType == null) {
+                // Stored input pins of the net without any site wire assignment, reaching no placed cell
+                for (SitePinInst spi : net.getPins()) {
+                    SiteInst si = spi.getSiteInst();
+                    if (spi.isOutPin() || si == null || spi.getConnectedNode() == null
+                            || si.getNetFromSiteWire(spi.getName()) != null) {
+                        continue;
+                    }
+                    if (!reachesPlacedCellPin(si, spi.getName(), null)) {
+                        keys.add(nodeKey(spi.getConnectedNode()));
                     }
                 }
             }
@@ -2130,6 +2156,48 @@ public class ReportRouteStatus {
                 }
             }
             return true;
+        }
+
+        /**
+         * Checks whether any of the given input site pin nodes of a (signal) net has site routing of the
+         * net that reaches no placed cell pin (see {@link #reachesPlacedCellPin(SiteInst, String, NetType)}).
+         */
+        private static boolean hasStaleSitePin(Net net, List<Node> nodes) {
+            Design design = net.getDesign();
+            for (Node node : nodes) {
+                SitePin sitePin = node.getSitePin();
+                SiteInst si = (sitePin == null) ? null : design.getSiteInstFromSite(sitePin.getSite());
+                BELPin port = (si == null) ? null : getSitePortPin(si, sitePin);
+                if (port == null || !isNetSitePin(net, si, port)) {
+                    continue;
+                }
+                boolean direct = false;
+                for (BELPin pin : si.getSiteWirePins(port.getSiteWireIndex())) {
+                    // (the common case: a placed cell's pin on the site wire of the site pin)
+                    Cell cell = pin.isInput() && !pin.isSitePort() ? si.getCell(pin.getBEL()) : null;
+                    if (cell != null && !cell.isRoutethru() && cell.getLogicalPinMapping(pin.getName()) != null) {
+                        direct = true;
+                        break;
+                    }
+                }
+                if (!direct && !reachesPlacedCellPin(si, port.getSiteWireName(), null)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Checks whether an input site pin belongs to a signal net in its site: its site wire carries
+         * the net, or (without any site wire assignment) the net has a SitePinInst on it.
+         */
+        private static boolean isNetSitePin(Net net, SiteInst si, BELPin port) {
+            Net wireNet = si.getNetFromSiteWireIndex(port.getSiteWireIndex());
+            if (wireNet != null) {
+                return wireNet == net;
+            }
+            SitePinInst spi = si.getSitePinInst(port.getBELName());
+            return spi != null && spi.getNet() == net;
         }
 
         /** Limit on the number of site PIPs and routethrus followed back from a site wire */
