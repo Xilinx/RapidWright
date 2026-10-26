@@ -265,7 +265,7 @@ public class EDIFPort extends EDIFPropertyObject {
      * the bus is specified using a big endian scheme ('bus[0:4]'), the named index
      * and port index match if the bus range starts at 0. However, buses can begin
      * with a non-zero index, such as 'bus[2:5]' ([2, 3, 4, 5]), in which case the
-     * port index for the named 'bus[3]' is actually offset and is 5.
+     * port index for the named 'bus[3]' is actually offset and is 1.
      * 
      * @param namedIndex The named index as what appears in the port instance name.
      * @return The internal port index stored as a class member variable in the port

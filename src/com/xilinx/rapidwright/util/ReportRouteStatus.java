@@ -898,7 +898,6 @@ public class ReportRouteStatus {
             return shared;
         }
 
-        /** Checks whether the design instantiates any primitive (below its top cell). */
         /** Kinds of missing ties, see {@link #getMissingTies()} */
         private static final int VCC_TIE = 1;
         private static final int GND_TIE = 2;
@@ -1078,6 +1077,7 @@ public class ReportRouteStatus {
             return false;
         }
 
+        /** Checks whether the design instantiates any primitive (below its top cell). */
         private boolean hasPrimitiveInstances() {
             Set<EDIFCell> visited = new HashSet<>();
             Deque<EDIFCell> queue = new ArrayDeque<>();
@@ -2749,15 +2749,15 @@ public class ReportRouteStatus {
             return c;
         }
 
+        /** Per static entry: the keys of the site pins of its macro ties (see addStaticLoadSitePins) */
+        private final Map<Integer, long[]> staticTieKeys = new HashMap<>();
+
         /**
          * Adds the nodes of the input site pins used by the site routing of each (non static) net, and
          * of the output site pins of its unrouted drivers, to the nodes it uses, so that routing of
          * another net to such a site pin is found to conflict. The site routing of static nets is not
          * precise enough.
          */
-        /** Per static entry: the keys of the site pins of its macro ties (see addStaticLoadSitePins) */
-        private final Map<Integer, long[]> staticTieKeys = new HashMap<>();
-
         private void addSitePinNodes() {
             numRoutingKeys = new int[sitePinKeys.length];
             Arrays.fill(numRoutingKeys, -1);
