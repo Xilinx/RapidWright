@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.util.route_status;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -94,5 +95,21 @@ final class Entries {
     String getName(int entry) {
         FlatNet flat = flats.get(entry);
         return (flat != null) ? flat.getName() : names.get(entry);
+    }
+
+    /** Gets the entry of each physical net (of an entry, or an alias of one). */
+    Map<Net, Integer> getEntryOfNet() {
+        Map<Net, Integer> entryOf = new IdentityHashMap<>(nets.size());
+        for (int i = 0; i < nets.size(); i++) {
+            if (nets.get(i) != null) {
+                entryOf.put(nets.get(i), i);
+            }
+        }
+        for (Map.Entry<Integer, List<Net>> e : aliasNets.entrySet()) {
+            for (Net alias : e.getValue()) {
+                entryOf.put(alias, e.getKey());
+            }
+        }
+        return entryOf;
     }
 }

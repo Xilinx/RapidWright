@@ -102,14 +102,33 @@ final class Series7Rules {
      * Marks the nets with pins in (7-series) sites whose site programming Vivado finds invalid:
      * block RAM sites where a pin of a placed cell, connected to a net that is not static, has no
      * site routing (as left by removing a physical net), and slices that a routethru of another
-     * net passes through (see {@link #findRoutethruInvalidSites}). All their nets conflict; the routing into
-     * (or out of) such a site leads nowhere, and its pins there are not loads (nor drivers).
+     * net passes through (see {@link #findRoutethruInvalidSites}). All their nets conflict; the routing
+     * into (or out of) such a site leads nowhere, and its pins there are not loads (nor drivers).
+     * @param staticEntry The entries of GND and VCC (-1 if none).
      */
     void markInvalidSites(int[] staticEntry) {
         if (design.getDevice().getSeries() != Series.Series7) {
             // (seen with 7-series block RAMs only; UltraScale+ ones are not found invalid)
             return;
         }
+        Map<SiteInst, List<EDIFHierPortInst>> invalidSitePins = findInvalidSites();
+        if (invalidSitePins.isEmpty()) {
+            return;
+        }
+        // Per entry: whether it is driven from such a site
+        Map<Integer, Boolean> drivenFromInvalidSite = new HashMap<>();
+        // The entries driven from such a slice (rather than a block RAM)
+        Set<Integer> drivenFromSlice = new HashSet<>();
+        findEntriesOfInvalidSites(invalidSitePins, staticEntry, drivenFromInvalidSite, drivenFromSlice);
+        for (Map.Entry<Integer, Boolean> e : drivenFromInvalidSite.entrySet()) {
+            int i = e.getKey();
+            entries.status[i] = getStatusWithInvalidSite(i, e.getValue(), drivenFromSlice.contains(i),
+                    invalidSitePins.keySet());
+        }
+    }
+
+    /** Finds the sites whose site programming is invalid (see {@link #markInvalidSites(int[])}), with their pins. */
+    private Map<SiteInst, List<EDIFHierPortInst>> findInvalidSites() {
         Map<SiteInst, List<EDIFHierPortInst>> invalidSitePins = new IdentityHashMap<>();
         for (SiteInst si : design.getSiteInsts()) {
             String type = si.getSiteTypeEnum().name();
@@ -141,18 +160,19 @@ final class Series7Rules {
                 invalidSitePins.put(si, pins);
             }
         }
-        if (invalidSitePins.isEmpty()) {
-            return;
-        }
+        return invalidSitePins;
+    }
+
+    /**
+     * Finds the entries of the pins in sites with invalid site programming, and whether they are
+     * driven from such a site (and from a slice).
+     */
+    private void findEntriesOfInvalidSites(Map<SiteInst, List<EDIFHierPortInst>> invalidSitePins, int[] staticEntry,
+                                           Map<Integer, Boolean> drivenFromInvalidSite, Set<Integer> drivenFromSlice) {
         Map<String, Integer> entryOfName = new HashMap<>();
-        for (int i = 0; i < entries.flats.size(); i++) {
-            FlatNet flat = entries.flats.get(i);
-            entryOfName.put(flat != null ? flat.getName() : entries.names.get(i), i);
+        for (int i = 0; i < entries.size(); i++) {
+            entryOfName.put(entries.getName(i), i);
         }
-        // Per entry: whether it is driven from such a site
-        Map<Integer, Boolean> drivenFromInvalidSite = new HashMap<>();
-        // The entries driven from such a slice (rather than a block RAM)
-        Set<Integer> drivenFromSlice = new HashSet<>();
         for (Map.Entry<SiteInst, List<EDIFHierPortInst>> sitePins : invalidSitePins.entrySet()) {
             boolean slice = routethruInvalidSites.contains(sitePins.getKey());
             for (EDIFHierPortInst pin : sitePins.getValue()) {
@@ -180,58 +200,61 @@ final class Series7Rules {
                 }
             }
         }
-        for (Map.Entry<Integer, Boolean> e : drivenFromInvalidSite.entrySet()) {
-            int i = e.getKey();
-            int st = entries.status[i];
-            FlatNet flat = entries.flats.get(i);
-            if (flat == null) {
-                // Static nets conflict too
-                entries.status[i] = (st & ~ROUTED) | CONFLICTS;
-                continue;
-            }
-            Net net = entries.nets.get(i);
-            // (loads of a physical net without site pins need site routing of it into their site)
-            boolean noPins = net != null && storedPins(net).isEmpty();
-            boolean loadsElsewhere = false;
-            if (net == null) {
-                // (without a physical net, only loads in hard blocks reached through general
-                // routing are connected, see classifyNet())
-                loadsElsewhere = flat.hasRoutedHardBlockLoad(design, invalidSitePins.keySet());
-            } else {
-                for (LeafPin pin : flat.getLeafPins(design)) {
-                    if (!pin.isOutput() && !(pin.isPlaced() && invalidSitePins.containsKey(pin.cell.getSiteInst()))
-                            && (!noPins || hasInputSiteRouting(pin, net))) {
-                        loadsElsewhere = true;
-                        break;
-                    }
-                }
-            }
-            boolean drivenFromSite = e.getValue();
-            if (drivenFromSlice.contains(i) && !loadsElsewhere) {
-                // Driven from such a slice, without loads elsewhere: it is not without loads
-                entries.status[i] = (st & ~(ROUTED | NOLOADS)) | CONFLICTS | (has(st, HAS_ROUTING) ? ANTENNAS : 0);
-                continue;
-            }
-            if (!has(st, HAS_ROUTING)) {
-                // An unrouted net driven from such a site has no loads unless it has others, and so
-                // does one without a physical net (unless it has loads in other hard blocks reached
-                // through general routing); others are partially routed
-                if (has(st, UNROUTED)) {
-                    boolean noLoads = drivenFromSite ? !loadsElsewhere : net == null && !loadsElsewhere;
-                    st = (st & ~UNROUTED) | (noLoads ? NOLOADS : PARTIAL);
-                }
-                entries.status[i] = st | CONFLICTS;
-                continue;
-            }
-            st = (st & ~ROUTED) | CONFLICTS | ANTENNAS;
-            if (drivenFromSite) {
-                // Driven from such a site: its routing is all islands
-                st |= loadsElsewhere ? PARTIAL : NOLOADS;
-            } else if (!loadsElsewhere) {
-                st |= PARTIAL;
-            }
-            entries.status[i] = st;
+    }
+
+    /**
+     * Gets the status of a net with pins in sites with invalid site programming: it conflicts, and
+     * routing into (or out of) such a site leads nowhere.
+     */
+    private int getStatusWithInvalidSite(int i, boolean drivenFromSite, boolean drivenFromSlice,
+                                         Set<SiteInst> invalidSites) {
+        int st = entries.status[i];
+        FlatNet flat = entries.flats.get(i);
+        if (flat == null) {
+            // Static nets conflict too
+            return (st & ~ROUTED) | CONFLICTS;
         }
+        boolean loadsElsewhere = hasLoadsOutsideSites(entries.nets.get(i), flat, invalidSites);
+        if (drivenFromSlice && !loadsElsewhere) {
+            // Driven from such a slice, without loads elsewhere: it is not without loads
+            return (st & ~(ROUTED | NOLOADS)) | CONFLICTS | (has(st, HAS_ROUTING) ? ANTENNAS : 0);
+        }
+        if (!has(st, HAS_ROUTING)) {
+            // An unrouted net driven from such a site has no loads unless it has others, and so does
+            // one without a physical net (unless it has loads in other hard blocks reached through
+            // general routing); others are partially routed
+            if (has(st, UNROUTED)) {
+                boolean noLoads = drivenFromSite ? !loadsElsewhere : entries.nets.get(i) == null && !loadsElsewhere;
+                st = (st & ~UNROUTED) | (noLoads ? NOLOADS : PARTIAL);
+            }
+            return st | CONFLICTS;
+        }
+        st = (st & ~ROUTED) | CONFLICTS | ANTENNAS;
+        if (drivenFromSite) {
+            // Driven from such a site: its routing is all islands
+            st |= loadsElsewhere ? PARTIAL : NOLOADS;
+        } else if (!loadsElsewhere) {
+            st |= PARTIAL;
+        }
+        return st;
+    }
+
+    /** Checks whether a net has (connected) loads outside the given sites. */
+    private boolean hasLoadsOutsideSites(Net net, FlatNet flat, Set<SiteInst> sites) {
+        if (net == null) {
+            // (without a physical net, only loads in hard blocks reached through general routing are
+            // connected, see RouteStatusEngine.classifyNet())
+            return flat.hasRoutedHardBlockLoad(design, sites);
+        }
+        // (loads of a physical net without site pins need site routing of it into their site)
+        boolean noPins = storedPins(net).isEmpty();
+        for (LeafPin pin : flat.getLeafPins(design)) {
+            if (!pin.isOutput() && !(pin.isPlaced() && sites.contains(pin.cell.getSiteInst()))
+                    && (!noPins || hasInputSiteRouting(pin, net))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Whether the site routing of a net enters the site of a placed cell pin (at an input site pin) */
@@ -260,17 +283,7 @@ final class Series7Rules {
             // (seen with 7-series slices only)
             return;
         }
-        Map<Net, Integer> entryOf = new IdentityHashMap<>();
-        for (int i = 0; i < entries.nets.size(); i++) {
-            if (entries.nets.get(i) != null) {
-                entryOf.put(entries.nets.get(i), i);
-            }
-        }
-        for (Map.Entry<Integer, List<Net>> e : entries.aliasNets.entrySet()) {
-            for (Net alias : e.getValue()) {
-                entryOf.put(alias, e.getKey());
-            }
-        }
+        Map<Net, Integer> entryOf = entries.getEntryOfNet();
         Net[] nets = design.getNets().toArray(new Net[0]);
         Set<Integer> conflicting = ConcurrentHashMap.newKeySet();
         parallelFor(nets.length, (n) -> {

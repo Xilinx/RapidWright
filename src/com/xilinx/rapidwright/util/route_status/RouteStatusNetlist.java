@@ -694,13 +694,9 @@ final class RouteStatusNetlist {
             invokeAll(chunks);
         }
 
+        /** Visits the nets [from, to) of the instance: creates or extends their flat nets. */
         private void visitNets(int from, int to, SiteInst[] leafSites, Cell[] leafCells,
                                FlatNet[][] childBindings) {
-            boolean isTop = portBinding == null;
-            byte[] kinds = info.kinds;
-            int[] slots = info.slots;
-            int[] childIdx = info.childIdx;
-            String[] leafPinNames = info.leafPinNames;
             List<FlatNet> created = new ArrayList<>(to - from);
             List<Segment> segments = null;
             int unconnected = 0;
@@ -708,29 +704,10 @@ final class RouteStatusNetlist {
             for (int n = from; n < to; n++) {
                 EDIFNet net = info.nets[n];
                 int hash = prefixHash * info.namePows[n] + info.nameHashes[n];
-                int first = info.start[n];
-                int last = info.start[n + 1];
-                FlatNet flat = null;
-                boolean local = false;
-                if (!isTop) {
-                    for (int p = first; p < last; p++) {
-                        if (kinds[p] != OWN_PORT) {
-                            continue;
-                        }
-                        FlatNet bound = portBinding[slots[p]];
-                        if (bound == null) {
-                            continue;
-                        }
-                        if (flat == null) {
-                            flat = bound;
-                        } else if (flat != bound) {
-                            // Feedthrough connecting two nets of the parent
-                            pendingMerges.add(new FlatNet[]{flat, bound});
-                        }
-                    }
-                }
-                if (flat == null) {
-                    if (first == last) {
+                FlatNet flat = findBoundFlatNet(n);
+                boolean local = flat == null;
+                if (local) {
+                    if (info.start[n] == info.start[n + 1]) {
                         if (info.notNets[n]) {
                             // Placeholder nets written by Vivado to declare the range of a bus net
                             // (e.g. "[7:0]data") are not nets, and neither are unconnected nets
@@ -747,7 +724,6 @@ final class RouteStatusNetlist {
                         }
                     }
                     flat = new FlatNet(prefix, net);
-                    local = true;
                     flat.insideMacro = info.insideMacro;
                     created.add(flat);
                 }
@@ -757,78 +733,7 @@ final class RouteStatusNetlist {
                     }
                     segments.add(new Segment(hash, prefix, net, flat));
                 }
-
-                t.resetConnections();
-                t.staticType = info.staticTypes[n];
-                t.namedBy = NAMED_BY_SEGMENT;
-                t.portOnlyOutput = false;
-                t.insideMacro = info.insideMacro;
-                t.ownPortOnlyOutput = last == first + 1 && kinds[first] == OWN_PORT && info.ownOutputs[slots[first]];
-                boolean childOutput = false;
-                boolean ownOutput = false;
-                for (int p = first; p < last; p++) {
-                    byte kind = kinds[p];
-                    if ((kind & CHILD_OUTPUT) != 0) {
-                        childOutput = true;
-                    } else if (kind == OWN_PORT && info.ownOutputs[slots[p]]) {
-                        ownOutput = true;
-                    }
-                    switch (kind & KIND_MASK) {
-                        case OWN_PORT:
-                            if (isTop) {
-                                addTopPort(t, net.getPortInsts().get(p - first));
-                            }
-                            break;
-                        case BLACK_BOX:
-                            t.blackBoxLoads++;
-                            break;
-                        case BLACK_BOX_INOUT:
-                            t.blackBoxLoads++;
-                            t.blackBoxInouts++;
-                            break;
-                        case BLACK_BOX_OUTPUT:
-                            t.blackBoxDrivers++;
-                            t.namedBy = NAMED_BY_DRIVER;
-                            break;
-                        case HIER:
-                            childBindings[childIdx[p]][slots[p]] = flat;
-                            if ((kind & DANGLING) != 0) {
-                                // An output port left unconnected inside its cell names the net,
-                                // unless there is a real driver
-                                t.namedBy = Math.max(t.namedBy, NAMED_BY_DANGLING_OUTPUT);
-                            } else if ((kind & DANGLING_INOUT) != 0) {
-                                // So does an inout port left unconnected inside its cell, even over
-                                // a top level inout port
-                                t.namedBy = Math.max(t.namedBy, NAMED_BY_DANGLING_INOUT);
-                            } else if ((kind & PORT_ONLY) != 0) {
-                                t.portOnlyOutput = true;
-                            }
-                            break;
-                        default:
-                            if (kind == LEAF_OUTPUT) {
-                                t.leafDrivers++;
-                                if (!info.childIsWeakDriver[childIdx[p]]) {
-                                    t.namedBy = NAMED_BY_DRIVER;
-                                }
-                            } else if (kind == LEAF_INPUT) {
-                                t.leafLoads++;
-                            } else {
-                                t.leafInouts++;
-                                // A leaf's inout pin names its net over a top level inout port
-                                t.namedBy = Math.max(t.namedBy, NAMED_BY_DANGLING_INOUT);
-                            }
-                            SiteInst si = leafSites[childIdx[p]];
-                            if (si != null) {
-                                t.addPin(si, leafCells[childIdx[p]], leafPinNames[p]);
-                            } else {
-                                t.unplacedLeafPins++;
-                                if (kind == LEAF_OUTPUT) {
-                                    t.unplacedLeafDrivers++;
-                                }
-                            }
-                    }
-                }
-                t.childOutputOnly = childOutput && !ownOutput;
+                tally(t, n, flat, leafSites, leafCells, childBindings);
                 if (local) {
                     flat.addUnsynchronized(t, prefix, net);
                 } else {
@@ -843,6 +748,124 @@ final class RouteStatusNetlist {
             }
             if (segments != null) {
                 segmentsOfInterest.add(segments);
+            }
+        }
+
+        /**
+         * Gets the flat net bound to the ports of the cell that a net connects to (noting feedthroughs
+         * that connect several, to be merged), or null.
+         */
+        private FlatNet findBoundFlatNet(int n) {
+            if (portBinding == null) {
+                return null;
+            }
+            FlatNet flat = null;
+            for (int p = info.start[n]; p < info.start[n + 1]; p++) {
+                if (info.kinds[p] != OWN_PORT) {
+                    continue;
+                }
+                FlatNet bound = portBinding[info.slots[p]];
+                if (bound == null) {
+                    continue;
+                }
+                if (flat == null) {
+                    flat = bound;
+                } else if (flat != bound) {
+                    // Feedthrough connecting two nets of the parent
+                    pendingMerges.add(new FlatNet[]{flat, bound});
+                }
+            }
+            return flat;
+        }
+
+        /** Tallies the connections of net n of the instance (a segment of a flat net) into t. */
+        private void tally(Tally t, int n, FlatNet flat, SiteInst[] leafSites, Cell[] leafCells,
+                           FlatNet[][] childBindings) {
+            int first = info.start[n];
+            int last = info.start[n + 1];
+            byte[] kinds = info.kinds;
+            int[] slots = info.slots;
+            t.resetConnections();
+            t.staticType = info.staticTypes[n];
+            t.namedBy = NAMED_BY_SEGMENT;
+            t.portOnlyOutput = false;
+            t.insideMacro = info.insideMacro;
+            t.ownPortOnlyOutput = last == first + 1 && kinds[first] == OWN_PORT && info.ownOutputs[slots[first]];
+            boolean childOutput = false;
+            boolean ownOutput = false;
+            for (int p = first; p < last; p++) {
+                byte kind = kinds[p];
+                if ((kind & CHILD_OUTPUT) != 0) {
+                    childOutput = true;
+                } else if (kind == OWN_PORT && info.ownOutputs[slots[p]]) {
+                    ownOutput = true;
+                }
+                switch (kind & KIND_MASK) {
+                    case OWN_PORT:
+                        if (portBinding == null) {
+                            addTopPort(t, info.nets[n].getPortInsts().get(p - first));
+                        }
+                        break;
+                    case BLACK_BOX:
+                        t.blackBoxLoads++;
+                        break;
+                    case BLACK_BOX_INOUT:
+                        t.blackBoxLoads++;
+                        t.blackBoxInouts++;
+                        break;
+                    case BLACK_BOX_OUTPUT:
+                        t.blackBoxDrivers++;
+                        t.namedBy = NAMED_BY_DRIVER;
+                        break;
+                    case HIER:
+                        childBindings[info.childIdx[p]][slots[p]] = flat;
+                        tallyChildPort(t, kind);
+                        break;
+                    default:
+                        tallyLeafPin(t, kind, p, leafSites, leafCells);
+                }
+            }
+            t.childOutputOnly = childOutput && !ownOutput;
+        }
+
+        /** Tallies how a port of a hierarchical child names the net. */
+        private void tallyChildPort(Tally t, byte kind) {
+            if ((kind & DANGLING) != 0) {
+                // An output port left unconnected inside its cell names the net, unless there is a
+                // real driver
+                t.namedBy = Math.max(t.namedBy, NAMED_BY_DANGLING_OUTPUT);
+            } else if ((kind & DANGLING_INOUT) != 0) {
+                // So does an inout port left unconnected inside its cell, even over a top level
+                // inout port
+                t.namedBy = Math.max(t.namedBy, NAMED_BY_DANGLING_INOUT);
+            } else if ((kind & PORT_ONLY) != 0) {
+                t.portOnlyOutput = true;
+            }
+        }
+
+        /** Tallies the pin (port instance p) of a leaf cell. */
+        private void tallyLeafPin(Tally t, byte kind, int p, SiteInst[] leafSites, Cell[] leafCells) {
+            int c = info.childIdx[p];
+            if (kind == LEAF_OUTPUT) {
+                t.leafDrivers++;
+                if (!info.childIsWeakDriver[c]) {
+                    t.namedBy = NAMED_BY_DRIVER;
+                }
+            } else if (kind == LEAF_INPUT) {
+                t.leafLoads++;
+            } else {
+                t.leafInouts++;
+                // A leaf's inout pin names its net over a top level inout port
+                t.namedBy = Math.max(t.namedBy, NAMED_BY_DANGLING_INOUT);
+            }
+            SiteInst si = leafSites[c];
+            if (si != null) {
+                t.addPin(si, leafCells[c], info.leafPinNames[p]);
+            } else {
+                t.unplacedLeafPins++;
+                if (kind == LEAF_OUTPUT) {
+                    t.unplacedLeafDrivers++;
+                }
             }
         }
 

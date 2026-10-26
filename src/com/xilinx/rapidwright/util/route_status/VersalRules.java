@@ -78,32 +78,8 @@ final class VersalRules {
                     continue;
                 }
                 EDIFHierCellInst inst = cell.getEDIFHierCellInst();
-                if (inst == null) {
-                    continue;
-                }
-                int routed = -1;
                 List<Integer> others = new ArrayList<>();
-                for (String output : SHARED_ROUTING_OUTPUTS) {
-                    EDIFHierPortInst pin = inst.getPortInst(output);
-                    EDIFHierNet hierNet = (pin == null) ? null : pin.getHierarchicalNet();
-                    RouteStatusNetlist.Segment seg = (hierNet == null) ? null
-                            : flatNetlist.getSegment(hierNet.getHierarchicalNetName());
-                    int entry = (seg == null) ? -1 : seg.flat.find().entry;
-                    if (entry < 0 || entry == routed || others.contains(entry)) {
-                        continue;
-                    }
-                    Net net = entries.nets.get(entry);
-                    if (net != null && net.hasPIPs()) {
-                        if (routed >= 0) {
-                            // (each output routed on its own)
-                            routed = -2;
-                            break;
-                        }
-                        routed = entry;
-                    } else {
-                        others.add(entry);
-                    }
-                }
+                int routed = (inst == null) ? -1 : findRoutedOutput(inst, entries, flatNetlist, others);
                 if (routed < 0) {
                     continue;
                 }
@@ -119,6 +95,36 @@ final class VersalRules {
             }
         }
         return shared;
+    }
+
+    /**
+     * Finds the entries of the nets of the outputs of a clock buffer.
+     * @param others Set to the entries of the outputs without routing.
+     * @return The entry of the only output with routing, or a negative value if none (or several).
+     */
+    private static int findRoutedOutput(EDIFHierCellInst inst, Entries entries, RouteStatusNetlist flatNetlist,
+                                        List<Integer> others) {
+        int routed = -1;
+        for (String output : SHARED_ROUTING_OUTPUTS) {
+            EDIFHierPortInst pin = inst.getPortInst(output);
+            EDIFHierNet hierNet = (pin == null) ? null : pin.getHierarchicalNet();
+            RouteStatusNetlist.Segment seg = (hierNet == null) ? null
+                    : flatNetlist.getSegment(hierNet.getHierarchicalNetName());
+            int entry = (seg == null) ? -1 : seg.flat.find().entry;
+            if (entry < 0 || entry == routed || others.contains(entry)) {
+                continue;
+            }
+            Net net = entries.nets.get(entry);
+            if (net == null || !net.hasPIPs()) {
+                others.add(entry);
+            } else if (routed >= 0) {
+                // (each output routed on its own)
+                return -2;
+            } else {
+                routed = entry;
+            }
+        }
+        return routed;
     }
 
     static boolean isVersalClockingSite(SiteInst si) {

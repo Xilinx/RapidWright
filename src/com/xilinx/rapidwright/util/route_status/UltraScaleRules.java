@@ -91,38 +91,43 @@ final class UltraScaleRules {
                     continue;
                 }
                 for (boolean ce : new boolean[]{true, false}) {
-                    BELPin belPin = bel.getPin(ce ? "CE" : "SR");
-                    if (belPin == null) {
-                        continue;
+                    if (isMissingTie(si, cell, ce, ce ? pins.getFirst() : pins.getSecond(), staticRouting)) {
+                        return StaticRouting.VCC_TIE;
                     }
-                    Net belPinNet = si.getNetFromSiteWireIndex(belPin.getSiteWireIndex());
-                    if (belPinNet != null && (ce || !belPinNet.isGNDNet())) {
-                        // Used by a signal (or a tie inside the site)
-                        continue;
-                    }
-                    String sitePin = ce ? pins.getFirst() : pins.getSecond();
-                    Net sitePinNet = si.getNetFromSiteWire(sitePin);
-                    if (si.getSitePinInst(sitePin) != null || (sitePinNet != null && !sitePinNet.isStaticNet())
-                            || staticRouting.isRoutingTo(si, sitePin)) {
-                        continue;
-                    }
-                    // Only a pin that the netlist ties off needs it (not one that is unconnected, nor
-                    // that of a cell missing from the netlist). The tied pin is not mapped.
-                    Pair<String, String> logicalPins = CE_SR_TIED_TYPES.get(cell.getType());
-                    String logicalPin = ce ? logicalPins.getFirst() : logicalPins.getSecond();
-                    if (!isTiedTo(cell, logicalPin, ce ? NetType.VCC : NetType.GND)) {
-                        continue;
-                    }
-                    if (!ce && isDrivenThroughUsedSitePIP(si, belPin)) {
-                        // The set/reset inverter (e.g. RST_ABCDINV) does not invert: the pin is not
-                        // tied to VCC
-                        continue;
-                    }
-                    return StaticRouting.VCC_TIE;
                 }
             }
         }
         return 0;
+    }
+
+    /**
+     * Checks whether the clock enable (or set/reset) site pin of a flip-flop needs a tie to VCC that
+     * no routing provides.
+     */
+    private static boolean isMissingTie(SiteInst si, Cell cell, boolean ce, String sitePin, StaticRouting staticRouting) {
+        BELPin belPin = cell.getBEL().getPin(ce ? "CE" : "SR");
+        if (belPin == null) {
+            return false;
+        }
+        Net belPinNet = si.getNetFromSiteWireIndex(belPin.getSiteWireIndex());
+        if (belPinNet != null && (ce || !belPinNet.isGNDNet())) {
+            // Used by a signal (or a tie inside the site)
+            return false;
+        }
+        Net sitePinNet = si.getNetFromSiteWire(sitePin);
+        if (si.getSitePinInst(sitePin) != null || (sitePinNet != null && !sitePinNet.isStaticNet())
+                || staticRouting.isRoutingTo(si, sitePin)) {
+            return false;
+        }
+        // Only a pin that the netlist ties off needs it (not one that is unconnected, nor that of a
+        // cell missing from the netlist). The tied pin is not mapped.
+        Pair<String, String> logicalPins = CE_SR_TIED_TYPES.get(cell.getType());
+        String logicalPin = ce ? logicalPins.getFirst() : logicalPins.getSecond();
+        if (!isTiedTo(cell, logicalPin, ce ? NetType.VCC : NetType.GND)) {
+            return false;
+        }
+        // (unless the set/reset inverter, e.g. RST_ABCDINV, does not invert: then it is not tied)
+        return ce || !isDrivenThroughUsedSitePIP(si, belPin);
     }
 
     /** Checks whether a BEL in a site that drives the site wire of a BEL pin has a used site PIP */

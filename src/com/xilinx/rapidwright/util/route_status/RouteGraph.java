@@ -90,26 +90,82 @@ final class RouteGraph {
     boolean[] drivenAgain;
 
     RouteGraph(Net net) {
-        List<PIP> pips = net.getPIPs();
-        int n = pips.size();
-        long[] startKeys = new long[n];
-        long[] endKeys = new long[n];
-        Node[] startNodes = new Node[n];
-        Node[] endNodes = new Node[n];
-        boolean[] isStub = new boolean[n];
-        boolean[] isStartStub = new boolean[n];
-        boolean[] isRoutethru = new boolean[n];
-        int edges = 0;
-        boolean[] isBidir = new boolean[n];
-        boolean[] isReversed = new boolean[n];
-        int numBidir = 0;
+        Edges edges = readEdges(net.getPIPs());
+        index = new LongIndex(2 * edges.count);
+        int[] startIdx = new int[edges.count];
+        int[] endIdx = new int[edges.count];
+        // Routing is mostly stored in order, each PIP starting where the previous one ends
+        long prevKey = Long.MIN_VALUE;
+        int prevIdx = -1;
+        for (int e = 0; e < edges.count; e++) {
+            startIdx[e] = (edges.startKeys[e] == prevKey) ? prevIdx : index.add(edges.startKeys[e]);
+            endIdx[e] = index.add(edges.endKeys[e]);
+            prevKey = edges.endKeys[e];
+            prevIdx = endIdx[e];
+        }
+        nodes = index.keys();
+        int distinct = nodes.length;
+        markStartStubs(edges, startIdx, distinct);
+        nodeObjects = new Node[distinct];
+        driven = new boolean[distinct];
+        stubEnd = new boolean[distinct];
+        routethruEnd = new boolean[distinct];
+        hasForwardFanout = new boolean[distinct];
+        fanoutStart = new int[distinct + 1];
+        addEdges(edges, startIdx, endIdx);
+        for (int i = 0; i < distinct; i++) {
+            fanoutStart[i + 1] += fanoutStart[i];
+        }
+        fanouts = new int[edges.count + edges.numBidir];
+        int[] fill = Arrays.copyOf(fanoutStart, distinct);
+        for (int e = 0; e < edges.count; e++) {
+            fanouts[fill[startIdx[e]]++] = endIdx[e];
+            if (edges.isBidir[e]) {
+                fanouts[fill[endIdx[e]]++] = startIdx[e];
+            }
+        }
+        extendStubs();
+    }
+
+    /** The PIPs of a net (between two nodes), as edges from their start node to their end node */
+    private static final class Edges {
+        final long[] startKeys;
+        final long[] endKeys;
+        final Node[] startNodes;
+        final Node[] endNodes;
+        final boolean[] isStub;
+        final boolean[] isStartStub;
+        final boolean[] isRoutethru;
+        final boolean[] isBidir;
+        final boolean[] isReversed;
+        int count;
+        int numBidir;
+
+        Edges(int capacity) {
+            startKeys = new long[capacity];
+            endKeys = new long[capacity];
+            startNodes = new Node[capacity];
+            endNodes = new Node[capacity];
+            isStub = new boolean[capacity];
+            isStartStub = new boolean[capacity];
+            isRoutethru = new boolean[capacity];
+            isBidir = new boolean[capacity];
+            isReversed = new boolean[capacity];
+        }
+    }
+
+    /**
+     * Reads the PIPs of a net as edges (in the direction they are used), noting whether any is locked,
+     * and the PIPs that mark explicit gaps.
+     */
+    private Edges readEdges(List<PIP> pips) {
+        Edges edges = new Edges(pips.size());
         // PIPs are mostly stored in routing order, so a PIP often starts at the tile wire where
         // the previous one ends: reuse that node rather than looking it up again
         Tile prevTile = null;
         int prevEndWire = -1;
         Node prevEnd = null;
-        for (int i = 0; i < n; i++) {
-            PIP pip = pips.get(i);
+        for (PIP pip : pips) {
             if (pip.isPIPFixed()) {
                 locked = true;
             }
@@ -137,108 +193,92 @@ final class RouteGraph {
                 }
                 continue;
             }
-            startNodes[edges] = start;
-            endNodes[edges] = end;
-            startKeys[edges] = nodeKey(start);
-            endKeys[edges] = nodeKey(end);
-            isStub[edges] = pip.isStub();
-            isStartStub[edges] = pip.isStartStub();
-            isRoutethru[edges] = pip.isRouteThru();
-            isBidir[edges] = pip.isBidirectional();
-            isReversed[edges] = pip.isReversed();
-            if (isBidir[edges]) {
-                numBidir++;
+            int e = edges.count++;
+            edges.startNodes[e] = start;
+            edges.endNodes[e] = end;
+            edges.startKeys[e] = nodeKey(start);
+            edges.endKeys[e] = nodeKey(end);
+            edges.isStub[e] = pip.isStub();
+            edges.isStartStub[e] = pip.isStartStub();
+            edges.isRoutethru[e] = pip.isRouteThru();
+            edges.isBidir[e] = pip.isBidirectional();
+            edges.isReversed[e] = pip.isReversed();
+            if (edges.isBidir[e]) {
+                edges.numBidir++;
             }
-            edges++;
         }
-        index = new LongIndex(2 * edges);
-        int[] startIdx = new int[edges];
-        int[] endIdx = new int[edges];
-        // Routing is mostly stored in order, each PIP starting where the previous one ends
-        long prevKey = Long.MIN_VALUE;
-        int prevIdx = -1;
-        for (int e = 0; e < edges; e++) {
-            startIdx[e] = (startKeys[e] == prevKey) ? prevIdx : index.add(startKeys[e]);
-            endIdx[e] = index.add(endKeys[e]);
-            prevKey = endKeys[e];
-            prevIdx = endIdx[e];
-        }
-        nodes = index.keys();
-        int distinct = nodes.length;
-        // A START_STUB makes all the routing from its start (e.g. the other output pin of a net
-        // driven through two site pins) a stub, not only the PIP it annotates
+        return edges;
+    }
+
+    /**
+     * A START_STUB makes all the routing from its start (e.g. the other output pin of a net driven
+     * through two site pins) a stub, not only the PIP it annotates.
+     */
+    private static void markStartStubs(Edges edges, int[] startIdx, int distinct) {
         boolean[] stubRoot = new boolean[distinct];
-        for (int e = 0; e < edges; e++) {
-            if (isStartStub[e]) {
+        for (int e = 0; e < edges.count; e++) {
+            if (edges.isStartStub[e]) {
                 stubRoot[startIdx[e]] = true;
             }
         }
-        for (int e = 0; e < edges; e++) {
+        for (int e = 0; e < edges.count; e++) {
             if (stubRoot[startIdx[e]]) {
-                isStub[e] = true;
+                edges.isStub[e] = true;
             }
         }
-        nodeObjects = new Node[distinct];
-        driven = new boolean[distinct];
-        stubEnd = new boolean[distinct];
-        routethruEnd = new boolean[distinct];
-        hasForwardFanout = new boolean[distinct];
-        fanoutStart = new int[distinct + 1];
-        for (int e = 0; e < edges; e++) {
-            nodeObjects[startIdx[e]] = startNodes[e];
-            nodeObjects[endIdx[e]] = endNodes[e];
+    }
+
+    /**
+     * Records the nodes of the edges, what drives them, the number of fanouts of each node (in
+     * {@link #fanoutStart}, not yet summed), stubs and routethrus.
+     */
+    private void addEdges(Edges edges, int[] startIdx, int[] endIdx) {
+        for (int e = 0; e < edges.count; e++) {
+            nodeObjects[startIdx[e]] = edges.startNodes[e];
+            nodeObjects[endIdx[e]] = edges.endNodes[e];
             fanoutStart[startIdx[e] + 1]++;
             hasForwardFanout[startIdx[e]] = true;
-            if (driven[endIdx[e]] && !isReversed[e]) {
+            if (driven[endIdx[e]] && !edges.isReversed[e]) {
                 if (drivenAgain == null) {
-                    drivenAgain = new boolean[distinct];
+                    drivenAgain = new boolean[nodes.length];
                 }
                 drivenAgain[endIdx[e]] = true;
             }
             driven[endIdx[e]] = true;
-            if (isBidir[e]) {
-                // Bidirectional PIPs connect their nodes either way (and in clock routing,
-                // either way may be the direction they are used in, unless explicitly stored
-                // as reversed)
+            if (edges.isBidir[e]) {
+                // Bidirectional PIPs connect their nodes either way (and in clock routing, either way
+                // may be the direction they are used in, unless explicitly stored as reversed)
                 fanoutStart[endIdx[e] + 1]++;
                 driven[startIdx[e]] = true;
-                if (!isReversed[e] && endNodes[e].getIntentCode().toString().contains("GLOBAL")) {
+                if (!edges.isReversed[e] && edges.endNodes[e].getIntentCode().toString().contains("GLOBAL")) {
                     hasForwardFanout[endIdx[e]] = true;
                 }
             }
-            if (isStub[e]) {
+            if (edges.isStub[e]) {
                 // Stubs are deliberately dangling and not considered antennas
                 stubEnd[endIdx[e]] = true;
             }
-            if (isRoutethru[e]) {
+            if (edges.isRoutethru[e]) {
                 routethruEnd[endIdx[e]] = true;
                 if (routethruNodes == null) {
                     routethruNodes = new ArrayList<>();
                 }
-                routethruNodes.add(startNodes[e]);
-                routethruNodes.add(endNodes[e]);
+                routethruNodes.add(edges.startNodes[e]);
+                routethruNodes.add(edges.endNodes[e]);
             }
         }
-        for (int i = 0; i < distinct; i++) {
-            fanoutStart[i + 1] += fanoutStart[i];
-        }
-        fanouts = new int[edges + numBidir];
-        int[] fill = Arrays.copyOf(fanoutStart, distinct);
-        for (int e = 0; e < edges; e++) {
-            fanouts[fill[startIdx[e]]++] = endIdx[e];
-            if (isBidir[e]) {
-                fanouts[fill[endIdx[e]]++] = startIdx[e];
-            }
-        }
-        // Everything downstream of a stub PIP is part of the stub
+    }
+
+    /** Marks everything downstream of a stub PIP as part of the stub. */
+    private void extendStubs() {
         int[] stack = null;
         int top = 0;
-        for (int i = 0; i < distinct; i++) {
+        for (int i = 0; i < nodes.length; i++) {
             if (!stubEnd[i]) {
                 continue;
             }
             if (stack == null) {
-                stack = new int[distinct];
+                stack = new int[nodes.length];
             }
             stack[top++] = i;
             while (top > 0) {
@@ -263,8 +303,13 @@ final class RouteGraph {
     }
 
     /**
+     * Analyzes which sinks of the net the routing reaches from its sources, and whether it has
+     * antennas or islands (see the results above).
      * @param aliases The other physical nets of the flat net (named after other segments), whose
      * site pins and site routing count too, or null.
+     * @param sitePinSinkKeys The keys of the nodes of further sinks: input site pins of the net's site
+     * routing (see {@link Entries#sitePinKeys}), or null.
+     * @param staleKeys The sorted keys of the nodes of site pins that are not loads, or null.
      * @param partitionPinKeys Sorted keys of the nodes of the design's partition pins, where
      * routing continues in (or comes from) another partition.
      * @param placedSource Whether the net has a placed source (which routing from a partition
@@ -281,18 +326,67 @@ final class RouteGraph {
         undrivenSource = false;
         islandSinks = 0;
         leafSinks = null;
-        int distinct = nodes.length;
-        boolean sourceUnrouted = false;
-        boolean[] isSink = new boolean[distinct];
-        boolean[] visited = new boolean[distinct];
-        int[] queue = new int[distinct];
-        // Per node: the node it was first reached from (or -1)
-        int[] parent = new int[distinct];
-        Arrays.fill(parent, -1);
-        int head = 0;
-        int tail = 0;
-        // Sinks are the input site pins of the net, whether or not they have a SitePinInst
-        // (those of unrouted sinks are not stored in a DCP), as found in its site routing
+        Search search = new Search(nodes.length);
+        long[] sinkKeys = seedSourcePins(search, net, aliases, isStatic, sitePinSinkKeys);
+        markSinks(search, sinkKeys, staleKeys);
+        seedUnstoredSourcePins(search, net, aliases, isStatic);
+        boolean rootedAtSource = search.tail > 0;
+        if (search.sourceUnrouted && !rootedAtSource) {
+            // Vivado does not tell the source from the alternate source of a net (e.g. the xMUX and
+            // x_O outputs of a LUT, both site routed): the routing may start at either
+            unroutedSource = true;
+        }
+        seedPartitionPins(search, partitionPinKeys);
+        rooted = search.tail > 0;
+        if (rooted && !rootedAtSource && placedSource && !isStatic) {
+            // Routing from another partition, but none from the placed source
+            unroutedSource = true;
+        }
+        boolean gapMarkers = seedExplicitGaps(search);
+        do {
+            propagate(search, net, isStatic, staleKeys != null, gapMarkers);
+        } while (joinUnstoredBidirectional(search));
+        countReached(search, isStatic, gapMarkers);
+    }
+
+    /** The state of a search of the routing from its sources, by node index */
+    private static final class Search {
+        final boolean[] isSink;
+        final boolean[] visited;
+        final int[] queue;
+        /** Per node: the node it was first reached from (or -1) */
+        final int[] parent;
+        int head;
+        int tail;
+        /** Per node: whether it is that of a site pin that is not a load (null if none) */
+        boolean[] isStale;
+        /** Per node: whether it is that of a partition pin (null if none) */
+        boolean[] isPartitionPin;
+        /** Whether the source pin of the net is not routed */
+        boolean sourceUnrouted;
+
+        Search(int n) {
+            isSink = new boolean[n];
+            visited = new boolean[n];
+            queue = new int[n];
+            parent = new int[n];
+            Arrays.fill(parent, -1);
+        }
+
+        /** Adds a node to search from. */
+        void add(int i) {
+            visited[i] = true;
+            queue[tail++] = i;
+        }
+    }
+
+    /**
+     * Starts the search from the output site pins of the net (and of its aliases) that its site routing
+     * drives, and gets the sinks: the input site pins of the net, whether or not they have a
+     * SitePinInst (those of unrouted sinks are not stored in a DCP), as found in its site routing.
+     * @return The keys of the nodes of the sinks.
+     */
+    private long[] seedSourcePins(Search search, Net net, List<Net> aliases, boolean isStatic, long[] sitePinSinkKeys) {
         List<SitePinInst> pins = net.getPins();
         if (aliases != null) {
             pins = new ArrayList<>(pins);
@@ -307,39 +401,45 @@ final class RouteGraph {
             Node node = spi.getConnectedNode();
             // (the net, or an alias)
             Net owner = spi.getNet();
-            if (spi.isOutPin()) {
-                if (!isStatic && !isDrivenBySiteRouting(owner, spi)) {
-                    // An output pin the site routing of the net does not lead to (e.g. one
-                    // inferred from routing that starts there) drives nothing
-                    undrivenSource = true;
-                    continue;
+            if (!spi.isOutPin()) {
+                if (node != null) {
+                    sinkKeys[numSinks++] = nodeKey(node);
                 }
-                int i = indexOf(node);
-                if (i >= 0 && !visited[i]) {
-                    visited[i] = true;
-                    queue[tail++] = i;
-                } else if (i < 0 && !isStatic && spi == owner.getSource()) {
-                    // The source pin is not routed (which only matters if no other output pin
-                    // of the net is, see below)
-                    sourceUnrouted = true;
-                }
-            } else if (node != null) {
-                sinkKeys[numSinks++] = nodeKey(node);
+                continue;
+            }
+            if (!isStatic && !isDrivenBySiteRouting(owner, spi)) {
+                // An output pin the site routing of the net does not lead to (e.g. one inferred from
+                // routing that starts there) drives nothing
+                undrivenSource = true;
+                continue;
+            }
+            int i = indexOf(node);
+            if (i >= 0 && !search.visited[i]) {
+                search.add(i);
+            } else if (i < 0 && !isStatic && spi == owner.getSource()) {
+                // The source pin is not routed (which only matters if no other output pin of the net
+                // is, see analyze())
+                search.sourceUnrouted = true;
             }
         }
         if (extra > 0) {
             System.arraycopy(sitePinSinkKeys, 0, sinkKeys, numSinks, extra);
             numSinks += extra;
         }
-        boolean[] isStale = null;
+        return Arrays.copyOf(sinkKeys, numSinks);
+    }
+
+    /** Counts and marks the (distinct) sinks, except the site pins that are not loads. */
+    private void markSinks(Search search, long[] sinkKeys, long[] staleKeys) {
+        int numSinks = sinkKeys.length;
         if (staleKeys != null) {
             for (long key : staleKeys) {
                 int idx = index.get(key);
                 if (idx >= 0) {
-                    if (isStale == null) {
-                        isStale = new boolean[distinct];
+                    if (search.isStale == null) {
+                        search.isStale = new boolean[nodes.length];
                     }
-                    isStale[idx] = true;
+                    search.isStale[idx] = true;
                 }
             }
             int kept = 0;
@@ -350,166 +450,182 @@ final class RouteGraph {
             }
             numSinks = kept;
         }
-        sinkKeys = Arrays.copyOf(sinkKeys, numSinks);
-        Arrays.sort(sinkKeys);
-        for (int i = 0; i < sinkKeys.length; i++) {
+        Arrays.sort(sinkKeys, 0, numSinks);
+        for (int i = 0; i < numSinks; i++) {
             if (i > 0 && sinkKeys[i] == sinkKeys[i - 1]) {
                 continue;
             }
             sinks++;
             int idx = index.get(sinkKeys[i]);
             if (idx >= 0) {
-                isSink[idx] = true;
+                search.isSink[idx] = true;
             }
         }
-        for (int i = 0; i < distinct; i++) {
-            if (driven[i] || visited[i] || fanoutStart[i] == fanoutStart[i + 1]) {
+    }
+
+    /**
+     * Starts the search from the undriven nodes that are sources without a SitePinInst: tied nodes of
+     * static nets, and site output pins driven by the site routing of the net.
+     */
+    private void seedUnstoredSourcePins(Search search, Net net, List<Net> aliases, boolean isStatic) {
+        for (int i = 0; i < nodes.length; i++) {
+            if (driven[i] || search.visited[i] || fanoutStart[i] == fanoutStart[i + 1]) {
                 continue;
             }
             Node node = nodeObjects[i];
             if (isStatic ? node.isTied() : isSiteRoutedOutputPinNode(net, aliases, node)) {
-                // Tied nodes of static nets, and site output pins (driven by the site routing
-                // of the net) without a SitePinInst
-                visited[i] = true;
-                queue[tail++] = i;
+                search.add(i);
             } else if (!isStatic && node.getSitePin() != null && !node.getSitePin().isInput()
                     && isSitePinUsedBy(net, node)) {
                 undrivenSource = true;
             }
         }
-        boolean rootedAtSource = tail > 0;
-        if (sourceUnrouted && !rootedAtSource) {
-            // Vivado does not tell the source from the alternate source of a net (e.g. the xMUX
-            // and x_O outputs of a LUT, both site routed): the routing may start at either
-            unroutedSource = true;
+    }
+
+    /** Starts the search from the partition pins that routing from another partition comes from. */
+    private void seedPartitionPins(Search search, long[] partitionPinKeys) {
+        if (partitionPinKeys.length == 0) {
+            return;
         }
-        boolean[] isPartitionPin = null;
-        if (partitionPinKeys.length > 0) {
-            for (int i = 0; i < distinct; i++) {
-                if (Arrays.binarySearch(partitionPinKeys, nodes[i]) < 0) {
-                    continue;
-                }
-                if (isPartitionPin == null) {
-                    isPartitionPin = new boolean[distinct];
-                }
-                isPartitionPin[i] = true;
-                if (!driven[i] && !visited[i] && hasForwardFanout[i]) {
-                    // Routing from another partition
-                    visited[i] = true;
-                    queue[tail++] = i;
-                }
-            }
-        }
-        rooted = tail > 0;
-        if (rooted && !rootedAtSource && placedSource && !isStatic) {
-            // Routing from another partition, but none from the placed source
-            unroutedSource = true;
-        }
-        // Explicit gaps connect the routing to the pins and routing they lead to (any routing
-        // may be joined through them), but a gap after a node used by nothing else is an island
-        boolean gapMarkers = gapStarts != null;
-        if (gapMarkers) {
-            explicitGaps = true;
-            for (Node node : gapStarts) {
-                if (index.get(nodeKey(node)) < 0 && !isSitePinNode(node)
-                        && node.getIntentCode() != IntentCode.NODE_PINFEED && !node.getAllDownhillNodes().isEmpty()) {
-                    antennas = true;
-                }
-            }
-        }
-        for (int i = 0; i < distinct; i++) {
-            if (driven[i] || visited[i] || !hasForwardFanout[i]) {
+        for (int i = 0; i < nodes.length; i++) {
+            if (Arrays.binarySearch(partitionPinKeys, nodes[i]) < 0) {
                 continue;
             }
-            if (gapMarkers && nodeObjects[i].getIntentCode() == IntentCode.NODE_PINFEED) {
-                // Routing from a pin feed, as is stored (with explicit gaps) for clocks routed
-                // only at their ends
-                visited[i] = true;
-                queue[tail++] = i;
+            if (search.isPartitionPin == null) {
+                search.isPartitionPin = new boolean[nodes.length];
+            }
+            search.isPartitionPin[i] = true;
+            if (!driven[i] && !search.visited[i] && hasForwardFanout[i]) {
+                // Routing from another partition
+                search.add(i);
             }
         }
-        boolean changed = true;
-        while (changed) {
-            while (head < tail) {
-                int i = queue[head++];
-                int from = fanoutStart[i];
-                int to = fanoutStart[i + 1];
-                // (a 7-series global clock node only leading back where it was reached from,
-                // through a bidirectional PIP, leads nowhere)
-                boolean onlyBack = from < to && parent[i] >= 0 && nodeObjects[i].getIntentCode() == IntentCode.GLOBAL;
-                for (int f = from; f < to && onlyBack; f++) {
-                    onlyBack = fanouts[f] == parent[i];
-                }
-                if (onlyBack || (!hasForwardFanout[i] && (from == to || (isStale != null && isStale[i])
-                        || !(isSitePinUsedBy(net, nodeObjects[i]) || nodeObjects[i].getIntentCode().toString().contains("GLOBAL"))))) {
-                    // (a site pin used by the site routing of the net, unless that leads to no
-                    // placed cell, or global clock routing, reached backwards through a
-                    // bidirectional PIP may lead on)
-                    // Leads nowhere, unless to a load. The site pins that loads of static nets
-                    // are tied to are not always in their site routing. Stubs are deliberately
-                    // dangling, but only on nets with loads.
-                    // Routing that ends where an explicit gap follows (to some pin) leads on
-                    // and so does routing to another partition
-                    if (!isSink[i] && !(stubEnd[i] && sinks > 0) && !(isStatic && isSitePinNode(nodeObjects[i]))
-                            && !gapMarkers && !(isPartitionPin != null && isPartitionPin[i])
-                            && !isLeafClockClearPin(nodeObjects[i]) && !routethruEnd[i]) {
-                        antennas = true;
-                    } else if (isSink[i] && !isStatic && from == to && staleKeys == null) {
-                        if (leafSinks == null) {
-                            leafSinks = new ArrayList<>();
-                        }
-                        leafSinks.add(nodeObjects[i]);
+    }
+
+    /**
+     * Explicit gaps connect the routing to the pins and routing they lead to (any routing may be joined
+     * through them), but a gap after a node used by nothing else is an island. Starts the search from
+     * the pin feeds that routing starts from, as is stored (with explicit gaps) for clocks routed only
+     * at their ends.
+     * @return Whether the net has explicit gaps.
+     */
+    private boolean seedExplicitGaps(Search search) {
+        if (gapStarts == null) {
+            return false;
+        }
+        explicitGaps = true;
+        for (Node node : gapStarts) {
+            if (index.get(nodeKey(node)) < 0 && !isSitePinNode(node)
+                    && node.getIntentCode() != IntentCode.NODE_PINFEED && !node.getAllDownhillNodes().isEmpty()) {
+                antennas = true;
+            }
+        }
+        for (int i = 0; i < nodes.length; i++) {
+            if (!driven[i] && !search.visited[i] && hasForwardFanout[i]
+                    && nodeObjects[i].getIntentCode() == IntentCode.NODE_PINFEED) {
+                search.add(i);
+            }
+        }
+        return true;
+    }
+
+    /** Continues the search through the fanouts of the nodes reached, finding where the routing ends. */
+    private void propagate(Search search, Net net, boolean isStatic, boolean hasStaleKeys, boolean gapMarkers) {
+        while (search.head < search.tail) {
+            int i = search.queue[search.head++];
+            int from = fanoutStart[i];
+            int to = fanoutStart[i + 1];
+            if (isDeadEnd(search, i, net)) {
+                // Leads nowhere, unless to a load. The site pins that loads of static nets are tied to
+                // are not always in their site routing. Stubs are deliberately dangling, but only on
+                // nets with loads. Routing that ends where an explicit gap follows (to some pin) leads
+                // on and so does routing to another partition.
+                if (!search.isSink[i] && !(stubEnd[i] && sinks > 0) && !(isStatic && isSitePinNode(nodeObjects[i]))
+                        && !gapMarkers && !(search.isPartitionPin != null && search.isPartitionPin[i])
+                        && !isLeafClockClearPin(nodeObjects[i]) && !routethruEnd[i]) {
+                    antennas = true;
+                } else if (search.isSink[i] && !isStatic && from == to && !hasStaleKeys) {
+                    if (leafSinks == null) {
+                        leafSinks = new ArrayList<>();
                     }
-                }
-                for (int f = from; f < to; f++) {
-                    int next = fanouts[f];
-                    if (!visited[next]) {
-                        visited[next] = true;
-                        parent[next] = i;
-                        queue[tail++] = next;
-                    }
+                    leafSinks.add(nodeObjects[i]);
                 }
             }
-            // Unreached global (clock) routing may still be joined to the rest by a
-            // bidirectional PIP that is not stored with the net (e.g. between the halves of a
-            // clock distribution row). Other bidirectional PIPs only connect if stored.
-            changed = false;
-            for (int i = 0; i < distinct; i++) {
-                if (visited[i] || !nodeObjects[i].getIntentCode().toString().contains("GLOBAL")) {
+            for (int f = from; f < to; f++) {
+                int next = fanouts[f];
+                if (!search.visited[next]) {
+                    search.parent[next] = i;
+                    search.add(next);
+                }
+            }
+        }
+    }
+
+    /**
+     * Checks whether the routing leads nowhere from a node reached: it has no fanout in the direction
+     * it is used in (a site pin used by the site routing of the net, unless that leads to no placed
+     * cell, or global clock routing, reached backwards through a bidirectional PIP may lead on), or it
+     * is a 7-series global clock node only leading back where it was reached from, through a
+     * bidirectional PIP.
+     */
+    private boolean isDeadEnd(Search search, int i, Net net) {
+        int from = fanoutStart[i];
+        int to = fanoutStart[i + 1];
+        boolean onlyBack = from < to && search.parent[i] >= 0 && nodeObjects[i].getIntentCode() == IntentCode.GLOBAL;
+        for (int f = from; f < to && onlyBack; f++) {
+            onlyBack = fanouts[f] == search.parent[i];
+        }
+        return onlyBack || (!hasForwardFanout[i] && (from == to || (search.isStale != null && search.isStale[i])
+                || !(isSitePinUsedBy(net, nodeObjects[i]) || nodeObjects[i].getIntentCode().toString().contains("GLOBAL"))));
+    }
+
+    /**
+     * Joins unreached global (clock) routing to the routing reached through a bidirectional PIP that
+     * is not stored with the net (e.g. between the halves of a clock distribution row). Other
+     * bidirectional PIPs only connect if stored.
+     * @return Whether any routing was joined (and is to be searched from).
+     */
+    private boolean joinUnstoredBidirectional(Search search) {
+        boolean joined = false;
+        for (int i = 0; i < nodes.length; i++) {
+            if (search.visited[i] || !nodeObjects[i].getIntentCode().toString().contains("GLOBAL")) {
+                continue;
+            }
+            for (PIP pip : nodeObjects[i].getAllUphillPIPs()) {
+                if (!pip.isBidirectional()) {
                     continue;
                 }
-                for (PIP pip : nodeObjects[i].getAllUphillPIPs()) {
-                    if (!pip.isBidirectional()) {
-                        continue;
-                    }
-                    Node start = pip.getStartNode();
-                    Node other = (start != null && nodeKey(start) == nodes[i]) ? pip.getEndNode() : start;
-                    int o = indexOf(other);
-                    if (o >= 0 && visited[o]) {
-                        visited[i] = true;
-                        queue[tail++] = i;
-                        changed = true;
-                        break;
-                    }
+                Node start = pip.getStartNode();
+                Node other = (start != null && nodeKey(start) == nodes[i]) ? pip.getEndNode() : start;
+                int o = indexOf(other);
+                if (o >= 0 && search.visited[o]) {
+                    search.add(i);
+                    joined = true;
+                    break;
                 }
             }
         }
-        for (int i = 0; i < distinct; i++) {
-            if (!visited[i] && fanoutStart[i] != fanoutStart[i + 1] && !gapMarkers) {
+        return joined;
+    }
+
+    /** Counts the sinks reached, and finds islands and nodes driven again. */
+    private void countReached(Search search, boolean isStatic, boolean gapMarkers) {
+        for (int i = 0; i < nodes.length; i++) {
+            if (!search.visited[i] && fanoutStart[i] != fanoutStart[i + 1] && !gapMarkers) {
                 // Island: routing not reachable from the source (unless through explicit gaps)
                 antennas = true;
             }
-            if (drivenAgain != null && drivenAgain[i] && !gapMarkers && !isSink[i] && !(stubEnd[i] && sinks > 0)
+            if (drivenAgain != null && drivenAgain[i] && !gapMarkers && !search.isSink[i] && !(stubEnd[i] && sinks > 0)
                     && !(isStatic && isSitePinNode(nodeObjects[i]))) {
-                // A node driven again leads nowhere the second time, unless it is a load (as
-                // are the site pins that static nets tie, which need not be in their site routing)
+                // A node driven again leads nowhere the second time, unless it is a load (as are the
+                // site pins that static nets tie, which need not be in their site routing)
                 antennas = true;
             }
-            if (isSink[i] && (visited[i] || rooted)) {
-                // Reached by routing (even if that routing is an island, or merely starts
-                // there, unless no routing leaves the source at all)
+            if (search.isSink[i] && (search.visited[i] || rooted)) {
+                // Reached by routing (even if that routing is an island, or merely starts there,
+                // unless no routing leaves the source at all)
                 reachedSinks++;
-            } else if (isSink[i]) {
+            } else if (search.isSink[i]) {
                 islandSinks++;
             }
         }

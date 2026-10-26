@@ -126,6 +126,31 @@ public final class RouteStatusEngine {
 
     private final Set<Net> partitionPinNets = new HashSet<>();
 
+    /** The number of flat (logical) nets that are entries (the first ones) */
+    private int numFlat;
+
+    /** Per static net (GND, VCC): its entry, or -1 if it is not reported */
+    private final int[] staticEntry = {-1, -1};
+
+    /** Per static net: whether the netlist uses it, and its flat nets */
+    private final boolean[] hasLogicalStatic = new boolean[2];
+
+    private final List<List<FlatNet>> staticFlats = Arrays.asList(new ArrayList<>(), new ArrayList<>());
+
+    /** Per static net: its loads, and how many are unplaced */
+    private final int[] staticLoads = new int[2];
+
+    private final int[] staticUnplacedLoads = new int[2];
+
+    /** The flat nets of undriven pins inside macro primitives, tied to GND (see isTiedInsideMacro()) */
+    private final List<FlatNet> macroTies = Collections.synchronizedList(new ArrayList<>());
+
+    /** The entries that are listed, but not counted in the summary */
+    private final List<Integer> uncounted = new ArrayList<>();
+
+    /** The entry of the routing that only reserves resources (see {@link #DUMMY_ROUTE_NET}), or -1 */
+    private int dummyEntry = -1;
+
     private RouteStatusEngine(Design design, boolean perNet, boolean packConflicts) {
         this.design = design;
         this.perNet = perNet;
@@ -206,6 +231,43 @@ public final class RouteStatusEngine {
     }
 
     private ReportRouteStatusResult run() {
+        RouteStatusNetlist flatNetlist = buildNetlist();
+        addFlatEntries(flatNetlist);
+        addPhysicalEntries(flatNetlist);
+        addStaticEntries();
+        int numEntries = entries.size();
+        entries.status = new int[numEntries];
+        entries.nodeKeys = new long[numEntries][];
+        entries.counted = new boolean[numEntries];
+        Arrays.fill(entries.counted, true);
+        for (int i : uncounted) {
+            entries.counted[i] = false;
+        }
+        findPartitionPins();
+        sitePins.computeSitePinKeys();
+        Map<Integer, Integer> sharedRouting = VersalRules.shareClockBufferRouting(design, entries, flatNetlist);
+        addStaticLoadSitePins();
+        int missingTies = getMissingTies();
+        if ((missingTies & StaticRouting.VCC_TIE) != 0) {
+            unroutedVccTies = true;
+        }
+        classifyEntries();
+        for (Map.Entry<Integer, Integer> e : sharedRouting.entrySet()) {
+            // (if the routing does not reach all the loads, both nets are partially routed)
+            entries.status[e.getKey()] = has(entries.status[e.getValue()], ROUTED) ? ROUTED_UNLISTED : PARTIAL;
+        }
+        classifyStaticNets(missingTies);
+        markConflicts();
+        series7.markInvalidSites(staticEntry);
+        series7.markOutputSitePinConflicts();
+        listUnplacedAsNoPlacedPins();
+        listPortsWithoutLoads();
+        listUncountedStaticNets();
+        return toResult();
+    }
+
+    /** Flattens the netlist, looking up the segments named like physical nets. */
+    private RouteStatusNetlist buildNetlist() {
         IntHashSet physNameHashes = new IntHashSet(design.getNets().size());
         for (Net net : design.getNets()) {
             physNameHashes.add(net.getName().hashCode());
@@ -213,20 +275,21 @@ public final class RouteStatusEngine {
         // (nets without connections need not be listed in the summary)
         RouteStatusNetlist flatNetlist = new RouteStatusNetlist(design, physNameHashes, !perNet);
         unconnectedNets = flatNetlist.getUnconnectedNets();
-        boolean[] hasLogicalStatic = new boolean[2];
-        // Loads of the static nets, and how many are unplaced
-        int[] staticLoads = new int[2];
-        int[] staticUnplacedLoads = new int[2];
-        List<List<FlatNet>> staticFlats = Arrays.asList(new ArrayList<>(), new ArrayList<>());
-        // The flat nets that are entries, found per list of the netlist (in parallel), then numbered
+        return flatNetlist;
+    }
+
+    /**
+     * Adds the flat nets that are entries (found per list of the netlist, in parallel, then
+     * numbered), and gathers the flat nets of GND and VCC.
+     */
+    private void addFlatEntries(RouteStatusNetlist flatNetlist) {
         List<List<FlatNet>> lists = flatNetlist.getFlatNetLists();
         FlatNet[][] listEntries = new FlatNet[lists.size()][];
         int[] listSizes = new int[lists.size()];
         List<FlatNet> statics = Collections.synchronizedList(new ArrayList<>());
-        List<FlatNet> macroTies = Collections.synchronizedList(new ArrayList<>());
         parallelFor(lists.size(), (l) -> {
             List<FlatNet> list = lists.get(l);
-            FlatNet[] entries = new FlatNet[list.size()];
+            FlatNet[] listed = new FlatNet[list.size()];
             int size = 0;
             for (FlatNet flat : list) {
                 if (flat.mergedInto != null) {
@@ -236,20 +299,15 @@ public final class RouteStatusEngine {
                     statics.add(flat);
                     continue;
                 }
-                if ((flat.insideMacro || (flat.leafLoads > 0 && flat.macroLeafLoads == flat.leafLoads && flat.leafInouts == 0
-                        && flat.blackBoxDrivers == 0))
-                        && flat.leafDrivers == 0 && !flat.hasTopPorts()) {
-                    // Undriven pins inside macro primitives are tied to a constant by Vivado (its
-                    // expansion of the macro includes the constant source), also where the net
-                    // reaches no pin outside LUT6_2 macros (its own site routing then does not matter)
+                if (isTiedInsideMacro(flat)) {
                     if (flat.insideMacro && flat.leafLoads > 0) {
                         macroTies.add(flat);
                     }
                     continue;
                 }
-                entries[size++] = flat;
+                listed[size++] = flat;
             }
-            listEntries[l] = entries;
+            listEntries[l] = listed;
             listSizes[l] = size;
         });
         for (FlatNet flat : statics) {
@@ -263,7 +321,7 @@ public final class RouteStatusEngine {
         for (int l = 0; l < lists.size(); l++) {
             listOffsets[l + 1] = listOffsets[l] + listSizes[l];
         }
-        int numFlat = listOffsets[lists.size()];
+        numFlat = listOffsets[lists.size()];
         FlatNet[] flats = new FlatNet[numFlat];
         parallelFor(lists.size(), (l) -> {
             for (int j = 0; j < listSizes[l]; j++) {
@@ -273,11 +331,58 @@ public final class RouteStatusEngine {
         });
         entries.flats.addAll(Arrays.asList(flats));
         entries.names.addAll(Collections.nCopies(numFlat, null));
-        // Each physical net is named after the segment naming a flat net, after another of its
-        // segments (an alias, which only matters if it has site routing), or is physical only
+    }
+
+    /**
+     * Checks whether a flat net only has undriven pins inside macro primitives, which Vivado ties to
+     * a constant (its expansion of the macro includes the constant source), also where the net
+     * reaches no pin outside LUT6_2 macros (its own site routing then does not matter).
+     */
+    private static boolean isTiedInsideMacro(FlatNet flat) {
+        boolean macroLoads = flat.insideMacro || (flat.leafLoads > 0 && flat.macroLeafLoads == flat.leafLoads
+                && flat.leafInouts == 0 && flat.blackBoxDrivers == 0);
+        return macroLoads && flat.leafDrivers == 0 && !flat.hasTopPorts();
+    }
+
+    /**
+     * Adds the physical nets of the flat entries, and the physical nets without a flat net as
+     * entries. Each physical net is named after the segment naming a flat net, after another of its
+     * segments (an alias, which only matters if it has site routing), or is physical only.
+     */
+    private void addPhysicalEntries(RouteStatusNetlist flatNetlist) {
         Net[] physNets = design.getNets().toArray(new Net[0]);
         Net[] flatPhysNets = new Net[numFlat];
-        // Per physical net: 1 + the entry of the flat net it is an alias of, or PHYSICAL_ONLY
+        int[] aliasOrPhysicalOnly = findFlatNetsOfPhysicalNets(flatNetlist, physNets, flatPhysNets);
+        entries.nets.addAll(Arrays.asList(flatPhysNets));
+        for (int i = 0; i < physNets.length; i++) {
+            Net net = physNets[i];
+            if (aliasOrPhysicalOnly[i] == PHYSICAL_ONLY) {
+                if (flatNetlist.isInsideBlackBox(net.getName())) {
+                    // Routing of the internals of a black box is not part of the design
+                    continue;
+                }
+                if (!net.hasPIPs() && net.getSiteInsts().isEmpty()) {
+                    // Neither is an empty net
+                    continue;
+                }
+                if (net.getName().equals(DUMMY_ROUTE_NET)) {
+                    dummyEntry = entries.size();
+                    uncounted.add(dummyEntry);
+                }
+                entries.add(null, net, net.getName());
+            } else if (aliasOrPhysicalOnly[i] > 0) {
+                addAlias(aliasOrPhysicalOnly[i] - 1, net);
+            }
+        }
+    }
+
+    /**
+     * Finds the flat net of each physical net, in parallel.
+     * @param flatPhysNets Set to the physical net named after each flat entry.
+     * @return Per physical net: 1 + the entry of the flat net it is an alias of, or PHYSICAL_ONLY
+     * (else 0).
+     */
+    private int[] findFlatNetsOfPhysicalNets(RouteStatusNetlist flatNetlist, Net[] physNets, Net[] flatPhysNets) {
         int[] aliasOrPhysicalOnly = new int[physNets.length];
         flatNetlist.prepareSegmentLookup();
         parallelFor(physNets.length, (i) -> {
@@ -301,49 +406,32 @@ public final class RouteStatusEngine {
                 aliasOrPhysicalOnly[i] = flat.entry + 1;
             }
         });
-        entries.nets.addAll(Arrays.asList(flatPhysNets));
-        List<Integer> uncounted = new ArrayList<>();
-        int dummyEntry = -1;
-        for (int i = 0; i < physNets.length; i++) {
-            Net net = physNets[i];
-            if (aliasOrPhysicalOnly[i] == PHYSICAL_ONLY) {
-                if (flatNetlist.isInsideBlackBox(net.getName())) {
-                    // Routing of the internals of a black box is not part of the design
-                    continue;
-                }
-                if (!net.hasPIPs() && net.getSiteInsts().isEmpty()) {
-                    // Neither is an empty net
-                    continue;
-                }
-                if (net.getName().equals(DUMMY_ROUTE_NET)) {
-                    dummyEntry = entries.flats.size();
-                    uncounted.add(dummyEntry);
-                }
-                entries.flats.add(null);
-                entries.nets.add(net);
-                entries.names.add(net.getName());
-            } else if (aliasOrPhysicalOnly[i] > 0) {
-                int entry = aliasOrPhysicalOnly[i] - 1;
-                Net named = entries.nets.get(entry);
-                if (net.hasPIPs() && (named == null || !named.hasPIPs())) {
-                    // The routing of a net stored under the name of another of its segments, which
-                    // Vivado uses when the net named after the flat net has none. (When several
-                    // physical nets of a flat net have routing, Vivado keeps that of one of them,
-                    // in an order not known here: that of the net named after the flat net is used.)
-                    entries.nets.set(entry, net);
-                    if (named != null) {
-                        entries.aliasNets.computeIfAbsent(entry, (k) -> new ArrayList<>()).add(named);
-                    }
-                } else {
-                    entries.aliasNets.computeIfAbsent(entry, (k) -> new ArrayList<>()).add(net);
-                }
-            }
-        }
+        return aliasOrPhysicalOnly;
+    }
 
-        // Vivado represents all GND (VCC) nets as a single net. It is listed if it is used physically
-        // or logically, but only counted in the summary if it is used logically. (A netlist with
-        // nets but without any primitive also lists GND, as internally routed.)
-        int[] staticEntry = {-1, -1};
+    /** Adds a physical net named after another segment of the flat net of an entry. */
+    private void addAlias(int entry, Net net) {
+        Net named = entries.nets.get(entry);
+        if (net.hasPIPs() && (named == null || !named.hasPIPs())) {
+            // The routing of a net stored under the name of another of its segments, which Vivado
+            // uses when the net named after the flat net has none. (When several physical nets of a
+            // flat net have routing, Vivado keeps that of one of them, in an order not known here:
+            // that of the net named after the flat net is used.)
+            entries.nets.set(entry, net);
+            if (named != null) {
+                entries.aliasNets.computeIfAbsent(entry, (k) -> new ArrayList<>()).add(named);
+            }
+        } else {
+            entries.aliasNets.computeIfAbsent(entry, (k) -> new ArrayList<>()).add(net);
+        }
+    }
+
+    /**
+     * Adds GND and VCC as entries. Vivado represents all GND (VCC) nets as a single net. It is listed
+     * if it is used physically or logically, but only counted in the summary if it is used logically.
+     * (A netlist with nets but without any primitive also lists GND, as internally routed.)
+     */
+    private void addStaticEntries() {
         boolean placeholderGnd = numFlat > 0 && !hasPrimitiveInstances();
         for (NetType type : new NetType[]{NetType.GND, NetType.VCC}) {
             String name = (type == NetType.GND) ? Net.GND_NET : Net.VCC_NET;
@@ -354,22 +442,15 @@ public final class RouteStatusEngine {
                 continue;
             }
             if (!hasLogical) {
-                uncounted.add(entries.flats.size());
+                uncounted.add(entries.size());
             }
-            staticEntry[type == NetType.GND ? 0 : 1] = entries.flats.size();
-            entries.flats.add(null);
-            entries.nets.add(net);
-            entries.names.add(name);
+            staticEntry[type == NetType.GND ? 0 : 1] = entries.size();
+            entries.add(null, net, name);
         }
+    }
 
-        int numEntries = entries.flats.size();
-        entries.status = new int[numEntries];
-        entries.nodeKeys = new long[numEntries][];
-        entries.counted = new boolean[numEntries];
-        Arrays.fill(entries.counted, true);
-        for (int i : uncounted) {
-            entries.counted[i] = false;
-        }
+    /** Finds the nodes of the partition pins that lead to another partition, and the nets on them. */
+    private void findPartitionPins() {
         List<PartitionPin> partitionPins = design.getPartitionPins();
         partitionPinKeys = new long[partitionPins.size()];
         int numPartitionPins = 0;
@@ -392,8 +473,10 @@ public final class RouteStatusEngine {
         }
         partitionPinKeys = Arrays.copyOf(partitionPinKeys, numPartitionPins);
         Arrays.sort(partitionPinKeys);
-        sitePins.computeSitePinKeys();
-        Map<Integer, Integer> sharedRouting = VersalRules.shareClockBufferRouting(design, entries, flatNetlist);
+    }
+
+    /** Adds the site pins of the loads of GND and VCC that need routing (see {@link SitePinClaims}). */
+    private void addStaticLoadSitePins() {
         for (int t = 0; t < 2; t++) {
             if (staticEntry[t] >= 0) {
                 sitePins.addStaticLoadSitePins(staticEntry[t], staticFlats.get(t), true);
@@ -405,15 +488,14 @@ public final class RouteStatusEngine {
             // not GND is routed
             sitePins.addStaticLoadSitePins(staticEntry[0], macroTies, false);
         }
-        int missingTies = getMissingTies();
-        if ((missingTies & StaticRouting.VCC_TIE) != 0) {
-            unroutedVccTies = true;
-        }
-        final int dummy = dummyEntry;
-        parallelFor(numEntries, (i) -> {
+    }
+
+    /** Classifies each entry (in parallel), see {@link #classifyNet(Net, FlatNet, int)}. */
+    private void classifyEntries() {
+        parallelFor(entries.size(), (i) -> {
             Net net = entries.nets.get(i);
             FlatNet flat = entries.flats.get(i);
-            if (i == dummy) {
+            if (i == dummyEntry) {
                 // Routing that reserves resources (for partial reconfiguration) is neither checked
                 // nor conflicting
                 boolean locked = net.getPIPs().stream().anyMatch(PIP::isPIPFixed);
@@ -422,41 +504,36 @@ public final class RouteStatusEngine {
             }
             entries.status[i] = (net == null && flat == null) ? INTRASITE : classifyNet(net, flat, i);
         });
-        for (Map.Entry<Integer, Integer> e : sharedRouting.entrySet()) {
-            // (if the routing does not reach all the loads, both nets are partially routed)
-            entries.status[e.getKey()] = has(entries.status[e.getValue()], ROUTED) ? ROUTED_UNLISTED : PARTIAL;
-        }
+    }
+
+    /**
+     * Classifies GND and VCC from their loads: missing ties, loads in several sites without routing,
+     * routing without loads, and unplaced loads.
+     */
+    private void classifyStaticNets(int missingTies) {
         if (unroutedVccTies && staticEntry[1] >= 0 && has(entries.status[staticEntry[1]], HAS_ROUTING)) {
             entries.status[staticEntry[1]] = (entries.status[staticEntry[1]] & ~ROUTED) | PARTIAL;
         }
-        if ((missingTies & StaticRouting.GND_TIE) != 0 && staticEntry[0] >= 0 && has(entries.status[staticEntry[0]], HAS_ROUTING)) {
+        if ((missingTies & StaticRouting.GND_TIE) != 0 && staticEntry[0] >= 0
+                && has(entries.status[staticEntry[0]], HAS_ROUTING)) {
             entries.status[staticEntry[0]] = (entries.status[staticEntry[0]] & ~ROUTED) | PARTIAL;
         }
         for (int t = 0; t < 2; t++) {
             int i = staticEntry[t];
-            if (i >= 0 && has(entries.status[i], INTRASITE)) {
-                // Not routed, but needs routing if its loads are not all in one site or any is
-                // fed from a site pin
-                Set<SiteInst> sites = new HashSet<>();
-                boolean needsRouting = false;
-                for (FlatNet flat : staticFlats.get(t)) {
-                    flat.addPhysicalPinSites(design, sites);
-                    if (sites.size() > 1 || (flat.firstSite != null && flat.hasLoadOnSitePin(design))) {
-                        needsRouting = true;
-                        break;
-                    }
-                }
-                if (needsRouting) {
-                    entries.status[i] = (entries.status[i] & ~INTRASITE) | UNROUTED;
-                }
+            if (i < 0) {
+                continue;
             }
-            if (i >= 0 && t == 0 && hasLogicalStatic[t] && has(entries.status[i], HAS_ROUTING)
+            if (has(entries.status[i], INTRASITE) && staticNeedsRouting(t)) {
+                // Not routed, but needs routing
+                entries.status[i] = (entries.status[i] & ~INTRASITE) | UNROUTED;
+            }
+            if (t == 0 && hasLogicalStatic[t] && has(entries.status[i], HAS_ROUTING)
                     && staticFlats.get(t).stream().noneMatch((f) -> f.hasLoadWithPhysicalPin(design))) {
                 // Like other nets, routing of GND without logical loads (with physical pins) leads
                 // nowhere (for VCC, enable pins without physical pins are loads, tied to VCC)
                 entries.status[i] = HAS_ROUTING | ANTENNAS | (entries.status[i] & LOCKED_NODES);
             }
-            if (i >= 0 && staticUnplacedLoads[t] > 0) {
+            if (staticUnplacedLoads[t] > 0) {
                 // Like other nets, static nets with unplaced loads are reported as such
                 int st = entries.status[i] & ~(ROUTED | INTRASITE | UNROUTED);
                 if (staticUnplacedLoads[t] == staticLoads[t]) {
@@ -467,7 +544,28 @@ public final class RouteStatusEngine {
                 }
             }
         }
+    }
 
+    /**
+     * Checks whether a static net (0 for GND, 1 for VCC) needs routing: if its loads are not all in
+     * one site, or any is fed from a site pin.
+     */
+    private boolean staticNeedsRouting(int t) {
+        Set<SiteInst> sites = new HashSet<>();
+        for (FlatNet flat : staticFlats.get(t)) {
+            flat.addPhysicalPinSites(design, sites);
+            if (sites.size() > 1 || (flat.firstSite != null && flat.hasLoadOnSitePin(design))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Marks the nets that use the same node (through routing or site pins) as conflicting (see
+     * {@link ConflictMarker}).
+     */
+    private void markConflicts() {
         sitePins.addClaimedLoadSitePins();
         for (int t = 0; t < 2; t++) {
             int i = staticEntry[t];
@@ -486,12 +584,14 @@ public final class RouteStatusEngine {
                 entries.status[staticEntry[t]] &= ~STATIC_CLAIMS;
             }
         }
-        series7.markInvalidSites(staticEntry);
-        series7.markOutputSitePinConflicts();
+    }
 
-        // The primary status of a net with some unplaced pins is UNPLACED unless it has conflicts or
-        // antennas. Vivado lists such nets as having no placed pins too, but only if any other net
-        // truly has no placed pins.
+    /**
+     * The primary status of a net with some unplaced pins is UNPLACED unless it has conflicts or
+     * antennas. Vivado lists such nets as having no placed pins too, but only if any other net truly
+     * has no placed pins.
+     */
+    private void listUnplacedAsNoPlacedPins() {
         boolean anyNoPlacedPins = false;
         for (int st : entries.status) {
             if ((has(st, UNPLACED_ALL) && !has(st, UNPLACED)) || has(st, NO_PLACED_PINS_ROUTED)) {
@@ -499,15 +599,22 @@ public final class RouteStatusEngine {
                 break;
             }
         }
-        if (anyNoPlacedPins) {
-            for (int i = 0; i < numEntries; i++) {
-                int st = entries.status[i];
-                if (has(st, UNPLACED) && !has(st, CONFLICTS | ANTENNAS)) {
-                    entries.status[i] |= UNPLACED_ALL;
-                }
+        if (!anyNoPlacedPins) {
+            return;
+        }
+        for (int i = 0; i < entries.status.length; i++) {
+            int st = entries.status[i];
+            if (has(st, UNPLACED) && !has(st, CONFLICTS | ANTENNAS)) {
+                entries.status[i] |= UNPLACED_ALL;
             }
         }
+    }
 
+    /**
+     * Vivado lists implicitly routed ports that have no loads as also having no loads, but only if
+     * the design has any other net with no loads.
+     */
+    private void listPortsWithoutLoads() {
         boolean anyNoLoads = false;
         for (int s : entries.status) {
             if (has(s, NOLOADS) && !has(s, HIERPORT)) {
@@ -515,44 +622,48 @@ public final class RouteStatusEngine {
                 break;
             }
         }
-        // Vivado lists implicitly routed ports that have no loads as also having no loads, but only
-        // if the design has any other net with no loads
-        if (anyNoLoads) {
-            for (int i = 0; i < numFlat; i++) {
-                if (has(entries.status[i], HIERPORT) && entries.flats.get(i).getLoads() == 0) {
-                    entries.status[i] |= NOLOADS;
-                }
+        if (!anyNoLoads) {
+            return;
+        }
+        for (int i = 0; i < numFlat; i++) {
+            if (has(entries.status[i], HIERPORT) && entries.flats.get(i).getLoads() == 0) {
+                entries.status[i] |= NOLOADS;
             }
         }
+    }
 
-        // Vivado lists the uncounted static nets only under statuses that some counted net has
-        if (!uncounted.isEmpty()) {
-            int countedStatuses = unconnectedNets > 0 ? INTRASITE : 0;
-            for (int i = 0; i < numEntries; i++) {
-                if (entries.counted[i]) {
-                    countedStatuses |= entries.status[i];
-                }
-            }
-            for (int i : uncounted) {
-                entries.status[i] &= countedStatuses;
+    /** Vivado lists the uncounted static nets only under statuses that some counted net has. */
+    private void listUncountedStaticNets() {
+        if (uncounted.isEmpty()) {
+            return;
+        }
+        int countedStatuses = unconnectedNets > 0 ? INTRASITE : 0;
+        for (int i = 0; i < entries.status.length; i++) {
+            if (entries.counted[i]) {
+                countedStatuses |= entries.status[i];
             }
         }
+        for (int i : uncounted) {
+            entries.status[i] &= countedStatuses;
+        }
+    }
 
+    /** Gets the summary, and with {@link #perNet}, the nets listed with each status. */
+    private ReportRouteStatusResult toResult() {
         ReportRouteStatusResult rrs = summarize();
-        if (perNet) {
-            rrs.netsByStatus = new EnumMap<>(NetRouteStatus.class);
+        if (!perNet) {
+            return rrs;
+        }
+        rrs.netsByStatus = new EnumMap<>(NetRouteStatus.class);
+        for (NetRouteStatus s : NetRouteStatus.values()) {
+            rrs.netsByStatus.put(s, new TreeSet<>());
+        }
+        for (int i = 0; i < entries.size(); i++) {
+            // Vivado escapes backslashes in the net names it lists
+            String name = entries.getName(i).replace("\\", "\\\\");
             for (NetRouteStatus s : NetRouteStatus.values()) {
-                rrs.netsByStatus.put(s, new TreeSet<>());
-            }
-            for (int i = 0; i < numEntries; i++) {
-                FlatNet flat = entries.flats.get(i);
-                String name = (flat != null) ? flat.getName() : entries.names.get(i);
-                // Vivado escapes backslashes in the net names it lists
-                name = name.replace("\\", "\\\\");
-                for (NetRouteStatus s : NetRouteStatus.values()) {
-                    if (has(entries.status[i], bit(s))) {
-                        rrs.netsByStatus.get(s).add(name);
-                    }
+                if (has(entries.status[i], bit(s))) {
+                    rrs.netsByStatus.get(s).add(name);
                 }
             }
         }
@@ -622,16 +733,20 @@ public final class RouteStatusEngine {
         ParallelismTools.invokeAll(runnables);
     }
 
+    /**
+     * Classifies a net from its connections, its placement and its routing.
+     * @param net Its physical net (null if none).
+     * @param flat Its flat net (null for physical-only and static nets).
+     * @return Its status (see {@link NetStatus}).
+     */
     private int classifyNet(Net net, FlatNet flat, int entry) {
         if (flat != null && flat.staticType != null) {
-            // (see isUnloadedStaticBusBit())
+            // (see FlatNet.isUnloadedStaticBusBit())
             return INTRASITE;
         }
         int s = 0;
-        boolean hasRouting = net != null && net.hasPIPs();
         RouteGraph graph = null;
-        boolean isStatic = net != null && net.isStaticNet();
-        if (hasRouting) {
+        if (net != null && net.hasPIPs()) {
             s |= HAS_ROUTING;
             graph = new RouteGraph(net);
             entries.nodeKeys[entry] = graph.nodes;
@@ -639,128 +754,181 @@ public final class RouteStatusEngine {
                 series7.findRoutethruInvalidSites(net, entry, graph.routethruNodes);
             }
         }
-
         if (flat != null) {
             int pinCount = flat.leafDrivers + flat.leafLoads + flat.leafInouts;
             if (pinCount > 0 && flat.unplacedLeafPins == pinCount && flat.placedPortDrivers + flat.placedPortLoads == 0) {
                 // A net with no placed pins but with routing has only antennas (and is counted, but
                 // not listed, as having no placed pins)
-                return hasRouting ? s | NO_PLACED_PINS_ROUTED | ANTENNAS | (graph.locked ? LOCKED_NODES : 0) : s | UNPLACED_ALL;
+                return (graph != null) ? s | NO_PLACED_PINS_ROUTED | ANTENNAS | lockedNodes(graph) : s | UNPLACED_ALL;
             }
             if (flat.unplacedLeafPins > 0) {
                 s |= UNPLACED;
             }
-            if (pinCount == 0) {
-                if (hasRouting && flat.blackBoxDrivers + flat.blackBoxLoads > 0 && partitionPinNets.contains(net)) {
-                    // Routing between the partition pins of black boxes (e.g. reconfigurable
-                    // modules) is checked like any other
-                    graph.analyze(net, entries.aliasNets.get(entry), false, null, null, partitionPinKeys, false);
-                    s |= graph.locked ? LOCKED_NODES : 0;
-                    if (graph.explicitGaps) {
-                        return s | GAPS | (graph.antennas ? ANTENNAS : 0);
-                    }
-                    return s | (graph.antennas ? ANTENNAS : ROUTED);
-                }
-                // Only connected to top level ports (and black boxes): an implicitly routed port if
-                // driven by a black box (or connected to an inout pin of one), and without loads if
-                // a black box drives nothing else
-                boolean blackBoxToPort = flat.blackBoxDrivers + flat.blackBoxInouts > 0
-                        && flat.placedPortLoads + flat.unplacedPortLoads > 0;
-                boolean blackBoxOnly = flat.blackBoxDrivers > 0 && flat.blackBoxLoads == 0 && !flat.hasTopPorts();
-                return s | (blackBoxToPort ? HIERPORT : blackBoxOnly ? NOLOADS : INTRASITE);
-            }
-            // (the output pin of a black box drives, from somewhere)
-            int drivers = flat.leafDrivers + flat.placedPortDrivers + flat.blackBoxDrivers;
-            int loads = flat.getLoads();
-            boolean hasUnplacedPorts = flat.unplacedPortDrivers + flat.unplacedPortLoads > 0;
-            if (hasUnplacedPorts && flat.firstSite != null && isIOSite(flat.firstSite)) {
-                // A port connected to an I/O buffer is placed on its pad (even if that is not stored)
-                drivers += flat.unplacedPortDrivers;
-                loads += flat.unplacedPortLoads;
-                hasUnplacedPorts = false;
-            }
-            boolean noPhysicalRouting = net == null || (!hasRouting && entries.sitePinKeys[entry] == null);
-            if (hasUnplacedPorts && drivers == 0 && noPhysicalRouting && !entries.aliasNets.containsKey(entry)
-                    && !flat.hasPinsInMultipleSites(design) && !flat.hasLoadOnLutInput(design)) {
-                // An unplaced input port without physical routing into a single site (but not into
-                // a LUT, whose inputs are only reached through site pins)
-                return s | INTRASITE;
-            }
-            if (hasUnplacedPorts && (drivers == 0 || loads == 0)) {
-                s |= HIERPORT;
-                if (hasRouting) {
-                    // Routing from/to the port leaves an explicit gap, unless it is to the
-                    // partition pin of the port (of a reconfigurable module), where it is not
-                    // connected to the port
-                    s |= flat.partitionPinPorts > 0 ? ANTENNAS | (graph.locked ? LOCKED_NODES : 0) : GAPS;
-                }
-                return s;
-            }
-            if (drivers == 0 && flat.leafInouts == 0 && loads > 0) {
-                // (an inout pin may drive)
-                if (hasRouting) {
-                    // Routing without a driver is all islands
-                    return s | NODRIVER | ANTENNAS | (graph.locked ? LOCKED_NODES : 0);
-                }
-                // Not routed, but needs routing if its loads are not all in one site
-                boolean needsRouting = (net != null && !storedPins(net).isEmpty()) || flat.hasPinsInMultipleSites(design);
-                return s | NODRIVER | (needsRouting ? PARTIAL : 0);
-            }
-            if (net == null && flat.unplacedLeafPins == 0 && !entries.aliasNets.containsKey(entry) && flat.leafDrivers > 0) {
-                // Without a physical net, only loads whose site pins follow from the placement and
-                // loads in the site of the driver are connected: in 7-series devices, loads in hard
-                // blocks reached through general routing; in others, loads on control pins
-                boolean series7 = design.getDevice().getSeries() == Series.Series7;
-                if ((series7 || design.getDevice().getSeries() == Series.Versal) && flat.hasRoutedHardBlockLoad(design)) {
-                    return s | UNROUTED;
-                }
-                int controlPins = series7 ? 0 : flat.getControlPinLoads(design);
-                if (controlPins != 0) {
-                    // Their site pins are also tied to VCC, without routing
-                    unroutedVccTies = true;
-                    return s | UNROUTED;
-                }
-                if (flat.hasPinsInMultipleSites(design) && flat.hasLoadOutsideDriverSite(design)) {
-                    return s | NOLOADS;
-                }
-            }
-            // (routing to a partition pin leads to loads in another partition, e.g. a reconfigurable
-            // module)
-            boolean toPartition = loads == 0 && hasRouting && partitionPinNets.contains(net);
-            if ((loads == 0 && !toPartition) || (pinCount == 1 && flat.leafInouts == 1 && !flat.hasTopPorts())) {
-                // Routing without loads leads nowhere (a lone inout pin has no load either)
-                if (hasRouting) {
-                    return s | ANTENNAS | (graph.locked ? LOCKED_NODES : 0);
-                }
-                // A hard block's pin without a physical pin is connected inside its site (or to
-                // another block without routing), and so are loads in black boxes
-                boolean internalDriver = flat.leafDrivers == 1 && pinCount == 1 && flat.firstCell != null
-                        && isHardBlockCell(flat.firstCell) && !RouteStatusNetlist.hasPhysicalPin(flat.firstCell, flat.firstPin);
-                return s | (internalDriver || (loads == 0 && flat.blackBoxLoads > 0) ? INTRASITE : NOLOADS);
+            int st = (pinCount == 0) ? classifyWithoutLeafPins(net, flat, entry, s, graph)
+                    : classifyByConnections(net, flat, entry, s, graph);
+            if (st != UNDECIDED) {
+                return st;
             }
         }
-
-        if (flat != null && flat.blackBoxDrivers > 0 && flat.leafDrivers == 0 && !hasRouting && !has(s, UNPLACED)) {
+        if (flat != null && flat.blackBoxDrivers > 0 && flat.leafDrivers == 0 && graph == null && !has(s, UNPLACED)) {
             // Driven by a black box: needs routing to its loads
             return s | UNROUTED;
         }
+        return (graph == null) ? classifyWithoutRouting(net, flat, entry, s) : classifyRouting(net, flat, entry, s, graph);
+    }
 
-        // A net with some unplaced pins is reported as such instead of being routed, unrouted or
-        // internal to a site; whether it is partially routed still is
-        boolean someUnplaced = has(s, UNPLACED);
-        boolean usesInputSitePin = entries.sitePinKeys[entry] != null;
-        if (someUnplaced && !hasRouting) {
-            // Partially routed if a placed driver has loads (whether placed or not, as unplaced
-            // loads are unrouted) outside its site, or if the placed pins are in different sites
-            boolean placedDriver = flat.leafDrivers > flat.unplacedLeafDrivers || flat.placedPortDrivers > 0;
-            boolean leavesSite = (net != null && (!storedPins(net).isEmpty() || usesOutputSitePin(net))) || usesInputSitePin;
-            return (placedDriver && flat.getLoads() > 0 && leavesSite) || flat.hasPinsInMultipleSites(design) ? s | PARTIAL : s;
+    /** A status not decided by a step of {@link #classifyNet(Net, FlatNet, int)} (statuses are not negative) */
+    private static final int UNDECIDED = -1;
+
+    private static int lockedNodes(RouteGraph graph) {
+        return graph.locked ? LOCKED_NODES : 0;
+    }
+
+    /**
+     * Classifies a net without pins on leaf cells: only connected to top level ports and black boxes
+     * (unless its routing connects the partition pins of black boxes).
+     */
+    private int classifyWithoutLeafPins(Net net, FlatNet flat, int entry, int s, RouteGraph graph) {
+        if (graph != null && flat.blackBoxDrivers + flat.blackBoxLoads > 0 && partitionPinNets.contains(net)) {
+            // Routing between the partition pins of black boxes (e.g. reconfigurable modules) is
+            // checked like any other
+            graph.analyze(net, entries.aliasNets.get(entry), false, null, null, partitionPinKeys, false);
+            s |= lockedNodes(graph);
+            if (graph.explicitGaps) {
+                return s | GAPS | (graph.antennas ? ANTENNAS : 0);
+            }
+            return s | (graph.antennas ? ANTENNAS : ROUTED);
         }
-        if ((net == null || storedPins(net).isEmpty()) && !hasRouting && !usesInputSitePin
+        // Only connected to top level ports (and black boxes): an implicitly routed port if driven by
+        // a black box (or connected to an inout pin of one), and without loads if a black box drives
+        // nothing else
+        boolean blackBoxToPort = flat.blackBoxDrivers + flat.blackBoxInouts > 0
+                && flat.placedPortLoads + flat.unplacedPortLoads > 0;
+        boolean blackBoxOnly = flat.blackBoxDrivers > 0 && flat.blackBoxLoads == 0 && !flat.hasTopPorts();
+        return s | (blackBoxToPort ? HIERPORT : blackBoxOnly ? NOLOADS : INTRASITE);
+    }
+
+    /**
+     * Classifies a net with pins on leaf cells by its drivers and loads: unplaced ports, no driver,
+     * no physical net, or no loads.
+     * @return Its status, or {@link #UNDECIDED}.
+     */
+    private int classifyByConnections(Net net, FlatNet flat, int entry, int s, RouteGraph graph) {
+        // (the output pin of a black box drives, from somewhere)
+        int drivers = flat.leafDrivers + flat.placedPortDrivers + flat.blackBoxDrivers;
+        int loads = flat.getLoads();
+        boolean hasUnplacedPorts = flat.unplacedPortDrivers + flat.unplacedPortLoads > 0;
+        if (hasUnplacedPorts && flat.firstSite != null && isIOSite(flat.firstSite)) {
+            // A port connected to an I/O buffer is placed on its pad (even if that is not stored)
+            drivers += flat.unplacedPortDrivers;
+            loads += flat.unplacedPortLoads;
+            hasUnplacedPorts = false;
+        }
+        if (hasUnplacedPorts) {
+            int st = classifyUnplacedPorts(net, flat, entry, s, graph, drivers, loads);
+            if (st != UNDECIDED) {
+                return st;
+            }
+        }
+        if (drivers == 0 && flat.leafInouts == 0 && loads > 0) {
+            // (an inout pin may drive)
+            if (graph != null) {
+                // Routing without a driver is all islands
+                return s | NODRIVER | ANTENNAS | lockedNodes(graph);
+            }
+            // Not routed, but needs routing if its loads are not all in one site
+            boolean needsRouting = (net != null && !storedPins(net).isEmpty()) || flat.hasPinsInMultipleSites(design);
+            return s | NODRIVER | (needsRouting ? PARTIAL : 0);
+        }
+        if (net == null && flat.unplacedLeafPins == 0 && !entries.aliasNets.containsKey(entry) && flat.leafDrivers > 0) {
+            int st = classifyWithoutPhysicalNet(flat, s);
+            if (st != UNDECIDED) {
+                return st;
+            }
+        }
+        // (routing to a partition pin leads to loads in another partition, e.g. a reconfigurable
+        // module)
+        boolean toPartition = loads == 0 && graph != null && partitionPinNets.contains(net);
+        int pinCount = flat.leafDrivers + flat.leafLoads + flat.leafInouts;
+        if ((loads == 0 && !toPartition) || (pinCount == 1 && flat.leafInouts == 1 && !flat.hasTopPorts())) {
+            // Routing without loads leads nowhere (a lone inout pin has no load either)
+            if (graph != null) {
+                return s | ANTENNAS | lockedNodes(graph);
+            }
+            // A hard block's pin without a physical pin is connected inside its site (or to another
+            // block without routing), and so are loads in black boxes
+            boolean internalDriver = flat.leafDrivers == 1 && pinCount == 1 && flat.firstCell != null
+                    && isHardBlockCell(flat.firstCell) && !RouteStatusNetlist.hasPhysicalPin(flat.firstCell, flat.firstPin);
+            return s | (internalDriver || (loads == 0 && flat.blackBoxLoads > 0) ? INTRASITE : NOLOADS);
+        }
+        return UNDECIDED;
+    }
+
+    /**
+     * Classifies a net connected to top level ports that are not placed.
+     * @return Its status, or {@link #UNDECIDED}.
+     */
+    private int classifyUnplacedPorts(Net net, FlatNet flat, int entry, int s, RouteGraph graph, int drivers,
+                                      int loads) {
+        boolean noPhysicalRouting = net == null || (graph == null && entries.sitePinKeys[entry] == null);
+        if (drivers == 0 && noPhysicalRouting && !entries.aliasNets.containsKey(entry)
+                && !flat.hasPinsInMultipleSites(design) && !flat.hasLoadOnLutInput(design)) {
+            // An unplaced input port without physical routing into a single site (but not into a
+            // LUT, whose inputs are only reached through site pins)
+            return s | INTRASITE;
+        }
+        if (drivers == 0 || loads == 0) {
+            s |= HIERPORT;
+            if (graph != null) {
+                // Routing from/to the port leaves an explicit gap, unless it is to the partition pin
+                // of the port (of a reconfigurable module), where it is not connected to the port
+                s |= flat.partitionPinPorts > 0 ? ANTENNAS | lockedNodes(graph) : GAPS;
+            }
+            return s;
+        }
+        return UNDECIDED;
+    }
+
+    /**
+     * Classifies a placed net without a physical net. Only loads whose site pins follow from the
+     * placement and loads in the site of the driver are connected: in 7-series devices, loads in
+     * hard blocks reached through general routing; in others, loads on control pins.
+     * @return Its status, or {@link #UNDECIDED}.
+     */
+    private int classifyWithoutPhysicalNet(FlatNet flat, int s) {
+        boolean series7 = design.getDevice().getSeries() == Series.Series7;
+        if ((series7 || design.getDevice().getSeries() == Series.Versal) && flat.hasRoutedHardBlockLoad(design)) {
+            return s | UNROUTED;
+        }
+        int controlPins = series7 ? 0 : flat.getControlPinLoads(design);
+        if (controlPins != 0) {
+            // Their site pins are also tied to VCC, without routing
+            unroutedVccTies = true;
+            return s | UNROUTED;
+        }
+        if (flat.hasPinsInMultipleSites(design) && flat.hasLoadOutsideDriverSite(design)) {
+            return s | NOLOADS;
+        }
+        return UNDECIDED;
+    }
+
+    /** Classifies a net without routing (that needs it, or is internal to a site). */
+    private int classifyWithoutRouting(Net net, FlatNet flat, int entry, int s) {
+        boolean usesInputSitePin = entries.sitePinKeys[entry] != null;
+        if (has(s, UNPLACED)) {
+            // A net with some unplaced pins is reported as such instead of being routed, unrouted or
+            // internal to a site. It is partially routed if a placed driver has loads (whether placed
+            // or not, as unplaced loads are unrouted) outside its site, or if the placed pins are in
+            // different sites.
+            boolean leavesSite = (net != null && (!storedPins(net).isEmpty() || usesOutputSitePin(net))) || usesInputSitePin;
+            return (flat.hasPlacedDriver() && flat.getLoads() > 0 && leavesSite) || flat.hasPinsInMultipleSites(design)
+                    ? s | PARTIAL : s;
+        }
+        if ((net == null || storedPins(net).isEmpty()) && !usesInputSitePin
                 && (flat == null || !flat.hasPinsInMultipleSites(design))) {
             if (flat != null && flat.multipleSites && flat.hasOnlyLeafClockClearLoads(design)) {
-                // The CLRB_LEAF pins of clock buffers are only connected through routing (to the
-                // leaf clock dividers, see isLeafClockClearPin())
+                // The CLRB_LEAF pins of clock buffers are only connected through routing (to the leaf
+                // clock dividers, see VersalRules.isLeafClockClearPin())
                 return s | NOLOADS;
             }
             if (flat != null && flat.multipleSites && flat.secondCell != null && flat.secondCell.getType().startsWith("RAMB")
@@ -770,39 +938,24 @@ public final class RouteStatusEngine {
             }
             return s | INTRASITE;
         }
-        if (!hasRouting) {
-            return s | UNROUTED;
-        }
+        return s | UNROUTED;
+    }
 
+    /** Classifies a net with routing, from the analysis of its routing (see {@link RouteGraph}). */
+    private int classifyRouting(Net net, FlatNet flat, int entry, int s, RouteGraph graph) {
+        boolean someUnplaced = has(s, UNPLACED);
         long[] staleKeys = null;
         if (someUnplaced && flat != null) {
-            boolean placedDriver = flat.leafDrivers > flat.unplacedLeafDrivers || flat.placedPortDrivers > 0;
-            if (!placedDriver && !partitionPinNets.contains(net)) {
-                // The routing of a net whose driver is unplaced is all islands (unless it comes
-                // from another partition)
-                return s | ANTENNAS | (graph.locked ? LOCKED_NODES : 0) | (flat.hasPinsInMultipleSites(design) ? PARTIAL : 0);
+            if (!flat.hasPlacedDriver() && !partitionPinNets.contains(net)) {
+                // The routing of a net whose driver is unplaced is all islands (unless it comes from
+                // another partition)
+                return s | ANTENNAS | lockedNodes(graph) | (flat.hasPinsInMultipleSites(design) ? PARTIAL : 0);
             }
             // Site pins left in sites without a placed cell of the net are not loads
             staleKeys = getStaleSitePinKeys(net, null);
         }
-        boolean placedSource = flat != null && (flat.leafDrivers > flat.unplacedLeafDrivers || flat.placedPortDrivers > 0);
-        List<Net> aliases = entries.aliasNets.get(entry);
-        graph.analyze(net, aliases, isStatic, entries.sitePinKeys[entry], staleKeys, partitionPinKeys, placedSource);
-        if (graph.reachedSinks < graph.sinks && entries.sitePinKeys[entry] != null && staleKeys == null) {
-            // Site routing is sometimes left behind (e.g. static ties for LUT pins, or where
-            // routing bounces through a site pin) where no placed cell uses it: such site pins
-            // are not loads
-            graph.analyze(net, aliases, isStatic, entries.sitePinKeys[entry],
-                    getStaleSitePinKeys(net, isStatic ? net.getType() : null), partitionPinKeys, placedSource);
-        } else if (graph.leafSinks != null && staleKeys == null && hasStaleSitePin(net, graph.leafSinks)) {
-            // Neither is a site pin (even with a SitePinInst) where routing ends, if the net's site
-            // routing from it reaches no placed cell: the routing to it is an antenna
-            graph.analyze(net, aliases, isStatic, entries.sitePinKeys[entry], getStaleSitePinKeys(net, null),
-                    partitionPinKeys, placedSource);
-        }
-        if (graph.locked) {
-            s |= LOCKED_NODES;
-        }
+        analyzeRouting(net, flat, entry, graph, staleKeys);
+        s |= lockedNodes(graph);
         if (graph.explicitGaps) {
             // Neither fully nor partially routed
             return s | GAPS | (graph.antennas ? ANTENNAS : 0);
@@ -815,25 +968,56 @@ public final class RouteStatusEngine {
         }
         // Other placed drivers (of a net with several) whose output site pins the routing does not
         // start from are unrouted
-        int unroutedDrivers = (!isStatic && flat != null && flat.leafDrivers - flat.unplacedLeafDrivers > 1)
+        int unroutedDrivers = (!net.isStaticNet() && flat != null && flat.leafDrivers - flat.unplacedLeafDrivers > 1)
                 ? sitePins.findUnroutedDriverPins(net, flat, graph, entry) : 0;
         if ((unroutedDrivers & SitePinClaims.DRIVER_PIN_CONFLICT) != 0) {
             s |= CONFLICTS;
         }
-        boolean sinksReached = graph.reachedSinks == graph.sinks;
-        if (!sinksReached && graph.undrivenSource && !graph.rooted && graph.reachedSinks + graph.islandSinks == graph.sinks
-                && flat != null && UltraScaleRules.hasOnlyLoadsInDriverSite(design, flat)) {
-            // Routing only from output site pins that the site routing of the net does not drive
-            // leads nowhere (antennas), but a driver whose loads are all in its own site needs no
-            // output site pin: its loads that the routing leads to are routed
-            sinksReached = true;
-        }
+        boolean sinksReached = graph.reachedSinks == graph.sinks || reachesLoadsInDriverSite(flat, graph);
         if (!sinksReached || graph.unroutedSource || unroutedDrivers != 0) {
             s |= PARTIAL;
         } else if (!graph.antennas && !someUnplaced && !has(s, CONFLICTS)) {
             s |= ROUTED;
         }
         return s;
+    }
+
+    /**
+     * Analyzes the routing of a net, and again without the site pins found to be stale (whose site
+     * routing reaches no placed cell), which are not loads.
+     * @param staleKeys The keys of the site pins known to be stale (of a net with unplaced pins), or
+     * null.
+     */
+    private void analyzeRouting(Net net, FlatNet flat, int entry, RouteGraph graph, long[] staleKeys) {
+        boolean isStatic = net.isStaticNet();
+        boolean placedSource = flat != null && flat.hasPlacedDriver();
+        List<Net> aliases = entries.aliasNets.get(entry);
+        long[] sitePinKeys = entries.sitePinKeys[entry];
+        graph.analyze(net, aliases, isStatic, sitePinKeys, staleKeys, partitionPinKeys, placedSource);
+        if (staleKeys != null) {
+            return;
+        }
+        if (graph.reachedSinks < graph.sinks && sitePinKeys != null) {
+            // Site routing is sometimes left behind (e.g. static ties for LUT pins, or where routing
+            // bounces through a site pin) where no placed cell uses it: such site pins are not loads
+            graph.analyze(net, aliases, isStatic, sitePinKeys, getStaleSitePinKeys(net, isStatic ? net.getType() : null),
+                    partitionPinKeys, placedSource);
+        } else if (graph.leafSinks != null && hasStaleSitePin(net, graph.leafSinks)) {
+            // Neither is a site pin (even with a SitePinInst) where routing ends, if the net's site
+            // routing from it reaches no placed cell: the routing to it is an antenna
+            graph.analyze(net, aliases, isStatic, sitePinKeys, getStaleSitePinKeys(net, null), partitionPinKeys,
+                    placedSource);
+        }
+    }
+
+    /**
+     * Checks whether routing that only starts from output site pins that the site routing of the net
+     * does not drive (antennas) still reaches the loads, as a driver whose loads are all in its own
+     * site needs no output site pin: its loads that the routing leads to are routed.
+     */
+    private boolean reachesLoadsInDriverSite(FlatNet flat, RouteGraph graph) {
+        return graph.undrivenSource && !graph.rooted && graph.reachedSinks + graph.islandSinks == graph.sinks
+                && flat != null && UltraScaleRules.hasOnlyLoadsInDriverSite(design, flat);
     }
 
     /**
@@ -845,64 +1029,74 @@ public final class RouteStatusEngine {
         rrs.logicalNets = (int) unconnectedNets;
         rrs.netsNotNeedingRouting = (int) unconnectedNets;
         rrs.internallyRoutedNets = (int) unconnectedNets;
-        final int errors = UNPLACED | PARTIAL | CONFLICTS | ANTENNAS | NODRIVER;
         for (int i = 0; i < entries.status.length; i++) {
-            if (!entries.counted[i]) {
-                continue;
-            }
-            int s = entries.status[i];
-            rrs.logicalNets++;
-            // Nets are counted with each error (or property) they are listed with, whatever else
-            // they are counted as
-            if (has(s, LOCKED_NODES)) {
-                rrs.netsWithFixedRouting++;
-            }
-            if (has(s, GAPS)) {
-                rrs.netsWithExplicitGaps++;
-            }
-            if (has(s, UNPLACED)) {
-                rrs.netsWithSomeUnplacedPins++;
-            }
-            if (has(s, PARTIAL)) {
-                rrs.netsWithSomeUnroutedPins++;
-            }
-            if (has(s, CONFLICTS)) {
-                rrs.netsWithResourceConflicts++;
-            }
-            if (has(s, ANTENNAS)) {
-                rrs.netsWithAntennasOrIslands++;
-            }
-            if (has(s, NODRIVER)) {
-                rrs.netsWithNoDriver++;
-            }
-            if (has(s, errors)) {
-                rrs.netsWithRoutingErrors++;
-            }
-            // ... and in one category
-            if ((has(s, UNPLACED_ALL) && !has(s, UNPLACED)) || has(s, NO_PLACED_PINS_ROUTED)) {
-                rrs.netsWithNoPlacedPins++;
-            } else if (has(s, NODRIVER)) {
-                rrs.netsNotNeedingRouting++;
-            } else if (has(s, HIERPORT)) {
-                rrs.netsNotNeedingRouting++;
-                rrs.implicitlyRoutedPorts++;
-            } else if (has(s, UNPLACED)) {
-                // (neither routable nor not needing routing)
-            } else if (has(s, NOLOADS)) {
-                rrs.netsNotNeedingRouting++;
-                rrs.netsWithNoLoads++;
-            } else if (has(s, INTRASITE)) {
-                rrs.netsNotNeedingRouting++;
-                rrs.internallyRoutedNets++;
-            } else {
-                rrs.routableNets++;
-                if (has(s, UNROUTED)) {
-                    rrs.unroutedNets++;
-                } else if (has(s, ROUTED | ROUTED_UNLISTED)) {
-                    rrs.fullyRoutedNets++;
-                }
+            if (entries.counted[i]) {
+                rrs.logicalNets++;
+                countErrors(rrs, entries.status[i]);
+                countCategory(rrs, entries.status[i]);
             }
         }
         return rrs;
+    }
+
+    /** The statuses that are routing errors */
+    private static final int ERRORS = UNPLACED | PARTIAL | CONFLICTS | ANTENNAS | NODRIVER;
+
+    /**
+     * Counts a net with each error (or property) it is listed with, whatever else it is counted as.
+     */
+    private static void countErrors(ReportRouteStatusResult rrs, int s) {
+        if (has(s, LOCKED_NODES)) {
+            rrs.netsWithFixedRouting++;
+        }
+        if (has(s, GAPS)) {
+            rrs.netsWithExplicitGaps++;
+        }
+        if (has(s, UNPLACED)) {
+            rrs.netsWithSomeUnplacedPins++;
+        }
+        if (has(s, PARTIAL)) {
+            rrs.netsWithSomeUnroutedPins++;
+        }
+        if (has(s, CONFLICTS)) {
+            rrs.netsWithResourceConflicts++;
+        }
+        if (has(s, ANTENNAS)) {
+            rrs.netsWithAntennasOrIslands++;
+        }
+        if (has(s, NODRIVER)) {
+            rrs.netsWithNoDriver++;
+        }
+        if (has(s, ERRORS)) {
+            rrs.netsWithRoutingErrors++;
+        }
+    }
+
+    /** Counts a net in one category (and subcategory) of the summary. */
+    private static void countCategory(ReportRouteStatusResult rrs, int s) {
+        if ((has(s, UNPLACED_ALL) && !has(s, UNPLACED)) || has(s, NO_PLACED_PINS_ROUTED)) {
+            rrs.netsWithNoPlacedPins++;
+        } else if (has(s, NODRIVER)) {
+            rrs.netsNotNeedingRouting++;
+        } else if (has(s, HIERPORT)) {
+            rrs.netsNotNeedingRouting++;
+            rrs.implicitlyRoutedPorts++;
+        } else if (has(s, UNPLACED)) {
+            // (neither routable nor not needing routing)
+            return;
+        } else if (has(s, NOLOADS)) {
+            rrs.netsNotNeedingRouting++;
+            rrs.netsWithNoLoads++;
+        } else if (has(s, INTRASITE)) {
+            rrs.netsNotNeedingRouting++;
+            rrs.internallyRoutedNets++;
+        } else {
+            rrs.routableNets++;
+            if (has(s, UNROUTED)) {
+                rrs.unroutedNets++;
+            } else if (has(s, ROUTED | ROUTED_UNLISTED)) {
+                rrs.fullyRoutedNets++;
+            }
+        }
     }
 }

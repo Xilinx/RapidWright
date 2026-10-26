@@ -166,23 +166,48 @@ final class SitePinClaims {
         return pins;
     }
 
-    /** Computes {@link Entries#sitePinKeys} in one pass over all site instances. */
+    /** Computes {@link Entries#sitePinKeys} in one pass over all site instances (in parallel chunks). */
     void computeSitePinKeys() {
-        entries.sitePinKeys = new long[entries.nets.size()][];
-        entries.driverPinKeys = new long[entries.nets.size()][];
-        Map<Net, Integer> entryOf = new IdentityHashMap<>(entries.nets.size());
-        for (int i = 0; i < entries.nets.size(); i++) {
-            if (entries.nets.get(i) != null) {
-                entryOf.put(entries.nets.get(i), i);
-            }
-        }
-        for (Map.Entry<Integer, List<Net>> e : entries.aliasNets.entrySet()) {
-            for (Net alias : e.getValue()) {
-                entryOf.put(alias, e.getKey());
-            }
-        }
+        entries.sitePinKeys = new long[entries.size()][];
+        entries.driverPinKeys = new long[entries.size()][];
+        Map<Net, Integer> entryOf = entries.getEntryOfNet();
         List<SiteInst> siteInsts = new ArrayList<>(design.getSiteInsts());
-        // The sites of top level ports (whose cells are named after the bits of the ports)
+        Set<SiteInst> portSites = getPortSites();
+        int chunks = Math.max(1, Math.min(siteInsts.size() / 1024, ParallelismTools.maxParallelism() * 4));
+        KeyBuffer[] found = new KeyBuffer[chunks];
+        parallelFor(chunks, (c) -> {
+            int from = (int) ((long) siteInsts.size() * c / chunks);
+            int to = (int) ((long) siteInsts.size() * (c + 1) / chunks);
+            found[c] = new KeyBuffer(Math.max(64, Math.min((to - from) * 8, 1 << 16)));
+            for (int s = from; s < to; s++) {
+                addSitePinKeys(siteInsts.get(s), entryOf, portSites, found[c]);
+            }
+        });
+        int[] counts = new int[entries.size()];
+        for (KeyBuffer buffer : found) {
+            for (int i = 0; i < buffer.size; i++) {
+                counts[buffer.entries[i]]++;
+            }
+        }
+        int[] fill = new int[entries.size()];
+        for (KeyBuffer buffer : found) {
+            for (int i = 0; i < buffer.size; i++) {
+                int entry = buffer.entries[i];
+                if (entries.sitePinKeys[entry] == null) {
+                    entries.sitePinKeys[entry] = new long[counts[entry]];
+                }
+                entries.sitePinKeys[entry][fill[entry]++] = buffer.keys[i];
+            }
+        }
+        for (int i = 0; i < entries.sitePinKeys.length; i++) {
+            if (entries.sitePinKeys[i] != null) {
+                entries.sitePinKeys[i] = sortedDistinct(entries.sitePinKeys[i], entries.sitePinKeys[i].length);
+            }
+        }
+    }
+
+    /** Gets the sites of top level ports (whose cells are named after the bits of the ports). */
+    private Set<SiteInst> getPortSites() {
         Set<SiteInst> portSites = Collections.newSetFromMap(new IdentityHashMap<>());
         for (EDIFPort port : design.getNetlist().getTopCell().getPorts()) {
             int width = port.isBus() ? port.getWidth() : 1;
@@ -193,72 +218,53 @@ final class SitePinClaims {
                 }
             }
         }
-        int chunks = Math.max(1, Math.min(siteInsts.size() / 1024, ParallelismTools.maxParallelism() * 4));
-        // Per chunk: the entries and node keys found, in parallel arrays
-        int[][] chunkEntries = new int[chunks][];
-        long[][] chunkKeys = new long[chunks][];
-        int[] chunkSizes = new int[chunks];
-        parallelFor(chunks, (c) -> {
-            int from = (int) ((long) siteInsts.size() * c / chunks);
-            int to = (int) ((long) siteInsts.size() * (c + 1) / chunks);
-            int[] entries = new int[Math.max(64, Math.min((to - from) * 8, 1 << 16))];
-            long[] keys = new long[entries.length];
-            int size = 0;
-            for (int s = from; s < to; s++) {
-                SiteInst si = siteInsts.get(s);
-                InputSitePins pins = getInputSitePins(si);
-                int[] pinIndices = null;
-                for (int p = 0; p < pins.siteWires.length; p++) {
-                    int siteWireIndex = pins.siteWireIndices[p];
-                    Net net = (siteWireIndex >= 0) ? si.getNetFromSiteWireIndex(siteWireIndex)
-                            : si.getNetFromSiteWire(pins.siteWires[p]);
-                    Integer entry = (net == null) ? null : entryOf.get(net);
-                    if (entry == null) {
-                        continue;
-                    }
-                    if (pins.isPad[p] || (portSites.contains(si) && isDrivenByPort(si, pins.otherBELs[p]))) {
-                        // (an I/O pad is connected to its top level port without routing)
-                        continue;
-                    }
-                    if (pinIndices == null) {
-                        pinIndices = pins.getPinIndices(si.getSite());
-                    }
-                    int pinIndex = pinIndices[p];
-                    Node node = (pinIndex < 0) ? null : si.getSite().getConnectedNode(pinIndex);
-                    if (node == null) {
-                        continue;
-                    }
-                    if (size == keys.length) {
-                        entries = Arrays.copyOf(entries, size * 2);
-                        keys = Arrays.copyOf(keys, size * 2);
-                    }
-                    entries[size] = entry;
-                    keys[size++] = nodeKey(node);
-                }
-            }
-            chunkEntries[c] = entries;
-            chunkKeys[c] = keys;
-            chunkSizes[c] = size;
-        });
-        int[] counts = new int[entries.nets.size()];
-        for (int c = 0; c < chunks; c++) {
-            for (int i = 0; i < chunkSizes[c]; i++) {
-                counts[chunkEntries[c][i]]++;
-            }
+        return portSites;
+    }
+
+    /** Entries with the keys of nodes they use, in parallel arrays */
+    private static final class KeyBuffer {
+        int[] entries;
+        long[] keys;
+        int size;
+
+        KeyBuffer(int capacity) {
+            entries = new int[capacity];
+            keys = new long[capacity];
         }
-        int[] fill = new int[entries.nets.size()];
-        for (int c = 0; c < chunks; c++) {
-            for (int i = 0; i < chunkSizes[c]; i++) {
-                int entry = chunkEntries[c][i];
-                if (entries.sitePinKeys[entry] == null) {
-                    entries.sitePinKeys[entry] = new long[counts[entry]];
-                }
-                entries.sitePinKeys[entry][fill[entry]++] = chunkKeys[c][i];
+
+        void add(int entry, long key) {
+            if (size == keys.length) {
+                entries = Arrays.copyOf(entries, size * 2);
+                keys = Arrays.copyOf(keys, size * 2);
             }
+            entries[size] = entry;
+            keys[size++] = key;
         }
-        for (int i = 0; i < entries.sitePinKeys.length; i++) {
-            if (entries.sitePinKeys[i] != null) {
-                entries.sitePinKeys[i] = sortedDistinct(entries.sitePinKeys[i], entries.sitePinKeys[i].length);
+    }
+
+    /** Adds the input site pins of a site that the site routing of an entry uses to a buffer. */
+    private void addSitePinKeys(SiteInst si, Map<Net, Integer> entryOf, Set<SiteInst> portSites, KeyBuffer buffer) {
+        InputSitePins pins = getInputSitePins(si);
+        int[] pinIndices = null;
+        for (int p = 0; p < pins.siteWires.length; p++) {
+            int siteWireIndex = pins.siteWireIndices[p];
+            Net net = (siteWireIndex >= 0) ? si.getNetFromSiteWireIndex(siteWireIndex)
+                    : si.getNetFromSiteWire(pins.siteWires[p]);
+            Integer entry = (net == null) ? null : entryOf.get(net);
+            if (entry == null) {
+                continue;
+            }
+            if (pins.isPad[p] || (portSites.contains(si) && isDrivenByPort(si, pins.otherBELs[p]))) {
+                // (an I/O pad is connected to its top level port without routing)
+                continue;
+            }
+            if (pinIndices == null) {
+                pinIndices = pins.getPinIndices(si.getSite());
+            }
+            int pinIndex = pinIndices[p];
+            Node node = (pinIndex < 0) ? null : si.getSite().getConnectedNode(pinIndex);
+            if (node != null) {
+                buffer.add(entry, nodeKey(node));
             }
         }
     }

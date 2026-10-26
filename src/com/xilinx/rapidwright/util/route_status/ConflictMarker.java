@@ -50,46 +50,45 @@ final class ConflictMarker {
     /**
      * Marks nets that use the same node as another net as conflicting, by sorting the keys of all
      * used nodes, each tagged with the index of its net.
+     * @param pack Whether to pack the node keys and entries into longs where they fit (else as for
+     * huge designs, see {@link #markFallback(Entries)}).
      */
     static void mark(Entries entries, boolean pack) {
-        int numEntries = entries.nodeKeys.length;
         long total = 0;
+        long maxTile = 0;
+        long maxWire = 0;
         for (long[] keys : entries.nodeKeys) {
-            if (keys != null) {
-                total += keys.length;
+            if (keys == null) {
+                continue;
+            }
+            total += keys.length;
+            for (long k : keys) {
+                maxTile = Math.max(maxTile, k >>> 32);
+                maxWire = Math.max(maxWire, k & 0xffffffffL);
             }
         }
         if (total == 0) {
             return;
         }
-        int entryBits = 64 - Long.numberOfLeadingZeros(Math.max(1, numEntries - 1));
-        long maxKey = 0;
-        for (long[] keys : entries.nodeKeys) {
-            if (keys != null) {
-                for (long k : keys) {
-                    maxKey = Math.max(maxKey, k);
-                }
-            }
-        }
         // Compact the node keys (tile address and wire index) to make room for the entry index
-        int maxWireBits = 0;
-        int maxTileBits = 0;
-        for (long[] keys : entries.nodeKeys) {
-            if (keys == null) {
-                continue;
-            }
-            for (long k : keys) {
-                maxWireBits = Math.max(maxWireBits, 64 - Long.numberOfLeadingZeros(k & 0xffffffffL));
-            }
-        }
-        maxTileBits = 64 - Long.numberOfLeadingZeros(maxKey >>> 32);
+        int entryBits = 64 - Long.numberOfLeadingZeros(Math.max(1, entries.nodeKeys.length - 1));
+        int tileBits = 64 - Long.numberOfLeadingZeros(maxTile);
+        int wireBits = 64 - Long.numberOfLeadingZeros(maxWire);
         // (one more bit flags the nodes of site pins)
-        if (maxTileBits + maxWireBits + entryBits + 1 > 63 || total > Integer.MAX_VALUE - 8 || !pack) {
+        if (!pack || tileBits + wireBits + entryBits + 1 > 63 || total > Integer.MAX_VALUE - 8) {
             markFallback(entries);
             return;
         }
-        final int wireBits = maxWireBits;
-        long[] tagged = new long[(int) total];
+        markPacked(entries, (int) total, wireBits, entryBits);
+    }
+
+    /**
+     * Marks conflicts by sorting the node keys packed with their entries: tile address, wire index
+     * (in the given numbers of bits), entry, and whether the node is that of a site pin.
+     */
+    private static void markPacked(Entries entries, int total, int wireBits, int entryBits) {
+        int numEntries = entries.nodeKeys.length;
+        long[] tagged = new long[total];
         int[] offsets = new int[numEntries + 1];
         for (int i = 0; i < numEntries; i++) {
             offsets[i + 1] = offsets[i] + (entries.nodeKeys[i] == null ? 0 : entries.nodeKeys[i].length);
@@ -100,7 +99,8 @@ final class ConflictMarker {
                 return;
             }
             int o = offsets[i];
-            int routing = (entries.numRoutingKeys == null || entries.numRoutingKeys[i] < 0) ? keys.length : entries.numRoutingKeys[i];
+            int routing = (entries.numRoutingKeys == null || entries.numRoutingKeys[i] < 0) ? keys.length
+                    : entries.numRoutingKeys[i];
             for (int j = 0; j < keys.length; j++) {
                 long k = keys[j];
                 long compact = ((k >>> 32) << wireBits) | (k & 0xffffffffL);
@@ -162,8 +162,7 @@ final class ConflictMarker {
         boolean otherRouting = false;
         boolean staticClaims = false;
         for (int u = 0; u < count; u++) {
-            boolean claim = (users[u] & 1) != 0 && has(status[users[u] >> 1], STATIC_CLAIMS);
-            staticClaims |= claim;
+            staticClaims |= isStaticClaim(status, users[u]);
             otherRouting |= (users[u] & 1) == 0 && !has(status[users[u] >> 1], STATIC_CLAIMS);
         }
         if (staticClaims && !otherRouting) {
@@ -172,7 +171,7 @@ final class ConflictMarker {
             int kept = 0;
             int[] others = new int[count];
             for (int u = 0; u < count; u++) {
-                if (!((users[u] & 1) != 0 && has(status[users[u] >> 1], STATIC_CLAIMS))) {
+                if (!isStaticClaim(status, users[u])) {
                     others[kept++] = users[u];
                 }
             }
@@ -197,26 +196,39 @@ final class ConflictMarker {
                 status[e] &= ~UNROUTED;
             }
         }
-        if (!hasPhysicalOwner) {
-            return;
+        if (hasPhysicalOwner) {
+            markRoutingThroughSitePin(status, users, count);
         }
+    }
+
+    /** Checks whether a user of a node is a site pin of a static net (see {@link NetStatus#STATIC_CLAIMS}). */
+    private static boolean isStaticClaim(int[] status, int user) {
+        return (user & 1) != 0 && has(status[user >> 1], STATIC_CLAIMS);
+    }
+
+    /**
+     * Marks the routing of nets through the site pin (with a physical owner) of other nets: it leads
+     * nowhere, and the site pin of an unrouted net (or a site pin of a static net) is reached by
+     * another net's routing, leaving it partially routed.
+     */
+    private static void markRoutingThroughSitePin(int[] status, int[] users, int count) {
         for (int u = 0; u < count; u++) {
             if ((users[u] & 1) != 0) {
                 continue;
             }
             int e = users[u] >> 1;
-            // Routing through the site pin of another net leads nowhere
             if (!isSitePinOwner(users, count, e)) {
                 status[e] |= ANTENNAS;
             }
             for (int o = 0; o < count; o++) {
                 int owner = users[o] >> 1;
-                if ((users[o] & 1) != 0 && owner != e && has(status[owner], STATIC_CLAIMS)) {
-                    // A site pin of a static net used by the routing of another net is unrouted
-                    status[owner] = (status[owner] & ~UNROUTED) | PARTIAL;
-                } else if ((users[o] & 1) != 0 && owner != e && has(status[owner], UNROUTED)) {
-                    // The site pin of an unrouted net is reached, if by the routing of another
-                    // net: the net is only partially unrouted
+                if ((users[o] & 1) == 0 || owner == e) {
+                    continue;
+                }
+                if (has(status[owner], STATIC_CLAIMS) || has(status[owner], UNROUTED)) {
+                    // A site pin of a static net used by the routing of another net is unrouted, and
+                    // the site pin of an unrouted net is reached, if by the routing of another net:
+                    // the net is only partially unrouted
                     status[owner] = (status[owner] & ~UNROUTED) | PARTIAL;
                 }
             }

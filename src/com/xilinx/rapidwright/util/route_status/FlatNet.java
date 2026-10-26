@@ -500,6 +500,11 @@ final class FlatNet extends Connections {
         return placedPortDrivers + placedPortLoads + unplacedPortDrivers + unplacedPortLoads > 0;
     }
 
+    /** Checks whether a driver (pin of a leaf cell, or top level port) is placed. */
+    boolean hasPlacedDriver() {
+        return leafDrivers > unplacedLeafDrivers || placedPortDrivers > 0;
+    }
+
     /** Gets the number of loads: pins of leaf cells (and inout pins), and placed top level ports. */
     int getLoads() {
         return leafLoads + leafInouts + placedPortLoads;

@@ -101,16 +101,7 @@ final class SiteRouting {
                 if (logicalPin != null && (staticType == null || isTiedTo(cell, logicalPin, staticType))) {
                     return true;
                 }
-                if (staticType == NetType.VCC && logicalPin == null && (isFracturedLutTie(si, pin)
-                        || (cell != null && cell.isRoutethru() && pin.getName().equals("A6") && pin.getBELName().endsWith("6LUT")))) {
-                    // A6 of a LUT must be tied high when its 5LUT is used, or when it is a
-                    // routethru (e.g. to a carry chain)
-                    return true;
-                }
-                if (staticType == NetType.GND && logicalPin == null && cell != null
-                        && pin.getName().equals("S0") && (pin.getBELName().startsWith("F7") || pin.getBELName().startsWith("F8"))) {
-                    // The select of a wide function mux used without it (as a routethru, or after
-                    // unplacing the driver of the select) is tied low
+                if (logicalPin == null && staticType != null && isStaticTie(si, pin, cell, staticType)) {
                     return true;
                 }
                 if (staticType == NetType.GND && (pin.getBELName().contains("INV") || !Utils.isSLICE(si))) {
@@ -118,21 +109,42 @@ final class SiteRouting {
                     // without routing
                     continue;
                 }
-                SitePIP sitePIP = si.getUsedSitePIP(pin);
-                if (sitePIP != null) {
-                    queue.add(sitePIP.getOutputPin().getSiteWireName());
-                } else if ((cell != null && cell.isRoutethru())
-                        || (staticType == null && cell == null && isPassThroughPin(pin))) {
-                    // Through a routethru cell (or a pass-through BEL) to its output
-                    for (BELPin out : pin.getBEL().getPins()) {
-                        if (out.isOutput()) {
-                            queue.add(out.getSiteWireName());
-                        }
-                    }
-                }
+                addSiteRoutingFrom(si, pin, cell, staticType == null, queue);
             }
         }
         return false;
+    }
+
+    /**
+     * Checks whether a BEL pin without a cell pin on it needs a static net tied to it: A6 of a LUT
+     * must be tied high when its 5LUT is used, or when it is a routethru (e.g. to a carry chain), and
+     * the select of a wide function mux used without it (as a routethru, or after unplacing the driver
+     * of the select) is tied low.
+     */
+    private static boolean isStaticTie(SiteInst si, BELPin pin, Cell cell, NetType staticType) {
+        if (staticType == NetType.VCC) {
+            return isFracturedLutTie(si, pin)
+                    || (cell != null && cell.isRoutethru() && pin.getName().equals("A6") && pin.getBELName().endsWith("6LUT"));
+        }
+        return cell != null && pin.getName().equals("S0")
+                && (pin.getBELName().startsWith("F7") || pin.getBELName().startsWith("F8"));
+    }
+
+    /**
+     * Adds the site wires that site routing leads to from a BEL input pin: through a used site PIP, a
+     * routethru cell or (for a signal net) a pass-through BEL, to the output of the BEL.
+     */
+    private static void addSiteRoutingFrom(SiteInst si, BELPin pin, Cell cell, boolean signal, List<String> queue) {
+        SitePIP sitePIP = si.getUsedSitePIP(pin);
+        if (sitePIP != null) {
+            queue.add(sitePIP.getOutputPin().getSiteWireName());
+        } else if ((cell != null && cell.isRoutethru()) || (signal && cell == null && isPassThroughPin(pin))) {
+            for (BELPin out : pin.getBEL().getPins()) {
+                if (out.isOutput()) {
+                    queue.add(out.getSiteWireName());
+                }
+            }
+        }
     }
 
     /** Checks whether a BEL pin is the only input of its BEL, with a site PIP through the BEL */

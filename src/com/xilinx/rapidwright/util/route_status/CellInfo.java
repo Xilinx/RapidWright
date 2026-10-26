@@ -126,13 +126,37 @@ final class CellInfo {
         boolean parallel = ForkJoinTask.inForkJoinPool();
         children = toArray(cell.getCellInsts(), new EDIFCellInst[0], parallel);
         childIsLeaf = new boolean[children.length];
-        Map<EDIFCellInst, Integer> childIndex = new IdentityHashMap<>(children.length);
         // Per hierarchical child: the port slots of its cell, and which are connected inside
         childOffsets = new Map[children.length];
         childConnected = new boolean[children.length][];
         childPortOnly = new boolean[children.length][];
         childIsWeakDriver = new boolean[children.length];
         childIsBlackBox = new boolean[children.length];
+        Map<EDIFCellInst, Integer> childIndex = initChildren(netlist);
+        nets = toArray(cell.getNets(), new EDIFNet[0], parallel);
+        nameHashes = new int[nets.length];
+        namePows = new int[nets.length];
+        notNets = new boolean[nets.length];
+        start = new int[nets.length + 1];
+        staticTypes = new NetType[nets.length];
+        Chunk[] chunks = initNetChunks(offsets, childIndex, parallel);
+        int total = 0;
+        for (Chunk chunk : chunks) {
+            total += chunk.size;
+        }
+        kinds = new byte[total];
+        childIdx = new int[total];
+        slots = new int[total];
+        leafPinNames = new String[total];
+        concatenate(chunks);
+    }
+
+    /**
+     * Describes the children of the cell.
+     * @return The index of each child.
+     */
+    private Map<EDIFCellInst, Integer> initChildren(RouteStatusNetlist netlist) {
+        Map<EDIFCellInst, Integer> childIndex = new IdentityHashMap<>(children.length);
         for (int i = 0; i < children.length; i++) {
             childIndex.put(children[i], i);
             EDIFCell type = children[i].getCellType();
@@ -148,13 +172,12 @@ final class CellInfo {
                 childPortOnly[i] = childInfo.ownPortOnly;
             }
         }
-        nets = toArray(cell.getNets(), new EDIFNet[0], parallel);
-        nameHashes = new int[nets.length];
-        namePows = new int[nets.length];
-        notNets = new boolean[nets.length];
-        start = new int[nets.length + 1];
-        staticTypes = new NetType[nets.length];
-        // Each chunk of nets is tallied into its own arrays, then they are concatenated
+        return childIndex;
+    }
+
+    /** Tallies the port instances of the nets, each chunk of nets into its own arrays (in parallel). */
+    private Chunk[] initNetChunks(Map<EDIFPort, Integer> offsets, Map<EDIFCellInst, Integer> childIndex,
+                                  boolean parallel) {
         int numChunks = Math.max(1, (nets.length + CHUNK - 1) / CHUNK);
         Chunk[] chunks = new Chunk[numChunks];
         if (numChunks > 4 && parallel) {
@@ -174,16 +197,13 @@ final class CellInfo {
                 chunks[c] = initNets(c * CHUNK, Math.min(nets.length, (c + 1) * CHUNK), offsets, childIndex);
             }
         }
-        int total = 0;
-        for (Chunk chunk : chunks) {
-            total += chunk.size;
-        }
-        kinds = new byte[total];
-        childIdx = new int[total];
-        slots = new int[total];
-        leafPinNames = new String[total];
+        return chunks;
+    }
+
+    /** Concatenates the port instances of the chunks of nets. */
+    private void concatenate(Chunk[] chunks) {
         int offset = 0;
-        for (int c = 0; c < numChunks; c++) {
+        for (int c = 0; c < chunks.length; c++) {
             Chunk chunk = chunks[c];
             System.arraycopy(chunk.kinds, 0, kinds, offset, chunk.size);
             System.arraycopy(chunk.childIdx, 0, childIdx, offset, chunk.size);
@@ -237,61 +257,66 @@ final class CellInfo {
             notNets[n] = count == 0 && (isBusRangeDeclaration(name) || !isBusBit(name));
             int base = chunk.size;
             chunk.ensureCapacity(base + count);
-            byte[] kinds = chunk.kinds;
-            int[] childIdx = chunk.childIdx;
-            int[] slots = chunk.slots;
             for (int p = 0; p < count; p++) {
-                int i = base + p;
-                EDIFPortInst epi = epis.get(p);
-                EDIFCellInst eci = epi.getCellInst();
-                if (eci == null) {
-                    kinds[i] = OWN_PORT;
-                    slots[i] = slot(offsets, epi);
-                    // (concurrent writes of the same value are harmless)
-                    ownConnected[slots[i]] = true;
-                    if (count == 1) {
-                        ownPortOnly[slots[i]] = true;
-                    }
-                    continue;
-                }
-                int c = childIndex.get(eci);
-                childIdx[i] = c;
-                if (childIsBlackBox[c]) {
-                    kinds[i] = epi.isOutput() ? BLACK_BOX_OUTPUT : epi.isInput() ? BLACK_BOX : BLACK_BOX_INOUT;
-                } else if (childIsLeaf[c]) {
-                    chunk.leafPinNames[i] = epi.getName();
-                    if (epi.isOutput()) {
-                        kinds[i] = LEAF_OUTPUT;
-                        EDIFCell type = eci.getCellType();
-                        String typeName = type.getName();
-                        if ((typeName.equals("GND") || typeName.equals("VCC")) && isPrimitive(type)) {
-                            staticTypes[n] = typeName.equals("GND") ? NetType.GND : NetType.VCC;
-                        }
-                    } else {
-                        kinds[i] = epi.isInput() ? LEAF_INPUT : LEAF_INOUT;
-                    }
-                } else {
-                    int slot = slot(childOffsets[c], epi);
-                    slots[i] = slot;
-                    byte kind = HIER;
-                    if (epi.isOutput()) {
-                        kind |= CHILD_OUTPUT;
-                        if (!childConnected[c][slot]) {
-                            kind |= DANGLING;
-                        }
-                        if (childPortOnly[c][slot]) {
-                            kind |= PORT_ONLY;
-                        }
-                    } else if (!epi.isInput() && !childConnected[c][slot]) {
-                        kind |= DANGLING_INOUT;
-                    }
-                    kinds[i] = kind;
-                }
+                addPortInst(chunk, base + p, n, epis.get(p), count == 1, offsets, childIndex);
             }
             chunk.size = base + count;
             start[n + 1] = chunk.size;
         }
         return chunk;
+    }
+
+    /**
+     * Tallies port instance i (of a chunk), on net n: its connection kind and flags, child, port slot
+     * and leaf pin name.
+     * @param only Whether it is the only port instance on the net.
+     */
+    private void addPortInst(Chunk chunk, int i, int n, EDIFPortInst epi, boolean only, Map<EDIFPort, Integer> offsets,
+                             Map<EDIFCellInst, Integer> childIndex) {
+        EDIFCellInst eci = epi.getCellInst();
+        if (eci == null) {
+            chunk.kinds[i] = OWN_PORT;
+            chunk.slots[i] = slot(offsets, epi);
+            // (concurrent writes of the same value are harmless)
+            ownConnected[chunk.slots[i]] = true;
+            if (only) {
+                ownPortOnly[chunk.slots[i]] = true;
+            }
+            return;
+        }
+        int c = childIndex.get(eci);
+        chunk.childIdx[i] = c;
+        if (childIsBlackBox[c]) {
+            chunk.kinds[i] = epi.isOutput() ? BLACK_BOX_OUTPUT : epi.isInput() ? BLACK_BOX : BLACK_BOX_INOUT;
+        } else if (childIsLeaf[c]) {
+            chunk.leafPinNames[i] = epi.getName();
+            if (epi.isOutput()) {
+                chunk.kinds[i] = LEAF_OUTPUT;
+                EDIFCell type = eci.getCellType();
+                String typeName = type.getName();
+                if ((typeName.equals("GND") || typeName.equals("VCC")) && isPrimitive(type)) {
+                    staticTypes[n] = typeName.equals("GND") ? NetType.GND : NetType.VCC;
+                }
+            } else {
+                chunk.kinds[i] = epi.isInput() ? LEAF_INPUT : LEAF_INOUT;
+            }
+        } else {
+            int slot = slot(childOffsets[c], epi);
+            chunk.slots[i] = slot;
+            byte kind = HIER;
+            if (epi.isOutput()) {
+                kind |= CHILD_OUTPUT;
+                if (!childConnected[c][slot]) {
+                    kind |= DANGLING;
+                }
+                if (childPortOnly[c][slot]) {
+                    kind |= PORT_ONLY;
+                }
+            } else if (!epi.isInput() && !childConnected[c][slot]) {
+                kind |= DANGLING_INOUT;
+            }
+            chunk.kinds[i] = kind;
+        }
     }
 
     /** Copies a (large) collection into an array, in parallel if in a fork join pool. */
