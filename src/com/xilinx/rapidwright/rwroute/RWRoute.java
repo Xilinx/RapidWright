@@ -377,11 +377,12 @@ public class RWRoute {
                 short delay;
                 try {
                     delay = delayModel.getLogicDelay(delayModel.getBELIndex(bel.getName()), inputPin, outputPin);
-                } catch (IllegalArgumentException | NullPointerException e) {
-                    // No delay model entry for this BEL (getBELIndex() unboxes a null) or arc
+                } catch (NullPointerException e) {
+                    // No delay model entry for this BEL (getBELIndex() unboxes a null)
                     return null;
                 }
                 if (delay < 0) {
+                    // No delay model entry for this arc
                     return null;
                 }
                 logicEdges.add(logic);
