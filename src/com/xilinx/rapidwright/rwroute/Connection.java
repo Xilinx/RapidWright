@@ -484,15 +484,28 @@ public class Connection implements Comparable<Connection>{
     }
 
     public void setAllTargets(RWRoute.ConnectionState state) {
-        sinkRnode.markTarget(state);
+        // With LUT pin swapping, a net that drives several inputs of the same LUT has several
+        // connections whose candidate pins overlap, and another of them may already be routed to
+        // one of this connection's pins (including its original one). Each LUT input needs its
+        // own pin, so such a pin is not a target -- even though routing otherwise lets
+        // connections of the same net share nodes.
+        boolean lutPinSwaps = altSinkRnodes != null && sink.isLUTInputPin();
+        if (!lutPinSwaps || sinkRnode.countConnectionsOfUser(netWrapper) == 0) {
+            sinkRnode.markTarget(state);
+        }
         if (altSinkRnodes != null) {
             for (RouteNode rnode : altSinkRnodes) {
-                assert(rnode.countConnectionsOfUser(netWrapper) == 0);
                 assert(!rnode.getType().isAnyExclusiveSink());
                 assert(rnode.getIntentCode() != IntentCode.NODE_PINBOUNCE);
+                if (rnode.countConnectionsOfUser(netWrapper) > 0) {
+                    assert(lutPinSwaps);
+                    continue;
+                }
                 rnode.markTarget(state);
             }
         }
+        // There are as many pins on a LUT as there can be inputs to it
+        assert(!state.targets.isEmpty());
     }
 
     protected Pair<SitePinInst,RouteNode> getOrCreateAlternateSource(RouteNodeGraph routingGraph) {
