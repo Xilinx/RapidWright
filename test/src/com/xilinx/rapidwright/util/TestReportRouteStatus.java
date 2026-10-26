@@ -394,7 +394,25 @@ public class TestReportRouteStatus {
                                 "ap_clk=HIERPORT",
                                 "ap_ctrl_start=HIERPORT",
                                 "bd_0_i/hls_inst/inst/add_ln838_reg_1562_reg/ACOUT[0]=NOLOADS",
-                                "bd_0_i/hls_inst/inst/add_ln838_reg_1562_reg/ACOUT[10]=NOLOADS"})
+                                "bd_0_i/hls_inst/inst/add_ln838_reg_1562_reg/ACOUT[10]=NOLOADS"}),
+                // (the clock reaches the flip-flops of Versal slices through FF_CLK_MOD, whose site
+                // PIPs are not stored)
+                Arguments.of("versal_slr_crossing.dcp",
+                        "Design Route Status\n" +
+                        "                                               :      # nets :\n" +
+                        "   ------------------------------------------- : ----------- :\n" +
+                        "   # of logical nets.......................... :       44332 :\n" +
+                        "       # of nets not needing routing.......... :       42321 :\n" +
+                        "           # of internally routed nets........ :       34112 :\n" +
+                        "           # of nets with no loads............ :        7968 :\n" +
+                        "           # of implicitly routed ports....... :         241 :\n" +
+                        "       # of routable nets..................... :        2011 :\n" +
+                        "           # of fully routed nets............. :        2011 :\n" +
+                        "       # of nets with routing errors.......... :           0 :\n" +
+                        "   ------------------------------------------- : ----------- :",
+                        new String[]{"clk=HAS_ROUTING,ROUTED",
+                                "GLOBAL_LOGIC0=HAS_ROUTING,ROUTED",
+                                "GLOBAL_LOGIC1=HAS_ROUTING,ROUTED"})
         );
     }
 

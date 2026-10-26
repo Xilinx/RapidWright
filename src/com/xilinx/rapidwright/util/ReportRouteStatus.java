@@ -1949,10 +1949,11 @@ public class ReportRouteStatus {
                 }
             }
             if (staticType == null) {
-                // Stored input pins of the net without any site wire assignment, reaching no placed cell
+                // Stored input pins of the net in slices without any site wire assignment, reaching no
+                // placed cell
                 for (SitePinInst spi : net.getPins()) {
                     SiteInst si = spi.getSiteInst();
-                    if (spi.isOutPin() || si == null || spi.getConnectedNode() == null
+                    if (spi.isOutPin() || si == null || !Utils.isSLICE(si) || spi.getConnectedNode() == null
                             || si.getNetFromSiteWire(spi.getName()) != null) {
                         continue;
                     }
@@ -1971,7 +1972,9 @@ public class ReportRouteStatus {
 
         /**
          * Checks whether the site routing from a site wire (through used site PIPs of routing BELs)
-         * reaches an input pin of a placed cell that is mapped to a logical pin.
+         * reaches an input pin of a placed cell that is mapped to a logical pin. For a signal net, the
+         * pad of a placed port cell is also such a pin, and BELs with a single input that always passes
+         * it on (e.g. FF_CLK_MOD of Versal slices, whose site PIPs are not stored) are followed.
          * @param staticType For a static net, the logical pin must be tied to the static source
          * (others may be tied off inside the site).
          */
@@ -1991,6 +1994,12 @@ public class ReportRouteStatus {
                     continue;
                 }
                 for (BELPin pin : si.getSiteWirePins(sw)) {
+                    if (staticType == null && pin.isBidir() && !pin.isSitePort()) {
+                        Cell cell = si.getCell(pin.getBEL());
+                        if (cell != null && cell.isPortCell()) {
+                            return true;
+                        }
+                    }
                     if (pin.isSitePort() || !pin.isInput()) {
                         continue;
                     }
@@ -2019,8 +2028,9 @@ public class ReportRouteStatus {
                     SitePIP sitePIP = si.getUsedSitePIP(pin);
                     if (sitePIP != null) {
                         queue.add(sitePIP.getOutputPin().getSiteWireName());
-                    } else if (cell != null && cell.isRoutethru()) {
-                        // Through a routethru cell to its output
+                    } else if ((cell != null && cell.isRoutethru())
+                            || (staticType == null && cell == null && isPassThroughPin(pin))) {
+                        // Through a routethru cell (or a pass-through BEL) to its output
                         for (BELPin out : pin.getBEL().getPins()) {
                             if (out.isOutput()) {
                                 queue.add(out.getSiteWireName());
@@ -2030,6 +2040,19 @@ public class ReportRouteStatus {
                 }
             }
             return false;
+        }
+
+        /** Checks whether a BEL pin is the only input of its BEL, with a site PIP through the BEL */
+        private static boolean isPassThroughPin(BELPin pin) {
+            if (pin.getSitePIPs().isEmpty()) {
+                return false;
+            }
+            for (BELPin other : pin.getBEL().getPins()) {
+                if (other != pin && other.isInput()) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         private static boolean isVersalClockingSite(SiteInst si) {
@@ -2166,15 +2189,17 @@ public class ReportRouteStatus {
         }
 
         /**
-         * Checks whether any of the given input site pin nodes of a (signal) net has site routing of the
-         * net that reaches no placed cell pin (see {@link #reachesPlacedCellPin(SiteInst, String, NetType)}).
+         * Checks whether any of the given input site pin nodes of a (signal) net in a slice has site
+         * routing of the net that reaches no placed cell pin (see
+         * {@link #reachesPlacedCellPin(SiteInst, String, NetType)}). (Other sites, e.g. of I/O, may
+         * pass a pin on to a cell without storing the site routing to it.)
          */
         private static boolean hasStaleSitePin(Net net, List<Node> nodes) {
             Design design = net.getDesign();
             for (Node node : nodes) {
                 SitePin sitePin = node.getSitePin();
                 SiteInst si = (sitePin == null) ? null : design.getSiteInstFromSite(sitePin.getSite());
-                BELPin port = (si == null) ? null : getSitePortPin(si, sitePin);
+                BELPin port = (si == null || !Utils.isSLICE(si)) ? null : getSitePortPin(si, sitePin);
                 if (port == null || !isNetSitePin(net, si, port)) {
                     continue;
                 }
