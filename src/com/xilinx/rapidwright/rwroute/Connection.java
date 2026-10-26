@@ -484,13 +484,12 @@ public class Connection implements Comparable<Connection>{
     }
 
     public void setAllTargets(RWRoute.ConnectionState state) {
-        // With LUT pin swapping, a net that drives several inputs of the same LUT has several
-        // connections whose candidate pins overlap, and another of them may already be routed to
-        // one of this connection's pins (including its original one). Each LUT input needs its
-        // own pin, so such a pin is not a target -- even though routing otherwise lets
-        // connections of the same net share nodes.
-        boolean lutPinSwaps = altSinkRnodes != null && sink.isLUTInputPin();
-        if (!lutPinSwaps || sinkRnode.countConnectionsOfUser(netWrapper) == 0) {
+        // With LUT pin swapping (the only source of alternate sinks), a net that drives several
+        // inputs of the same LUT has several connections whose candidate pins overlap, and another
+        // of them may already be routed to one of this connection's pins (including its original
+        // one). Each LUT input needs its own pin, so such a pin is not a target -- even though
+        // routing otherwise lets connections of the same net share nodes.
+        if (altSinkRnodes == null || sinkRnode.countConnectionsOfUser(netWrapper) == 0) {
             sinkRnode.markTarget(state);
         }
         if (altSinkRnodes != null) {
@@ -498,13 +497,14 @@ public class Connection implements Comparable<Connection>{
                 assert(!rnode.getType().isAnyExclusiveSink());
                 assert(rnode.getIntentCode() != IntentCode.NODE_PINBOUNCE);
                 if (rnode.countConnectionsOfUser(netWrapper) > 0) {
-                    assert(lutPinSwaps);
                     continue;
                 }
                 rnode.markTarget(state);
             }
         }
-        // There are as many pins on a LUT as there can be inputs to it
+        // Each LUT pin carries one signal, and this connection's candidate pins are its LUT's
+        // swappable pins that are not preserved (for other nets): this net's other connections
+        // into the LUT cannot occupy all of them, since this connection needs one too
         assert(!state.targets.isEmpty());
     }
 
