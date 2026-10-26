@@ -114,11 +114,14 @@ public class ConstraintTools {
      * are left out:
      * <ul>
      * <li>commands whose {@code src_info} has {@code save:NONE}: constraints of the context, or that
-     * Vivado added itself, such as the shell's pblocks and site {@code PROHIBIT}s;</li>
+     * Vivado added itself, such as the shell's pblocks and site {@code PROHIBIT}s. A
+     * {@code create_pblock} of a pblock that the design does not create is kept, though: the context
+     * can create pblocks nested in the partition's, for cells of the module, which the design's
+     * checkpoint, written without the module, does not have;</li>
      * <li>commands under a {@code current_instance} that is not the circuit's cell or a cell inside
      * it;</li>
      * <li>{@code HD.RECONFIGURABLE} on the circuit's design;</li>
-     * <li>commands that modify the pblock the circuit adds its top cell to
+     * <li>commands that create or modify the pblock the circuit adds its top cell to
      * ({@code add_cells_to_pblock [get_pblocks <name>] -top}), which is the partition's pblock and is
      * defined by the design;</li>
      * <li>the {@code SRC_FILE_INFO} table.</li>
@@ -177,6 +180,17 @@ public class ConstraintTools {
             }
         }
 
+        // The pblocks the design creates, which the circuits' context constraints create again
+        Set<String> pblocks = new HashSet<>();
+        for (ConstraintGroup cg : ConstraintGroup.values()) {
+            for (String line : design.getXDCConstraints(cg)) {
+                String pblock = getCreatedPblock(line.trim());
+                if (pblock != null) {
+                    pblocks.add(pblock);
+                }
+            }
+        }
+
         int added = 0;
         for (Map.Entry<String, Design> e : blackBoxes.entrySet()) {
             Design cell = e.getValue();
@@ -184,7 +198,7 @@ public class ConstraintTools {
             for (ConstraintGroup cg : ConstraintGroup.values()) {
                 groups.put(cg, XDCCommand.split(cell.getXDCConstraints(cg)));
             }
-            BlackBoxScope scope = new BlackBoxScope(netlist, e.getKey(), topPorts, groups.values());
+            BlackBoxScope scope = new BlackBoxScope(netlist, e.getKey(), topPorts, pblocks, groups.values());
 
             List<XDCCommand> normal = groups.get(ConstraintGroup.NORMAL);
             if (!normal.isEmpty()) {
@@ -212,8 +226,25 @@ public class ConstraintTools {
         return added;
     }
 
+    /** A Tcl word naming one object: braced, quoted, or bare with any [<n>] bus bit suffixes */
+    private static final String NAME_WORD = "(\\{[^}]*\\}|\"[^\"]*\"|(?:[^\\s\\[\\]{}\"]|\\[\\d+\\])+)";
+
+    /**
+     * @return The name of the pblock a command creates, or null if it is not a create_pblock.
+     */
+    private static String getCreatedPblock(String cmd) {
+        if (!cmd.startsWith("create_pblock ")) return null;
+        for (String word : XDCTools.splitWords(cmd.substring("create_pblock".length()))) {
+            if (!word.startsWith("-")) return XDCTools.unquotedName(word);
+        }
+        return null;
+    }
+
     private static final Pattern ADD_TOP_TO_PBLOCK =
-            Pattern.compile("^add_cells_to_pblock\\s+\\[get_pblocks\\s+\\{?([^\\]\\s}]+)\\}?\\]\\s+-top\\b");
+            Pattern.compile("^add_cells_to_pblock\\s+\\[get_pblocks\\s+" + NAME_WORD + "\\s*\\]\\s+-top\\b");
+
+    private static final Pattern GET_PBLOCKS =
+            Pattern.compile("\\[get_pblocks\\s+(?:-quiet\\s+)?" + NAME_WORD + "\\s*\\]");
 
     private static final String SCOPED_TO_CURRENT_INSTANCE = "-scoped_to_current_instance";
 
@@ -226,6 +257,9 @@ public class ConstraintTools {
     private static final String REGEXP_CHARS = ".[*+?";
 
     private static final Pattern MATCHES_NOTHING = Pattern.compile("(?!)");
+
+    /** A bus index, or range, or wildcard in brackets, which Vivado reads as part of a name */
+    private static final Pattern BUS_INDEX = Pattern.compile("\\[(?:\\d+(?::\\d+)?|[*?])\\]");
 
     /** A bus's declared name, such as bus[7:0] */
     private static final Pattern BUS_DECLARATION = Pattern.compile(".*\\[\\d+:\\d+\\]");
@@ -328,7 +362,11 @@ public class ConstraintTools {
                 StringBuilder value = new StringBuilder();
                 for (int c = t + 1; c <= t + wordToken.numComponents; c++) {
                     TclToken token = parse.getToken(c);
-                    if (token.type == TCL_TOKEN_COMMAND) {
+                    if (token.type == TCL_TOKEN_COMMAND && value != null && BUS_INDEX.matcher(
+                            new String(script, token.script_index, token.size)).matches()) {
+                        // Vivado reads a bus index after a name, such as bus[1] or bus[*], as is
+                        value.append(script, token.script_index, token.size);
+                    } else if (token.type == TCL_TOKEN_COMMAND) {
                         findGetPorts(script, token.script_index + 1, token.script_index + token.size - 1, true, found);
                         value = null;
                     } else if (value != null && token.type == TCL_TOKEN_TEXT) {
@@ -477,12 +515,15 @@ public class ConstraintTools {
         private final Map<String, List<String>> topPorts;
         /** The pblocks the circuit adds its top cell to */
         private final Set<String> ownPblocks = new HashSet<>();
+        /** The pblocks the design creates, including those the circuits' constraints added */
+        private final Set<String> pblocks;
         /** The names of the black box's pins, by their own name and by the name of their bus */
         private final Map<String, List<String>> pins = new HashMap<>();
 
         BlackBoxScope(EDIFNetlist netlist, String boxName, Map<String, List<String>> topPorts,
-                Collection<List<XDCCommand>> groups) {
+                Set<String> pblocks, Collection<List<XDCCommand>> groups) {
             this.netlist = netlist;
+            this.pblocks = pblocks;
             this.box = netlist.getHierCellInstFromName(boxName);
             this.boxName = box.getFullHierarchicalInstName();
             this.topPorts = topPorts;
@@ -490,7 +531,7 @@ public class ConstraintTools {
                 for (XDCCommand c : cmds) {
                     Matcher m = ADD_TOP_TO_PBLOCK.matcher(c.text);
                     if (m.find()) {
-                        ownPblocks.add(m.group(1));
+                        ownPblocks.add(XDCTools.unquotedName(m.group(1)));
                     }
                 }
             }
@@ -526,13 +567,17 @@ public class ConstraintTools {
                     current = currentInstance(current, c.text);
                     continue;
                 }
+                String createdPblock = getCreatedPblock(c.text);
                 boolean drop = current == null
-                        || c.saveNone
+                        || (c.saveNone && (createdPblock == null || pblocks.contains(createdPblock)))
                         || c.text.startsWith("set_property SRC_FILE_INFO ")
                         || modifiesPblock(c.text)
                         || (skipPblocks && PBLOCK_COMMAND.matcher(c.text).find())
                         || (c.text.contains("HD.RECONFIGURABLE") && c.text.contains("[current_design]"));
                 if (drop) continue;
+                if (createdPblock != null) {
+                    pblocks.add(createdPblock);
+                }
                 out.kept++;
                 String scope = current.equals(boxName) && namesOnlyDevicePins(c.text) ? "" : current;
                 if (!scope.equals(written)) {
@@ -573,8 +618,8 @@ public class ConstraintTools {
          */
         private String currentInstance(String current, String cmd) {
             String path = null;
-            for (String word : cmd.substring("current_instance".length()).trim().split("\\s+")) {
-                if (word.isEmpty() || word.equals("-quiet") || word.equals("-verbose")) continue;
+            for (String word : XDCTools.splitWords(cmd.substring("current_instance".length()))) {
+                if (word.equals("-quiet") || word.equals("-verbose")) continue;
                 path = XDCTools.unquotedName(word);
             }
             if (path == null) {
@@ -618,19 +663,25 @@ public class ConstraintTools {
         }
 
         /**
-         * @return True if a command modifies the pblock the circuit adds its top cell to, rather
-         *         than merely naming it.
+         * @return True if a command creates or modifies the pblock the circuit adds its top cell
+         *         to, rather than merely naming it.
          */
         private boolean modifiesPblock(String cmd) {
-            for (String pblock : ownPblocks) {
-                String ref = "[get_pblocks " + pblock + "]";
-                String bracedRef = "[get_pblocks {" + pblock + "}]";
-                if (!cmd.contains(ref) && !cmd.contains(bracedRef)) continue;
-                if (cmd.startsWith("add_cells_to_pblock") || cmd.startsWith("resize_pblock")
-                        || cmd.startsWith("remove_cells_from_pblock") || cmd.startsWith("delete_pblock")) {
-                    return true;
+            if (ownPblocks.isEmpty()) return false;
+            if (cmd.startsWith("create_pblock ")) {
+                // The design already has it
+                for (String word : XDCTools.splitWords(cmd.substring("create_pblock".length()))) {
+                    if (!word.startsWith("-") && ownPblocks.contains(XDCTools.unquotedName(word))) return true;
                 }
-                if (cmd.startsWith("set_property") && (cmd.endsWith(ref) || cmd.endsWith(bracedRef))) {
+                return false;
+            }
+            boolean pblockCommand = cmd.startsWith("add_cells_to_pblock") || cmd.startsWith("resize_pblock")
+                    || cmd.startsWith("remove_cells_from_pblock") || cmd.startsWith("delete_pblock");
+            Matcher m = GET_PBLOCKS.matcher(cmd);
+            while (m.find()) {
+                if (!ownPblocks.contains(XDCTools.unquotedName(m.group(1)))) continue;
+                // A set_property modifies the objects it ends with
+                if (pblockCommand || (cmd.startsWith("set_property") && m.end() == cmd.length())) {
                     return true;
                 }
             }
