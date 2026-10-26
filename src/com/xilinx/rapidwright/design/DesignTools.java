@@ -1752,8 +1752,8 @@ public class DesignTools {
     }
 
     /**
-     * Gets the BEL input pins (other than site ports) that the site routing of a net reaches from an
-     * output BEL pin, through used site PIPs.
+     * Gets the BEL input pins of cells that the site routing of a net reaches from an output BEL pin,
+     * through used site PIPs and routethru cells.
      */
     private static List<BELPin> getSiteRoutedLoads(SiteInst siteInst, Net net, BELPin output) {
         List<BELPin> loads = new ArrayList<>();
@@ -1769,12 +1769,20 @@ public class DesignTools {
                 if (otherPin == output || !otherPin.isInput() || otherPin.isSitePort()) {
                     continue;
                 }
+                Cell cell = siteInst.getCell(otherPin.getBEL());
                 if (otherPin.getBEL().getBELClass() == BELClass.RBEL) {
                     SitePIP pip = siteInst.getUsedSitePIP(otherPin);
                     if (pip != null) {
                         siteWires.add(pip.getOutputPin().getSiteWireName());
                     }
-                } else {
+                } else if (cell != null && cell.isRoutethru()) {
+                    // Through a routethru (e.g. of an F7 mux) to the load beyond it
+                    for (BELPin out : otherPin.getBEL().getPins()) {
+                        if (out.isOutput()) {
+                            siteWires.add(out.getSiteWireName());
+                        }
+                    }
+                } else if (cell != null) {
                     loads.add(otherPin);
                 }
             }
@@ -1787,8 +1795,21 @@ public class DesignTools {
         BEL bel = cell.getBEL();
         // If cell was using shared control signals (CLK, CE, RST), check to see if this was
         // the last cell used and then remove the site routing, site pin, and partial routing if
-        // it exists
+        // it exists. (Outputs first: the site routing from them to loads in the site may pass
+        // through routethrus whose static inputs, e.g. the select of an F7 mux, are on the site
+        // wires of the cell's inputs too.)
+        List<BELPin> pins = new ArrayList<>();
         for (BELPin pin : bel.getPins()) {
+            if (pin.isOutput()) {
+                pins.add(pin);
+            }
+        }
+        for (BELPin pin : bel.getPins()) {
+            if (!pin.isOutput()) {
+                pins.add(pin);
+            }
+        }
+        for (BELPin pin : pins) {
             Net net = siteInst.getNetFromSiteWire(pin.getSiteWireName());
             if (net == null) {
                 // Under certain circumstances, site routing is not explicit for VCC/GND

@@ -2871,6 +2871,32 @@ public class TestDesignTools {
     }
 
     @Test
+    public void testFullyUnplaceCellDrivingCellInSiteThroughRoutethru() {
+        // A LUT driving a MUXF8 in its site through a routethru of the F7 mux, and a site pin:
+        // unplacing the LUT removes its site routing up to the MUXF8, the routethru and the site pin
+        Design d = new Design("testFullyUnplaceCellDrivingCellInSiteThroughRoutethru", Device.KCU105);
+        Cell muxf8 = d.createAndPlaceCell("muxf8", Unisim.MUXF8, "SLICE_X32Y73/F8MUX_TOP");
+        Cell lut = d.createAndPlaceCell("lut", Unisim.LUT1, "SLICE_X32Y73/E6LUT");
+        SiteInst si = lut.getSiteInst();
+        Net net = d.createNet("lut_out");
+        net.getLogicalNet().createPortInst("O", lut.getEDIFCellInst());
+        net.getLogicalNet().createPortInst("I1", muxf8.getEDIFCellInst());
+        Assertions.assertTrue(si.routeIntraSiteNet(net, lut.getBEL().getPin("O6"), si.getBELPin("F8MUX_TOP", "1")));
+        Assertions.assertTrue(si.getCell("F7MUX_EF").isRoutethru());
+        // (the LUT also drives a load outside of the site, from the site pin on the same site wire)
+        SitePinInst out = net.createPin("E_O", si);
+
+        DesignTools.fullyUnplaceCell(lut, null);
+
+        Assertions.assertFalse(lut.isPlaced());
+        Assertions.assertNull(si.getCell("F7MUX_EF"));
+        Assertions.assertFalse(net.getPins().contains(out));
+        for (String siteWire : new String[]{"E_O", "F7MUX_EF_OUT"}) {
+            Assertions.assertNull(si.getNetFromSiteWire(siteWire), siteWire);
+        }
+    }
+
+    @Test
     public void testFullyUnplaceCellAlternateSiteType() {
         // A block RAM placed on a site as an alternate type (RAMB36E1 on a RAMBFIFO36E1 site): its
         // site port BEL pins are named as in the alternate type
