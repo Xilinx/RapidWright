@@ -1751,6 +1751,37 @@ public class DesignTools {
         return toRemove;
     }
 
+    /**
+     * Gets the BEL input pins (other than site ports) that the site routing of a net reaches from an
+     * output BEL pin, through used site PIPs.
+     */
+    private static List<BELPin> getSiteRoutedLoads(SiteInst siteInst, Net net, BELPin output) {
+        List<BELPin> loads = new ArrayList<>();
+        Queue<String> siteWires = new LinkedList<>();
+        Set<String> visited = new HashSet<>();
+        siteWires.add(output.getSiteWireName());
+        while (!siteWires.isEmpty()) {
+            String siteWire = siteWires.poll();
+            if (!visited.add(siteWire) || siteInst.getNetFromSiteWire(siteWire) != net) {
+                continue;
+            }
+            for (BELPin otherPin : siteInst.getSiteWirePins(siteWire)) {
+                if (otherPin == output || !otherPin.isInput() || otherPin.isSitePort()) {
+                    continue;
+                }
+                if (otherPin.getBEL().getBELClass() == BELClass.RBEL) {
+                    SitePIP pip = siteInst.getUsedSitePIP(otherPin);
+                    if (pip != null) {
+                        siteWires.add(pip.getOutputPin().getSiteWireName());
+                    }
+                } else {
+                    loads.add(otherPin);
+                }
+            }
+        }
+        return loads;
+    }
+
     private static void fullyUnplaceCellHelper(Cell cell, Map<Net, Set<SitePinInst>> deferRemovals) {
         SiteInst siteInst = cell.getSiteInst();
         BEL bel = cell.getBEL();
@@ -1784,6 +1815,13 @@ public class DesignTools {
             Queue<String> siteWires = new LinkedList<>();
             Set<String> visited = new HashSet<>();
             siteWires.add(pin.getSiteWireName());
+            List<BELPin> siteRoutedLoads = null;
+            if (pin.isOutput()) {
+                // Other cells on the site routing of an output are its loads, which do not keep the
+                // site routing of a driver that is gone (else Vivado places the cell there again)
+                siteWires.clear();
+                siteRoutedLoads = getSiteRoutedLoads(siteInst, net, pin);
+            }
             while (!siteWires.isEmpty()) {
                 String siteWire = siteWires.poll();
                 visited.add(siteWire);
@@ -1820,7 +1858,8 @@ public class DesignTools {
             if (otherUser == false) {
                 // Unroute site routing back to pin and remove site pin
                 for (String sitePinName : getAllRoutedSitePinsFromPhysicalPin(cell, net, pin.getName())) {
-                    BELPin sitePortBelPin = siteInst.getSite().getBELPin(sitePinName);
+                    // (the site port BEL of the site instance's type, which may be an alternate type)
+                    BELPin sitePortBelPin = siteInst.getBELPin(sitePinName, sitePinName);
                     assert(sitePortBelPin.isSitePort());
                     boolean outputSitePin = sitePortBelPin.isInput(); // Input BELPin means output SitePin
                     if (outputSitePin) {
@@ -1847,6 +1886,11 @@ public class DesignTools {
                             }
                         }
                     }
+                }
+            }
+            if (siteRoutedLoads != null) {
+                for (BELPin load : siteRoutedLoads) {
+                    siteInst.unrouteIntraSiteNet(pin, load);
                 }
             }
         }
