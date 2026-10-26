@@ -111,7 +111,8 @@ final class SiteRouting {
                     continue;
                 }
                 Cell cell = si.getCell(pin.getBEL());
-                String logicalPin = (cell == null || cell.isRoutethru()) ? null : cell.getLogicalPinMapping(pin.getName());
+                String logicalPin = (cell == null || cell.isRoutethru()) ? null
+                        : cell.getLogicalPinMapping(pin.getName());
                 if (logicalPin != null && (staticType == null || isTiedTo(cell, logicalPin, staticType))) {
                     return true;
                 }
@@ -138,7 +139,8 @@ final class SiteRouting {
     private static boolean isStaticTie(SiteInst si, BELPin pin, Cell cell, NetType staticType) {
         if (staticType == NetType.VCC) {
             return isFracturedLutTie(si, pin)
-                    || (cell != null && cell.isRoutethru() && pin.getName().equals("A6") && pin.getBELName().endsWith("6LUT"));
+                    || (cell != null && cell.isRoutethru() && pin.getName().equals("A6")
+                        && pin.getBELName().endsWith("6LUT"));
         }
         return cell != null && pin.getName().equals("S0")
                 && (pin.getBELName().startsWith("F7") || pin.getBELName().startsWith("F8"));
@@ -404,7 +406,8 @@ final class SiteRouting {
             if (cell.isRoutethru()) {
                 for (String physPin : cell.getPinMappingsP2L().keySet()) {
                     BELPin input = bel.getPin(physPin);
-                    if (input != null && input.isInput() && si.getNetFromSiteWireIndex(input.getSiteWireIndex()) == net) {
+                    if (input != null && input.isInput()
+                            && si.getNetFromSiteWireIndex(input.getSiteWireIndex()) == net) {
                         return isSiteWireDriven(si, net, input.getSiteWireIndex(), depth + 1);
                     }
                 }

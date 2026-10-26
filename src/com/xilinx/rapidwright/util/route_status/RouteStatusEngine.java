@@ -758,7 +758,8 @@ public final class RouteStatusEngine {
         }
         if (flat != null) {
             int pinCount = flat.leafDrivers + flat.leafLoads + flat.leafInouts;
-            if (pinCount > 0 && flat.unplacedLeafPins == pinCount && flat.placedPortDrivers + flat.placedPortLoads == 0) {
+            if (pinCount > 0 && flat.unplacedLeafPins == pinCount
+                    && flat.placedPortDrivers + flat.placedPortLoads == 0) {
                 // A net with no placed pins but with routing has only antennas (and is counted, but
                 // not listed, as having no placed pins)
                 return (graph != null) ? s | NO_PLACED_PINS_ROUTED | ANTENNAS | lockedNodes(graph) : s | UNPLACED_ALL;
@@ -776,7 +777,8 @@ public final class RouteStatusEngine {
             // Driven by a black box: needs routing to its loads
             return s | UNROUTED;
         }
-        return (graph == null) ? classifyWithoutRouting(net, flat, entry, s) : classifyRouting(net, flat, entry, s, graph);
+        return (graph == null) ? classifyWithoutRouting(net, flat, entry, s)
+                : classifyRouting(net, flat, entry, s, graph);
     }
 
     /** A status not decided by a step of {@link #classifyNet(Net, FlatNet, int)} (statuses are not negative) */
@@ -842,7 +844,8 @@ public final class RouteStatusEngine {
             boolean needsRouting = (net != null && !storedPins(net).isEmpty()) || flat.hasPinsInMultipleSites(design);
             return s | NODRIVER | (needsRouting ? PARTIAL : 0);
         }
-        if (net == null && flat.unplacedLeafPins == 0 && !entries.aliasNets.containsKey(entry) && flat.leafDrivers > 0) {
+        if (net == null && flat.unplacedLeafPins == 0 && !entries.aliasNets.containsKey(entry)
+                && flat.leafDrivers > 0) {
             int st = classifyWithoutPhysicalNet(flat, s);
             if (st != UNDECIDED) {
                 return st;
@@ -860,7 +863,8 @@ public final class RouteStatusEngine {
             // A hard block's pin without a physical pin is connected inside its site (or to another
             // block without routing), and so are loads in black boxes
             boolean internalDriver = flat.leafDrivers == 1 && pinCount == 1 && flat.firstCell != null
-                    && isHardBlockCell(flat.firstCell) && !RouteStatusNetlist.hasPhysicalPin(flat.firstCell, flat.firstPin);
+                    && isHardBlockCell(flat.firstCell)
+                    && !RouteStatusNetlist.hasPhysicalPin(flat.firstCell, flat.firstPin);
             return s | (internalDriver || (loads == 0 && flat.blackBoxLoads > 0) ? INTRASITE : NOLOADS);
         }
         return UNDECIDED;
@@ -922,7 +926,8 @@ public final class RouteStatusEngine {
             // internal to a site. It is partially routed if a placed driver has loads (whether placed
             // or not, as unplaced loads are unrouted) outside its site, or if the placed pins are in
             // different sites.
-            boolean leavesSite = (net != null && (!storedPins(net).isEmpty() || usesOutputSitePin(net))) || usesInputSitePin;
+            boolean leavesSite = (net != null && (!storedPins(net).isEmpty() || usesOutputSitePin(net)))
+                    || usesInputSitePin;
             return (flat.hasPlacedDriver() && flat.getLoads() > 0 && leavesSite) || flat.hasPinsInMultipleSites(design)
                     ? s | PARTIAL : s;
         }
@@ -933,7 +938,8 @@ public final class RouteStatusEngine {
                 // clock dividers, see VersalRules.isLeafClockClearPin())
                 return s | NOLOADS;
             }
-            if (flat != null && flat.multipleSites && flat.secondCell != null && flat.secondCell.getType().startsWith("RAMB")
+            if (flat != null && flat.multipleSites && flat.secondCell != null
+                    && flat.secondCell.getType().startsWith("RAMB")
                     && flat.leafLoads == 1 && flat.leafDrivers == 1) {
                 // An unused (unmapped) block RAM pin in another site is not a load
                 return s | NOLOADS;
@@ -1002,8 +1008,8 @@ public final class RouteStatusEngine {
         if (graph.reachedSinks < graph.sinks && sitePinKeys != null) {
             // Site routing is sometimes left behind (e.g. static ties for LUT pins, or where routing
             // bounces through a site pin) where no placed cell uses it: such site pins are not loads
-            graph.analyze(net, aliases, isStatic, sitePinKeys, getStaleSitePinKeys(net, isStatic ? net.getType() : null),
-                    partitionPinKeys, placedSource);
+            long[] staleSitePinKeys = getStaleSitePinKeys(net, isStatic ? net.getType() : null);
+            graph.analyze(net, aliases, isStatic, sitePinKeys, staleSitePinKeys, partitionPinKeys, placedSource);
         } else if (graph.leafSinks != null && hasStaleSitePin(net, graph.leafSinks)) {
             // Neither is a site pin (even with a SitePinInst) where routing ends, if the net's site
             // routing from it reaches no placed cell: the routing to it is an antenna

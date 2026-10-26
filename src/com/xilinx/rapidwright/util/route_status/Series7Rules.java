@@ -341,7 +341,8 @@ final class Series7Rules {
                     String siteWire = belPin.getSiteWireName();
                     int pinIndex = si.getSite().getPinIndex(siteWire);
                     if (pinIndex < 0 || si.getNetFromSiteWire(siteWire) != null || si.getSitePinInst(siteWire) != null
-                            || !isReachableThroughRouting(si.getSite().getConnectedNode(pinIndex)) || staticRouting.isRoutingTo(si, siteWire)
+                            || !isReachableThroughRouting(si.getSite().getConnectedNode(pinIndex))
+                            || staticRouting.isRoutingTo(si, siteWire)
                             || RouteStatusNetlist.getStaticType(pin.getHierarchicalNet()) != null) {
                         // (nor cascade inputs, which have dedicated connections)
                         continue;

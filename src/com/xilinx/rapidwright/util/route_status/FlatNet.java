@@ -416,7 +416,8 @@ final class FlatNet extends Connections {
                         return true;
                     }
                     SitePin sitePin = up.getSitePin();
-                    if (sitePin == null || sitePin.getSite().getSiteTypeEnum().name().startsWith(INTERFACE_SITE_PREFIX)) {
+                    String siteType = (sitePin == null) ? null : sitePin.getSite().getSiteTypeEnum().name();
+                    if (siteType == null || siteType.startsWith(INTERFACE_SITE_PREFIX)) {
                         next.add(up);
                     }
                 }

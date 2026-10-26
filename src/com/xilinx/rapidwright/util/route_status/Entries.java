@@ -76,7 +76,10 @@ final class Entries {
     /** Per entry with site pin nodes added to its node keys: how many of them are routing nodes (first) */
     int[] numRoutingKeys;
 
-    /** Per static entry: the keys of the site pins of its macro ties (see {@link SitePinClaims#addStaticLoadSitePins}) */
+    /**
+     * Per static entry: the keys of the site pins of its macro ties (see
+     * {@link SitePinClaims#addStaticLoadSitePins})
+     */
     final Map<Integer, long[]> staticTieKeys = new HashMap<>();
 
     /** Gets the number of entries. */

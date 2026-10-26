@@ -53,7 +53,8 @@ import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 final class VersalRules {
 
     /** Clock buffers with several outputs whose clocks share the routing of one of them */
-    private static final String[] SHARED_ROUTING_CLOCK_BUFFERS = {"MBUFGCE", "MBUFGCE_DIV", "MBUFGCTRL", "MBUFG_GT", "MBUFG_PS"};
+    private static final String[] SHARED_ROUTING_CLOCK_BUFFERS = {"MBUFGCE", "MBUFGCE_DIV", "MBUFGCTRL", "MBUFG_GT",
+        "MBUFG_PS"};
 
     /** The outputs of such clock buffers */
     private static final String[] SHARED_ROUTING_OUTPUTS = {"O1", "O2", "O3", "O4"};

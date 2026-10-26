@@ -401,7 +401,8 @@ final class SitePinClaims {
     void addClaimedLoadSitePins() {
         parallelFor(entries.nets.size(), (i) -> {
             FlatNet flat = entries.flats.get(i);
-            boolean unrouted = has(entries.status[i], UNROUTED) || (has(entries.status[i], NODRIVER) && !has(entries.status[i], HAS_ROUTING));
+            int st = entries.status[i];
+            boolean unrouted = has(st, UNROUTED) || (has(st, NODRIVER) && !has(st, HAS_ROUTING));
             if (entries.nets.get(i) != null || flat == null || !unrouted || entries.aliasNets.containsKey(i)) {
                 return;
             }

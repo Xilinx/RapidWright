@@ -137,7 +137,8 @@ final class ConflictMarker {
             if (keys == null) {
                 continue;
             }
-            int routing = (entries.numRoutingKeys == null || entries.numRoutingKeys[i] < 0) ? keys.length : entries.numRoutingKeys[i];
+            int routing = (entries.numRoutingKeys == null || entries.numRoutingKeys[i] < 0) ? keys.length
+                    : entries.numRoutingKeys[i];
             for (int j = 0; j < keys.length; j++) {
                 users.computeIfAbsent(keys[j], (k) -> new ArrayList<>(2)).add(i << 1 | (j >= routing ? 1 : 0));
             }

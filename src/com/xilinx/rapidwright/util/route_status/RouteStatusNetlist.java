@@ -440,7 +440,8 @@ final class RouteStatusNetlist {
                 continue;
             }
             EDIFCell type = info.children[c].getCellType();
-            boolean macro = insideMacro || type.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME);
+            boolean macro = insideMacro
+                    || type.getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME);
             markMacros(getCellInfo(type), macro);
         }
     }

@@ -64,7 +64,10 @@ final class RouteGraph {
     List<Node> routethruNodes;
     /** Index of each node key in {@link #nodes} */
     LongIndex index;
-    /** Per node: whether a PIP leads from it in the direction it is used (not just backwards through a bidirectional PIP) */
+    /**
+     * Per node: whether a PIP leads from it in the direction it is used (not just backwards through a
+     * bidirectional PIP)
+     */
     final boolean[] hasForwardFanout;
     boolean locked;
     /** Results of {@link #analyze}: the sinks, and how many of them the routing reaches */

@@ -105,7 +105,8 @@ final class UltraScaleRules {
      * Checks whether the clock enable (or set/reset) site pin of a flip-flop needs a tie to VCC that
      * no routing provides.
      */
-    private static boolean isMissingTie(SiteInst si, Cell cell, boolean ce, String sitePin, StaticRouting staticRouting) {
+    private static boolean isMissingTie(SiteInst si, Cell cell, boolean ce, String sitePin,
+                                        StaticRouting staticRouting) {
         BELPin belPin = cell.getBEL().getPin(ce ? "CE" : "SR");
         if (belPin == null) {
             return false;
