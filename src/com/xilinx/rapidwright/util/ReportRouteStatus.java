@@ -952,17 +952,28 @@ public class ReportRouteStatus {
             return ties;
         }
 
-        /** The types of the flip-flops and latches whose unused clock enable and set/reset are tied to VCC */
-        private static final Set<String> CE_SR_TIED_TYPES = new HashSet<>(Arrays.asList("FDRE", "FDSE", "FDCE",
-                "FDPE", "LDCE", "LDPE"));
+        /**
+         * The flip-flops and latches whose unused clock enable and set/reset are tied to VCC, with the
+         * names of their logical clock enable and set/reset pins
+         */
+        private static final Map<String, Pair<String, String>> CE_SR_TIED_TYPES = new HashMap<>();
+        static {
+            CE_SR_TIED_TYPES.put("FDRE", new Pair<>("CE", "R"));
+            CE_SR_TIED_TYPES.put("FDSE", new Pair<>("CE", "S"));
+            CE_SR_TIED_TYPES.put("FDCE", new Pair<>("CE", "CLR"));
+            CE_SR_TIED_TYPES.put("FDPE", new Pair<>("CE", "PRE"));
+            CE_SR_TIED_TYPES.put("LDCE", new Pair<>("GE", "CLR"));
+            CE_SR_TIED_TYPES.put("LDPE", new Pair<>("GE", "PRE"));
+        }
 
         /**
          * In UltraScale(+) slices, the clock enable and set/reset site pins (e.g. CKEN1, SRST1) of
-         * flip-flops (or latches) that use them without a signal (no site routing to the CE pin, and none
-         * or that of GND to the SR pin, as in {@link DesignTools#createCeSrRstPinsToVCC(Design)}) are
-         * tied to VCC through routing. Finds such a pin that has neither a site pin nor site routing of a
-         * signal, and which the routing of GND or VCC does not lead to (e.g. after moving flip-flops into
-         * the slice).
+         * flip-flops (or latches) that tie them off in the netlist (CE to VCC, SR to GND), without a
+         * signal (no site routing to the CE pin, and none or that of GND to the SR pin, as in
+         * {@link DesignTools#createCeSrRstPinsToVCC(Design)}) are tied to VCC through routing, the SR
+         * pin through the inverting setting of its inverter (without a used site PIP). Finds such a pin
+         * that has neither a site pin nor site routing of a signal, and which the routing of GND or VCC
+         * does not lead to (e.g. after moving flip-flops into the slice).
          * @return {@link #VCC_TIE} if there is such a pin, else 0.
          */
         private int getMissingSliceControlTies(Series series) {
@@ -973,7 +984,7 @@ public class ReportRouteStatus {
                 }
                 for (Cell cell : si.getCells()) {
                     BEL bel = cell.getBEL();
-                    if (cell.isRoutethru() || bel == null || !bel.isFF() || !CE_SR_TIED_TYPES.contains(cell.getType())) {
+                    if (cell.isRoutethru() || bel == null || !bel.isFF() || !CE_SR_TIED_TYPES.containsKey(cell.getType())) {
                         continue;
                     }
                     Pair<String, String> pins = sitePinNames.get(bel.getName());
@@ -996,11 +1007,38 @@ public class ReportRouteStatus {
                                 || isStaticRoutingTo(si, sitePin)) {
                             continue;
                         }
+                        // Only a pin that the netlist ties off needs it (not one that is unconnected, nor
+                        // that of a cell missing from the netlist). The tied pin is not mapped.
+                        Pair<String, String> logicalPins = CE_SR_TIED_TYPES.get(cell.getType());
+                        String logicalPin = ce ? logicalPins.getFirst() : logicalPins.getSecond();
+                        if (!isTiedTo(cell, logicalPin, ce ? NetType.VCC : NetType.GND)) {
+                            continue;
+                        }
+                        if (!ce && isDrivenThroughUsedSitePIP(si, belPin)) {
+                            // The set/reset inverter (e.g. RST_ABCDINV) does not invert: the pin is not
+                            // tied to VCC
+                            continue;
+                        }
                         return VCC_TIE;
                     }
                 }
             }
             return 0;
+        }
+
+        /** Checks whether a BEL in a site that drives the site wire of a BEL pin has a used site PIP */
+        private static boolean isDrivenThroughUsedSitePIP(SiteInst si, BELPin pin) {
+            for (BELPin driver : si.getSiteWirePins(pin.getSiteWireIndex())) {
+                if (!driver.isOutput() || driver.isSitePort()) {
+                    continue;
+                }
+                for (BELPin input : driver.getBEL().getPins()) {
+                    if (input.isInput() && si.getUsedSitePIP(input) != null) {
+                        return true;
+                    }
+                }
+            }
+            return false;
         }
 
         /** The nodes that the routing of GND and VCC leads to, see {@link #isStaticRoutingTo} */
