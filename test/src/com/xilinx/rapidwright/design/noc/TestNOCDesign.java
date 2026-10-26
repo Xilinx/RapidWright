@@ -340,6 +340,57 @@ public class TestNOCDesign {
     }
 
     /**
+     * One NMU with a path to each port of a DDRMC5E: each solution path is loaded into the connection
+     * to its own port and written back with its own nets and achieved bandwidths.
+     */
+    @Test
+    public void testGen2PathsToBothDDRPorts() {
+        String path0 = GEN2_TRAFFIC.substring(GEN2_TRAFFIC.indexOf("{\"Phase\": 0"), GEN2_TRAFFIC.lastIndexOf('}',
+                GEN2_TRAFFIC.lastIndexOf(']')) + 1);
+        String traffic = GEN2_TRAFFIC.replace(path0, path0 + ",\n    " + path0.replace("PORT0", "PORT1"));
+        String sol0 = GEN2_SOLUTION.substring(GEN2_SOLUTION.indexOf("{\"Phase\": 0"),
+                GEN2_SOLUTION.indexOf("    ]}],") + "    ]}".length());
+        String sol1 = sol0.replace("PORT0", "PORT1").replace("Port0_", "Port1_")
+                .replace("\"ReadAchievedBW\": 500", "\"ReadAchievedBW\": 400")
+                .replace("\"WriteAchievedBW\": 500", "\"WriteAchievedBW\": 300");
+        String solution = GEN2_SOLUTION.replace(sol0, sol0 + ",\n    " + sol1);
+
+        Design d = new Design("noc2", "xc2ve3858");
+        NOCDesign noc = new NOCDesign(d);
+        noc.loadTraffic(new ByteArrayInputStream(traffic.getBytes(StandardCharsets.UTF_8)));
+        noc.loadSolution(new ByteArrayInputStream(solution.getBytes(StandardCharsets.UTF_8)));
+        NOCMaster nmu = noc.getMasterClients().get("noc/S00_AXI_nmu/NOC2_NMU512_INST");
+        Assertions.assertEquals(2, noc.getAllConnections().size());
+        for (String port : new String[] {"PORT0", "PORT1"}) {
+            NOCConnection conn = nmu.getConnectionTo("noc/MC0_ddrc/DDRMC5_COMP", port);
+            Assertions.assertEquals(port, conn.getPort());
+            Assertions.assertTrue(conn.isRouted(), port);
+            Assertions.assertEquals(4, conn.getChannels().size(), port);
+        }
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        noc.writeSolution(out);
+        org.json.JSONArray written = new JSONObject(out.toString(StandardCharsets.UTF_8)).getJSONArray("Paths");
+        org.json.JSONArray orig = new JSONObject(solution).getJSONArray("Paths");
+        Assertions.assertEquals(2, written.length());
+        for (int i = 0; i < orig.length(); i++) {
+            JSONObject o = orig.getJSONObject(i);
+            JSONObject w = null;
+            for (int j = 0; j < written.length(); j++) {
+                if (written.getJSONObject(j).getString("Port").equals(o.getString("Port"))) {
+                    w = written.getJSONObject(j);
+                }
+            }
+            Assertions.assertNotNull(w, o.getString("Port"));
+            Assertions.assertEquals(o.getInt("ReadAchievedBW"), w.getInt("ReadAchievedBW"));
+            Assertions.assertEquals(o.getInt("WriteAchievedBW"), w.getInt("WriteAchievedBW"));
+            Assertions.assertEquals(o.getJSONArray("Nets").length(), w.getJSONArray("Nets").length());
+            Assertions.assertTrue(w.getJSONArray("Nets").toString().contains(o.getString("Port").replace("PORT", "Port")
+                    + "_req"), w.toString());
+        }
+    }
+
+    /**
      * Modeled fields that are cleared after loading stay cleared when written, while fields
      * RapidWright does not model are still written back unchanged.
      */

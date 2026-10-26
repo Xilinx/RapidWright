@@ -76,11 +76,30 @@ public class NOCMaster extends NOCClient implements Serializable {
      * @since 2022.1.1
      */
     public NOCConnection getConnectionTo(String slaveName) {
+        return getConnectionTo(slaveName, null);
+    }
+
+    /**
+     * Gets the corresponding connection based on slave client name and slave port. A master can have one connection
+     * per port of the same slave (e.g. to PORT0 and PORT1 of a Versal Gen 2 DDRMC5E).
+     *
+     * @param slaveName The name of the slave client that connects to this master.
+     * @param port The slave port of the connection (e.g. "PORT1"), or null to match any port.
+     * @return The connection to that port of the slave client, else the first connection to the slave client, or
+     *         null if none found.
+     * @since 2026.1.0
+     */
+    public NOCConnection getConnectionTo(String slaveName, String port) {
+        NOCConnection first = null;
         for (NOCConnection connection : getConnections()) {
-            if (connection.getDest().getName().equals(slaveName))
+            if (!connection.getDest().getName().equals(slaveName))
+                continue;
+            if (port == null || port.equals(connection.getPort()))
                 return connection;
+            if (first == null)
+                first = connection;
         }
-        return null;
+        return first;
     }
 
     /**
