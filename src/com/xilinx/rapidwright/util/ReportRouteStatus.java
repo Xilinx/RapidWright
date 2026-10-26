@@ -1682,6 +1682,7 @@ public class ReportRouteStatus {
                 islandSinks = 0;
                 leafSinks = null;
                 int distinct = nodes.length;
+                boolean sourceUnrouted = false;
                 boolean[] isSink = new boolean[distinct];
                 boolean[] visited = new boolean[distinct];
                 int[] queue = new int[distinct];
@@ -1718,8 +1719,9 @@ public class ReportRouteStatus {
                             visited[i] = true;
                             queue[tail++] = i;
                         } else if (i < 0 && !isStatic && spi == owner.getSource()) {
-                            // The source pin is not routed
-                            unroutedSource = true;
+                            // The source pin is not routed (which only matters if no other output pin
+                            // of the net is, see below)
+                            sourceUnrouted = true;
                         }
                     } else if (node != null) {
                         sinkKeys[numSinks++] = nodeKey(node);
@@ -1776,6 +1778,11 @@ public class ReportRouteStatus {
                     }
                 }
                 boolean rootedAtSource = tail > 0;
+                if (sourceUnrouted && !rootedAtSource) {
+                    // Vivado does not tell the source from the alternate source of a net (e.g. the xMUX
+                    // and x_O outputs of a LUT, both site routed): the routing may start at either
+                    unroutedSource = true;
+                }
                 boolean[] isPartitionPin = null;
                 if (partitionPinKeys.length > 0) {
                     for (int i = 0; i < distinct; i++) {

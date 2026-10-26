@@ -1068,6 +1068,34 @@ public class TestReportRouteStatus {
     }
 
     /**
+     * A net whose LUT drives both its G_O and GMUX outputs through site routing, with routing from
+     * G_O only, is fully routed (to Vivado, neither pin is the source), also where GMUX is the
+     * source of the net in RapidWright and G_O its alternate source.
+     */
+    @Test
+    public void testReportRouteStatusRoutedFromAlternateSource() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp");
+        Net net = design.getNet("picoblaze_0_12/processor/alu_result_2");
+        SiteInst si = design.getSiteInstFromSiteName("SLICE_X10Y62");
+        SitePinInst routed = net.getSource();
+        Assertions.assertEquals("G_O", routed.getName());
+        Assertions.assertEquals(net, si.getNetFromSiteWire("GMUX"));
+        SitePinInst gmux = net.createPin("GMUX", si);
+        net.getAlternateSources().remove(gmux);
+        net.setSource(gmux);
+        net.setAlternateSource(routed);
+        ReportRouteStatusResult rrs = ReportRouteStatus.reportRouteStatus(design, true);
+        Assertions.assertEquals(PICOBLAZE4_SUMMARY_HEAD +
+                "           # of fully routed nets............. :         772 :\n" +
+                "       # of nets with routing errors.......... :           2 :\n" +
+                "           # of nets with some unplaced pins.. :           2 :\n" +
+                "           # of nets with some unrouted pins.. :           2 :\n" +
+                "   ------------------------------------------- : ----------- :",
+                rrs.toString());
+        assertNetStatuses(rrs, new String[]{"picoblaze_0_12/processor/alu_result_2=HAS_ROUTING,ROUTED"});
+    }
+
+    /**
      * Routing to an input site pin of a net (with a SitePinInst, with or without site routing of the
      * net) whose site routing reaches no placed cell is an antenna, even where all loads of the net
      * are routed (Vivado reports both the same).
