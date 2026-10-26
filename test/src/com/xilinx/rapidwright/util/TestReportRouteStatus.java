@@ -954,6 +954,20 @@ public class TestReportRouteStatus {
         assertNetStatuses(rrs, new String[]{"picoblaze_0_12/in_port[0]=CONFLICTS," + (toLoad ? "" : "ANTENNAS,") + "HAS_ROUTING"});
     }
 
+    /** The summary of picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp up to its routable nets (Vivado 2026.1) */
+    private static final String PICOBLAZE4_SUMMARY_HEAD =
+            "Design Route Status\n" +
+            "                                               :      # nets :\n" +
+            "   ------------------------------------------- : ----------- :\n" +
+            "   # of logical nets.......................... :        1505 :\n" +
+            "       # of nets with no placed pins.......... :           1 :\n" +
+            "       # of nets not needing routing.......... :         697 :\n" +
+            "           # of internally routed nets........ :         476 :\n" +
+            "           # of nets with no loads............ :         188 :\n" +
+            "           # of implicitly routed ports....... :          33 :\n" +
+            "       # of routable nets..................... :         805 :\n" +
+            "           # of unrouted nets................. :          33 :\n";
+
     /** The summary of microblazeAndILA_3pblocks.dcp up to its routable nets (Vivado 2026.1) */
     private static final String MICROBLAZE_SUMMARY_HEAD =
             "Design Route Status\n" +
@@ -1025,6 +1039,32 @@ public class TestReportRouteStatus {
                 "   ------------------------------------------- : ----------- :",
                 rrs.toString());
         assertNetStatuses(rrs, new String[]{"GLOBAL_LOGIC1=CONFLICTS,HAS_ROUTING"});
+    }
+
+    /**
+     * Output site pins of a net whose site wires are not driven by the net: here the HMUX output,
+     * whose OUTMUXH selects the O6 output of the net's LUT, once that output (and the H_O pin) has no
+     * site routing of the net. Vivado reports the routing from both pins as antennas, and the net as
+     * partially routed.
+     */
+    @Test
+    public void testReportRouteStatusUndrivenOutputSitePin() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp");
+        SiteInst si = design.getSiteInstFromSiteName("SLICE_X10Y64");
+        BELPin o6 = si.getBEL("H6LUT").getPin("O6");
+        si.unrouteIntraSiteNet(o6, o6);
+        Assertions.assertNull(si.getNetFromSiteWire("H_O"));
+        Assertions.assertNotNull(si.getUsedSitePIP(si.getBEL("OUTMUXH")));
+        ReportRouteStatusResult rrs = ReportRouteStatus.reportRouteStatus(design, true);
+        Assertions.assertEquals(PICOBLAZE4_SUMMARY_HEAD +
+                "           # of fully routed nets............. :         771 :\n" +
+                "       # of nets with routing errors.......... :           3 :\n" +
+                "           # of nets with some unplaced pins.. :           2 :\n" +
+                "           # of nets with some unrouted pins.. :           3 :\n" +
+                "           # of nets with antennas/islands.... :           1 :\n" +
+                "   ------------------------------------------- : ----------- :",
+                rrs.toString());
+        assertNetStatuses(rrs, new String[]{"picoblaze_0_12/processor/alu_result_0=PARTIAL,ANTENNAS,HAS_ROUTING"});
     }
 
     /**

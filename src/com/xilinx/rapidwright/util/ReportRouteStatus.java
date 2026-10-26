@@ -1334,12 +1334,48 @@ public class ReportRouteStatus {
             if ((unroutedDrivers & DRIVER_PIN_CONFLICT) != 0) {
                 s |= CONFLICTS;
             }
-            if (graph.reachedSinks < graph.sinks || graph.unroutedSource || unroutedDrivers != 0) {
+            boolean sinksReached = graph.reachedSinks == graph.sinks;
+            if (!sinksReached && graph.undrivenSource && !graph.rooted && graph.reachedSinks + graph.islandSinks == graph.sinks
+                    && flat != null && hasOnlyLoadsInDriverSite(flat)) {
+                // Routing only from output site pins that the site routing of the net does not drive
+                // leads nowhere (antennas), but a driver whose loads are all in its own site needs no
+                // output site pin: its loads that the routing leads to are routed
+                sinksReached = true;
+            }
+            if (!sinksReached || graph.unroutedSource || unroutedDrivers != 0) {
                 s |= PARTIAL;
             } else if (!graph.antennas && !someUnplaced && !has(s, CONFLICTS)) {
                 s |= ROUTED;
             }
             return s;
+        }
+
+        /**
+         * Checks whether a net has a single placed driver, in an UltraScale(+) slice, and all its loads
+         * are placed in the same site.
+         */
+        private boolean hasOnlyLoadsInDriverSite(RouteStatusNetlist.FlatNet flat) {
+            Series series = design.getDevice().getSeries();
+            if ((series != Series.UltraScale && series != Series.UltraScalePlus) || flat.leafDrivers != 1
+                    || flat.unplacedLeafPins > 0 || flat.leafInouts > 0 || flat.hasTopPorts()) {
+                return false;
+            }
+            SiteInst driverSite = null;
+            List<RouteStatusNetlist.LeafPin> pins = flat.getLeafPins(design);
+            for (RouteStatusNetlist.LeafPin pin : pins) {
+                if (pin.isOutput()) {
+                    driverSite = pin.cell.getSiteInst();
+                }
+            }
+            if (driverSite == null || !Utils.isSLICE(driverSite)) {
+                return false;
+            }
+            for (RouteStatusNetlist.LeafPin pin : pins) {
+                if (pin.cell.getSiteInst() != driverSite) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         static long nodeKey(Node node) {
@@ -1379,6 +1415,12 @@ public class ReportRouteStatus {
             /** The start nodes of the PIPs marking explicit gaps (PIPs to nowhere), or null */
             List<Node> gapStarts;
             boolean unroutedSource;
+            /** Whether an output site pin of the net was not taken as a source, as its site routing does not drive it */
+            boolean undrivenSource;
+            /** Whether any routing starts at a source of the net (or comes from another partition) */
+            boolean rooted;
+            /** The sinks that the routing leads to without being reached from a source (e.g. on islands) */
+            int islandSinks;
             /**
              * Per node: whether more than one PIP (or the same PIP more than once) drives it. Vivado
              * gets such a node once more in the route tree, as a leaf: a conflict with itself.
@@ -1574,6 +1616,8 @@ public class ReportRouteStatus {
                 antennas = false;
                 explicitGaps = false;
                 unroutedSource = false;
+                undrivenSource = false;
+                islandSinks = 0;
                 int distinct = nodes.length;
                 boolean[] isSink = new boolean[distinct];
                 boolean[] visited = new boolean[distinct];
@@ -1603,6 +1647,7 @@ public class ReportRouteStatus {
                         if (!isStatic && !isDrivenBySiteRouting(owner, spi)) {
                             // An output pin the site routing of the net does not lead to (e.g. one
                             // inferred from routing that starts there) drives nothing
+                            undrivenSource = true;
                             continue;
                         }
                         int i = indexOf(node);
@@ -1662,6 +1707,9 @@ public class ReportRouteStatus {
                         // of the net) without a SitePinInst
                         visited[i] = true;
                         queue[tail++] = i;
+                    } else if (!isStatic && node.getSitePin() != null && !node.getSitePin().isInput()
+                            && isSitePinUsedBy(net, node)) {
+                        undrivenSource = true;
                     }
                 }
                 boolean rootedAtSource = tail > 0;
@@ -1682,7 +1730,7 @@ public class ReportRouteStatus {
                         }
                     }
                 }
-                boolean rooted = tail > 0;
+                rooted = tail > 0;
                 if (rooted && !rootedAtSource && placedSource && !isStatic) {
                     // Routing from another partition, but none from the placed source
                     unroutedSource = true;
@@ -1786,6 +1834,8 @@ public class ReportRouteStatus {
                         // Reached by routing (even if that routing is an island, or merely starts
                         // there, unless no routing leaves the source at all)
                         reachedSinks++;
+                    } else if (isSink[i]) {
+                        islandSinks++;
                     }
                 }
             }
@@ -1990,13 +2040,24 @@ public class ReportRouteStatus {
 
 
         /**
-         * Checks whether the site routing of a net may lead to an output pin of it of a (7 series)
-         * slice, i.e. unless another net's site routing leads to it, or that of the net leads to
-         * another output pin of the slice (and not to this one).
+         * Checks whether the site routing of a net may lead to an output pin of it of a slice. In
+         * 7-series devices, unless another net's site routing leads to it, or that of the net leads to
+         * another output pin of the slice (and not to this one); in UltraScale(+) devices, if the site
+         * wire of the pin carries the net and is driven by it (see
+         * {@link #isSiteWireDriven(SiteInst, Net, int, int)}).
          */
         private static boolean isDrivenBySiteRouting(Net net, SitePinInst spi) {
             SiteInst si = spi.getSiteInst();
-            if (si == null || si.getDesign().getSeries() != Series.Series7 || !si.getSiteTypeEnum().name().startsWith("SLICE")) {
+            if (si == null || !si.getSiteTypeEnum().name().startsWith("SLICE")) {
+                return true;
+            }
+            Series series = si.getDesign().getSeries();
+            if (series == Series.UltraScale || series == Series.UltraScalePlus) {
+                Integer siteWire = spi.getSiteWireIndex();
+                return siteWire == null || siteWire < 0
+                        || (si.getNetFromSiteWireIndex(siteWire) == net && isSiteWireDriven(si, net, siteWire, 0));
+            }
+            if (series != Series.Series7) {
                 return true;
             }
             Net siteWireNet = si.getNetFromSiteWire(spi.getSiteWireName());
@@ -2016,6 +2077,65 @@ public class ReportRouteStatus {
             return true;
         }
 
+        /** Limit on the number of site PIPs and routethrus followed back from a site wire */
+        private static final int MAX_SITE_ROUTING_DEPTH = 16;
+
+        /**
+         * Checks whether a site wire of an UltraScale(+) slice that carries a net is driven by the net:
+         * from an output pin of a placed cell or from an input site pin, through site wires of the net,
+         * the used site PIPs (e.g. of an OUTMUX, or of a LUT used as a routethru) and routethru cells.
+         * Vivado reports the routing from an output site pin whose site wire is merely assigned to the
+         * net (e.g. that of an xMUX output whose OUTMUX selects the output of a LUT that is not site
+         * routed as the net) as an antenna, which does not drive the net's loads.
+         */
+        private static boolean isSiteWireDriven(SiteInst si, Net net, int siteWire, int depth) {
+            if (depth > MAX_SITE_ROUTING_DEPTH) {
+                return true;
+            }
+            for (BELPin pin : si.getSiteWirePins(siteWire)) {
+                if (!pin.isOutput()) {
+                    continue;
+                }
+                // The pin driving the site wire: the port BEL of an input site pin, or the output of a BEL
+                if (pin.isSitePort()) {
+                    return true;
+                }
+                BEL bel = pin.getBEL();
+                SitePIP sitePIP = si.getUsedSitePIP(bel);
+                if (sitePIP != null) {
+                    BELPin input = sitePIP.getInputPin();
+                    int inputWire = input.getSiteWireIndex();
+                    return si.getNetFromSiteWireIndex(inputWire) == net && isSiteWireDriven(si, net, inputWire, depth + 1);
+                }
+                Cell cell = si.getCell(bel);
+                if (cell == null) {
+                    return false;
+                }
+                if (cell.isRoutethru()) {
+                    for (String physPin : cell.getPinMappingsP2L().keySet()) {
+                        BELPin input = bel.getPin(physPin);
+                        if (input != null && input.isInput() && si.getNetFromSiteWireIndex(input.getSiteWireIndex()) == net) {
+                            return isSiteWireDriven(si, net, input.getSiteWireIndex(), depth + 1);
+                        }
+                    }
+                    return false;
+                }
+                return cell.getLogicalPinMapping(pin.getName()) != null;
+            }
+            return false;
+        }
+
+        /** Gets the port BEL pin of a site pin, named as in the type of the site instance, or null. */
+        private static BELPin getSitePortPin(SiteInst si, SitePin sitePin) {
+            String pinName = sitePin.getPinName();
+            BEL bel = si.getBEL(pinName);
+            if (bel == null) {
+                pinName = si.getAlternateSitePinName(pinName);
+                bel = (pinName == null) ? null : si.getBEL(pinName);
+            }
+            return (bel == null) ? null : bel.getPin(pinName);
+        }
+
         /** Checks whether the node is that of a site pin used by the site routing of the net. */
         private static boolean isSitePinUsedBy(Net net, Node node) {
             SitePin sitePin = node.getSitePin();
@@ -2026,21 +2146,25 @@ public class ReportRouteStatus {
             if (si == null) {
                 return false;
             }
-            // (the site pin's port BEL, named as in the type of the site instance)
-            String pinName = sitePin.getPinName();
-            BEL bel = si.getBEL(pinName);
-            if (bel == null) {
-                pinName = si.getAlternateSitePinName(pinName);
-                bel = (pinName == null) ? null : si.getBEL(pinName);
-            }
-            BELPin belPin = (bel == null) ? null : bel.getPin(pinName);
+            BELPin belPin = getSitePortPin(si, sitePin);
             return belPin != null && si.getNetFromSiteWireIndex(belPin.getSiteWireIndex()) == net;
         }
 
         /** Checks whether the node is that of an output site pin driven by the site routing of the net. */
         private static boolean isSiteRoutedOutputPinNode(Net net, Node node) {
             SitePin sitePin = node.getSitePin();
-            return sitePin != null && !sitePin.isInput() && isSitePinUsedBy(net, node);
+            if (sitePin == null || sitePin.isInput() || !isSitePinUsedBy(net, node)) {
+                return false;
+            }
+            Series series = net.getDesign().getSeries();
+            if (series != Series.UltraScale && series != Series.UltraScalePlus) {
+                return true;
+            }
+            SiteInst si = net.getDesign().getSiteInstFromSite(sitePin.getSite());
+            if (!si.getSiteTypeEnum().name().startsWith("SLICE")) {
+                return true;
+            }
+            return isSiteWireDriven(si, net, getSitePortPin(si, sitePin).getSiteWireIndex(), 0);
         }
 
         /**
