@@ -966,6 +966,46 @@ public class TestReportRouteStatus {
             "       # of routable nets..................... :        5002 :\n";
 
     /**
+     * The clock enable and set/reset site pins of UltraScale(+) slices whose flip-flops do not use them
+     * are tied to VCC through routing, without a site pin or site routing. Without that routing,
+     * Vivado lists the pin's node as an unrouted node of VCC (here INT_X9Y236/CTRL_W0, and
+     * INT_X9Y94/CTRL_E_B1, whose routing is left as an antenna).
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+            "picoblaze_ooc_X10Y235.dcp, INT_X9Y236/INT.VCC_WIRE->>CTRL_W0",
+            "microblazeAndILA_3pblocks.dcp, INT_X9Y94/INT.INT_NODE_GLOBAL_7_OUT1->>CTRL_E_B1"})
+    public void testReportRouteStatusMissingSliceControlTie(String dcp, String tie) {
+        Design design = RapidWrightDCP.loadDCP(dcp);
+        Assertions.assertTrue(design.getVccNet().getPIPs().removeIf((p) -> p.toString().equals(tie)));
+        ReportRouteStatusResult rrs = ReportRouteStatus.reportRouteStatus(design, true);
+        boolean picoblaze = dcp.startsWith("picoblaze");
+        Assertions.assertEquals(picoblaze
+                ? "Design Route Status\n" +
+                  "                                               :      # nets :\n" +
+                  "   ------------------------------------------- : ----------- :\n" +
+                  "   # of logical nets.......................... :         407 :\n" +
+                  "       # of nets not needing routing.......... :         212 :\n" +
+                  "           # of internally routed nets........ :         119 :\n" +
+                  "           # of nets with no loads............ :          27 :\n" +
+                  "           # of implicitly routed ports....... :          66 :\n" +
+                  "       # of routable nets..................... :         195 :\n" +
+                  "           # of nets with explicit gaps....... :           1 :\n" +
+                  "           # of fully routed nets............. :         194 :\n" +
+                  "       # of nets with routing errors.......... :           1 :\n" +
+                  "           # of nets with some unrouted pins.. :           1 :\n" +
+                  "   ------------------------------------------- : ----------- :"
+                : MICROBLAZE_SUMMARY_HEAD +
+                  "           # of fully routed nets............. :        5001 :\n" +
+                  "       # of nets with routing errors.......... :           1 :\n" +
+                  "           # of nets with some unrouted pins.. :           1 :\n" +
+                  "           # of nets with antennas/islands.... :           1 :\n" +
+                  "   ------------------------------------------- : ----------- :",
+                rrs.toString());
+        assertNetStatuses(rrs, new String[]{"GLOBAL_LOGIC1=PARTIAL," + (picoblaze ? "" : "ANTENNAS,") + "HAS_ROUTING"});
+    }
+
+    /**
      * A site pin that VCC ties through routing (without a site pin or site routing of VCC) driven
      * twice: a conflict of VCC with itself, but not an antenna, as the pin is a load.
      */

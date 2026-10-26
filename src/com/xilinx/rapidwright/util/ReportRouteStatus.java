@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.util;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.PartitionPin;
@@ -848,11 +849,17 @@ public class ReportRouteStatus {
          * Finds site pins that the site programming needs tied to a constant through routing, but which
          * have no site routing (as left by removing nets or their pins): in 7-series devices, the inputs
          * of hard blocks reachable through routing whose net has no site routing there (VCC, or GND for
-         * clock enables and clock inputs). Vivado lists them as unrouted nodes of VCC (GND).
+         * clock enables and clock inputs); in UltraScale(+) devices, the clock enable and set/reset
+         * pins of slices (see {@link #getMissingSliceControlTies(Series)}). Vivado lists them as
+         * unrouted nodes of VCC (GND).
          * @return A combination of {@link #VCC_TIE} and {@link #GND_TIE}.
          */
         private int getMissingTies() {
-            if (design.getDevice().getSeries() != Series.Series7) {
+            Series series = design.getDevice().getSeries();
+            if (series == Series.UltraScale || series == Series.UltraScalePlus) {
+                return getMissingSliceControlTies(series);
+            }
+            if (series != Series.Series7) {
                 return 0;
             }
             int ties = 0;
@@ -888,6 +895,57 @@ public class ReportRouteStatus {
                 }
             }
             return ties;
+        }
+
+        /** The types of the flip-flops and latches whose unused clock enable and set/reset are tied to VCC */
+        private static final Set<String> CE_SR_TIED_TYPES = new HashSet<>(Arrays.asList("FDRE", "FDSE", "FDCE",
+                "FDPE", "LDCE", "LDPE"));
+
+        /**
+         * In UltraScale(+) slices, the clock enable and set/reset site pins (e.g. CKEN1, SRST1) of
+         * flip-flops (or latches) that use them without a signal (no site routing to the CE pin, and none
+         * or that of GND to the SR pin, as in {@link DesignTools#createCeSrRstPinsToVCC(Design)}) are
+         * tied to VCC through routing. Finds such a pin that has neither a site pin nor site routing of a
+         * signal, and which the routing of GND or VCC does not lead to (e.g. after moving flip-flops into
+         * the slice).
+         * @return {@link #VCC_TIE} if there is such a pin, else 0.
+         */
+        private int getMissingSliceControlTies(Series series) {
+            Map<String, Pair<String, String>> sitePinNames = DesignTools.belTypeSitePinNameMapping.get(series);
+            for (SiteInst si : design.getSiteInsts()) {
+                if (!Utils.isSLICE(si)) {
+                    continue;
+                }
+                for (Cell cell : si.getCells()) {
+                    BEL bel = cell.getBEL();
+                    if (cell.isRoutethru() || bel == null || !bel.isFF() || !CE_SR_TIED_TYPES.contains(cell.getType())) {
+                        continue;
+                    }
+                    Pair<String, String> pins = sitePinNames.get(bel.getName());
+                    if (pins == null) {
+                        continue;
+                    }
+                    for (boolean ce : new boolean[]{true, false}) {
+                        BELPin belPin = bel.getPin(ce ? "CE" : "SR");
+                        if (belPin == null) {
+                            continue;
+                        }
+                        Net belPinNet = si.getNetFromSiteWireIndex(belPin.getSiteWireIndex());
+                        if (belPinNet != null && (ce || !belPinNet.isGNDNet())) {
+                            // Used by a signal (or a tie inside the site)
+                            continue;
+                        }
+                        String sitePin = ce ? pins.getFirst() : pins.getSecond();
+                        Net sitePinNet = si.getNetFromSiteWire(sitePin);
+                        if (si.getSitePinInst(sitePin) != null || (sitePinNet != null && !sitePinNet.isStaticNet())
+                                || isStaticRoutingTo(si, sitePin)) {
+                            continue;
+                        }
+                        return VCC_TIE;
+                    }
+                }
+            }
+            return 0;
         }
 
         /** The nodes that the routing of GND and VCC leads to, see {@link #isStaticRoutingTo} */
