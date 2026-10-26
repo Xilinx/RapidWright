@@ -1718,8 +1718,10 @@ public class ReportRouteStatus {
                         // Island: routing not reachable from the source (unless through explicit gaps)
                         antennas = true;
                     }
-                    if (drivenAgain != null && drivenAgain[i] && !gapMarkers && !isSink[i] && !(stubEnd[i] && sinks > 0)) {
-                        // A node driven again leads nowhere the second time, unless it is a load
+                    if (drivenAgain != null && drivenAgain[i] && !gapMarkers && !isSink[i] && !(stubEnd[i] && sinks > 0)
+                            && !(isStatic && isSitePinNode(nodeObjects[i]))) {
+                        // A node driven again leads nowhere the second time, unless it is a load (as
+                        // are the site pins that static nets tie, which need not be in their site routing)
                         antennas = true;
                     }
                     if (isSink[i] && (visited[i] || rooted)) {

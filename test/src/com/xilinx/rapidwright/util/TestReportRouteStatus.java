@@ -954,6 +954,39 @@ public class TestReportRouteStatus {
         assertNetStatuses(rrs, new String[]{"picoblaze_0_12/in_port[0]=CONFLICTS," + (toLoad ? "" : "ANTENNAS,") + "HAS_ROUTING"});
     }
 
+    /** The summary of microblazeAndILA_3pblocks.dcp up to its routable nets (Vivado 2026.1) */
+    private static final String MICROBLAZE_SUMMARY_HEAD =
+            "Design Route Status\n" +
+            "                                               :      # nets :\n" +
+            "   ------------------------------------------- : ----------- :\n" +
+            "   # of logical nets.......................... :        8682 :\n" +
+            "       # of nets not needing routing.......... :        3680 :\n" +
+            "           # of internally routed nets........ :        3591 :\n" +
+            "           # of nets with no loads............ :          89 :\n" +
+            "       # of routable nets..................... :        5002 :\n";
+
+    /**
+     * A site pin that VCC ties through routing (without a site pin or site routing of VCC) driven
+     * twice: a conflict of VCC with itself, but not an antenna, as the pin is a load.
+     */
+    @Test
+    public void testReportRouteStatusStaticTieDrivenTwice() {
+        Design design = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
+        Net vcc = design.getVccNet();
+        for (String pip : new String[]{"INT_X8Y94/INT.VCC_WIRE->>EE2_E_BEG0", "INT_X9Y94/INT.EE2_E_END0->>INT_NODE_GLOBAL_11_OUT0",
+                "INT_X9Y94/INT.INT_NODE_GLOBAL_11_OUT0->>CTRL_E_B1"}) {
+            vcc.addPIP(design.getDevice().getPIP(pip));
+        }
+        ReportRouteStatusResult rrs = ReportRouteStatus.reportRouteStatus(design, true);
+        Assertions.assertEquals(MICROBLAZE_SUMMARY_HEAD +
+                "           # of fully routed nets............. :        5001 :\n" +
+                "       # of nets with routing errors.......... :           1 :\n" +
+                "           # of nets with resource conflicts.. :           1 :\n" +
+                "   ------------------------------------------- : ----------- :",
+                rrs.toString());
+        assertNetStatuses(rrs, new String[]{"GLOBAL_LOGIC1=CONFLICTS,HAS_ROUTING"});
+    }
+
     /**
      * A netlist with nets but no primitives (here a wire from an input to an output port, or a
      * black box between them): Vivado lists GLOBAL_LOGIC0 as internally routed, without counting it.
