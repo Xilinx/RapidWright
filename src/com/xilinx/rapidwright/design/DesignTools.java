@@ -1161,27 +1161,33 @@ public class DesignTools {
             Net vccCell = cell.getVccNet();
             Net gndCell = cell.getGndNet();
             for (SiteInst si : cell.getSiteInsts()) {
-                // The new names of the site's cells. Renaming a cell may also rename the routethru
-                // cells and alternate pin mappings in its site that carry its name, so those already
-                // carrying a new name are not prefixed again
-                Set<String> newNames = new HashSet<>();
+                // The names the site's routethru cells and their alternate pin mappings carry before
+                // its other cells are renamed. Renaming a cell may also rename those carrying its name
+                // (see Cell.updateName()), and a name changed that way is not prefixed again
+                Map<Cell, String> routethruNames = new IdentityHashMap<>();
+                Map<AltPinMapping, String> altCellNames = new IdentityHashMap<>();
+                for (Cell c : si.getCells()) {
+                    if (c.isRoutethru()) {
+                        routethruNames.put(c, c.getName());
+                        for (AltPinMapping m : c.getAltPinMappings().values()) {
+                            altCellNames.put(m, m.getAltCellName());
+                        }
+                    }
+                }
                 for (Cell c : new ArrayList<>(si.getCells())) {
                     if (!c.isRoutethru()) {
                         c.updateName(hierarchicalCellName + "/" + c.getName());
-                        newNames.add(c.getName());
                         design.addCell(c);
                     }
                 }
-                for (Cell c : si.getCells()) {
-                    if (c.isRoutethru()) {
-                        if (!newNames.contains(c.getName())) {
-                            c.updateName(hierarchicalCellName + "/" + c.getName());
-                        }
-                        for (AltPinMapping m : c.getAltPinMappings().values()) {
-                            if (!newNames.contains(m.getAltCellName())) {
-                                m.setAltCellName(hierarchicalCellName + "/" + m.getAltCellName());
-                            }
-                        }
+                for (Entry<Cell, String> rt : routethruNames.entrySet()) {
+                    if (rt.getKey().getName().equals(rt.getValue())) {
+                        rt.getKey().updateName(hierarchicalCellName + "/" + rt.getValue());
+                    }
+                }
+                for (Entry<AltPinMapping, String> alt : altCellNames.entrySet()) {
+                    if (alt.getKey().getAltCellName().equals(alt.getValue())) {
+                        alt.getKey().setAltCellName(hierarchicalCellName + "/" + alt.getValue());
                     }
                 }
 
