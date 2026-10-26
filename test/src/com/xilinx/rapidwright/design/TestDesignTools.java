@@ -1401,6 +1401,183 @@ public class TestDesignTools {
     }
 
     /**
+     * A net on a port with nothing on it is removed, not merged, and its parent may have no
+     * physical net to take a BEL attribute on it. The attribute is then left with no net rather
+     * than the one removed -- unless another port's net has since become the parent's, in which
+     * case it goes onto that one, whichever port was reached first. The ports are reached in the
+     * same order each time, so it is the boxes the circuits fill that are swapped.
+     */
+    @ParameterizedTest
+    @CsvSource({
+        "bb0, ",
+        "bb0, bb1",
+        "bb1, bb0",
+    })
+    public void testPopulateBlackBoxBELAttrsOnRemovedNet(String emptyBox, String readerBox) {
+        // The shell: 'in', held as no physical net, into two black boxes
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", createBlackBox(top, "bb0", EDIFDirection.INPUT));
+        in.createPortInst("I", createBlackBox(top, "bb1", EDIFDirection.INPUT));
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, null);
+
+        // The first circuit holds its input as a physical net with nothing on it, but for a BEL
+        // attribute
+        Design empty = createCircuit("empty", EDIFDirection.INPUT);
+        EDIFCell emptyTop = empty.getTopEDIFCell();
+        emptyTop.createNet("I").createPortInst(emptyTop.getPort("I"));
+        Net emptyNet = empty.createNet("I");
+        Site site = design.getDevice().getSite("SLICE_X1Y0");
+        BEL bel = site.getBEL("A6LUT");
+        empty.addBELAttr(emptyNet, site, site.getSiteTypeEnum(), bel, "ON_PORT", "1");
+
+        // The second reads its input with a LUT
+        Design reader = createCircuit("reader", EDIFDirection.INPUT);
+        EDIFCell readerTop = reader.getTopEDIFCell();
+        EDIFNet readerIn = readerTop.createNet("I");
+        readerIn.createPortInst(readerTop.getPort("I"));
+        addSinkLUT(reader, readerTop, "lut", "SLICE_X2Y0", readerIn, reader.createNet("I"));
+
+        Map<String, Design> blackBoxes = new HashMap<>();
+        blackBoxes.put(emptyBox, empty);
+        if (readerBox != null) {
+            blackBoxes.put(readerBox, reader);
+        }
+        populateBlackBox(design, blackBoxes, false);
+
+        Assertions.assertNull(design.getNet(emptyBox + "/I"));
+        Net inNet = design.getNet("in");
+        Assertions.assertEquals(readerBox != null, inNet != null);
+        BELAttr attr = design.getBELAttrs().get(site).getBELAttribute(bel, "ON_PORT");
+        Assertions.assertSame(inNet, attr.getNet());
+        Assertions.assertEquals("1", attr.getValue());
+    }
+
+    /**
+     * A circuit written against an abstract shell can hold attributes on the boundary of another
+     * black box being filled, naming a net under it, such as a clock delay on a flip-flop that
+     * captures a signal crossing into that box. That box's own circuit decides there, as in
+     * link_design, whichever order the black boxes are filled in.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testPopulateBlackBoxBELAttrsOnOtherBox(boolean otherFirst) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", createBlackBox(top, "bb0", EDIFDirection.INPUT));
+        in.createPortInst("I", createBlackBox(top, "bb1", EDIFDirection.INPUT));
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, null);
+
+        Site site = design.getDevice().getSite("SLICE_X2Y0");
+        BEL bel = site.getBEL("AFF");
+        Map<String, Design> circuits = new HashMap<>();
+        for (String box : new String[] {"bb0", "bb1"}) {
+            Design circuit = createCircuit("c_" + box, EDIFDirection.INPUT);
+            EDIFCell circuitTop = circuit.getTopEDIFCell();
+            circuitTop.createNet("I").createPortInst(circuitTop.getPort("I"));
+            circuits.put(box, circuit);
+        }
+        // The first circuit's view of a net under the second box, named as in the full design
+        Net otherNet = new Net("bb1/clk");
+        circuits.get("bb0").addNet(otherNet);
+        circuits.get("bb0").addBELAttr(otherNet, site, site.getSiteTypeEnum(), bel, "CLK_DLY_VAL", "4'h0");
+
+        Map<String, Design> blackBoxes = new LinkedHashMap<>();
+        for (String box : otherFirst ? new String[] {"bb1", "bb0"} : new String[] {"bb0", "bb1"}) {
+            blackBoxes.put(box, circuits.get(box));
+        }
+        populateBlackBox(design, blackBoxes, false);
+
+        SiteConfig siteConfig = design.getBELAttrs() == null ? null : design.getBELAttrs().get(site);
+        Assertions.assertTrue(siteConfig == null || siteConfig.getBELAttribute(bel, "CLK_DLY_VAL") == null);
+    }
+
+    /**
+     * A BEL attribute can be on a context net, one of the empty nets named as in the full design
+     * that are dropped rather than moved in, as the reader creates one for a net named so. The
+     * attribute goes onto the design's net of that name instead: a copy of the circuit's own net
+     * with the black box's prefix becomes that net, and a copy of a shell's net the shell's. A net
+     * of a name the design does not have is left as it was, still written out under that name.
+     */
+    @Test
+    public void testPopulateBlackBoxBELAttrsOnContextNets() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", createBlackBox(top, "bb", EDIFDirection.INPUT));
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, design.createNet("in"));
+        Net shellClock = design.createNet("shell_clk");
+
+        Design circuit = createContextNetCircuit("bb", 1);
+        Net xNet = circuit.getNet("x");
+        Net unknown = new Net("unknown");
+        circuit.addNet(unknown);
+        Site site = circuit.getSiteInstFromSiteName("SLICE_X1Y0").getSite();
+        BEL bel = site.getBEL("A6LUT");
+        circuit.addBELAttr(circuit.getNet("bb/x"), site, site.getSiteTypeEnum(), bel, "COPY", "1");
+        circuit.addBELAttr(circuit.getNet("shell_clk"), site, site.getSiteTypeEnum(), bel, "SHELL",
+                "2");
+        circuit.addBELAttr(unknown, site, site.getSiteTypeEnum(), bel, "UNKNOWN", "3");
+
+        populateBlackBox(design, "bb", circuit, false);
+
+        SiteConfig siteConfig = design.getBELAttrs().get(site);
+        Assertions.assertSame(xNet, design.getNet("bb/x"));
+        Assertions.assertSame(xNet, siteConfig.getBELAttribute(bel, "COPY").getNet());
+        Assertions.assertSame(shellClock, siteConfig.getBELAttribute(bel, "SHELL").getNet());
+        Assertions.assertNull(design.getNet("unknown"));
+        Assertions.assertSame(unknown, siteConfig.getBELAttribute(bel, "UNKNOWN").getNet());
+    }
+
+    /**
+     * Circuits written against an abstract shell hold the shell's BEL attributes as well, and on a
+     * site shared with the shell -- a GCLK_DELAY on a clock spine, say -- each names the net it saw
+     * there. As Vivado's link_design does, the attribute is taken from the circuit that names a net
+     * of its own, whichever order the black boxes are filled in, and is otherwise left as the shell
+     * has it. A net on a circuit's input port is not its own: it is merged onto the shell's.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testPopulateBlackBoxBELAttrsSharedWithShell(boolean ownerFirst) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet in = top.createNet("in");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, design.createNet("in"));
+        Net shellClock = design.createNet("shell_clk");
+        Site site = design.getDevice().getSite("SLICE_X10Y0");
+        BEL bel = site.getBEL("A6LUT");
+        design.addBELAttr(shellClock, site, site.getSiteTypeEnum(), bel, "SHARED", "1");
+        design.addBELAttr(shellClock, site, site.getSiteTypeEnum(), bel, "SHELL_ONLY", "2");
+        design.addBELAttr(shellClock, site, site.getSiteTypeEnum(), bel, "VIA_PORT", "3");
+
+        // For SHARED, bb0 names the shell's clock, through its copy of it; for VIA_PORT, its input
+        // port's net. bb1 names the copy of its own net x for both
+        Map<String, Design> circuits = new LinkedHashMap<>();
+        for (String box : ownerFirst ? new String[] {"bb1", "bb0"} : new String[] {"bb0", "bb1"}) {
+            in.createPortInst("I", createBlackBox(top, box, EDIFDirection.INPUT));
+            Design circuit = createContextNetCircuit(box, box.equals("bb0") ? 1 : 3);
+            Net named = circuit.getNet(box.equals("bb0") ? "shell_clk" : box + "/x");
+            circuit.addBELAttr(named, site, site.getSiteTypeEnum(), bel, "SHARED", "1");
+            circuit.addBELAttr(circuit.getNet("shell_clk"), site, site.getSiteTypeEnum(), bel,
+                    "SHELL_ONLY", "2");
+            Net viaPort = circuit.getNet(box.equals("bb0") ? "I" : box + "/x");
+            circuit.addBELAttr(viaPort, site, site.getSiteTypeEnum(), bel, "VIA_PORT", "3");
+            circuits.put(box, circuit);
+        }
+        Net ownNet = circuits.get("bb1").getNet("x");
+
+        populateBlackBox(design, circuits, false);
+
+        SiteConfig siteConfig = design.getBELAttrs().get(site);
+        Assertions.assertSame(ownNet, design.getNet("bb1/x"));
+        Assertions.assertSame(ownNet, siteConfig.getBELAttribute(bel, "SHARED").getNet());
+        Assertions.assertSame(shellClock, siteConfig.getBELAttribute(bel, "SHELL_ONLY").getNet());
+        Assertions.assertSame(ownNet, siteConfig.getBELAttribute(bel, "VIA_PORT").getNet());
+    }
+
+    /**
      * An output the circuit does not drive brings in no physical net to merge, but its shell
      * routing must still respect keepBoundaryRouting. A circuit that is nothing but ports is still
      * a leaf to the parent net map, so the net owns itself; one with contents leaves the net with

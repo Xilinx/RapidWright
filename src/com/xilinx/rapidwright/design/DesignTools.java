@@ -1299,8 +1299,8 @@ public class DesignTools {
         // no routing is left to carry across. The design's GND or VCC net is the exception: it is
         // unrouted, in its entirety, only when something is merged onto it, a port merely tied to
         // a constant not being reason enough
-        // What each net merged away or removed below became, for the BEL attributes on it
-        Map<Net, Net> replacedBy = new IdentityHashMap<>();
+        // The parent of each net merged away or removed below, for the BEL attributes on it
+        Map<Net, String> mergedInto = new IdentityHashMap<>();
         for (String name : portNames) {
             String parent = resolveParent(portParents, undriven, name);
             Net net = design.getNet(name);
@@ -1314,7 +1314,7 @@ public class DesignTools {
             if (!hasPhysicalPresence(net)) {
                 // Nothing to move, so the net is simply removed rather than left behind as an
                 // alias of its parent
-                replacedBy.put(net, target);
+                mergedInto.put(net, parent);
                 design.removeNet(net);
                 // TEMPORARY WORKAROUND: the design has stopped holding this net, but the change
                 // tracking still has it
@@ -1331,6 +1331,58 @@ public class DesignTools {
             }
             if (mergeOntoNet(design, net, target)) {
                 mergedOnto.add(target);
+            }
+            mergedInto.put(net, parent);
+        }
+
+        // The BEL attributes of each circuit (DDRMC and IMR settings, for example) are moved in as
+        // well, each onto the net it is on in the design now. A circuit written against an abstract
+        // shell also holds the shell's, on sites such as the GCLK_DELAYs of the clock spines, where
+        // it can name a different net than the shell or another circuit does: there, as Vivado's
+        // link_design does, the attribute of the circuit that names a net of its own -- one under
+        // its black box, once resolved, so not a port's net merged onto the shell's -- is the one
+        // kept. The shell can also hold another black box's boundary, so a circuit can name a net
+        // under another black box being filled: that box's own circuit decides there, as in
+        // link_design
+        for (Entry<String, Design> b : blackBoxes.entrySet()) {
+            final String cellPrefix = b.getKey() + EDIFTools.EDIF_HIER_SEP;
+            Map<Site, SiteConfig> belAttrs = b.getValue().getBELAttrs();
+            if (belAttrs == null) continue;
+            for (SiteConfig siteConfig : belAttrs.values()) {
+                for (Entry<BEL, Map<String, BELAttr>> e : siteConfig.getBELAttributes().entrySet()) {
+                    for (BELAttr attr : e.getValue().values()) {
+                        Net net = attr.getNet();
+                        String circuitNetName = net == null ? null : net.getName();
+                        if (net != null && net.isStaticNet()) {
+                            net = design.getStaticNet(net.getType());
+                        } else if (mergedInto.containsKey(net)) {
+                            // Looked up only now, as a parent with no physical net when the net
+                            // was removed may have been given one since, by a later port's net
+                            // being renamed to it. If not, the attribute keeps no net
+                            net = design.getNet(mergedInto.get(net));
+                        } else if (net != null && design.getNet(net.getName()) != net) {
+                            // A net the design does not hold, such as a context net dropped
+                            // above, which the reader creates for a net named as in the full
+                            // design: the design's net of that name is taken instead, which is
+                            // written out under the same name. With none, the attribute keeps the
+                            // net it had
+                            Net named = design.getNet(net.getName());
+                            if (named != null) {
+                                net = named;
+                            }
+                        }
+                        boolean ownNet = net != null && net.getName().startsWith(cellPrefix);
+                        if (!ownNet && isUnderOtherBox(circuitNetName, b.getKey(), blackBoxes.keySet())) {
+                            continue;
+                        }
+                        if (!ownNet && hasBELAttr(design, siteConfig.getSite(), e.getKey(),
+                                attr.getName())) {
+                            continue;
+                        }
+                        design.addBELAttr(net, siteConfig.getSite(), siteConfig.getSiteTypeEnum(),
+                                e.getKey(), attr.getName(), attr.getValue());
+                    }
+                }
             }
         }
 
@@ -1361,6 +1413,28 @@ public class DesignTools {
             if (!c.getName().endsWith(Cell.LOCKED)) return false;
         }
         return si.getSitePinInsts().isEmpty() && si.getSiteWireToNetMap().isEmpty() && !si.hasUsedSitePIPs();
+    }
+
+    /**
+     * @return True if a name is of an object under one of the black boxes other than the given one.
+     */
+    private static boolean isUnderOtherBox(String name, String box, Set<String> boxes) {
+        if (name == null) return false;
+        for (String other : boxes) {
+            if (!other.equals(box) && name.startsWith(other + EDIFTools.EDIF_HIER_SEP)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @return True if the design has a BEL attribute of the given name on the given BEL.
+     */
+    private static boolean hasBELAttr(Design design, Site site, BEL bel, String name) {
+        Map<Site, SiteConfig> attrs = design.getBELAttrs();
+        SiteConfig siteConfig = attrs == null ? null : attrs.get(site);
+        return siteConfig != null && siteConfig.getBELAttribute(bel, name) != null;
     }
 
     /**
