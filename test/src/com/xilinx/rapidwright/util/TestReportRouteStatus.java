@@ -734,6 +734,59 @@ public class TestReportRouteStatus {
                 "GLOBAL_LOGIC1=CONFLICTS,HAS_ROUTING"});
     }
 
+    /**
+     * A 7-series block RAM site whose programming is invalid (a pin on a signal net without site
+     * routing) conflicts with the nets of all its pins, including VCC where its pins are tied to VCC
+     * through the output port of a hierarchical cell (Vivado 2026.1 reports both the same).
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testReportRouteStatusInvalidSiteTiedThroughPort(boolean throughPort) {
+        Design design = RapidWrightDCP.loadDCP("bug709.dcp");
+        Cell ram = design.getCell("video_mem/ram_video_reg");
+        SiteInst si = ram.getSiteInst();
+        BELPin pin = ram.getBEL().getPin("ADDRARDADDRL10");
+        Assertions.assertEquals("addr_write[8]", si.getNetFromSiteWire(pin.getSiteWireName()).getName());
+        si.unrouteIntraSiteNet(pin, pin);
+        if (throughPort) {
+            // Tie the block RAM's VCC pins to the output of a hierarchical cell tied to VCC inside
+            EDIFNetlist netlist = design.getNetlist();
+            EDIFCell top = netlist.getTopCell();
+            EDIFCell tie = new EDIFCell(netlist.getWorkLibrary(), "vcc_tie");
+            tie.createPort("O", EDIFDirection.OUTPUT, 1);
+            EDIFCellInst tieInst = tie.createCellInst("vcc_tie", top);
+            EDIFTools.getStaticNet(NetType.VCC, netlist.getHierCellInstFromName("vcc_tie"), netlist)
+                    .getNet().createPortInst("O", tie);
+            EDIFNet tied = top.createNet("vcc_tie_o");
+            tied.createPortInst("O", tieInst);
+            int moved = 0;
+            for (EDIFPortInst epi : new ArrayList<>(ram.getEDIFCellInst().getPortInsts())) {
+                if (epi.getNet() != null && epi.getNet().isVCC()) {
+                    epi.getNet().removePortInst(epi);
+                    tied.addPortInst(epi);
+                    moved++;
+                }
+            }
+            Assertions.assertEquals(13, moved);
+        }
+        ReportRouteStatusResult rrs = ReportRouteStatus.reportRouteStatus(design, true);
+        Assertions.assertEquals("Design Route Status\n" +
+                "                                               :      # nets :\n" +
+                "   ------------------------------------------- : ----------- :\n" +
+                "   # of logical nets.......................... :         534 :\n" +
+                "       # of nets not needing routing.......... :         120 :\n" +
+                "           # of internally routed nets........ :         120 :\n" +
+                "       # of routable nets..................... :         414 :\n" +
+                "           # of fully routed nets............. :         378 :\n" +
+                "       # of nets with routing errors.......... :          36 :\n" +
+                "           # of nets with some unrouted pins.. :          16 :\n" +
+                "           # of nets with resource conflicts.. :          36 :\n" +
+                "           # of nets with antennas/islands.... :          34 :\n" +
+                "   ------------------------------------------- : ----------- :", rrs.toString());
+        assertNetStatuses(rrs, new String[]{"GLOBAL_LOGIC0=CONFLICTS,HAS_ROUTING",
+                "GLOBAL_LOGIC1=CONFLICTS,HAS_ROUTING"});
+    }
+
     private static void assertNetStatuses(ReportRouteStatusResult rrs, String[] netStatuses) {
         Map<String, EnumSet<NetRouteStatus>> statuses = rrs.getNetStatuses();
         for (String netStatus : netStatuses) {

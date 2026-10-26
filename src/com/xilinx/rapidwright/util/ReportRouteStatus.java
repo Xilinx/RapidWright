@@ -78,6 +78,7 @@ import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveAction;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 public class ReportRouteStatus {
 
@@ -661,7 +662,7 @@ public class ReportRouteStatus {
                         pins.add(pin);
                         BELPin belPin = cell.getBEL().getPin(e.getKey());
                         if (!invalid && belPin != null && si.getNetFromSiteWire(belPin.getSiteWireName()) == null
-                                && !pin.getNet().isGND() && !pin.getNet().isVCC()) {
+                                && RouteStatusNetlist.getStaticType(pin.getHierarchicalNet()) == null) {
                             invalid = true;
                         }
                     }
@@ -686,17 +687,19 @@ public class ReportRouteStatus {
                 boolean slice = routethruInvalidSites.contains(sitePins.getKey());
                 for (EDIFHierPortInst pin : sitePins.getValue()) {
                     int entry = -1;
-                    boolean isStatic = false;
+                    NetType staticType = null;
                     for (EDIFHierNet seg : RouteStatusNetlist.getSegments(pin.getHierarchicalNet())) {
                         Integer e = entryOfName.get(seg.getHierarchicalNetName());
                         if (e != null) {
                             entry = e;
                             break;
                         }
-                        isStatic |= seg.getNet().isGND() || seg.getNet().isVCC();
+                        if (staticType == null && (seg.getNet().isGND() || seg.getNet().isVCC())) {
+                            staticType = seg.getNet().isVCC() ? NetType.VCC : NetType.GND;
+                        }
                     }
-                    if (entry < 0 && isStatic) {
-                        entry = staticEntry[pin.getNet().isVCC() ? 1 : 0];
+                    if (entry < 0 && staticType != null) {
+                        entry = staticEntry[staticType == NetType.VCC ? 1 : 0];
                     }
                     if (entry < 0) {
                         continue;
@@ -933,14 +936,14 @@ public class ReportRouteStatus {
                     for (Map.Entry<String, String> e : cell.getPinMappingsP2L().entrySet()) {
                         BELPin belPin = cell.getBEL().getPin(e.getKey());
                         EDIFHierPortInst pin = inst.getPortInst(e.getValue());
-                        if (belPin == null || !belPin.isInput() || pin == null || pin.getNet() == null
-                                || pin.getNet().isGND() || pin.getNet().isVCC()) {
+                        if (belPin == null || !belPin.isInput() || pin == null || pin.getNet() == null) {
                             continue;
                         }
                         String siteWire = belPin.getSiteWireName();
                         int pinIndex = si.getSite().getPinIndex(siteWire);
                         if (pinIndex < 0 || si.getNetFromSiteWire(siteWire) != null || si.getSitePinInst(siteWire) != null
-                                || !isReachableThroughRouting(si.getSite().getConnectedNode(pinIndex)) || isStaticRoutingTo(si, siteWire)) {
+                                || !isReachableThroughRouting(si.getSite().getConnectedNode(pinIndex)) || isStaticRoutingTo(si, siteWire)
+                                || RouteStatusNetlist.getStaticType(pin.getHierarchicalNet()) != null) {
                             // (nor cascade inputs, which have dedicated connections)
                             continue;
                         }
@@ -3277,6 +3280,29 @@ public class ReportRouteStatus {
          */
         static List<EDIFHierNet> getSegments(EDIFHierNet start) {
             List<EDIFHierNet> segments = new ArrayList<>();
+            findSegment(start, (hn) -> {
+                segments.add(hn);
+                return false;
+            });
+            return segments;
+        }
+
+        /**
+         * Gets the static type of the flat net a segment is part of (see {@link #getSegments(EDIFHierNet)}),
+         * e.g. of a pin tied to VCC through the output port of a hierarchical cell.
+         * @return GND or VCC if a segment is a static net, else null.
+         */
+        static NetType getStaticType(EDIFHierNet start) {
+            EDIFHierNet tie = findSegment(start, (hn) -> hn.getNet().isGND() || hn.getNet().isVCC());
+            return (tie == null) ? null : tie.getNet().isVCC() ? NetType.VCC : NetType.GND;
+        }
+
+        /**
+         * Visits the segments of the flat net a segment is part of (see {@link #getSegments(EDIFHierNet)})
+         * until one matches.
+         * @return The first segment that matches, or null.
+         */
+        private static EDIFHierNet findSegment(EDIFHierNet start, Predicate<EDIFHierNet> match) {
             Deque<EDIFHierNet> queue = new ArrayDeque<>();
             Set<EDIFHierNet> visited = new HashSet<>();
             queue.add(start);
@@ -3285,7 +3311,9 @@ public class ReportRouteStatus {
                 if (!visited.add(hn)) {
                     continue;
                 }
-                segments.add(hn);
+                if (match.test(hn)) {
+                    return hn;
+                }
                 for (EDIFHierPortInst p : hn.getPortInsts()) {
                     EDIFCellInst eci = p.getPortInst().getCellInst();
                     if (eci == null) {
@@ -3305,7 +3333,7 @@ public class ReportRouteStatus {
                     }
                 }
             }
-            return segments;
+            return null;
         }
 
         /** Gets the pins on leaf cells (or black boxes) of a segment. */
