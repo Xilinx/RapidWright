@@ -27,7 +27,7 @@ import java.util.stream.Stream;
 
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
-import com.xilinx.rapidwright.util.VivadoTools;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -58,7 +58,7 @@ public class TestPolynomialGenerator {
         }
 
         if (FileTools.isVivadoOnPath()) {
-            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(d);
+            ReportRouteStatusResult rrs = VivadoToolsHelper.reportRouteStatus(d);
             if (route) {
                 Assertions.assertTrue(rrs.isFullyRouted());
             } else {

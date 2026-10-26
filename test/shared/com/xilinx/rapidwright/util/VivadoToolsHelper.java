@@ -27,6 +27,7 @@ import java.nio.file.Path;
 import org.junit.jupiter.api.Assertions;
 
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.edif.EDIFTools;
 
 public class VivadoToolsHelper {
     public static void assertFullyRouted(Design design) {
@@ -34,7 +35,7 @@ public class VivadoToolsHelper {
             return;
         }
 
-        ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+        ReportRouteStatusResult rrs = reportRouteStatus(design);
         Assertions.assertTrue(rrs.isFullyRouted());
     }
 
@@ -43,8 +44,39 @@ public class VivadoToolsHelper {
             return;
         }
 
-        ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(dcp);
+        ReportRouteStatusResult rrs = reportRouteStatus(dcp);
         Assertions.assertTrue(rrs.isFullyRouted());
+    }
+
+    /**
+     * Runs Vivado's `report_route_status` on a design (see {@link VivadoTools#reportRouteStatus(Design)}),
+     * and checks that {@link ReportRouteStatus#reportRouteStatus(Design)} reports the same (unless the
+     * netlist has encrypted cells, whose contents only Vivado sees).
+     * @param design The design to report on.
+     * @return Vivado's route status.
+     */
+    public static ReportRouteStatusResult reportRouteStatus(Design design) {
+        ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+        if (!design.getNetlist().hasEncryptedCells()) {
+            Assertions.assertEquals(rrs.toString(), ReportRouteStatus.reportRouteStatus(design).toString());
+        }
+        return rrs;
+    }
+
+    /**
+     * Runs Vivado's `report_route_status` on a checkpoint (see {@link VivadoTools#reportRouteStatus(Path)}),
+     * and checks that {@link ReportRouteStatus#reportRouteStatus(Design)} reports the same on the design
+     * read from it (unless it has encrypted cells).
+     * @param dcp The checkpoint to report on.
+     * @return Vivado's route status.
+     */
+    public static ReportRouteStatusResult reportRouteStatus(Path dcp) {
+        ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(dcp);
+        if (!FileTools.replaceExtension(dcp, EDIFTools.LOAD_TCL_SUFFIX).toFile().exists()) {
+            Design design = Design.readCheckpoint(dcp);
+            Assertions.assertEquals(rrs.toString(), ReportRouteStatus.reportRouteStatus(design).toString());
+        }
+        return rrs;
     }
 
     /**
