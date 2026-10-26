@@ -22,9 +22,26 @@
 
 package com.xilinx.rapidwright.util.route_status;
 
+import static com.xilinx.rapidwright.util.route_status.CellInfo.BLACK_BOX;
+import static com.xilinx.rapidwright.util.route_status.CellInfo.BLACK_BOX_INOUT;
+import static com.xilinx.rapidwright.util.route_status.CellInfo.BLACK_BOX_OUTPUT;
+import static com.xilinx.rapidwright.util.route_status.CellInfo.CHILD_OUTPUT;
+import static com.xilinx.rapidwright.util.route_status.CellInfo.DANGLING;
+import static com.xilinx.rapidwright.util.route_status.CellInfo.DANGLING_INOUT;
+import static com.xilinx.rapidwright.util.route_status.CellInfo.HIER;
+import static com.xilinx.rapidwright.util.route_status.CellInfo.KIND_MASK;
+import static com.xilinx.rapidwright.util.route_status.CellInfo.LEAF_INPUT;
+import static com.xilinx.rapidwright.util.route_status.CellInfo.LEAF_OUTPUT;
+import static com.xilinx.rapidwright.util.route_status.CellInfo.OWN_PORT;
+import static com.xilinx.rapidwright.util.route_status.CellInfo.PORT_ONLY;
+import static com.xilinx.rapidwright.util.route_status.FlatNet.NAMED_BY_DANGLING_INOUT;
+import static com.xilinx.rapidwright.util.route_status.FlatNet.NAMED_BY_DANGLING_OUTPUT;
+import static com.xilinx.rapidwright.util.route_status.FlatNet.NAMED_BY_DRIVER;
+import static com.xilinx.rapidwright.util.route_status.FlatNet.NAMED_BY_INOUT;
+import static com.xilinx.rapidwright.util.route_status.FlatNet.NAMED_BY_SEGMENT;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
@@ -37,7 +54,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveAction;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Consumer;
@@ -45,19 +61,14 @@ import java.util.function.Predicate;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.PartitionPin;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.Unisim;
-import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
-import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
-import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
@@ -77,66 +88,6 @@ import com.xilinx.rapidwright.util.ReportRouteStatus;
  * subtrees), without materializing hierarchical net objects.
  */
 final class RouteStatusNetlist {
-
-    /** How a flat net got its name, in increasing order of precedence */
-    private static final int NAMED_BY_SEGMENT = 0;
-    private static final int NAMED_BY_DANGLING_OUTPUT = 1;
-    private static final int NAMED_BY_INOUT = 2;
-    private static final int NAMED_BY_DANGLING_INOUT = 3;
-    private static final int NAMED_BY_DRIVER = 4;
-
-    /**
-     * Tracks whether pins are placed in more than one site. Pins without a physical pin (e.g.
-     * hardwired between sites) need no routing, so should not count; as checking that is costly,
-     * the pins found in the first two sites are kept so that it can be checked later, if needed
-     * (see {@link FlatNet#hasPinsInMultipleSites(Design)}).
-     */
-    static class SiteTracker {
-        SiteInst firstSite;
-        /** The cells and logical pins found in the first two sites (null cells for top level ports) */
-        Cell firstCell;
-        String firstPin;
-        Cell secondCell;
-        String secondPin;
-        boolean multipleSites;
-
-        void addPin(SiteInst si, Cell cell, String pin) {
-            if (multipleSites || si == firstSite) {
-                return;
-            }
-            if (firstSite == null) {
-                firstSite = si;
-                firstCell = cell;
-                firstPin = pin;
-                return;
-            }
-            secondCell = cell;
-            secondPin = pin;
-            multipleSites = true;
-        }
-
-        void addAll(SiteTracker other) {
-            if (other.multipleSites && !multipleSites) {
-                firstSite = other.firstSite;
-                firstCell = other.firstCell;
-                firstPin = other.firstPin;
-                secondCell = other.secondCell;
-                secondPin = other.secondPin;
-                multipleSites = true;
-            } else if (other.firstSite != null) {
-                addPin(other.firstSite, other.firstCell, other.firstPin);
-            }
-        }
-
-        void resetSites() {
-            firstSite = null;
-            firstCell = null;
-            firstPin = null;
-            secondCell = null;
-            secondPin = null;
-            multipleSites = false;
-        }
-    }
 
     /**
      * Gets the input site pin feeding a BEL input pin directly or through a routing BEL (e.g. an
@@ -183,6 +134,7 @@ final class RouteStatusNetlist {
 
     /** The names of all primitives */
     private static final Set<String> UNISIM_NAMES = new HashSet<>();
+
     static {
         for (Unisim u : Unisim.values()) {
             UNISIM_NAMES.add(u.name());
@@ -285,548 +237,8 @@ final class RouteStatusNetlist {
         return pins;
     }
 
-    /** A pin on a leaf cell, with its cell (null if there is none). */
-    static class LeafPin {
-        final EDIFHierPortInst pin;
-        final Cell cell;
-
-        LeafPin(EDIFHierPortInst pin, Cell cell) {
-            this.pin = pin;
-            this.cell = cell;
-        }
-
-        boolean isOutput() {
-            return pin.isOutput();
-        }
-
-        boolean isPlaced() {
-            return cell != null && cell.isPlaced();
-        }
-
-        String getName() {
-            return pin.getPortInst().getName();
-        }
-
-        Set<String> getPhysicalPins() {
-            return RouteStatusNetlist.getPhysicalPins(cell, getName());
-        }
-
-        boolean hasPhysicalPin() {
-            return !getPhysicalPins().isEmpty();
-        }
-    }
-
-    /** The connections of a net (segment, or flat net): its pins by kind, and their sites. */
-    static class Connections extends SiteTracker {
-        int leafDrivers;
-        int leafLoads;
-        int leafInouts;
-        int unplacedLeafPins;
-        int unplacedLeafDrivers;
-        int placedPortDrivers;
-        int placedPortLoads;
-        int unplacedPortDrivers;
-        int unplacedPortLoads;
-        /** Output pins of black boxes, which are not counted as pins */
-        int blackBoxDrivers;
-        /** Input (or inout) pins of black boxes, which are not counted as pins either */
-        int blackBoxLoads;
-        /** Inout pins of black boxes (also counted in {@link #blackBoxLoads}), which may drive too */
-        int blackBoxInouts;
-        /** Top level ports with partition pins */
-        int partitionPinPorts;
-        /** GND or VCC if driven by a static source primitive */
-        NetType staticType;
-
-        /** Adds the connections of another net (segment). */
-        void addConnections(Connections other) {
-            leafDrivers += other.leafDrivers;
-            leafLoads += other.leafLoads;
-            leafInouts += other.leafInouts;
-            unplacedLeafPins += other.unplacedLeafPins;
-            unplacedLeafDrivers += other.unplacedLeafDrivers;
-            addAll(other);
-            placedPortDrivers += other.placedPortDrivers;
-            placedPortLoads += other.placedPortLoads;
-            unplacedPortDrivers += other.unplacedPortDrivers;
-            unplacedPortLoads += other.unplacedPortLoads;
-            blackBoxDrivers += other.blackBoxDrivers;
-            blackBoxLoads += other.blackBoxLoads;
-            blackBoxInouts += other.blackBoxInouts;
-            partitionPinPorts += other.partitionPinPorts;
-            if (staticType == null) {
-                staticType = other.staticType;
-            }
-        }
-
-        /** Removes all connections. */
-        void resetConnections() {
-            leafDrivers = 0;
-            leafLoads = 0;
-            leafInouts = 0;
-            unplacedLeafPins = 0;
-            unplacedLeafDrivers = 0;
-            resetSites();
-            placedPortDrivers = 0;
-            placedPortLoads = 0;
-            unplacedPortDrivers = 0;
-            unplacedPortLoads = 0;
-            blackBoxDrivers = 0;
-            blackBoxLoads = 0;
-            blackBoxInouts = 0;
-            partitionPinPorts = 0;
-            staticType = null;
-        }
-    }
-
-    /** A flat (parent) net, i.e. a set of electrically connected net segments. */
-    static class FlatNet extends Connections {
-        /** Hierarchical prefix (instance path plus '/', or empty) and net naming this flat net */
-        String prefix;
-        EDIFNet net;
-        /** Precedence of the name (see NAMED_BY_*) */
-        int namedBy;
-        int segments;
-        /** Set when merged into another flat net by a feedthrough */
-        FlatNet mergedInto;
-        /** True if created inside a macro primitive (e.g. DSP58), whose internals are expanded */
-        boolean insideMacro;
-        /** Index of this flat net's entry in the route status engine, if any */
-        int entry = -1;
-        /**
-         * A segment connected to nothing but an output port of its cell (as left by removing a
-         * driver), which names a net without a driver
-         */
-        String undrivenPrefix;
-        EDIFNet undrivenNet;
-        /** The segment inside a LUT6_2 macro with the smallest (local) name, which names a net without a driver */
-        String macroPrefix;
-        EDIFNet macroNet;
-        /** The leaf loads on segments inside LUT6_2 macros */
-        int macroLeafLoads;
-
-        FlatNet(String prefix, EDIFNet net) {
-            this.prefix = prefix;
-            this.net = net;
-        }
-
-        String getName() {
-            return prefix.isEmpty() ? net.getName() : prefix + net.getName();
-        }
-
-        /**
-         * Names the flat net after the given segment if it takes precedence over the current name.
-         * Ties (e.g. multiple drivers) are broken by name to be independent of traversal order.
-         */
-        private void name(int namedBy, String prefix, EDIFNet net) {
-            if (namedBy < this.namedBy) {
-                return;
-            }
-            if (namedBy == this.namedBy && (prefix + net.getName()).compareTo(getName()) >= 0) {
-                return;
-            }
-            this.namedBy = namedBy;
-            this.prefix = prefix;
-            this.net = net;
-        }
-
-        /**
-         * Segment fed by an output port of a child with nothing but the port inside; it names a
-         * flat net without any leaf pin (unless something else does)
-         */
-        String portOnlyPrefix;
-        EDIFNet portOnlyNet;
-
-        /**
-         * For a flat net without leaf pins (so far): whether a segment is fed by an output port of
-         * a child but not connected to an output port of its cell (where the output ports from a
-         * port only output end), and the segment with the smallest (local) name
-         */
-        boolean hasOutputChainEnd;
-        String smallestPrefix;
-        EDIFNet smallestNet;
-
-        private void nameSmallest(String prefix, EDIFNet net) {
-            if (net == null || leafDrivers + leafLoads + leafInouts > 0) {
-                return;
-            }
-            int c = (smallestNet == null) ? -1 : net.getName().compareTo(smallestNet.getName());
-            if (c < 0 || (c == 0 && (prefix + net.getName()).compareTo(smallestPrefix + smallestNet.getName()) < 0)) {
-                smallestPrefix = prefix;
-                smallestNet = net;
-            }
-        }
-
-        private void namePortOnly(String prefix, EDIFNet net) {
-            if (net == null) {
-                return;
-            }
-            if (portOnlyNet == null || (prefix + net.getName()).compareTo(portOnlyPrefix + portOnlyNet.getName()) < 0) {
-                portOnlyPrefix = prefix;
-                portOnlyNet = net;
-            }
-        }
-
-        /** Applies the naming by a port only output, once all segments have been added. */
-        void finishNaming() {
-            if (portOnlyNet != null && namedBy == NAMED_BY_SEGMENT && leafDrivers + leafLoads + leafInouts == 0) {
-                if (hasOutputChainEnd && smallestNet != null && !hasTopPorts()) {
-                    // When the output ports from the port only output end in a segment (feeding
-                    // other cells), the segment with the smallest name names the net
-                    name(NAMED_BY_DANGLING_OUTPUT, smallestPrefix, smallestNet);
-                } else {
-                    name(NAMED_BY_DANGLING_OUTPUT, portOnlyPrefix, portOnlyNet);
-                }
-            } else if (namedBy == NAMED_BY_SEGMENT && leafLoads + leafInouts > 0 && leafDrivers == 0
-                    && placedPortDrivers + unplacedPortDrivers + blackBoxDrivers == 0) {
-                if (undrivenNet != null) {
-                    prefix = undrivenPrefix;
-                    net = undrivenNet;
-                } else if (macroNet != null) {
-                    prefix = macroPrefix;
-                    net = macroNet;
-                }
-            }
-            portOnlyPrefix = null;
-            portOnlyNet = null;
-            undrivenPrefix = null;
-            undrivenNet = null;
-            macroPrefix = null;
-            macroNet = null;
-            smallestPrefix = null;
-            smallestNet = null;
-        }
-
-        private void nameMacro(String prefix, EDIFNet net) {
-            if (net == null) {
-                return;
-            }
-            // (the smallest local name, then full name)
-            int c = (macroNet == null) ? -1 : net.getName().compareTo(macroNet.getName());
-            if (c < 0 || (c == 0 && (prefix + net.getName()).compareTo(macroPrefix + macroNet.getName()) < 0)) {
-                macroPrefix = prefix;
-                macroNet = net;
-            }
-        }
-
-        private void nameUndriven(String prefix, EDIFNet net) {
-            if (net == null) {
-                return;
-            }
-            if (undrivenNet == null || (prefix + net.getName()).compareTo(undrivenPrefix + undrivenNet.getName()) < 0) {
-                undrivenPrefix = prefix;
-                undrivenNet = net;
-            }
-        }
-
-        /** Adds the tallies of one net segment (shared by concurrently visited instances). */
-        synchronized void add(Tally t, String prefix, EDIFNet net) {
-            addUnsynchronized(t, prefix, net);
-        }
-
-        /** Adds the tallies of one net segment, for a flat net not yet shared with other tasks. */
-        void addUnsynchronized(Tally t, String prefix, EDIFNet net) {
-            if (t.portOnlyOutput) {
-                namePortOnly(prefix, net);
-            }
-            if (t.ownPortOnlyOutput) {
-                nameUndriven(prefix, net);
-            }
-            if (t.insideMacro && net.getParentCell().getName().equals("LUT6_2")) {
-                nameMacro(prefix, net);
-                macroLeafLoads += t.leafLoads;
-            }
-            segments++;
-            addConnections(t);
-            hasOutputChainEnd |= t.childOutputOnly;
-            nameSmallest(prefix, net);
-            if (t.namedBy > NAMED_BY_SEGMENT) {
-                name(t.namedBy, prefix, net);
-            }
-        }
-
-        void absorb(FlatNet other) {
-            segments += other.segments;
-            addConnections(other);
-            insideMacro &= other.insideMacro;
-            name(other.namedBy, other.prefix, other.net);
-            namePortOnly(other.portOnlyPrefix, other.portOnlyNet);
-            nameUndriven(other.undrivenPrefix, other.undrivenNet);
-            nameMacro(other.macroPrefix, other.macroNet);
-            macroLeafLoads += other.macroLeafLoads;
-            hasOutputChainEnd |= other.hasOutputChainEnd;
-            if (other.leafDrivers + other.leafLoads + other.leafInouts == 0) {
-                nameSmallest(other.smallestPrefix, other.smallestNet);
-            }
-            other.mergedInto = this;
-        }
-
-        FlatNet find() {
-            FlatNet n = this;
-            while (n.mergedInto != null) {
-                n = n.mergedInto;
-            }
-            return n;
-        }
-
-        /**
-         * Checks whether the placed pins with a physical pin are in more than one site, i.e. the
-         * net needs routing between sites.
-         */
-        boolean hasPinsInMultipleSites(Design design) {
-            if (!multipleSites) {
-                return false;
-            }
-            if (hasPhysicalPin(firstCell, firstPin) && hasPhysicalPin(secondCell, secondPin)) {
-                return true;
-            }
-            // Rare: look at all the pins
-            SiteInst site = null;
-            for (LeafPin pin : getLeafPins(design)) {
-                if (!pin.isPlaced() || !pin.hasPhysicalPin()) {
-                    continue;
-                }
-                if (site == null) {
-                    site = pin.cell.getSiteInst();
-                } else if (site != pin.cell.getSiteInst()) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        /**
-         * Gets the sites of the placed pins with a physical pin, adding them to the given set
-         * until it has more than one.
-         */
-        void addPhysicalPinSites(Design design, Set<SiteInst> sites) {
-            if (firstSite == null || sites.size() > 1) {
-                return;
-            }
-            if (hasPhysicalPin(firstCell, firstPin) && (!multipleSites || hasPhysicalPin(secondCell, secondPin))) {
-                sites.add(firstSite);
-                if (multipleSites) {
-                    // Any other site will do
-                    sites.add(null);
-                }
-                return;
-            }
-            for (LeafPin pin : getLeafPins(design)) {
-                if (pin.isPlaced() && pin.hasPhysicalPin()) {
-                    sites.add(pin.cell.getSiteInst());
-                    if (sites.size() > 1) {
-                        return;
-                    }
-                }
-            }
-        }
-
-        /**
-         * Checks whether a placed leaf load is in another site than the (first) placed leaf driver.
-         */
-        boolean hasLoadOutsideDriverSite(Design design) {
-            List<LeafPin> pins = getLeafPins(design);
-            SiteInst site = null;
-            for (LeafPin pin : pins) {
-                if (pin.isOutput() && pin.isPlaced()) {
-                    site = pin.cell.getSiteInst();
-                    break;
-                }
-            }
-            if (site == null) {
-                return false;
-            }
-            for (LeafPin pin : pins) {
-                if (!pin.isOutput() && pin.isPlaced() && pin.cell.getSiteInst() != site) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        /** Control pin kinds, see {@link #getControlPinLoads(Design)} */
-        static final int ENABLE_PIN = 1;
-        static final int RESET_PIN = 2;
-
-        /**
-         * Gets the kinds of control pins (clock, write or clock buffer enable, set/reset) among the placed leaf
-         * loads, whose site pins follow from the placement alone.
-         * @return A combination of {@link #ENABLE_PIN} and {@link #RESET_PIN}.
-         */
-        int getControlPinLoads(Design design) {
-            int kinds = 0;
-            for (LeafPin pin : getLeafPins(design)) {
-                if (pin.isOutput() || !pin.isPlaced()) {
-                    continue;
-                }
-                boolean ff = pin.cell.getBEL().isFF();
-                for (String physPin : pin.getPhysicalPins()) {
-                    if (ff ? physPin.equals("CE") : (physPin.startsWith("WE") || physPin.equals("CE"))) {
-                        kinds |= ENABLE_PIN;
-                    } else if (ff ? physPin.equals("SR") : physPin.startsWith("RST")) {
-                        kinds |= RESET_PIN;
-                    }
-                }
-            }
-            return kinds;
-        }
-
-        /**
-         * Checks whether any placed load in a site that is neither a slice, a clock buffer nor the
-         * driver's has an input site pin reached through general routing (not only through a
-         * dedicated connection, e.g. from an OLOGIC to its IOB, or a DSP cascade).
-         */
-        boolean hasRoutedHardBlockLoad(Design design) {
-            return hasRoutedHardBlockLoad(design, Collections.emptySet());
-        }
-
-        /** As {@link #hasRoutedHardBlockLoad(Design)}, ignoring loads in some sites */
-        boolean hasRoutedHardBlockLoad(Design design, Set<SiteInst> ignoredSites) {
-            SiteInst driverSite = null;
-            for (LeafPin pin : getLeafPins(design)) {
-                if (pin.isOutput() && pin.isPlaced()) {
-                    driverSite = pin.cell.getSiteInst();
-                }
-            }
-            for (LeafPin pin : getLeafPins(design)) {
-                if (pin.isOutput() || !pin.isPlaced()) {
-                    continue;
-                }
-                SiteInst si = pin.cell.getSiteInst();
-                String type = si.getSiteTypeEnum().name();
-                if (si == driverSite || type.startsWith("SLICE") || type.startsWith("BUF") || ignoredSites.contains(si)) {
-                    // (nor clock buffers, whose inputs are reached through clock routing)
-                    continue;
-                }
-                for (String physPin : pin.getPhysicalPins()) {
-                    BELPin belPin = pin.cell.getBEL().getPin(physPin);
-                    String sitePin = (belPin == null) ? null : getSitePinFeeding(si, belPin);
-                    Node node = (sitePin == null) ? null : si.getSite().getConnectedNode(si.getPrimarySitePinName(sitePin));
-                    if (node != null && isReachedByGeneralRouting(node)) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        /**
-         * Checks whether a site pin node is reached through general routing: whether the nodes
-         * leading to it (within a few steps, not through the pins of other sites, except Versal
-         * interface sites) include interconnect tile wires. Otherwise it is only reached through
-         * dedicated connections (e.g. from an OLOGIC to its IOB, or clock routing to a BUFG).
-         */
-        static boolean isReachedByGeneralRouting(Node node) {
-            if (node == null) {
-                return false;
-            }
-            List<Node> frontier = Collections.singletonList(node);
-            Set<Node> visited = new HashSet<>(frontier);
-            for (int depth = 0; depth < 4 && !frontier.isEmpty(); depth++) {
-                List<Node> next = new ArrayList<>();
-                for (Node n : frontier) {
-                    for (Node up : n.getAllUphillNodes()) {
-                        if (!visited.add(up)) {
-                            continue;
-                        }
-                        if (up.getTile().getTileTypeEnum().name().startsWith("INT")) {
-                            return true;
-                        }
-                        SitePin sitePin = up.getSitePin();
-                        if (sitePin == null || sitePin.getSite().getSiteTypeEnum().name().startsWith("IRI")) {
-                            next.add(up);
-                        }
-                    }
-                }
-                frontier = next;
-            }
-            return false;
-        }
-
-        /** Checks whether any load pin (placed or not) has a physical pin, i.e. needs a connection. */
-        boolean hasLoadWithPhysicalPin(Design design) {
-            for (LeafPin pin : getLeafPins(design)) {
-                if (!pin.isOutput() && (!pin.isPlaced() || pin.hasPhysicalPin())) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        /**
-         * Checks whether all loads are CLRB_LEAF pins of clock buffers (e.g. MBUFGCE), which have
-         * no physical pin: they reach the CLR_B pins of the leaf clock dividers through routing.
-         */
-        boolean hasOnlyLeafClockClearLoads(Design design) {
-            boolean any = false;
-            for (LeafPin pin : getLeafPins(design)) {
-                if (pin.isOutput()) {
-                    continue;
-                }
-                if (!pin.getName().equals("CLRB_LEAF") || !pin.pin.getCellType().getName().startsWith("MBUFG")) {
-                    return false;
-                }
-                any = true;
-            }
-            return any;
-        }
-
-        /** Checks whether any placed load is on a LUT input. */
-        boolean hasLoadOnLutInput(Design design) {
-            for (LeafPin pin : getLeafPins(design)) {
-                if (!pin.isOutput() && pin.isPlaced() && pin.cell.getBEL().isLUT()) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        /** Checks whether any placed load pin is on a BEL pin that is fed from a site pin. */
-        boolean hasLoadOnSitePin(Design design) {
-            for (LeafPin pin : getLeafPins(design)) {
-                if (pin.isOutput() || !pin.isPlaced()) {
-                    continue;
-                }
-                for (String physPin : pin.getPhysicalPins()) {
-                    BELPin belPin = pin.cell.getBEL().getPin(physPin);
-                    if (belPin != null && belPin.getConnectedSitePinName() != null) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        /** Gets the segments (hierarchical nets) of this flat net. */
-        List<EDIFHierNet> getSegments(Design design) {
-            EDIFNetlist netlist = design.getNetlist();
-            String instName = prefix.isEmpty() ? "" : prefix.substring(0, prefix.length() - 1);
-            EDIFHierCellInst inst;
-            // Looking up hierarchical objects by name is not thread safe
-            synchronized (netlist) {
-                inst = instName.isEmpty() ? netlist.getTopHierCellInst() : netlist.getHierCellInstFromName(instName);
-            }
-            return RouteStatusNetlist.getSegments(new EDIFHierNet(inst, net));
-        }
-
-        /** Gets the pins on leaf cells of all the segments of this flat net, with their cells. */
-        List<LeafPin> getLeafPins(Design design) {
-            List<LeafPin> pins = new ArrayList<>();
-            for (EDIFHierNet hn : getSegments(design)) {
-                for (EDIFHierPortInst p : getLeafPortInsts(hn)) {
-                    pins.add(new LeafPin(p, p.getPhysicalCell(design)));
-                }
-            }
-            return pins;
-        }
-
-        boolean hasTopPorts() {
-            return placedPortDrivers + placedPortLoads + unplacedPortDrivers + unplacedPortLoads > 0;
-        }
-    }
-
     /** The connections of one net segment, tallied before being added to its flat net. */
-    private static class Tally extends Connections {
+    static class Tally extends Connections {
         int namedBy;
         /** Whether fed by an output port of a child that has nothing but the port inside */
         boolean portOnlyOutput;
@@ -839,278 +251,26 @@ final class RouteStatusNetlist {
 
     }
 
-    /** Connection kinds of a port instance on a net, as precomputed per cell definition */
-    private static final byte OWN_PORT = 0;
-    private static final byte LEAF_OUTPUT = 1;
-    private static final byte LEAF_INPUT = 2;
-    private static final byte LEAF_INOUT = 3;
-    private static final byte HIER = 4;
-    /** Pins of black boxes (leaf cells that are not primitives) are not counted */
-    private static final byte BLACK_BOX = 5;
-    private static final byte BLACK_BOX_OUTPUT = 6;
-    private static final byte BLACK_BOX_INOUT = 7;
-
-    /** Flags of a port instance on a net, combined with its connection kind */
-    private static final byte KIND_MASK = 0x0f;
-    /** A hierarchical output port that dangles inside the child */
-    private static final byte DANGLING = 0x10;
-    /** A hierarchical output port that only has a net inside the child */
-    private static final byte PORT_ONLY = 0x20;
-    /** A hierarchical inout port that dangles inside the child */
-    private static final byte DANGLING_INOUT = 0x40;
-    /** A hierarchical output port */
-    private static final byte CHILD_OUTPUT = (byte) 0x80;
-
-    /** The connectivity of a (non-leaf) cell definition, precomputed once for all its instances. */
-    private static class CellInfo {
-        final int numSlots;
-        final EDIFNet[] nets;
-        /** Per net: the hash code of its name, and 31^(length of its name) */
-        final int[] nameHashes;
-        final int[] namePows;
-        /**
-         * Per net: whether it is not a net, but a placeholder declaring the range of a bus (see
-         * isBusRangeDeclaration()), or a net without connections that is not the bit of a bus
-         */
-        final boolean[] notNets;
-        /** Per net: the range of its port instances in the arrays below */
-        final int[] start;
-        /** Per port instance: connection kind and flags, child index, and port slot */
-        final byte[] kinds;
-        final int[] childIdx;
-        final int[] slots;
-        /** Per port instance: the name of the pin of a leaf cell (null otherwise) */
-        final String[] leafPinNames;
-        /** Per net, the static source type driving it from within this cell, if any */
-        final NetType[] staticTypes;
-        final EDIFCellInst[] children;
-        final boolean[] childIsLeaf;
-        /** Total number of instances in this cell's subtree */
-        long leafCount;
-        /** True if the cell is a macro primitive, or inside one */
-        boolean insideMacro;
-        boolean macroVisited;
-        /** Per child: whether it only weakly drives its nets (e.g. a pull-up), so does not name them */
-        final boolean[] childIsWeakDriver;
-        /** Per child: whether it is a black box (a leaf cell that is not a primitive) */
-        final boolean[] childIsBlackBox;
-
-        /** Per port slot: whether a net inside connects to it, and whether that net connects to nothing else */
-        final boolean[] ownConnected;
-        final boolean[] ownPortOnly;
-        /** Per port slot: whether it is (part of) an output port */
-        final boolean[] ownOutputs;
-        private final Map<EDIFPort, Integer>[] childOffsets;
-        private final boolean[][] childConnected;
-        private final boolean[][] childPortOnly;
-
-        @SuppressWarnings("unchecked")
-        CellInfo(EDIFCell cell, RouteStatusNetlist netlist) {
-            Map<EDIFPort, Integer> offsets = netlist.getPortOffsets(cell);
-            numSlots = offsets.get(null);
-            ownConnected = new boolean[numSlots];
-            ownPortOnly = new boolean[numSlots];
-            ownOutputs = new boolean[numSlots];
-            for (EDIFPort port : cell.getPorts()) {
-                if (port.isOutput()) {
-                    int offset = offsets.get(port);
-                    Arrays.fill(ownOutputs, offset, offset + Math.max(1, port.getWidth()), true);
-                }
-            }
-            boolean parallel = ForkJoinTask.inForkJoinPool();
-            children = toArray(cell.getCellInsts(), new EDIFCellInst[0], parallel);
-            childIsLeaf = new boolean[children.length];
-            Map<EDIFCellInst, Integer> childIndex = new IdentityHashMap<>(children.length);
-            // Per hierarchical child: the port slots of its cell, and which are connected inside
-            childOffsets = new Map[children.length];
-            childConnected = new boolean[children.length][];
-            childPortOnly = new boolean[children.length][];
-            childIsWeakDriver = new boolean[children.length];
-            childIsBlackBox = new boolean[children.length];
-            for (int i = 0; i < children.length; i++) {
-                childIndex.put(children[i], i);
-                EDIFCell type = children[i].getCellType();
-                childIsLeaf[i] = type.isLeafCellOrBlackBox();
-                String typeName = type.getName();
-                childIsWeakDriver[i] = childIsLeaf[i] && (typeName.equals("PULLUP") || typeName.equals("PULLDOWN")
-                        || typeName.equals("KEEPER"));
-                childIsBlackBox[i] = childIsLeaf[i] && !isPrimitive(type);
-                if (!childIsLeaf[i]) {
-                    childOffsets[i] = netlist.getPortOffsets(type);
-                    CellInfo childInfo = netlist.getCellInfo(type);
-                    childConnected[i] = childInfo.ownConnected;
-                    childPortOnly[i] = childInfo.ownPortOnly;
-                }
-            }
-            nets = toArray(cell.getNets(), new EDIFNet[0], parallel);
-            nameHashes = new int[nets.length];
-            namePows = new int[nets.length];
-            notNets = new boolean[nets.length];
-            start = new int[nets.length + 1];
-            staticTypes = new NetType[nets.length];
-            // Each chunk of nets is tallied into its own arrays, then they are concatenated
-            int numChunks = Math.max(1, (nets.length + CHUNK - 1) / CHUNK);
-            Chunk[] chunks = new Chunk[numChunks];
-            if (numChunks > 4 && parallel) {
-                List<RecursiveAction> tasks = new ArrayList<>();
-                for (int c = 0; c < numChunks; c++) {
-                    final int i = c;
-                    tasks.add(new RecursiveAction() {
-                        @Override
-                        protected void compute() {
-                            chunks[i] = initNets(i * CHUNK, Math.min(nets.length, (i + 1) * CHUNK), offsets, childIndex);
-                        }
-                    });
-                }
-                ForkJoinTask.invokeAll(tasks);
-            } else {
-                for (int c = 0; c < numChunks; c++) {
-                    chunks[c] = initNets(c * CHUNK, Math.min(nets.length, (c + 1) * CHUNK), offsets, childIndex);
-                }
-            }
-            int total = 0;
-            for (Chunk chunk : chunks) {
-                total += chunk.size;
-            }
-            kinds = new byte[total];
-            childIdx = new int[total];
-            slots = new int[total];
-            leafPinNames = new String[total];
-            int offset = 0;
-            for (int c = 0; c < numChunks; c++) {
-                Chunk chunk = chunks[c];
-                System.arraycopy(chunk.kinds, 0, kinds, offset, chunk.size);
-                System.arraycopy(chunk.childIdx, 0, childIdx, offset, chunk.size);
-                System.arraycopy(chunk.slots, 0, slots, offset, chunk.size);
-                System.arraycopy(chunk.leafPinNames, 0, leafPinNames, offset, chunk.size);
-                for (int n = c * CHUNK, end = Math.min(nets.length, (c + 1) * CHUNK); n < end; n++) {
-                    start[n + 1] += offset;
-                }
-                offset += chunk.size;
-            }
-        }
-
-        /** The port instances of a range of nets, before concatenation. */
-        private static class Chunk {
-            int size;
-            byte[] kinds;
-            int[] childIdx;
-            int[] slots;
-            String[] leafPinNames;
-
-            Chunk(int capacity) {
-                kinds = new byte[capacity];
-                childIdx = new int[capacity];
-                slots = new int[capacity];
-                leafPinNames = new String[capacity];
-            }
-
-            void ensureCapacity(int capacity) {
-                if (capacity > kinds.length) {
-                    int newCapacity = Math.max(capacity, kinds.length * 2);
-                    kinds = Arrays.copyOf(kinds, newCapacity);
-                    childIdx = Arrays.copyOf(childIdx, newCapacity);
-                    slots = Arrays.copyOf(slots, newCapacity);
-                    leafPinNames = Arrays.copyOf(leafPinNames, newCapacity);
-                }
-            }
-        }
-
-        /**
-         * Tallies the port instances of nets [from, to). Sets start[n + 1] to the end of net n's
-         * port instances within the chunk (offset by the chunk's start later).
-         */
-        private Chunk initNets(int from, int to, Map<EDIFPort, Integer> offsets, Map<EDIFCellInst, Integer> childIndex) {
-            Chunk chunk = new Chunk(Math.max(16, (to - from) * 4));
-            for (int n = from; n < to; n++) {
-                String name = nets[n].getName();
-                nameHashes[n] = name.hashCode();
-                namePows[n] = pow31(name.length());
-                List<EDIFPortInst> epis = nets[n].getPortInsts();
-                int count = epis.size();
-                notNets[n] = count == 0 && (isBusRangeDeclaration(name) || !isBusBit(name));
-                int base = chunk.size;
-                chunk.ensureCapacity(base + count);
-                byte[] kinds = chunk.kinds;
-                int[] childIdx = chunk.childIdx;
-                int[] slots = chunk.slots;
-                for (int p = 0; p < count; p++) {
-                    int i = base + p;
-                    EDIFPortInst epi = epis.get(p);
-                    EDIFCellInst eci = epi.getCellInst();
-                    if (eci == null) {
-                        kinds[i] = OWN_PORT;
-                        slots[i] = slot(offsets, epi);
-                        // (concurrent writes of the same value are harmless)
-                        ownConnected[slots[i]] = true;
-                        if (count == 1) {
-                            ownPortOnly[slots[i]] = true;
-                        }
-                        continue;
-                    }
-                    int c = childIndex.get(eci);
-                    childIdx[i] = c;
-                    if (childIsBlackBox[c]) {
-                        kinds[i] = epi.isOutput() ? BLACK_BOX_OUTPUT : epi.isInput() ? BLACK_BOX : BLACK_BOX_INOUT;
-                    } else if (childIsLeaf[c]) {
-                        chunk.leafPinNames[i] = epi.getName();
-                        if (epi.isOutput()) {
-                            kinds[i] = LEAF_OUTPUT;
-                            EDIFCell type = eci.getCellType();
-                            String typeName = type.getName();
-                            if ((typeName.equals("GND") || typeName.equals("VCC")) && isPrimitive(type)) {
-                                staticTypes[n] = typeName.equals("GND") ? NetType.GND : NetType.VCC;
-                            }
-                        } else {
-                            kinds[i] = epi.isInput() ? LEAF_INPUT : LEAF_INOUT;
-                        }
-                    } else {
-                        int slot = slot(childOffsets[c], epi);
-                        slots[i] = slot;
-                        byte kind = HIER;
-                        if (epi.isOutput()) {
-                            kind |= CHILD_OUTPUT;
-                            if (!childConnected[c][slot]) {
-                                kind |= DANGLING;
-                            }
-                            if (childPortOnly[c][slot]) {
-                                kind |= PORT_ONLY;
-                            }
-                        } else if (!epi.isInput() && !childConnected[c][slot]) {
-                            kind |= DANGLING_INOUT;
-                        }
-                        kinds[i] = kind;
-                    }
-                }
-                chunk.size = base + count;
-                start[n + 1] = chunk.size;
-            }
-            return chunk;
-        }
-    }
-
-    /** Copies a (large) collection into an array, in parallel if in a fork join pool. */
-    private static <T> T[] toArray(Collection<T> collection, T[] empty, boolean parallel) {
-        if (parallel && collection.size() > 4 * CHUNK) {
-            return collection.parallelStream().toArray((n) -> Arrays.copyOf(empty, n));
-        }
-        return collection.toArray(empty);
-    }
-
     private final Design design;
+
     /** Flat nets created, in one list per task to avoid contention */
     private final Queue<List<FlatNet>> flatNets = new ConcurrentLinkedQueue<>();
+
     private final Queue<FlatNet[]> pendingMerges = new ConcurrentLinkedQueue<>();
+
     private final Map<EDIFCell, Map<EDIFPort, Integer>> portOffsets = new ConcurrentHashMap<>();
+
     private final Map<EDIFCell, CellInfo> cellInfos = new ConcurrentHashMap<>();
 
     /** Subtrees with fewer instances than this are visited by the thread visiting the parent */
     private static final long MIN_PARALLEL_INSTANCES = 4096;
+
     /** Cells with more nets or children than this have them visited in parallel chunks */
-    private static final int CHUNK = 8192;
+    static final int CHUNK = 8192;
 
     /** Hash codes of the names of interest (physical net names), or null */
-    private final RouteStatusEngine.IntHashSet namesOfInterest;
+    private final IntHashSet namesOfInterest;
+
     /** Full names of the black box instances */
     private final Set<String> blackBoxes = ConcurrentHashMap.newKeySet();
 
@@ -1129,6 +289,7 @@ final class RouteStatusNetlist {
 
     /** Net segments whose full names have the hash code of a name of interest (in one list per task) */
     private final Queue<List<Segment>> segmentsOfInterest = new ConcurrentLinkedQueue<>();
+
     /** Open addressing table of the segments of interest by hash code */
     private Segment[] segmentTable;
 
@@ -1160,7 +321,7 @@ final class RouteStatusNetlist {
      * {@link #getSegment(String)}, or null.
      * @param countUnconnected Whether to only count the nets without any connection.
      */
-    RouteStatusNetlist(Design design, RouteStatusEngine.IntHashSet namesOfInterest, boolean countUnconnected) {
+    RouteStatusNetlist(Design design, IntHashSet namesOfInterest, boolean countUnconnected) {
         this.design = design;
         this.namesOfInterest = namesOfInterest;
         this.countUnconnected = countUnconnected;
@@ -1180,6 +341,7 @@ final class RouteStatusNetlist {
      * are only counted (see {@link #getUnconnectedNets()}), unless their names are of interest.
      */
     private final boolean countUnconnected;
+
     private final LongAdder unconnectedNets = new LongAdder();
 
     /** Gets the number of nets without any connection that were only counted. */
@@ -1199,7 +361,7 @@ final class RouteStatusNetlist {
         int capacity = Integer.highestOneBit(Math.max(4, segs.size() * 2) - 1) << 1;
         Segment[] table = new Segment[capacity];
         for (Segment seg : segs) {
-            int i = RouteStatusEngine.IntHashSet.spread(seg.hash) & (capacity - 1);
+            int i = IntHashSet.spread(seg.hash) & (capacity - 1);
             while (table[i] != null) {
                 i = (i + 1) & (capacity - 1);
             }
@@ -1214,7 +376,7 @@ final class RouteStatusNetlist {
         int h = name.hashCode();
         int mask = segmentTable.length - 1;
         Segment seg;
-        for (int i = RouteStatusEngine.IntHashSet.spread(h) & mask; (seg = segmentTable[i]) != null; i = (i + 1) & mask) {
+        for (int i = IntHashSet.spread(h) & mask; (seg = segmentTable[i]) != null; i = (i + 1) & mask) {
             if (seg.hash != h) {
                 continue;
             }
@@ -1235,7 +397,7 @@ final class RouteStatusNetlist {
         return new ArrayList<>(flatNets);
     }
 
-    private Map<EDIFPort, Integer> getPortOffsets(EDIFCell cell) {
+    Map<EDIFPort, Integer> getPortOffsets(EDIFCell cell) {
         Map<EDIFPort, Integer> offsets = portOffsets.get(cell);
         if (offsets != null) {
             return offsets;
@@ -1251,7 +413,7 @@ final class RouteStatusNetlist {
         return offsets;
     }
 
-    private CellInfo getCellInfo(EDIFCell cell) {
+    CellInfo getCellInfo(EDIFCell cell) {
         CellInfo info = cellInfos.get(cell);
         if (info == null) {
             info = new CellInfo(cell, this);
@@ -1348,7 +510,7 @@ final class RouteStatusNetlist {
         return true;
     }
 
-    private static int slot(Map<EDIFPort, Integer> offsets, EDIFPortInst epi) {
+    static int slot(Map<EDIFPort, Integer> offsets, EDIFPortInst epi) {
         return offsets.get(epi.getPort()) + Math.max(0, epi.getIndex());
     }
 
@@ -1368,7 +530,7 @@ final class RouteStatusNetlist {
             mask = capacity - 1;
             for (Cell cell : all) {
                 int h = cell.getName().hashCode();
-                int i = RouteStatusEngine.IntHashSet.spread(h) & mask;
+                int i = IntHashSet.spread(h) & mask;
                 while (cells[i] != null) {
                     i = (i + 1) & mask;
                 }
@@ -1380,7 +542,7 @@ final class RouteStatusNetlist {
         /** Gets the cell named prefix + name, given the hash code of the prefix. */
         Cell get(String prefix, int prefixHash, String name) {
             int h = prefixHash * pow31(name.length()) + name.hashCode();
-            for (int i = RouteStatusEngine.IntHashSet.spread(h) & mask; cells[i] != null; i = (i + 1) & mask) {
+            for (int i = IntHashSet.spread(h) & mask; cells[i] != null; i = (i + 1) & mask) {
                 if (hashes[i] != h) {
                     continue;
                 }

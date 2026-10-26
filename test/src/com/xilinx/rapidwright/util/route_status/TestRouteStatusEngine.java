@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/** Tests of the internals of {@link RouteStatusEngine}. */
+/** Tests of the internals of the route status engine. */
 public class TestRouteStatusEngine {
 
     @Test
@@ -41,14 +41,9 @@ public class TestRouteStatusEngine {
         Design design = RapidWrightDCP.loadDCP("routethru_luts.dcp");
         new RouteStatusMutator(design, 1).apply("conflict:5");
         ReportRouteStatusResult expected = ReportRouteStatus.reportRouteStatus(design, true);
-        try {
-            RouteStatusEngine.forceConflictsFallback = true;
-            ReportRouteStatusResult fallback = ReportRouteStatus.reportRouteStatus(design, true);
-            Assertions.assertEquals(expected.toString(), fallback.toString());
-            Assertions.assertEquals(expected.netsByStatus, fallback.netsByStatus);
-        } finally {
-            RouteStatusEngine.forceConflictsFallback = false;
-        }
+        ReportRouteStatusResult fallback = RouteStatusEngine.run(design, true, false);
+        Assertions.assertEquals(expected.toString(), fallback.toString());
+        Assertions.assertEquals(expected.netsByStatus, fallback.netsByStatus);
     }
 
     private static int bits(NetRouteStatus... statuses) {
@@ -67,7 +62,7 @@ public class TestRouteStatusEngine {
         int[] status = {bits(NetRouteStatus.UNROUTED), bits(NetRouteStatus.UNROUTED),
                 bits(NetRouteStatus.HAS_ROUTING, NetRouteStatus.ROUTED)};
         int[] users = reversed ? new int[]{1 << 1 | 1, 0 << 1 | 1, 2 << 1} : new int[]{0 << 1 | 1, 1 << 1 | 1, 2 << 1};
-        RouteStatusEngine.markNodeUsers(status, users, users.length);
+        ConflictMarker.markNodeUsers(status, users, users.length);
         int owner = bits(NetRouteStatus.PARTIAL, NetRouteStatus.CONFLICTS);
         Assertions.assertArrayEquals(new int[]{owner, owner,
                 bits(NetRouteStatus.HAS_ROUTING, NetRouteStatus.CONFLICTS, NetRouteStatus.ANTENNAS)}, status);
