@@ -42,9 +42,7 @@ import com.xilinx.rapidwright.util.Params;
  * <p>
  * The checkpoints are read in parallel. Each black box is filled with
  * {@link DesignTools#populateBlackBox(Design, Map, boolean)}, keeping the routing on its boundary,
- * which also adds each module's constraints to the design, scoped to its black box. Physical nets
- * whose names Vivado would resolve to another logical net are then renamed
- * ({@link DesignTools#renameAmbiguousPhysNets(Design)}).
+ * which also adds each module's constraints to the design, scoped to its black box.
  * <p>
  * The result is written in the 2024.1 DCP format, which keeps everything Vivado needs to read such
  * a design back, including its DFX state.
@@ -87,7 +85,6 @@ public class CombineDcps {
 
         t.stop().start("Populate black boxes");
         DesignTools.populateBlackBox(design, blackBoxes, true);
-        DesignTools.renameAmbiguousPhysNets(design);
 
         t.stop().start("Write DCP");
         boolean orig2024Dot1 = Params.RW_WRITE_DCP_2024_1;
