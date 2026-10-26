@@ -1068,6 +1068,26 @@ public class TestReportRouteStatus {
     }
 
     /**
+     * Writing a checkpoint leaves the macro primitives of the netlist collapsed, while the placed
+     * cells are those of their expansion: the route status is the same as before writing, and the
+     * netlist is left as the write left it.
+     */
+    @Test
+    public void testReportRouteStatusAfterWriteCheckpoint(@TempDir Path tempDir) {
+        Design design = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
+        ReportRouteStatusResult before = ReportRouteStatus.reportRouteStatus(design, true);
+        design.writeCheckpoint(tempDir.resolve("microblazeAndILA_3pblocks.dcp"));
+        EDIFCell ram = design.getNetlist().getHDIPrimitivesLibrary().getCell("RAM32M");
+        Assertions.assertTrue(ram != null && ram.isLeafCellOrBlackBox());
+        ReportRouteStatusResult after = ReportRouteStatus.reportRouteStatus(design, true);
+        Assertions.assertEquals(before.toString(), after.toString());
+        Assertions.assertEquals(before.netsByStatus, after.netsByStatus);
+        // (the report expands and collapses the macro again: the library holds the collapsed cell)
+        ram = design.getNetlist().getHDIPrimitivesLibrary().getCell("RAM32M");
+        Assertions.assertTrue(ram != null && ram.isLeafCellOrBlackBox());
+    }
+
+    /**
      * A netlist with nets but no primitives (here a wire from an input to an output port, or a
      * black box between them): Vivado lists GLOBAL_LOGIC0 as internally routed, without counting it.
      */

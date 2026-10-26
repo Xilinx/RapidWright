@@ -184,7 +184,62 @@ public class ReportRouteStatus {
          * See {@link ReportRouteStatus#reportRouteStatus(Design, boolean)}.
          */
         public static ReportRouteStatusResult run(Design design, boolean perNet) {
-            return new RouteStatusEngine(design, perNet).run();
+            // Writing a checkpoint leaves the macro primitives (e.g. RAM64X1D) collapsed in the
+            // netlist, while the cells placed for them are those of their expansion (as read from a
+            // checkpoint). Vivado expands them when it reads the design: so does the report, which then
+            // restores the netlist.
+            EDIFNetlist netlist = design.getNetlist();
+            boolean expanded = hasCollapsedMacros(design);
+            boolean tracking = netlist.isTrackingCellChanges();
+            if (expanded) {
+                netlist.setTrackCellChanges(false);
+                netlist.expandMacroUnisims(design.getSeries());
+            }
+            try {
+                return new RouteStatusEngine(design, perNet).run();
+            } finally {
+                if (expanded) {
+                    netlist.collapseMacroUnisims(design.getSeries());
+                    netlist.setTrackCellChanges(tracking);
+                }
+            }
+        }
+
+        /**
+         * Checks whether the netlist of a design has macro primitives that are collapsed into leaf
+         * cells while cells of their expansion are placed, as {@link Design#writeCheckpoint(String)}
+         * leaves them.
+         */
+        private static boolean hasCollapsedMacros(Design design) {
+            EDIFNetlist netlist = design.getNetlist();
+            EDIFLibrary prims = netlist.getHDIPrimitivesLibrary();
+            Series series = design.getSeries();
+            if (prims == null || series == null) {
+                return false;
+            }
+            EDIFLibrary macros = Design.getMacroPrimitives(series);
+            Set<EDIFCell> collapsed = Collections.newSetFromMap(new IdentityHashMap<>());
+            for (EDIFCell cell : prims.getCells()) {
+                EDIFCell macro = macros.getCell(cell.getName());
+                if (macro != null && cell.isLeafCellOrBlackBox() && !macro.isLeafCellOrBlackBox()) {
+                    collapsed.add(cell);
+                }
+            }
+            if (collapsed.isEmpty()) {
+                return false;
+            }
+            for (Cell cell : design.getCells()) {
+                String name = cell.getName();
+                int sep = name.lastIndexOf(EDIFTools.EDIF_HIER_SEP);
+                if (cell.isRoutethru() || sep < 0) {
+                    continue;
+                }
+                EDIFHierCellInst parent = netlist.getHierCellInstFromName(name.substring(0, sep));
+                if (parent != null && collapsed.contains(parent.getCellType())) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private static final int PHYSICAL_ONLY = -1;
