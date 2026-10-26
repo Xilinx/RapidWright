@@ -86,6 +86,9 @@ final class FlatNet extends Connections {
     /** The leaf loads on segments inside LUT6_2 macros */
     int macroLeafLoads;
 
+    /** The pins on leaf cells, see {@link #getLeafPins(Design)} (or null) */
+    private List<LeafPin> leafPins;
+
     FlatNet(String prefix, EDIFNet net) {
         this.prefix = prefix;
         this.net = net;
@@ -489,15 +492,30 @@ final class FlatNet extends Connections {
         return RouteStatusNetlist.getSegments(new EDIFHierNet(inst, net));
     }
 
-    /** Gets the pins on leaf cells of all the segments of this flat net, with their cells. */
+    /**
+     * Gets the pins on leaf cells of all the segments of this flat net, with their cells. They are kept
+     * (except for static nets, which may be huge) until {@link #releaseLeafPins()}, as the checks of a
+     * net often need them more than once.
+     */
     List<LeafPin> getLeafPins(Design design) {
+        if (leafPins != null) {
+            return leafPins;
+        }
         List<LeafPin> pins = new ArrayList<>();
         for (EDIFHierNet hn : getSegments(design)) {
             for (EDIFHierPortInst p : getLeafPortInsts(hn)) {
                 pins.add(new LeafPin(p, p.getPhysicalCell(design)));
             }
         }
+        if (staticType == null) {
+            leafPins = pins;
+        }
         return pins;
+    }
+
+    /** Releases the pins kept by {@link #getLeafPins(Design)}. */
+    void releaseLeafPins() {
+        leafPins = null;
     }
 
     boolean hasTopPorts() {

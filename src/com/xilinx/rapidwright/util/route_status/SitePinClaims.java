@@ -421,6 +421,7 @@ final class SitePinClaims {
                     }
                 }
             }
+            flat.releaseLeafPins();
             if (!keys.isEmpty()) {
                 long[] merged = concat(entries.driverPinKeys[i], toSortedDistinct(keys));
                 entries.driverPinKeys[i] = sortedDistinct(merged, merged.length);

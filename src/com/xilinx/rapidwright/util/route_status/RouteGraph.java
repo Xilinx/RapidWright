@@ -91,6 +91,9 @@ final class RouteGraph {
      */
     boolean[] drivenAgain;
 
+    /** Per node: see {@link #getBidirectionalPartners(int)} (null until needed) */
+    private int[][] bidirectionalPartners;
+
     /** The intent codes of global (clock) routing */
     private static final Set<IntentCode> GLOBAL_INTENT_CODES = EnumSet.noneOf(IntentCode.class);
 
@@ -609,14 +612,8 @@ final class RouteGraph {
             if (search.visited[i] || !isGlobal(nodeObjects[i])) {
                 continue;
             }
-            for (PIP pip : nodeObjects[i].getAllUphillPIPs()) {
-                if (!pip.isBidirectional()) {
-                    continue;
-                }
-                Node start = pip.getStartNode();
-                Node other = (start != null && nodeKey(start) == nodes[i]) ? pip.getEndNode() : start;
-                int o = indexOf(other);
-                if (o >= 0 && search.visited[o]) {
+            for (int o : getBidirectionalPartners(i)) {
+                if (search.visited[o]) {
                     search.add(i);
                     joined = true;
                     break;
@@ -624,6 +621,35 @@ final class RouteGraph {
             }
         }
         return joined;
+    }
+
+    /**
+     * Gets the nodes of the routing that bidirectional PIPs (stored or not) connect a node to, found
+     * once (for the nodes that searches need them for).
+     */
+    private int[] getBidirectionalPartners(int i) {
+        if (bidirectionalPartners == null) {
+            bidirectionalPartners = new int[nodes.length][];
+        }
+        int[] partners = bidirectionalPartners[i];
+        if (partners != null) {
+            return partners;
+        }
+        partners = new int[0];
+        for (PIP pip : nodeObjects[i].getAllUphillPIPs()) {
+            if (!pip.isBidirectional()) {
+                continue;
+            }
+            Node start = pip.getStartNode();
+            Node other = (start != null && nodeKey(start) == nodes[i]) ? pip.getEndNode() : start;
+            int o = indexOf(other);
+            if (o >= 0) {
+                partners = Arrays.copyOf(partners, partners.length + 1);
+                partners[partners.length - 1] = o;
+            }
+        }
+        bidirectionalPartners[i] = partners;
+        return partners;
     }
 
     /** Counts the sinks reached, and finds islands and nodes driven again. */

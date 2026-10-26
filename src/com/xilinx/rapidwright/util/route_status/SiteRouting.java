@@ -200,8 +200,9 @@ final class SiteRouting {
      */
     static boolean isTiedTo(Cell cell, String logicalPin, NetType staticType) {
         EDIFHierCellInst inst;
-        // The logical cell may be looked up by name, which is not thread safe
-        synchronized (SiteRouting.class) {
+        // The logical cell may be looked up by name, which is not thread safe (see
+        // FlatNet.getSegments())
+        synchronized (cell.getSiteInst().getDesign().getNetlist()) {
             inst = cell.getEDIFHierCellInst();
         }
         EDIFPortInst epi = (inst == null) ? null : inst.getInst().getPortInst(logicalPin);

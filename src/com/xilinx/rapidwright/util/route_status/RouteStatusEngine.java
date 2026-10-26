@@ -502,6 +502,9 @@ public final class RouteStatusEngine {
                 return;
             }
             entries.status[i] = (net == null && flat == null) ? INTRASITE : classifyNet(net, flat, i);
+            if (flat != null) {
+                flat.releaseLeafPins();
+            }
         });
     }
 
