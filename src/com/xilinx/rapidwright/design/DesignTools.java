@@ -1788,13 +1788,65 @@ public class DesignTools {
         return toRemove;
     }
 
+    /**
+     * Gets the BEL input pins of cells that the site routing of a net reaches from an output BEL pin,
+     * through used site PIPs and routethru cells.
+     */
+    private static List<BELPin> getSiteRoutedLoads(SiteInst siteInst, Net net, BELPin output) {
+        List<BELPin> loads = new ArrayList<>();
+        Queue<String> siteWires = new LinkedList<>();
+        Set<String> visited = new HashSet<>();
+        siteWires.add(output.getSiteWireName());
+        while (!siteWires.isEmpty()) {
+            String siteWire = siteWires.poll();
+            if (!visited.add(siteWire) || siteInst.getNetFromSiteWire(siteWire) != net) {
+                continue;
+            }
+            for (BELPin otherPin : siteInst.getSiteWirePins(siteWire)) {
+                if (otherPin == output || !otherPin.isInput() || otherPin.isSitePort()) {
+                    continue;
+                }
+                Cell cell = siteInst.getCell(otherPin.getBEL());
+                if (otherPin.getBEL().getBELClass() == BELClass.RBEL) {
+                    SitePIP pip = siteInst.getUsedSitePIP(otherPin);
+                    if (pip != null) {
+                        siteWires.add(pip.getOutputPin().getSiteWireName());
+                    }
+                } else if (cell != null && cell.isRoutethru()) {
+                    // Through a routethru (e.g. of an F7 mux) to the load beyond it
+                    for (BELPin out : otherPin.getBEL().getPins()) {
+                        if (out.isOutput()) {
+                            siteWires.add(out.getSiteWireName());
+                        }
+                    }
+                } else if (cell != null) {
+                    loads.add(otherPin);
+                }
+            }
+        }
+        return loads;
+    }
+
     private static void fullyUnplaceCellHelper(Cell cell, Map<Net, Set<SitePinInst>> deferRemovals) {
         SiteInst siteInst = cell.getSiteInst();
         BEL bel = cell.getBEL();
         // If cell was using shared control signals (CLK, CE, RST), check to see if this was
         // the last cell used and then remove the site routing, site pin, and partial routing if
-        // it exists
+        // it exists. (Outputs first: the site routing from them to loads in the site may pass
+        // through routethrus whose static inputs, e.g. the select of an F7 mux, are on the site
+        // wires of the cell's inputs too.)
+        List<BELPin> pins = new ArrayList<>();
         for (BELPin pin : bel.getPins()) {
+            if (pin.isOutput()) {
+                pins.add(pin);
+            }
+        }
+        for (BELPin pin : bel.getPins()) {
+            if (!pin.isOutput()) {
+                pins.add(pin);
+            }
+        }
+        for (BELPin pin : pins) {
             Net net = siteInst.getNetFromSiteWire(pin.getSiteWireName());
             if (net == null) {
                 // Under certain circumstances, site routing is not explicit for VCC/GND
@@ -1821,6 +1873,13 @@ public class DesignTools {
             Queue<String> siteWires = new LinkedList<>();
             Set<String> visited = new HashSet<>();
             siteWires.add(pin.getSiteWireName());
+            List<BELPin> siteRoutedLoads = null;
+            if (pin.isOutput()) {
+                // Other cells on the site routing of an output are its loads, which do not keep the
+                // site routing of a driver that is gone (else Vivado places the cell there again)
+                siteWires.clear();
+                siteRoutedLoads = getSiteRoutedLoads(siteInst, net, pin);
+            }
             while (!siteWires.isEmpty()) {
                 String siteWire = siteWires.poll();
                 visited.add(siteWire);
@@ -1857,7 +1916,8 @@ public class DesignTools {
             if (otherUser == false) {
                 // Unroute site routing back to pin and remove site pin
                 for (String sitePinName : getAllRoutedSitePinsFromPhysicalPin(cell, net, pin.getName())) {
-                    BELPin sitePortBelPin = siteInst.getSite().getBELPin(sitePinName);
+                    // (the site port BEL of the site instance's type, which may be an alternate type)
+                    BELPin sitePortBelPin = siteInst.getBELPin(sitePinName, sitePinName);
                     assert(sitePortBelPin.isSitePort());
                     boolean outputSitePin = sitePortBelPin.isInput(); // Input BELPin means output SitePin
                     if (outputSitePin) {
@@ -1884,6 +1944,11 @@ public class DesignTools {
                             }
                         }
                     }
+                }
+            }
+            if (siteRoutedLoads != null) {
+                for (BELPin load : siteRoutedLoads) {
+                    siteInst.unrouteIntraSiteNet(pin, load);
                 }
             }
         }

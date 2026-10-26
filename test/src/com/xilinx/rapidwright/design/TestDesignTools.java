@@ -45,12 +45,14 @@ import org.junit.jupiter.params.provider.ValueSource;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.UtilizationType;
 import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
@@ -2856,5 +2858,89 @@ public class TestDesignTools {
         
         Assertions.assertFalse(c.isPlaced());
         Assertions.assertNull(c.getBEL());
+    }
+
+    @Test
+    public void testFullyUnplaceCellDrivingCellInSite() {
+        // A LUT driving a flip-flop in its site through the site routing: unplacing the LUT removes
+        // its site routing to the flip-flop too (else Vivado places the LUT there again)
+        Design d = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        Cell lut = null;
+        BELPin ffD = null;
+        for (Cell c : d.getCells()) {
+            if (!c.isPlaced() || c.isRoutethru() || !c.getBEL().isLUT() || !c.getBELName().endsWith("6LUT")) {
+                continue;
+            }
+            SiteInst si = c.getSiteInst();
+            BELPin o6 = c.getBEL().getPin("O6");
+            Net net = si.getNetFromSiteWire(o6.getSiteWireName());
+            if (net == null) {
+                continue;
+            }
+            for (BELPin p : si.getSiteWirePins(o6.getSiteWireName())) {
+                SitePIP pip = p.getBEL().getBELClass() == BELClass.RBEL ? si.getUsedSitePIP(p) : null;
+                if (pip == null) {
+                    continue;
+                }
+                for (BELPin q : si.getSiteWirePins(pip.getOutputPin().getSiteWireName())) {
+                    if (q.getBEL().isFF() && q.getName().equals("D") && si.getCell(q.getBEL()) != null) {
+                        lut = c;
+                        ffD = q;
+                    }
+                }
+            }
+            if (lut != null) {
+                break;
+            }
+        }
+        Assertions.assertNotNull(lut);
+        SiteInst si = lut.getSiteInst();
+        String o6Wire = lut.getBEL().getPin("O6").getSiteWireName();
+
+        DesignTools.fullyUnplaceCell(lut, null);
+
+        Assertions.assertFalse(lut.isPlaced());
+        Assertions.assertNull(si.getNetFromSiteWire(o6Wire));
+        Assertions.assertNull(si.getNetFromSiteWire(ffD.getSiteWireName()));
+    }
+
+    @Test
+    public void testFullyUnplaceCellDrivingCellInSiteThroughRoutethru() {
+        // A LUT driving a MUXF8 in its site through a routethru of the F7 mux, and a site pin:
+        // unplacing the LUT removes its site routing up to the MUXF8, the routethru and the site pin
+        Design d = new Design("testFullyUnplaceCellDrivingCellInSiteThroughRoutethru", Device.KCU105);
+        Cell muxf8 = d.createAndPlaceCell("muxf8", Unisim.MUXF8, "SLICE_X32Y73/F8MUX_TOP");
+        Cell lut = d.createAndPlaceCell("lut", Unisim.LUT1, "SLICE_X32Y73/E6LUT");
+        SiteInst si = lut.getSiteInst();
+        Net net = d.createNet("lut_out");
+        net.getLogicalNet().createPortInst("O", lut.getEDIFCellInst());
+        net.getLogicalNet().createPortInst("I1", muxf8.getEDIFCellInst());
+        Assertions.assertTrue(si.routeIntraSiteNet(net, lut.getBEL().getPin("O6"), si.getBELPin("F8MUX_TOP", "1")));
+        Assertions.assertTrue(si.getCell("F7MUX_EF").isRoutethru());
+        // (the LUT also drives a load outside of the site, from the site pin on the same site wire)
+        SitePinInst out = net.createPin("E_O", si);
+
+        DesignTools.fullyUnplaceCell(lut, null);
+
+        Assertions.assertFalse(lut.isPlaced());
+        Assertions.assertNull(si.getCell("F7MUX_EF"));
+        Assertions.assertFalse(net.getPins().contains(out));
+        for (String siteWire : new String[]{"E_O", "F7MUX_EF_OUT"}) {
+            Assertions.assertNull(si.getNetFromSiteWire(siteWire), siteWire);
+        }
+    }
+
+    @Test
+    public void testFullyUnplaceCellAlternateSiteType() {
+        // A block RAM placed on a site as an alternate type (RAMB36E1 on a RAMBFIFO36E1 site): its
+        // site port BEL pins are named as in the alternate type
+        Design d = RapidWrightDCP.loadDCP("bug709.dcp");
+        Cell ram = d.getCell("video_mem/ram_video_reg");
+        SiteInst si = ram.getSiteInst();
+        Assertions.assertNotEquals(si.getSite().getSiteTypeEnum(), si.getSiteTypeEnum());
+
+        DesignTools.fullyUnplaceCell(ram, null);
+
+        Assertions.assertFalse(ram.isPlaced());
     }
 }
