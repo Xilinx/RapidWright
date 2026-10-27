@@ -29,6 +29,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 
 /**
@@ -206,6 +207,46 @@ public class TestLecAcceptance {
         LecHarness result = check(LecNetlistFixtures.ioBuffersOnInouts(false),
                 LecNetlistFixtures.ioBuffersOnInouts(true));
         result.assertFail();
+    }
+
+    /**
+     * Top level ports are terminals even where no cone reaches them: an input
+     * that only one netlist has must fail.
+     */
+    @Test
+    public void testExtraTopLevelPortFails() {
+        EDIFNetlist imp = LecNetlistFixtures.feedthrough("z");
+        LecNetlistFixtures.port(imp.getTopCell(), "unused", EDIFDirection.INPUT);
+        LecHarness result = check(LecNetlistFixtures.feedthrough("z"), imp);
+        result.assertFail();
+        Assertions.assertTrue(
+                result.getReport().getCount(LecDifferenceType.TERMINAL_MISSING_IN_REF) > 0,
+                "The extra port must be reported as a terminal REF lacks");
+    }
+
+    /**
+     * A net shorted between a terminal and cloud logic is matched by its
+     * drivers, and the cloud driver is checked: the same short passes, and a
+     * different function on the cloud side fails.
+     */
+    @Test
+    public void testShortedNetIsMatchedByCheckedDrivers() {
+        check(LecNetlistFixtures.shortedNet("4'h8"), LecNetlistFixtures.shortedNet("4'h8"))
+                .assertPass();
+        check(LecNetlistFixtures.shortedNet("4'h8"), LecNetlistFixtures.shortedNet("4'hE"))
+                .assertFail();
+    }
+
+    /**
+     * Clock pins are checked like any other pin: a flip flop moved to a
+     * different clock must fail.
+     */
+    @Test
+    public void testRewiredClockFails() {
+        check(LecNetlistFixtures.clockedFlop("clk_a"), LecNetlistFixtures.clockedFlop("clk_a"))
+                .assertPass();
+        check(LecNetlistFixtures.clockedFlop("clk_a"), LecNetlistFixtures.clockedFlop("clk_b"))
+                .assertFail();
     }
 
     /**

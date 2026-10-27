@@ -78,7 +78,6 @@ public class NetlistStats {
 
     private int checkedPinCount;
 
-    private int clockPinCount;
 
     private int unconnectedCheckedPinCount;
 
@@ -108,7 +107,7 @@ public class NetlistStats {
     public static NetlistStats collect(String label, FlatNetlist flat, Connectivity conn,
             CellClassifier classifier, LecLog log) {
         NetlistStats stats = new NetlistStats(label, NetlistLoader.getPartName(flat.getNetlist()),
-                classifier.getClockPinTable().getSeries());
+                classifier.getSeries());
         stats.instCount = flat.getInstCount();
         stats.leafCount = flat.getLeafCount();
         stats.netCount = flat.getNetCount();
@@ -127,7 +126,7 @@ public class NetlistStats {
             }
             if (role == CellRole.TERMINAL) {
                 stats.terminalCount++;
-                stats.countTerminalPins(flat, conn, classifier, instId, typeName);
+                stats.countTerminalPins(flat, conn, instId);
                 if (!isWellKnownTerminal(typeName)) {
                     stats.opaquePrimitiveCounts.merge(typeName, 1, Integer::sum);
                 }
@@ -139,19 +138,13 @@ public class NetlistStats {
 
     /**
      * Counts the checked cone roots a single terminal contributes: every input
-     * pin except clock fanout.
+     * pin, clocks included.
      */
-    private void countTerminalPins(FlatNetlist flat, Connectivity conn, CellClassifier classifier,
-            int instId, String typeName) {
+    private void countTerminalPins(FlatNetlist flat, Connectivity conn, int instId) {
         CellIndex index = flat.getIndex(instId);
         for (int bit = 0; bit < index.getPortBitCount(); bit++) {
             EDIFPort port = index.getPortOfBit(bit);
             if (port.getDirection() != EDIFDirection.INPUT) {
-                continue;
-            }
-            String pinName = index.getPortBitName(bit);
-            if (classifier.isClockPin(typeName, pinName)) {
-                clockPinCount++;
                 continue;
             }
             checkedPinCount++;
@@ -226,7 +219,6 @@ public class NetlistStats {
         out.println("  leaf pins                : " + leafPinCount);
         out.println("  terminals                : " + terminalCount);
         out.println("  checked cone roots       : " + checkedPinCount);
-        out.println("  clock pins excluded      : " + clockPinCount);
         out.println("  unconnected checked pins : " + unconnectedCheckedPinCount);
         out.println("  undriven checked pins    : " + undrivenCheckedPinCount);
         out.println("  top ports in/out/inout   : " + topInputBits + " / " + topOutputBits + " / "
@@ -329,10 +321,6 @@ public class NetlistStats {
 
     public int getCheckedPinCount() {
         return checkedPinCount;
-    }
-
-    public int getClockPinCount() {
-        return clockPinCount;
     }
 
     public int getPartitionCount() {

@@ -48,8 +48,7 @@ import com.xilinx.rapidwright.edif.EDIFPropertyValue;
  * inverter into the flip flop's data pin, instead of leaving it as a separate
  * cell, is a legitimate implementation choice that does not change the logic;
  * comparing the attribute as well would report it as a difference and then the
- * cone comparison would report the compensating change too. The inversion of a
- * clock pin, which no cone covers, is still compared.
+ * cone comparison would report the compensating change too.
  *
  * Placement, timing and physical attributes are excluded because the
  * comparison is of logic, not implementation.

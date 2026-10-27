@@ -103,21 +103,20 @@
  * hierarchy boundaries vanish. Multi-driver nets are tolerated and
  * classified.</li>
  * <li><b>Classify.</b> {@link com.xilinx.rapidwright.lec.CellClassifier}
- * assigns every leaf a {@link com.xilinx.rapidwright.lec.CellRole}, and
- * {@link com.xilinx.rapidwright.lec.ClockPinTable} identifies clock pins,
- * which are excluded from comparison. A cell with no functional model is a
- * black box that poisons the cones reaching it.</li>
+ * assigns every leaf a {@link com.xilinx.rapidwright.lec.CellRole}. A cell
+ * with no functional model is a black box that poisons the cones reaching
+ * it.</li>
  * <li><b>Elaborate.</b> {@link com.xilinx.rapidwright.lec.ConeBuilder} walks
- * backwards from every non-clock terminal input pin, lowering each primitive
- * through {@link com.xilinx.rapidwright.lec.PrimitiveModelLibrary}. The graph
- * is structurally hashed, so two cones built from the same operations over the
- * same terminals collapse to the <i>same literal</i>, across netlists. Every
- * primitive declares its exact, property-aware input support per output pin,
- * so the dependency graph is over pins rather than cells: a carry chain, which
- * is cyclic as a graph of cells, is acyclic as a graph of pins, and a
+ * backwards from every terminal input pin, clocks included, lowering each
+ * primitive through {@link com.xilinx.rapidwright.lec.PrimitiveModelLibrary}.
+ * The graph is structurally hashed, so two cones built from the same operations
+ * over the same terminals collapse to the <i>same literal</i>, across netlists.
+ * Every primitive declares its exact, property-aware input support per output
+ * pin, so the dependency graph is over pins rather than cells: a carry chain,
+ * which is cyclic as a graph of cells, is acyclic as a graph of pins, and a
  * {@code LUT6_2} whose {@code O5} ignores inputs that {@code O6} uses does not
- * create a false loop. Genuine loops are reported by
- * {@link com.xilinx.rapidwright.lec.LoopReport}.</li>
+ * create a false loop. Genuine loops are reported by {@link
+ * com.xilinx.rapidwright.lec.LoopReport}.</li>
  * <li><b>Compare.</b> Terminal sets and functional attributes are compared
  * first ({@link com.xilinx.rapidwright.lec.TerminalAttributes}), then every
  * pin present in both netlists is run up the escalation ladder in

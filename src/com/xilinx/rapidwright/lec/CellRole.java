@@ -40,9 +40,9 @@ public enum CellRole {
 
     /**
      * A cone endpoint. Its output pins are source terminals (free variables of
-     * the compared functions) and its non-clock input pins are checked cone
-     * roots. Flip-flops, latches, SRLs, block and ultra RAM, distributed RAM and
-     * opaque DSPs are all terminals.
+     * the compared functions) and its input pins, clocks included, are checked
+     * cone roots. Flip-flops, latches, SRLs, block and ultra RAM, distributed
+     * RAM and opaque DSPs are all terminals.
      */
     TERMINAL,
 

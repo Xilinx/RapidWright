@@ -214,7 +214,7 @@ public class TestConeBuilder {
     }
 
     /**
-     * Every terminal input pin except clock fanout becomes a cone, and every
+     * Every terminal input pin, clocks included, becomes a cone, and every
      * cone resolves to a literal. A missing cone would silently skip a check.
      */
     @Test

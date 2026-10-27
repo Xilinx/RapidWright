@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.lec;
 
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Map;
 
 import com.xilinx.rapidwright.device.Series;
@@ -55,45 +56,46 @@ public class CellClassifier {
 
     private final LecConfig config;
 
-    private final ClockPinTable clockPins;
+    private final Series series;
 
     private final LecLog log;
 
-    private final Map<String, CellRole> roleCache = new HashMap<>();
+    private final Map<EDIFCell, CellRole> roleCache = new IdentityHashMap<>();
 
     public CellClassifier(Series series, LecConfig config, LecLog log) {
         this.config = config;
         this.log = log;
-        this.clockPins = new ClockPinTable(series, log);
+        this.series = series;
     }
 
     /**
      * @return The role of a cell type, computing and caching it on first use.
      */
     public CellRole classify(EDIFCell cell) {
-        String name = cell.getName();
-        CellRole cached = roleCache.get(name);
+        CellRole cached = roleCache.get(cell);
         if (cached != null) {
             return cached;
         }
-        CellRole role = computeRole(cell, name);
-        roleCache.put(name, role);
+        CellRole role = computeRole(cell, cell.getName());
+        roleCache.put(cell, role);
         return role;
     }
 
     /**
      * The rule order is significant.
      *
-     * The well known terminal and combinational types are handled first. What
-     * remains splits on library membership rather than on a list of names. A
-     * cell in {@code hdi_primitives} is a device hard block: a transceiver, a
-     * clock manager, an IO serialiser. Its identity is fixed by the
-     * architecture, so its instance name corresponds one to one between the two
-     * netlists exactly as it does for any other terminal, and treating it as
-     * an opaque terminal is both sound and matchable.
+     * Only a cell in {@code hdi_primitives} is a primitive at all. A leaf cell
+     * <i>outside</i> that library is a black box, whatever it is called: a user
+     * module named {@code FD_custom} or {@code LUT4} says nothing about its
+     * contents. Among primitives, the well known terminal and combinational
+     * types are handled first. Any other primitive is a device hard block: a
+     * transceiver, a clock manager, an IO serialiser. Its identity is fixed by
+     * the architecture, so its instance name corresponds one to one between the
+     * two netlists exactly as it does for any other terminal, and treating it
+     * as an opaque terminal is both sound and matchable.
      *
-     * A leaf cell <i>outside</i> that library is a black box: user or IP logic
-     * whose contents were not elaborated. Nothing guarantees its name
+     * A black box is user or IP logic whose contents were not elaborated.
+     * Nothing guarantees its name
      * corresponds, so its outputs become unmatchable variables and any cone
      * reaching one can only be reported inconclusive.
      *
@@ -102,6 +104,10 @@ public class CellClassifier {
      * logic.
      */
     private CellRole computeRole(EDIFCell cell, String name) {
+        if (!isDevicePrimitive(cell)) {
+            log.warn(BLACK_BOX_TYPE, name, null);
+            return CellRole.UNINTERPRETED;
+        }
         if (cell.isGNDSource()) {
             return CellRole.CONSTANT_GND;
         }
@@ -120,12 +126,8 @@ public class CellClassifier {
         if (isDsp(name)) {
             return CellRole.TERMINAL;
         }
-        if (isDevicePrimitive(cell)) {
-            log.warn(OPAQUE_PRIMITIVE, name, null);
-            return CellRole.TERMINAL;
-        }
-        log.warn(BLACK_BOX_TYPE, name, null);
-        return CellRole.UNINTERPRETED;
+        log.warn(OPAQUE_PRIMITIVE, name, null);
+        return CellRole.TERMINAL;
     }
 
     /**
@@ -175,27 +177,8 @@ public class CellClassifier {
     }
 
     /**
-     * @param cellTypeName The primitive type name.
-     * @param pinName      A pin name such as {@code "D"} or {@code "ADDRA[3]"}.
-     * @return True if the pin is clock fanout and therefore not a cone root.
-     */
-    public boolean isClockPin(String cellTypeName, String pinName) {
-        return clockPins.isClockPin(cellTypeName, stripBusIndex(pinName));
-    }
-
-    /**
-     * Decides whether a terminal input pin is a cone root to be checked.
-     * Every terminal input pin is checked, so the only exclusion is
-     * clock fanout.
-     */
-    public boolean isCheckedInputPin(String cellTypeName, String pinName) {
-        return !isClockPin(cellTypeName, pinName);
-    }
-
-    /**
      * @return The pin name with any bus index removed, so {@code "ADDRA[3]"}
-     *         becomes {@code "ADDRA"}. Clock pins are always scalar, but callers
-     *         pass bus pins too.
+     *         becomes {@code "ADDRA"}.
      */
     public static String stripBusIndex(String pinName) {
         int bracket = pinName.lastIndexOf('[');
@@ -205,12 +188,22 @@ public class CellClassifier {
         return pinName.substring(0, bracket);
     }
 
-    public ClockPinTable getClockPinTable() {
-        return clockPins;
+    /** @return The series the netlist targets, or null if it names none. */
+    public Series getSeries() {
+        return series;
     }
 
-    /** @return Every cell type classified so far, mapped to its role. */
+    /**
+     * @return Every cell type classified so far, by library qualified name,
+     *         mapped to its role.
+     */
     public Map<String, CellRole> getClassifiedTypes() {
-        return new HashMap<>(roleCache);
+        Map<String, CellRole> types = new HashMap<>();
+        for (Map.Entry<EDIFCell, CellRole> e : roleCache.entrySet()) {
+            EDIFCell cell = e.getKey();
+            String library = cell.getLibrary() == null ? "" : cell.getLibrary().getName() + ".";
+            types.put(library + cell.getName(), e.getValue());
+        }
+        return types;
     }
 }

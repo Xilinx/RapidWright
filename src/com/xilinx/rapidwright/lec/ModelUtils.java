@@ -77,7 +77,13 @@ public class ModelUtils {
             return false;
         }
         Long bits = parseLiteral(value);
-        return bits == null ? defaultValue : bits != 0;
+        if (bits == null) {
+            // The default is only for an absent property; guessing a supplied
+            // one could build the same function from two different settings.
+            throw new LecException("Unreadable " + key + " value '" + raw + "' on "
+                    + inst.getName());
+        }
+        return bits != 0;
     }
 
     /**
