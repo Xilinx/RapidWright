@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, 2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2024-2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -33,6 +33,17 @@ import java.util.function.Supplier;
 
 /**
  * Helper class that keeps track of EDIF Renames during writing. This class is thread-safe.
+ * <p>
+ * A name that is not a legal EDIF identifier is renamed to a legal one, once per cache. Different names can be made
+ * legal as the same identifier (ignoring case, as Vivado does not like renames that differ only in case), e.g.
+ * {@code a[0]} and {@code A(0)}: the first of them to be renamed gets that identifier, and each later one gets it
+ * with a suffix ({@code _HDI_0}, {@code _HDI_1}, ...), in the order in which they are first renamed. Each renamed name
+ * keeps the same legal identifier for as long as the cache is used, and no two renamed names share one. (A name that
+ * is already legal is written as it is, without being checked against these: so a legal {@code a_0_} and a renamed
+ * {@code a[0]} would share one.) Which renamed name gets which identifier depends on that order: with
+ * {@link #singleThreaded()}, that is the order in which the names are written; with {@link #multiThreaded()}, shared
+ * by threads writing different parts of a netlist at the same time, it depends on their timing, so the identifiers
+ * (and so the text, and its length) may differ between exports of the same netlist.
  */
 public abstract class EDIFWriteLegalNameCache<T> {
 
@@ -53,6 +64,11 @@ public abstract class EDIFWriteLegalNameCache<T> {
     private final Map<String, byte[]>[] renames;
 
     private final Map<String, byte[]> busCollisionRenames;
+
+    /**
+     * {@link #calcRename(String)}, made once rather than on every {@link #getEDIFRename(String)}
+     */
+    private final Function<String, byte[]> calcRename = this::calcRename;
 
     @SuppressWarnings("unchecked")
     private EDIFWriteLegalNameCache(Map<String, T> usedRenames, Supplier<Map<String, byte[]>> renameSupplier) {
@@ -82,7 +98,11 @@ public abstract class EDIFWriteLegalNameCache<T> {
 
     public byte[] getEDIFRename(String name) {
         Map<String, byte[]> map = renames[name.charAt(0)&0xFF];
-        final byte[] rename = map.computeIfAbsent(name, this::calcRename);
+        // Look up first: ConcurrentHashMap.computeIfAbsent() locks the bin unless the name is its first node
+        byte[] rename = map.get(name);
+        if (rename == null) {
+            rename = map.computeIfAbsent(name, calcRename);
+        }
         //Checking equality against this special marker instance is ok
         if (rename == MARKER_NO_RENAME) {
             return null;
@@ -91,8 +111,13 @@ public abstract class EDIFWriteLegalNameCache<T> {
     }
 
     public byte[] getBusCollisionEDIFRename(String name) {
-        return busCollisionRenames.computeIfAbsent(name,
-                n -> (EDIFTools.makeNameEDIFCompatible(n) + "_BUS_").getBytes(StandardCharsets.UTF_8));
+        // Look up first, as in getEDIFRename()
+        byte[] rename = busCollisionRenames.get(name);
+        if (rename == null) {
+            rename = busCollisionRenames.computeIfAbsent(name,
+                    n -> (EDIFTools.makeNameEDIFCompatible(n) + "_BUS_").getBytes(StandardCharsets.UTF_8));
+        }
+        return rename;
     }
 
     public static EDIFWriteLegalNameCache<?> singleThreaded() {
@@ -107,6 +132,11 @@ public abstract class EDIFWriteLegalNameCache<T> {
         };
     }
 
+    /**
+     * @return A cache that can be shared by threads writing different parts of a netlist at the same time. Names that
+     * are made legal as the same identifier are told apart in the order in which threads first rename them, which
+     * depends on their timing (see {@link EDIFWriteLegalNameCache}).
+     */
     public static EDIFWriteLegalNameCache<?> multiThreaded() {
         return new EDIFWriteLegalNameCache<AtomicInteger>(new ConcurrentHashMap<>(), ConcurrentHashMap::new) {
             @Override
