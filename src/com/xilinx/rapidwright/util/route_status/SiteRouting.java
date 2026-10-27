@@ -386,7 +386,7 @@ final class SiteRouting {
     }
 
     /** Limit on the number of site PIPs and routethrus followed back from a site wire */
-    private static final int MAX_SITE_ROUTING_DEPTH = 16;
+    static final int MAX_SITE_ROUTING_DEPTH = 16;
 
     /**
      * Checks whether a site wire of an UltraScale(+) slice that carries a net is driven by the net:

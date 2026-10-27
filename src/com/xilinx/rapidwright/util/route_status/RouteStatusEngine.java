@@ -45,6 +45,7 @@ import static com.xilinx.rapidwright.util.route_status.NodeKeys.concat;
 import static com.xilinx.rapidwright.util.route_status.NodeKeys.nodeKey;
 import static com.xilinx.rapidwright.util.route_status.NodeKeys.sortedDistinct;
 import static com.xilinx.rapidwright.util.route_status.SitePinClaims.getStaleSitePinKeys;
+import static com.xilinx.rapidwright.util.route_status.SiteRouting.MAX_SITE_ROUTING_DEPTH;
 import static com.xilinx.rapidwright.util.route_status.SiteRouting.hasStaleSitePin;
 import static com.xilinx.rapidwright.util.route_status.SiteRouting.isHardBlockCell;
 import static com.xilinx.rapidwright.util.route_status.SiteRouting.isIOSite;
@@ -75,6 +76,7 @@ import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
@@ -603,14 +605,31 @@ public final class RouteStatusEngine {
         return false;
     }
 
-    /** Checks whether the site wire of a BEL pin carries a net, driven by a BEL (not a site pin) in its site. */
+    /**
+     * Checks whether the site routing of a net ties a BEL pin off inside its site: its site wire
+     * carries the net from a BEL that does not pass it on from a site pin (e.g. a constant source, or
+     * an optional inverter whose input carries another net), through used site PIPs.
+     */
     private static boolean isTiedInsideSite(SiteInst si, BELPin belPin, Net net) {
-        if (si.getNetFromSiteWireIndex(belPin.getSiteWireIndex()) != net) {
-            return false;
-        }
-        for (BELPin driver : si.getSiteWirePins(belPin.getSiteWireIndex())) {
-            if (driver.isOutput()) {
-                return !driver.isSitePort();
+        int siteWire = belPin.getSiteWireIndex();
+        for (int depth = 0; depth < MAX_SITE_ROUTING_DEPTH && si.getNetFromSiteWireIndex(siteWire) == net; depth++) {
+            BELPin driver = null;
+            for (BELPin pin : si.getSiteWirePins(siteWire)) {
+                if (pin.isOutput()) {
+                    driver = pin;
+                    break;
+                }
+            }
+            if (driver == null || driver.isSitePort()) {
+                return false;
+            }
+            SitePIP sitePIP = si.getUsedSitePIP(driver.getBEL());
+            if (sitePIP == null) {
+                return true;
+            }
+            siteWire = sitePIP.getInputPin().getSiteWireIndex();
+            if (si.getNetFromSiteWireIndex(siteWire) != net) {
+                return true;
             }
         }
         return false;
@@ -974,11 +993,9 @@ public final class RouteStatusEngine {
     /** Classifies a net without routing (that needs it, or is internal to a site). */
     private int classifyWithoutRouting(Net net, FlatNet flat, int entry, int s) {
         boolean usesInputSitePin = entries.sitePinKeys[entry] != null;
-        if (usesInputSitePin && net != null && net.isStaticNet()) {
-            // (the site pins of a static net whose site routing leads to no load that needs the
-            // constant, e.g. GND to an optional inverter, need no routing)
-            long[] stale = getStaleSitePinKeys(net, net.getType());
-            usesInputSitePin = Arrays.stream(entries.sitePinKeys[entry]).anyMatch((k) -> Arrays.binarySearch(stale, k) < 0);
+        if (usesInputSitePin && net != null && net.getType() == NetType.GND) {
+            // (GND is tied off at optional inverters: their site pins need no routing)
+            usesInputSitePin = hasSitePinNotToInverter(net);
         }
         if (has(s, UNPLACED)) {
             // A net with some unplaced pins is reported as such instead of being routed, unrouted or
@@ -1006,6 +1023,27 @@ public final class RouteStatusEngine {
             return s | INTRASITE;
         }
         return s | UNROUTED;
+    }
+
+    /** Checks whether the site routing of a net enters a site at a site pin that does not only feed inverters. */
+    private static boolean hasSitePinNotToInverter(Net net) {
+        for (SiteInst si : net.getSiteInsts()) {
+            for (String siteWire : si.getSiteWiresFromNet(net)) {
+                boolean fromSitePin = false;
+                boolean toInverterOnly = true;
+                for (BELPin pin : si.getSiteWirePins(siteWire)) {
+                    if (pin.isSitePort()) {
+                        fromSitePin |= pin.isOutput();
+                    } else if (pin.isInput() && !pin.getBELName().contains("INV")) {
+                        toInverterOnly = false;
+                    }
+                }
+                if (fromSitePin && !toInverterOnly) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /** Classifies a net with routing, from the analysis of its routing (see {@link RouteGraph}). */
