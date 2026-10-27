@@ -1137,11 +1137,15 @@ public class DesignTools {
                 // since the site was given to the circuit by the placer on the strength of it being free
                 SiteInst existingSi = design.getSiteInstFromSite(si.getSite());
                 if (existingSi != null) {
-                    if (!existingSi.getName().startsWith(SiteInst.STATIC_SOURCE)) {
+                    // ... or a site instance that merely locks the site's BELs, as a static shell
+                    // has for sites in the region of a reconfigurable partition. It holds nothing
+                    // else, so it is evicted just the same
+                    if (!existingSi.getName().startsWith(SiteInst.STATIC_SOURCE)
+                            && !holdsOnlyLockedPlaceholders(existingSi)) {
                         throw new RuntimeException("ERROR: Site overlap at " + existingSi.getSiteName() + " when populating blackbox '" + hierarchicalCellName + "'");
                     }
-                    // Cell is only allowed to evict STATIC_SOURCEs -- but we have to unroute all
-                    // static trees affected by its evicted output pins
+                    // Cell is otherwise only allowed to evict STATIC_SOURCEs -- but we have to
+                    // unroute all static trees affected by its evicted output pins
                     // TODO: In the future, perhaps we can port the mutually exclusive parts
                     //       of the static source into the cell SiteInst?
                     for (SitePinInst spi : existingSi.getSitePinInsts()) {
@@ -1149,7 +1153,9 @@ public class DesignTools {
                         assert(spi.getNet().isStaticNet());
                     }
                     // Its pins are collected into deferredRemovals rather than taken now. Removing
-                    // it hands what the site held originally on to the site instance added below
+                    // it hands what the site held originally on to the site instance added below.
+                    // The design does that by site rather than by name, which matters since both are
+                    // usually named after the site
                     boolean keepSitePinRouting = false;
                     design.removeSiteInst(existingSi, keepSitePinRouting, deferredRemovals);
                 }
@@ -1258,6 +1264,22 @@ public class DesignTools {
             }
             mergeOntoNet(design, net, target);
         }
+    }
+
+    /**
+     * Checks whether a site instance holds nothing but locked placeholder cells ({@link Cell#LOCKED}):
+     * at least one of them, no other cells, no site pins and no site routing, including used site PIPs
+     * without a net.
+     *
+     * @param si The site instance.
+     * @return True if the site instance only locks its BELs.
+     */
+    private static boolean holdsOnlyLockedPlaceholders(SiteInst si) {
+        if (si.getCells().isEmpty()) return false;
+        for (Cell c : si.getCells()) {
+            if (!c.getName().endsWith(Cell.LOCKED)) return false;
+        }
+        return si.getSitePinInsts().isEmpty() && si.getSiteWireToNetMap().isEmpty() && !si.hasUsedSitePIPs();
     }
 
     /**
