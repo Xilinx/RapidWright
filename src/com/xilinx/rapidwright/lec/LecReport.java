@@ -170,7 +170,9 @@ public class LecReport {
 
     /**
      * @return True if every checked cone was proven equivalent and nothing else
-     *         disqualified the run.
+     *         disqualified the run, or if what remains was explicitly waived
+     *         with {@code --allow-inconclusive} or
+     *         {@code --allow-preexisting-loops}.
      */
     public boolean isPass() {
         if (getEquivalenceDifferenceCount() > 0 || getIntroducedLoopCount() > 0) {
@@ -270,7 +272,8 @@ public class LecReport {
         out.println();
         out.println("==============================================================");
         if (isPass()) {
-            out.println(" PASS - every checked cone is equivalent");
+            out.println(getInconclusiveCount() == 0 ? " PASS - every checked cone is equivalent"
+                    : " PASS WITH WAIVERS - no cone differs, but not every cone was proven");
             if (getPreexistingLoopCount() > 0) {
                 out.println(" (" + getPreexistingLoopCount() + " combinational loops exist in "
                         + "both netlists; they are inherited from the input and are being "

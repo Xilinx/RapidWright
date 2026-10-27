@@ -36,11 +36,8 @@ import com.xilinx.rapidwright.edif.EDIFPort;
  * Everything the comparison needs from one netlist, and nothing else.
  *
  * The point of this class is what it does <i>not</i> hold: once a netlist has
- * been elaborated into the shared graph, the EDIF object graph, the flattened
- * model and the connectivity are all released, leaving only names mapped to
- * graph literals. That is what lets the two netlists be processed one after the
- * other instead of both being resident at once, which roughly halves peak
- * memory on a large design.
+ * been elaborated into the shared graph, the flattened model and the
+ * connectivity are released, leaving only names mapped to graph literals.
  */
 public class NetlistSummary {
 
@@ -82,7 +79,7 @@ public class NetlistSummary {
             CellClassifier classifier, Aig aig, Series series, NetlistStats stats, LecLog log) {
         NetlistSummary summary = new NetlistSummary(label,
                 NetlistLoader.getPartName(flat.getNetlist()), series, stats);
-        ConeBuilder cones = new ConeBuilder(flat, conn, classifier, aig, series, log);
+        ConeBuilder cones = new ConeBuilder(flat, conn, classifier, aig, series, log, label);
         int nodesBefore = aig.getNodeCount();
         summary.collectTerminalCones(flat, classifier, cones, log);
         summary.collectTopOutputCones(flat, conn, cones);
@@ -117,10 +114,13 @@ public class NetlistSummary {
                 }
                 int lit = cones.literalDriving(instId, bit);
                 String basePin = CellClassifier.stripBusIndex(pinName);
-                if (ModelUtils.isPinInverted(flat.getInst(instId), basePin)) {
+                if (ModelUtils.isPinBitInverted(flat.getInst(instId), basePin,
+                        busIndexOf(pinName))) {
                     lit = Aig.not(lit);
-                    foldedPins.add(basePin);
                 }
+                // The cone accounts for this pin's inversion either way, so the
+                // attribute is folded even where it reads zero.
+                foldedPins.add(basePin);
                 coneLiterals.put(TerminalKey.forPin(instName, pinName), lit);
             }
             terminals.put(instName.isEmpty() ? typeName : instName,
@@ -128,10 +128,20 @@ public class NetlistSummary {
         }
     }
 
+    /** @return The bit index of a bus pin such as {@code ALUMODE[2]}, or 0. */
+    private static int busIndexOf(String pinName) {
+        String basePin = CellClassifier.stripBusIndex(pinName);
+        if (basePin.length() == pinName.length()) {
+            return 0;
+        }
+        return Integer.parseInt(pinName.substring(basePin.length() + 1, pinName.length() - 1));
+    }
+
     /**
      * Top level output ports are terminals too, so the logic reaching each one
-     * is a checked cone. They attach to a net rather than to a cell pin, so they
-     * are resolved from the electrical node.
+     * is a checked cone, as is the driven side of a bidirectional port. They
+     * attach to a net rather than to a cell pin, so they are resolved from the
+     * electrical node.
      */
     private void collectTopOutputCones(FlatNetlist flat, Connectivity conn, ConeBuilder cones) {
         int topId = flat.getTopInstId();
@@ -140,13 +150,15 @@ public class NetlistSummary {
         }
         CellIndex index = flat.getIndex(topId);
         for (int bit = 0; bit < index.getPortBitCount(); bit++) {
-            if (index.getPortOfBit(bit).getDirection() != EDIFDirection.OUTPUT) {
+            EDIFDirection dir = index.getPortOfBit(bit).getDirection();
+            if (dir == EDIFDirection.INPUT) {
                 continue;
             }
             int localNet = index.getBoundaryNet(bit);
             int root = localNet < 0 ? -1 : conn.getRoot(flat.getGlobalNet(topId, localNet));
             coneLiterals.put(TerminalKey.forTopPort(index.getPortBitName(bit)),
-                    cones.literalOfNetRoot(root));
+                    dir == EDIFDirection.INOUT ? cones.literalOfInoutRoot(root)
+                            : cones.literalOfNetRoot(root));
         }
     }
 

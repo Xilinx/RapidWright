@@ -135,8 +135,18 @@ public class ConeBuilder {
 
     private int unstableCounter;
 
+    private final String scope;
+
+    /**
+     * @param scope Label of the netlist being built, such as {@code "REF"}. It
+     *              qualifies every unstable variable, so that the two netlists
+     *              never share one: a black box output or a loop cut is named
+     *              from the cloud, and a shared name would let structural
+     *              hashing prove two unrelated functions equal.
+     */
     public ConeBuilder(FlatNetlist flat, Connectivity conn, CellClassifier classifier,
-            Aig aig, Series series, LecLog log) {
+            Aig aig, Series series, LecLog log, String scope) {
+        this.scope = scope;
         this.flat = flat;
         this.conn = conn;
         this.classifier = classifier;
@@ -266,6 +276,25 @@ public class ConeBuilder {
      * Resolves the literal produced by a leaf cell output pin, pushing a frame
      * if that output still has to be built.
      */
+    /**
+     * Resolves what the design drives onto a top level bidirectional port. The
+     * port is a source too, so its node counts two drivers; the checked
+     * function is that of the single leaf driver. Without exactly one, this is
+     * the node's own function, which for several sources is unmatchable.
+     */
+    public int literalOfInoutRoot(int root) {
+        if (root < 0 || conn.getRootKind(root) != Connectivity.MULTI_DRIVER
+                || conn.getDriverPin(root) < 0 || conn.getExtraDrivers(root) != null) {
+            return literalOfNetRoot(root);
+        }
+        int lit = literalOfDriver(conn.getDriverPin(root));
+        if (lit == PUSHED) {
+            runLoop();
+            lit = literalOfDriver(conn.getDriverPin(root));
+        }
+        return lit;
+    }
+
     private int literalOfDriver(int driverPin) {
         if (driverPin < 0) {
             return Aig.FALSE;
@@ -339,7 +368,7 @@ public class ConeBuilder {
         if (support == null) {
             log.warn(UNMODELED_OUTPUT, flat.getCellTypeName(owner) + "."
                     + index.getPortBitName(bit), flat.getInstName(owner));
-            int lit = aig.newInput(TerminalKey.OPAQUE_PREFIX + flat.getPinName(owner, bit), false);
+            int lit = unstableInput(TerminalKey.OPAQUE_PREFIX, flat.getPinName(owner, bit));
             litOf[pin] = lit;
             state[pin] = BLACK;
             pop();
@@ -392,8 +421,8 @@ public class ConeBuilder {
             loops.record(cycle);
         }
         int owner = pinOwner[pin];
-        int lit = aig.newInput(TerminalKey.LOOP_PREFIX
-                + flat.getPinName(owner, pin - flat.getGlobalPin(owner, 0)), false);
+        int lit = unstableInput(TerminalKey.LOOP_PREFIX,
+                flat.getPinName(owner, pin - flat.getGlobalPin(owner, 0)));
         loopLit[pin] = lit;
         return lit;
     }
@@ -414,7 +443,12 @@ public class ConeBuilder {
         if (role == CellRole.TERMINAL) {
             return aig.newInput(name, true);
         }
-        return aig.newInput(TerminalKey.OPAQUE_PREFIX + name, false);
+        return unstableInput(TerminalKey.OPAQUE_PREFIX, name);
+    }
+
+    /** Mints an unstable variable private to this netlist. */
+    private int unstableInput(String prefix, String name) {
+        return aig.newInput(prefix + scope + ":" + name, false);
     }
 
     /** A top level port is a source terminal, named by its port bit. */
@@ -447,7 +481,7 @@ public class ConeBuilder {
         if (names != null) {
             lit = aig.newInput(TerminalKey.forMultiDriver(names), true);
         } else {
-            lit = aig.newInput(TerminalKey.MULTI_DRIVER_PREFIX + "#" + (unstableCounter++), false);
+            lit = unstableInput(TerminalKey.MULTI_DRIVER_PREFIX, "#" + (unstableCounter++));
             log.warn(UNSTABLE_MULTI_DRIVER, drivers == null ? "unknown drivers"
                     : drivers.length + " drivers", exampleDriverName(drivers));
         }

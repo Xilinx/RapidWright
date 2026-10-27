@@ -158,7 +158,8 @@ public class ConnectivityBuilder {
         }
         int globalPin = flat.getGlobalPin(childId, bit);
         pinNet[globalPin] = outerNet;
-        if (portInst.isOutput()) {
+        // A bidirectional leaf pin, such as an IOBUF's IO, drives its net too.
+        if (portInst.isOutput() || portInst.getDirection() == EDIFDirection.INOUT) {
             drivers.add(outerNet, childId, globalPin);
         }
     }
@@ -180,6 +181,7 @@ public class ConnectivityBuilder {
         Arrays.fill(rootKind, Connectivity.UNDRIVEN);
 
         Map<Integer, int[]> extraDrivers = new HashMap<>();
+        boolean[] logicDriven = new boolean[rootCount];
         for (int i = 0; i < drivers.size; i++) {
             int root = netRoot[drivers.net[i]];
             driverCount[root]++;
@@ -188,7 +190,11 @@ public class ConnectivityBuilder {
             } else {
                 appendDriver(extraDrivers, root, rootDriverPin[root], drivers.pin[i]);
             }
-            constVote[root] = mergeConstVote(constVote[root], constKindOf(flat, drivers.inst[i]));
+            byte constKind = constKindOf(flat, drivers.inst[i]);
+            if (constKind == CONST_NONE) {
+                logicDriven[root] = true;
+            }
+            constVote[root] = mergeConstVote(constVote[root], constKind);
         }
         for (int net : constZeroNets) {
             int root = netRoot[net];
@@ -199,18 +205,22 @@ public class ConnectivityBuilder {
             constVote[root] = mergeConstVote(constVote[root], Connectivity.CONST1);
         }
 
-        boolean[] topSource = new boolean[rootCount];
-        markTopPorts(flat, netRoot, rootTopPortBit, topSource, log);
+        int[] topSources = new int[rootCount];
+        markTopPorts(flat, netRoot, rootTopPortBit, topSources, log);
 
         for (int root = 0; root < rootCount; root++) {
-            int sources = driverCount[root] + (topSource[root] ? 1 : 0);
-            if (constVote[root] == Connectivity.CONST0 || constVote[root] == Connectivity.CONST1) {
+            int sources = driverCount[root] + topSources[root];
+            // Constant evidence only stands when nothing else drives the node; a
+            // constant shorted to logic or to a port is a multi-driver net.
+            boolean constant = constVote[root] == Connectivity.CONST0
+                    || constVote[root] == Connectivity.CONST1;
+            if (constant && !logicDriven[root] && topSources[root] == 0) {
                 rootKind[root] = constVote[root];
             } else if (sources > 1) {
                 rootKind[root] = Connectivity.MULTI_DRIVER;
             } else if (driverCount[root] == 1) {
                 rootKind[root] = Connectivity.DRIVEN_BY_LEAF;
-            } else if (topSource[root]) {
+            } else if (topSources[root] > 0) {
                 rootKind[root] = isTopInout(flat, netRoot, rootTopPortBit[root])
                         ? Connectivity.TOP_INOUT : Connectivity.TOP_INPUT;
             } else {
@@ -239,9 +249,13 @@ public class ConnectivityBuilder {
      * Records which roots touch the top cell's own interface. A top level input
      * is a source terminal; a bidirectional port is both a source and a sink and
      * is reported because it weakens the proof.
+     *
+     * A root's port bit names its source variable, so a source port always
+     * takes precedence over an output port on the same node. Otherwise a
+     * feedthrough would name its input after the output it drives.
      */
     private static void markTopPorts(FlatNetlist flat, int[] netRoot, int[] rootTopPortBit,
-            boolean[] topSource, LecLog log) {
+            int[] topSources, LecLog log) {
         int topId = flat.getTopInstId();
         if (flat.isLeaf(topId)) {
             return;
@@ -253,14 +267,17 @@ public class ConnectivityBuilder {
                 continue;
             }
             int root = netRoot[flat.getGlobalNet(topId, localNet)];
-            if (rootTopPortBit[root] < 0) {
+            EDIFDirection dir = index.getPortOfBit(bit).getDirection();
+            boolean source = dir == EDIFDirection.INPUT || dir == EDIFDirection.INOUT;
+            if (source) {
+                if (topSources[root] == 0) {
+                    rootTopPortBit[root] = bit;
+                }
+                topSources[root]++;
+            } else if (rootTopPortBit[root] < 0) {
                 rootTopPortBit[root] = bit;
             }
-            EDIFDirection dir = index.getPortOfBit(bit).getDirection();
-            if (dir == EDIFDirection.INPUT) {
-                topSource[root] = true;
-            } else if (dir == EDIFDirection.INOUT) {
-                topSource[root] = true;
+            if (dir == EDIFDirection.INOUT) {
                 log.warn(TOP_INOUT, index.getPortBitName(bit), null);
             }
         }
