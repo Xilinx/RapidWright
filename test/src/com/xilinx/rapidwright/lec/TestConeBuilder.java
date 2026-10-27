@@ -195,6 +195,21 @@ public class TestConeBuilder {
     }
 
     /**
+     * A shorted net's key must identify its driver set unambiguously, even when
+     * driver names contain the characters a plain join would use.
+     */
+    @Test
+    public void testMultiDriverKeysAreUnambiguous() {
+        Assertions.assertNotEquals(
+                TerminalKey.forMultiDriver(new String[] { "a/Q", "b/Q+c/Q" }),
+                TerminalKey.forMultiDriver(new String[] { "a/Q+b/Q", "c/Q" }));
+        Assertions.assertEquals(
+                TerminalKey.forMultiDriver(new String[] { "b/Q", "a/Q" }),
+                TerminalKey.forMultiDriver(new String[] { "a/Q", "b/Q" }),
+                "The key must not depend on driver order");
+    }
+
+    /**
      * Real designs must elaborate without spurious loops. These fixtures cover
      * all four series and include Versal carry look up tables, Series 7 four bit
      * carry chains and wide multiplexer trees.

@@ -63,7 +63,8 @@ public class EdifPortDiagnostics {
             Pattern.compile("\\(port\\s+(?:\\(array\\s+)?(?:\\(rename\\s+)?(" + NAME + ")");
 
     private static final Pattern INSTANCE = Pattern.compile("\\(instance\\s+(?:\\(rename\\s+)?("
-            + NAME + ")\\s+\\(viewref\\s+" + NAME + "\\s+\\(cellref\\s+(" + NAME + ")");
+            + NAME + ")(?:\\s+\"[^\"]*\"\\s*\\))?\\s+\\(viewref\\s+" + NAME
+            + "\\s+\\(cellref\\s+(" + NAME + ")");
 
     private static final Pattern PORT_REF = Pattern.compile("\\(portref\\s+(?:\\(member\\s+)?("
             + NAME + ")(?:\\s+\\d+\\))?\\s*(?:\\(instanceref\\s+(" + NAME + ")\\))?");
