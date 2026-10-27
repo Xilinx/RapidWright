@@ -160,6 +160,10 @@ final class UltraScaleRules {
         SiteInst driverSite = null;
         List<LeafPin> pins = flat.getLeafPins(design);
         for (LeafPin pin : pins) {
+            if (!pin.isPlaced()) {
+                // (e.g. a pin of a black box, which has no cell)
+                return false;
+            }
             if (pin.isOutput()) {
                 driverSite = pin.cell.getSiteInst();
             }

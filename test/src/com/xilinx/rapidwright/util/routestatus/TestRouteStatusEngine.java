@@ -22,7 +22,18 @@
 
 package com.xilinx.rapidwright.util.routestatus;
 
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetType;
+import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFDirection;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.ReportRouteStatus;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult.NetRouteStatus;
@@ -66,5 +77,47 @@ public class TestRouteStatusEngine {
         int owner = bits(NetRouteStatus.PARTIAL, NetRouteStatus.CONFLICTS);
         Assertions.assertArrayEquals(new int[]{owner, owner,
                 bits(NetRouteStatus.HAS_ROUTING, NetRouteStatus.CONFLICTS, NetRouteStatus.ANTENNAS)}, status);
+    }
+
+    @Test
+    public void testIsTiedToThroughChildOutput() {
+        // A flip-flop's clock enable tied to VCC through the output port of a hierarchical sibling
+        // (not through the ports of its parents)
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        EDIFNetlist netlist = design.getNetlist();
+        Cell ff = null;
+        for (Cell cell : design.getCells()) {
+            EDIFHierCellInst inst = cell.getEDIFHierCellInst();
+            EDIFPortInst ce = (inst == null || !cell.getType().equals("FDRE")) ? null : inst.getInst().getPortInst("CE");
+            if (ce != null && ce.getNet() != null && ce.getNet().isVCC() && !inst.getParent().isTopLevelInst()) {
+                ff = cell;
+                break;
+            }
+        }
+        Assertions.assertNotNull(ff);
+        Assertions.assertTrue(SiteRouting.isTiedTo(ff, "CE", NetType.VCC));
+        EDIFHierCellInst parent = ff.getEDIFHierCellInst().getParent();
+        EDIFCell tie = new EDIFCell(netlist.getWorkLibrary(), "vcc_tie");
+        tie.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFCellInst tieInst = tie.createCellInst("vcc_tie", parent.getCellType());
+        EDIFTools.getStaticNet(NetType.VCC, parent.getChild(tieInst), netlist).getNet().createPortInst("O", tie);
+        EDIFNet tied = parent.getCellType().createNet("vcc_tie_o");
+        tied.createPortInst("O", tieInst);
+        EDIFPortInst ce = ff.getEDIFHierCellInst().getInst().getPortInst("CE");
+        ce.getNet().removePortInst(ce);
+        tied.addPortInst(ce);
+        Assertions.assertTrue(SiteRouting.isTiedTo(ff, "CE", NetType.VCC));
+        Assertions.assertFalse(SiteRouting.isTiedTo(ff, "CE", NetType.GND));
+    }
+
+    @Test
+    public void testReportRouteStatusCreatesNoStaticNets() {
+        // Without VCC, the flip-flops' clock enable ties are missing: looking for the routing of
+        // VCC to them does not create it
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        design.removeNet(design.getVccNet());
+        Assertions.assertNull(design.getNet(Net.VCC_NET));
+        ReportRouteStatus.reportRouteStatus(design);
+        Assertions.assertNull(design.getNet(Net.VCC_NET));
     }
 }

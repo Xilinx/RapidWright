@@ -46,6 +46,7 @@ import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
@@ -204,22 +205,29 @@ final class SiteRouting {
     }
 
     /**
-     * Checks whether a logical pin of a cell is tied to a static source of the given type, either
-     * in the cell's parent or, through ports of hierarchical cells, further up. (Pins inside a
-     * macro tied through the macro's ports are tied off inside their site: not followed.)
+     * Checks whether a logical pin of a cell is tied to a static source of the given type: its flat
+     * net is static (e.g. tied in the cell's parent, further up through ports of hierarchical cells,
+     * or through the output port of a hierarchical cell). (Pins inside a macro tied through the
+     * macro's ports are tied off inside their site: only the nets up to the macro are followed.)
      */
     static boolean isTiedTo(Cell cell, String logicalPin, NetType staticType) {
         EDIFHierCellInst inst = getLogicalCell(cell.getSiteInst().getDesign(), cell);
         EDIFPortInst epi = (inst == null) ? null : inst.getInst().getPortInst(logicalPin);
-        EDIFNet net = (epi == null) ? null : epi.getNet();
-        EDIFHierCellInst parent = (inst == null) ? null : inst.getParent();
+        if (epi == null || epi.getNet() == null) {
+            return false;
+        }
+        // First the net, and the nets that the ports of its parents connect it to
+        EDIFNet net = epi.getNet();
+        EDIFHierCellInst parent = inst.getParent();
         while (net != null) {
             if (staticType == NetType.GND ? net.isGND() : net.isVCC()) {
                 return true;
             }
-            if (parent == null || parent.isTopLevelInst()
-                    || parent.getCellType().getLibrary().isHDIPrimitivesLibrary()) {
+            if (parent == null || parent.getCellType().getLibrary().isHDIPrimitivesLibrary()) {
                 return false;
+            }
+            if (parent.isTopLevelInst()) {
+                break;
             }
             // Continue with the net that a port of the parent cell on this net connects to
             EDIFPortInst port = null;
@@ -233,7 +241,8 @@ final class SiteRouting {
             net = (outer == null) ? null : outer.getNet();
             parent = parent.getParent();
         }
-        return false;
+        // Then the whole flat net (e.g. tied through the output port of a hierarchical cell)
+        return RouteStatusNetlist.getStaticType(new EDIFHierNet(inst.getParent(), epi.getNet())) == staticType;
     }
 
     /**

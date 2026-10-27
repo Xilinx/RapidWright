@@ -56,7 +56,11 @@ final class StaticRouting {
     boolean isRoutingTo(SiteInst si, String sitePinName) {
         if (staticRoutingEnds == null) {
             staticRoutingEnds = new HashSet<>();
-            for (Net net : new Net[]{design.getGndNet(), design.getVccNet()}) {
+            // (getGndNet() and getVccNet() would create the nets if absent)
+            for (Net net : new Net[]{design.getNet(Net.GND_NET), design.getNet(Net.VCC_NET)}) {
+                if (net == null) {
+                    continue;
+                }
                 for (PIP pip : net.getPIPs()) {
                     Node end = pip.isReversed() ? pip.getStartNode() : pip.getEndNode();
                     if (end != null) {

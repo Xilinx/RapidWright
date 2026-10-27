@@ -34,7 +34,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.PartitionPin;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Node;
@@ -44,6 +46,7 @@ import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.util.Utils;
 
 /** A flat (parent) net, i.e. a set of electrically connected net segments. */
@@ -264,8 +267,14 @@ final class FlatNet extends Connections {
         if (hasPhysicalPin(firstCell, firstPin) && hasPhysicalPin(secondCell, secondPin)) {
             return true;
         }
-        // Rare: look at all the pins
-        SiteInst site = null;
+        // Rare: look at all the pins (and placed top level ports)
+        List<SiteInst> portSites = getPlacedPortSites(design);
+        SiteInst site = portSites.isEmpty() ? null : portSites.get(0);
+        for (SiteInst portSite : portSites) {
+            if (portSite != site) {
+                return true;
+            }
+        }
         for (LeafPin pin : getLeafPins(design)) {
             if (!pin.isPlaced() || !pin.hasPhysicalPin()) {
                 continue;
@@ -295,6 +304,12 @@ final class FlatNet extends Connections {
             }
             return;
         }
+        for (SiteInst portSite : getPlacedPortSites(design)) {
+            sites.add(portSite);
+            if (sites.size() > 1) {
+                return;
+            }
+        }
         for (LeafPin pin : getLeafPins(design)) {
             if (pin.isPlaced() && pin.hasPhysicalPin()) {
                 sites.add(pin.cell.getSiteInst());
@@ -303,6 +318,36 @@ final class FlatNet extends Connections {
                 }
             }
         }
+    }
+
+    /**
+     * Gets the sites of the placed top level ports of this flat net (an input port with a partition
+     * pin is not placed, see RouteStatusNetlist).
+     */
+    private List<SiteInst> getPlacedPortSites(Design design) {
+        List<SiteInst> sites = new ArrayList<>();
+        if (placedPortDrivers + placedPortLoads == 0) {
+            return sites;
+        }
+        Set<String> partitionPinPorts = new HashSet<>();
+        for (PartitionPin pp : design.getPartitionPins()) {
+            if (pp.isPort() && pp.getTerminalName() != null) {
+                partitionPinPorts.add(pp.getTerminalName());
+            }
+        }
+        for (EDIFHierNet hn : getSegments(design)) {
+            if (!hn.getHierarchicalInst().isTopLevelInst()) {
+                continue;
+            }
+            for (EDIFPortInst epi : hn.getNet().getPortInsts()) {
+                Cell portCell = (epi.getCellInst() == null) ? design.getCell(epi.getName()) : null;
+                if (portCell != null && portCell.isPlaced()
+                        && !(!epi.isOutput() && partitionPinPorts.contains(epi.getName()))) {
+                    sites.add(portCell.getSiteInst());
+                }
+            }
+        }
+        return sites;
     }
 
     /**
