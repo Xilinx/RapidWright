@@ -33,6 +33,7 @@ import java.util.TreeSet;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFPort;
+import com.xilinx.rapidwright.edif.EDIFTools;
 
 /**
  * Everything the comparison needs from one netlist, and nothing else.
@@ -156,6 +157,7 @@ public class NetlistSummary {
         Set<String> noFoldedPins = Collections.emptySet();
         for (int bit = 0; bit < index.getPortBitCount(); bit++) {
             EDIFDirection dir = index.getPortOfBit(bit).getDirection();
+            checkPortNameIsUnambiguous(index.getPortBitName(bit));
             terminals.put("top level port " + index.getPortBitName(bit),
                     TerminalAttributes.of(dir + " port", null, noFoldedPins));
             if (dir == EDIFDirection.INPUT) {
@@ -166,6 +168,22 @@ public class NetlistSummary {
             coneLiterals.put(TerminalKey.forTopPort(index.getPortBitName(bit)),
                     dir == EDIFDirection.INOUT ? cones.literalOfInoutRoot(root)
                             : cones.literalOfNetRoot(root));
+        }
+    }
+
+    /**
+     * Rejects a top level port whose name is also the name of a terminal pin,
+     * such as a port {@code ff/D} beside an instance {@code ff}, or that uses
+     * the reserved unstable prefix. Port and pin keys share one namespace, and
+     * any character can appear in a renamed EDIF name, so such a netlist cannot
+     * be compared without aliasing two different signals.
+     */
+    private void checkPortNameIsUnambiguous(String portName) {
+        int slash = portName.lastIndexOf(EDIFTools.EDIF_HIER_SEP);
+        if (portName.startsWith(TerminalKey.UNSTABLE_PREFIX)
+                || (slash > 0 && terminals.containsKey(portName.substring(0, slash)))) {
+            throw new LecException(label + ": top level port '" + portName + "' has the same "
+                    + "name as a terminal pin, so the two cannot be told apart");
         }
     }
 
