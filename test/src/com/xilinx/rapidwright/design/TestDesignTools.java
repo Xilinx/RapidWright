@@ -1207,6 +1207,54 @@ public class TestDesignTools {
     }
 
     /**
+     * A circuit's own net on an input port can be renamed to its parent's name, which is under
+     * another black box when that box drives the signal and has no physical net for it. A BEL
+     * attribute on that net is still the circuit's own and is kept, whichever order the black
+     * boxes are filled in: only a net the circuit names under another box itself is left to that
+     * box's circuit.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testPopulateBlackBoxBELAttrsOnNetRenamedUnderOtherBox(boolean driverFirst) {
+        // The shell: s, held as no physical net, from bb1's output into bb0's input
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet s = top.createNet("s");
+        s.createPortInst("O", createBlackBox(top, "bb1", EDIFDirection.OUTPUT));
+        s.createPortInst("I", createBlackBox(top, "bb0", EDIFDirection.INPUT));
+
+        // bb1's circuit drives O from a LUT, with no physical net
+        Design driver = createCircuit("driver", EDIFDirection.OUTPUT);
+        EDIFCell driverTop = driver.getTopEDIFCell();
+        EDIFNet o = driverTop.createNet("O");
+        o.createPortInst(driverTop.getPort("O"));
+        addSourceLUT(driver, driverTop, "lut", "SLICE_X0Y0", o, null);
+
+        // bb0's circuit reads I with a LUT, with a BEL attribute on its physical net
+        Design reader = createCircuit("reader", EDIFDirection.INPUT);
+        EDIFCell readerTop = reader.getTopEDIFCell();
+        EDIFNet in = readerTop.createNet("I");
+        in.createPortInst(readerTop.getPort("I"));
+        Net inNet = reader.createNet("I");
+        SitePinInst pin = addSinkLUT(reader, readerTop, "lut", "SLICE_X1Y0", in, inNet);
+        Site site = pin.getSiteInst().getSite();
+        BEL bel = site.getBEL("A6LUT");
+        reader.addBELAttr(inNet, site, site.getSiteTypeEnum(), bel, "ON_PORT", "1");
+
+        Map<String, Design> blackBoxes = new LinkedHashMap<>();
+        for (String box : driverFirst ? new String[] {"bb1", "bb0"} : new String[] {"bb0", "bb1"}) {
+            blackBoxes.put(box, box.equals("bb1") ? driver : reader);
+        }
+        populateBlackBox(design, blackBoxes, false);
+
+        Assertions.assertSame(inNet, design.getNet("bb1/O"));
+        SiteConfig siteConfig = design.getBELAttrs() == null ? null : design.getBELAttrs().get(site);
+        BELAttr attr = siteConfig == null ? null : siteConfig.getBELAttribute(bel, "ON_PORT");
+        Assertions.assertNotNull(attr);
+        Assertions.assertSame(inNet, attr.getNet());
+    }
+
+    /**
      * A BEL attribute can be on a context net, one of the empty nets named as in the full design
      * that are dropped rather than moved in, as the reader creates one for a net named so. The
      * attribute goes onto the design's net of that name instead: a copy of the circuit's own net
