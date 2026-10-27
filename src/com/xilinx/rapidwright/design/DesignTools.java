@@ -1240,21 +1240,6 @@ public class DesignTools {
         boolean preserveOtherRoutes = true;
         DesignTools.batchRemoveSitePins(deferredRemovals, preserveOtherRoutes);
 
-
-        // TEMPORARY WORKAROUND, part 2 of 2. addSiteInst() displaced each of these from the design,
-        // but left it in the change tracking - which marked it again just above, as its pins were
-        // taken. It is then a SiteInst that getModifiedSiteInsts() holds and getSiteInsts() does
-        // not, so whoever walks the modified set - BitGenerator, for one - reads a site the design
-        // no longer owns, alongside the live SiteInst for that same site. Two entries for one site
-        // means two writers of its configuration bits, and which one lands last depends on the
-        // iteration order of the modified set, which changes as the set grows and rehashes.
-        // The proper fix belongs in Design.addSiteInst(), which should treat displacing an
-        // existing SiteInst as a tracked removal, so that no caller has to remember to do this.
-        for (SiteInst evicted : evictedSiteInsts) {
-            design.getModifiedSiteInsts().remove(evicted);
-            design.getOriginalSiteInsts().remove(evicted.getName());
-        }
-
         // Nets that something was merged onto, and so may hold the same PIP more than once
         Set<Net> mergedOnto = new HashSet<>();
 
