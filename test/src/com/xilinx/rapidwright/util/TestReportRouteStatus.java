@@ -46,7 +46,7 @@ import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.rwroute.RWRoute;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult.NetRouteStatus;
-import com.xilinx.rapidwright.util.route_status.RouteStatusMutator;
+import com.xilinx.rapidwright.util.routestatus.RouteStatusMutator;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

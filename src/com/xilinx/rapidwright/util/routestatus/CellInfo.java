@@ -20,14 +20,14 @@
  *
  */
 
-package com.xilinx.rapidwright.util.route_status;
+package com.xilinx.rapidwright.util.routestatus;
 
-import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.CHUNK;
-import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.isBusBit;
-import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.isBusRangeDeclaration;
-import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.isPrimitive;
-import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.pow31;
-import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.slot;
+import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.CHUNK;
+import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.isBusBit;
+import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.isBusRangeDeclaration;
+import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.isPrimitive;
+import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.pow31;
+import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.slot;
 
 import java.util.ArrayList;
 import java.util.Arrays;

@@ -20,24 +20,24 @@
  *
  */
 
-package com.xilinx.rapidwright.util.route_status;
+package com.xilinx.rapidwright.util.routestatus;
 
-import static com.xilinx.rapidwright.util.route_status.NetStatus.HAS_ROUTING;
-import static com.xilinx.rapidwright.util.route_status.NetStatus.LOGICAL_ONLY;
-import static com.xilinx.rapidwright.util.route_status.NetStatus.NODRIVER;
-import static com.xilinx.rapidwright.util.route_status.NetStatus.UNROUTED;
-import static com.xilinx.rapidwright.util.route_status.NetStatus.has;
-import static com.xilinx.rapidwright.util.route_status.NodeKeys.concat;
-import static com.xilinx.rapidwright.util.route_status.NodeKeys.nodeKey;
-import static com.xilinx.rapidwright.util.route_status.NodeKeys.sortedDistinct;
-import static com.xilinx.rapidwright.util.route_status.NodeKeys.toSortedDistinct;
-import static com.xilinx.rapidwright.util.route_status.RouteStatusEngine.parallelFor;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.getPrimarySitePinName;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.getSitePinNode;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.getSitePinNodes;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.isCascadeAddressPin;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.reachesPlacedCellPin;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.storedPins;
+import static com.xilinx.rapidwright.util.routestatus.NetStatus.HAS_ROUTING;
+import static com.xilinx.rapidwright.util.routestatus.NetStatus.LOGICAL_ONLY;
+import static com.xilinx.rapidwright.util.routestatus.NetStatus.NODRIVER;
+import static com.xilinx.rapidwright.util.routestatus.NetStatus.UNROUTED;
+import static com.xilinx.rapidwright.util.routestatus.NetStatus.has;
+import static com.xilinx.rapidwright.util.routestatus.NodeKeys.concat;
+import static com.xilinx.rapidwright.util.routestatus.NodeKeys.nodeKey;
+import static com.xilinx.rapidwright.util.routestatus.NodeKeys.sortedDistinct;
+import static com.xilinx.rapidwright.util.routestatus.NodeKeys.toSortedDistinct;
+import static com.xilinx.rapidwright.util.routestatus.RouteStatusEngine.parallelFor;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.getPrimarySitePinName;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.getSitePinNode;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.getSitePinNodes;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isCascadeAddressPin;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.reachesPlacedCellPin;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.storedPins;
 
 import java.util.ArrayList;
 import java.util.Arrays;

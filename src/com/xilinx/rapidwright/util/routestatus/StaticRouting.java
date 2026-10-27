@@ -20,9 +20,9 @@
  *
  */
 
-package com.xilinx.rapidwright.util.route_status;
+package com.xilinx.rapidwright.util.routestatus;
 
-import static com.xilinx.rapidwright.util.route_status.NodeKeys.nodeKey;
+import static com.xilinx.rapidwright.util.routestatus.NodeKeys.nodeKey;
 
 import java.util.HashSet;
 import java.util.Set;

@@ -24,7 +24,7 @@ package com.xilinx.rapidwright.util;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.util.route_status.RouteStatusEngine;
+import com.xilinx.rapidwright.util.routestatus.RouteStatusEngine;
 
 public class ReportRouteStatus {
 

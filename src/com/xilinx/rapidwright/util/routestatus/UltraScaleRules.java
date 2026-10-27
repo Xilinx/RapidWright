@@ -20,10 +20,10 @@
  *
  */
 
-package com.xilinx.rapidwright.util.route_status;
+package com.xilinx.rapidwright.util.routestatus;
 
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.isTiedTo;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.isUltraScale;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isTiedTo;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isUltraScale;
 
 import java.util.HashMap;
 import java.util.List;

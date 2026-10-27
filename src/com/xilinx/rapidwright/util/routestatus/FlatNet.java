@@ -20,13 +20,13 @@
  *
  */
 
-package com.xilinx.rapidwright.util.route_status;
+package com.xilinx.rapidwright.util.routestatus;
 
-import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.getLeafPortInsts;
-import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.getSegments;
-import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.getSitePinFeeding;
-import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.hasPhysicalPin;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.isClockBufferSite;
+import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.getLeafPortInsts;
+import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.getSegments;
+import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.getSitePinFeeding;
+import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.hasPhysicalPin;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isClockBufferSite;
 
 import java.util.ArrayList;
 import java.util.Collections;

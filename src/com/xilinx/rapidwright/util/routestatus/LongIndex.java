@@ -20,7 +20,7 @@
  *
  */
 
-package com.xilinx.rapidwright.util.route_status;
+package com.xilinx.rapidwright.util.routestatus;
 
 import java.util.Arrays;
 

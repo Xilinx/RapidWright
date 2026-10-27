@@ -20,7 +20,7 @@
  *
  */
 
-package com.xilinx.rapidwright.util.route_status;
+package com.xilinx.rapidwright.util.routestatus;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.support.RapidWrightDCP;

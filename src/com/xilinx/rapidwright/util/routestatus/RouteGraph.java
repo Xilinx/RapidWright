@@ -20,15 +20,15 @@
  *
  */
 
-package com.xilinx.rapidwright.util.route_status;
+package com.xilinx.rapidwright.util.routestatus;
 
-import static com.xilinx.rapidwright.util.route_status.NodeKeys.nodeKey;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.isDrivenBySiteRouting;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.isSitePinNode;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.isSitePinUsedBy;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.isSiteRoutedOutputPinNode;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.storedPins;
-import static com.xilinx.rapidwright.util.route_status.VersalRules.isLeafClockClearPin;
+import static com.xilinx.rapidwright.util.routestatus.NodeKeys.nodeKey;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isDrivenBySiteRouting;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isSitePinNode;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isSitePinUsedBy;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isSiteRoutedOutputPinNode;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.storedPins;
+import static com.xilinx.rapidwright.util.routestatus.VersalRules.isLeafClockClearPin;
 
 import java.util.ArrayList;
 import java.util.Arrays;

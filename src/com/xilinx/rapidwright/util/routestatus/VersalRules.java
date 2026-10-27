@@ -20,12 +20,12 @@
  *
  */
 
-package com.xilinx.rapidwright.util.route_status;
+package com.xilinx.rapidwright.util.routestatus;
 
-import static com.xilinx.rapidwright.util.route_status.NodeKeys.concat;
-import static com.xilinx.rapidwright.util.route_status.NodeKeys.sortedDistinct;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.getLogicalCell;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.getSiteTypes;
+import static com.xilinx.rapidwright.util.routestatus.NodeKeys.concat;
+import static com.xilinx.rapidwright.util.routestatus.NodeKeys.sortedDistinct;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.getLogicalCell;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.getSiteTypes;
 
 import java.util.ArrayList;
 import java.util.Arrays;

@@ -20,9 +20,9 @@
  *
  */
 
-package com.xilinx.rapidwright.util.route_status;
+package com.xilinx.rapidwright.util.routestatus;
 
-import static com.xilinx.rapidwright.util.route_status.VersalRules.isVersalClockingSite;
+import static com.xilinx.rapidwright.util.routestatus.VersalRules.isVersalClockingSite;
 
 import java.util.ArrayList;
 import java.util.Collections;

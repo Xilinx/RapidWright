@@ -20,10 +20,10 @@
  *
  */
 
-package com.xilinx.rapidwright.util.route_status;
+package com.xilinx.rapidwright.util.routestatus;
 
-import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.getPhysicalPins;
-import static com.xilinx.rapidwright.util.route_status.RouteStatusNetlist.hasPhysicalPin;
+import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.getPhysicalPins;
+import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.hasPhysicalPin;
 
 import java.util.Set;
 

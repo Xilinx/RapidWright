@@ -20,7 +20,7 @@
  *
  */
 
-package com.xilinx.rapidwright.util.route_status;
+package com.xilinx.rapidwright.util.routestatus;
 
 /**
  * A set of ints, in one open addressing table (0 marks empty slots, so is kept aside). It holds the

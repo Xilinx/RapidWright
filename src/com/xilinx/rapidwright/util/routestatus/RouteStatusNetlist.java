@@ -20,25 +20,25 @@
  *
  */
 
-package com.xilinx.rapidwright.util.route_status;
+package com.xilinx.rapidwright.util.routestatus;
 
-import static com.xilinx.rapidwright.util.route_status.CellInfo.BLACK_BOX;
-import static com.xilinx.rapidwright.util.route_status.CellInfo.BLACK_BOX_INOUT;
-import static com.xilinx.rapidwright.util.route_status.CellInfo.BLACK_BOX_OUTPUT;
-import static com.xilinx.rapidwright.util.route_status.CellInfo.CHILD_OUTPUT;
-import static com.xilinx.rapidwright.util.route_status.CellInfo.DANGLING;
-import static com.xilinx.rapidwright.util.route_status.CellInfo.DANGLING_INOUT;
-import static com.xilinx.rapidwright.util.route_status.CellInfo.HIER;
-import static com.xilinx.rapidwright.util.route_status.CellInfo.KIND_MASK;
-import static com.xilinx.rapidwright.util.route_status.CellInfo.LEAF_INPUT;
-import static com.xilinx.rapidwright.util.route_status.CellInfo.LEAF_OUTPUT;
-import static com.xilinx.rapidwright.util.route_status.CellInfo.OWN_PORT;
-import static com.xilinx.rapidwright.util.route_status.CellInfo.PORT_ONLY;
-import static com.xilinx.rapidwright.util.route_status.FlatNet.NAMED_BY_DANGLING_INOUT;
-import static com.xilinx.rapidwright.util.route_status.FlatNet.NAMED_BY_DANGLING_OUTPUT;
-import static com.xilinx.rapidwright.util.route_status.FlatNet.NAMED_BY_DRIVER;
-import static com.xilinx.rapidwright.util.route_status.FlatNet.NAMED_BY_INOUT;
-import static com.xilinx.rapidwright.util.route_status.FlatNet.NAMED_BY_SEGMENT;
+import static com.xilinx.rapidwright.util.routestatus.CellInfo.BLACK_BOX;
+import static com.xilinx.rapidwright.util.routestatus.CellInfo.BLACK_BOX_INOUT;
+import static com.xilinx.rapidwright.util.routestatus.CellInfo.BLACK_BOX_OUTPUT;
+import static com.xilinx.rapidwright.util.routestatus.CellInfo.CHILD_OUTPUT;
+import static com.xilinx.rapidwright.util.routestatus.CellInfo.DANGLING;
+import static com.xilinx.rapidwright.util.routestatus.CellInfo.DANGLING_INOUT;
+import static com.xilinx.rapidwright.util.routestatus.CellInfo.HIER;
+import static com.xilinx.rapidwright.util.routestatus.CellInfo.KIND_MASK;
+import static com.xilinx.rapidwright.util.routestatus.CellInfo.LEAF_INPUT;
+import static com.xilinx.rapidwright.util.routestatus.CellInfo.LEAF_OUTPUT;
+import static com.xilinx.rapidwright.util.routestatus.CellInfo.OWN_PORT;
+import static com.xilinx.rapidwright.util.routestatus.CellInfo.PORT_ONLY;
+import static com.xilinx.rapidwright.util.routestatus.FlatNet.NAMED_BY_DANGLING_INOUT;
+import static com.xilinx.rapidwright.util.routestatus.FlatNet.NAMED_BY_DANGLING_OUTPUT;
+import static com.xilinx.rapidwright.util.routestatus.FlatNet.NAMED_BY_DRIVER;
+import static com.xilinx.rapidwright.util.routestatus.FlatNet.NAMED_BY_INOUT;
+import static com.xilinx.rapidwright.util.routestatus.FlatNet.NAMED_BY_SEGMENT;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;

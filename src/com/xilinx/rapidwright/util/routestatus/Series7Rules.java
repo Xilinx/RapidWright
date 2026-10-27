@@ -20,22 +20,22 @@
  *
  */
 
-package com.xilinx.rapidwright.util.route_status;
+package com.xilinx.rapidwright.util.routestatus;
 
-import static com.xilinx.rapidwright.util.route_status.NetStatus.ANTENNAS;
-import static com.xilinx.rapidwright.util.route_status.NetStatus.CONFLICTS;
-import static com.xilinx.rapidwright.util.route_status.NetStatus.HAS_ROUTING;
-import static com.xilinx.rapidwright.util.route_status.NetStatus.NOLOADS;
-import static com.xilinx.rapidwright.util.route_status.NetStatus.PARTIAL;
-import static com.xilinx.rapidwright.util.route_status.NetStatus.ROUTED;
-import static com.xilinx.rapidwright.util.route_status.NetStatus.UNROUTED;
-import static com.xilinx.rapidwright.util.route_status.NetStatus.has;
-import static com.xilinx.rapidwright.util.route_status.RouteStatusEngine.parallelFor;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.getLogicalCell;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.isBlockRamSite;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.isClockBufferSite;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.isReachableThroughRouting;
-import static com.xilinx.rapidwright.util.route_status.SiteRouting.storedPins;
+import static com.xilinx.rapidwright.util.routestatus.NetStatus.ANTENNAS;
+import static com.xilinx.rapidwright.util.routestatus.NetStatus.CONFLICTS;
+import static com.xilinx.rapidwright.util.routestatus.NetStatus.HAS_ROUTING;
+import static com.xilinx.rapidwright.util.routestatus.NetStatus.NOLOADS;
+import static com.xilinx.rapidwright.util.routestatus.NetStatus.PARTIAL;
+import static com.xilinx.rapidwright.util.routestatus.NetStatus.ROUTED;
+import static com.xilinx.rapidwright.util.routestatus.NetStatus.UNROUTED;
+import static com.xilinx.rapidwright.util.routestatus.NetStatus.has;
+import static com.xilinx.rapidwright.util.routestatus.RouteStatusEngine.parallelFor;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.getLogicalCell;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isBlockRamSite;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isClockBufferSite;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isReachableThroughRouting;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.storedPins;
 
 import java.util.ArrayList;
 import java.util.HashMap;

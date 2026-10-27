@@ -20,17 +20,17 @@
  *
  */
 
-package com.xilinx.rapidwright.util.route_status;
+package com.xilinx.rapidwright.util.routestatus;
 
-import static com.xilinx.rapidwright.util.route_status.NetStatus.ANTENNAS;
-import static com.xilinx.rapidwright.util.route_status.NetStatus.CONFLICTS;
-import static com.xilinx.rapidwright.util.route_status.NetStatus.LOGICAL_ONLY;
-import static com.xilinx.rapidwright.util.route_status.NetStatus.PARTIAL;
-import static com.xilinx.rapidwright.util.route_status.NetStatus.ROUTED;
-import static com.xilinx.rapidwright.util.route_status.NetStatus.STATIC_CLAIMS;
-import static com.xilinx.rapidwright.util.route_status.NetStatus.UNROUTED;
-import static com.xilinx.rapidwright.util.route_status.NetStatus.has;
-import static com.xilinx.rapidwright.util.route_status.RouteStatusEngine.parallelFor;
+import static com.xilinx.rapidwright.util.routestatus.NetStatus.ANTENNAS;
+import static com.xilinx.rapidwright.util.routestatus.NetStatus.CONFLICTS;
+import static com.xilinx.rapidwright.util.routestatus.NetStatus.LOGICAL_ONLY;
+import static com.xilinx.rapidwright.util.routestatus.NetStatus.PARTIAL;
+import static com.xilinx.rapidwright.util.routestatus.NetStatus.ROUTED;
+import static com.xilinx.rapidwright.util.routestatus.NetStatus.STATIC_CLAIMS;
+import static com.xilinx.rapidwright.util.routestatus.NetStatus.UNROUTED;
+import static com.xilinx.rapidwright.util.routestatus.NetStatus.has;
+import static com.xilinx.rapidwright.util.routestatus.RouteStatusEngine.parallelFor;
 
 import java.util.ArrayList;
 import java.util.Arrays;
