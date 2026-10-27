@@ -60,13 +60,11 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.EnumMap;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
-import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
@@ -80,10 +78,6 @@ import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
-import com.xilinx.rapidwright.edif.EDIFHierCellInst;
-import com.xilinx.rapidwright.edif.EDIFLibrary;
-import com.xilinx.rapidwright.edif.EDIFNetlist;
-import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.ReportRouteStatus;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult.NetRouteStatus;
@@ -177,66 +171,15 @@ public final class RouteStatusEngine {
         // Writing a checkpoint leaves the macro primitives (e.g. RAM64X1D) collapsed in the
         // netlist, while the cells placed for them are those of their expansion (as read from a
         // checkpoint). Vivado expands them when it reads the design: so does the report, which then
-        // restores the netlist.
-        EDIFNetlist netlist = design.getNetlist();
-        boolean expanded = hasCollapsedMacros(design);
-        boolean tracking = netlist.isTrackingCellChanges();
-        if (expanded) {
-            netlist.setTrackCellChanges(false);
-            netlist.expandMacroUnisims(design.getSeries());
-        }
+        // collapses them again.
+        CollapsedMacros expanded = CollapsedMacros.expand(design);
         try {
             return new RouteStatusEngine(design, perNet, packConflicts).run();
         } finally {
-            if (expanded) {
-                netlist.collapseMacroUnisims(design.getSeries());
-                netlist.setTrackCellChanges(tracking);
+            if (expanded != null) {
+                expanded.collapse();
             }
         }
-    }
-
-    /**
-     * Checks whether the netlist of a design has macro primitives that are collapsed into leaf
-     * cells while cells of their expansion are placed, as {@link Design#writeCheckpoint(String)}
-     * leaves them.
-     */
-    private static boolean hasCollapsedMacros(Design design) {
-        EDIFNetlist netlist = design.getNetlist();
-        EDIFLibrary prims = netlist.getHDIPrimitivesLibrary();
-        Series series = design.getSeries();
-        if (prims == null || series == null) {
-            return false;
-        }
-        EDIFLibrary macros = Design.getMacroPrimitives(series);
-        Set<EDIFCell> collapsed = Collections.newSetFromMap(new IdentityHashMap<>());
-        for (EDIFCell cell : prims.getCells()) {
-            EDIFCell macro = macros.getCell(cell.getName());
-            if (macro != null && cell.isLeafCellOrBlackBox() && !macro.isLeafCellOrBlackBox()) {
-                collapsed.add(cell);
-            }
-        }
-        if (collapsed.isEmpty()) {
-            return false;
-        }
-        for (Cell cell : design.getCells()) {
-            if (cell.isRoutethru()) {
-                continue;
-            }
-            // The closest instance above the cell in the netlist (macros may be nested, e.g. DSP58C in
-            // DSP58)
-            String name = cell.getName();
-            for (int sep = name.lastIndexOf(EDIFTools.EDIF_HIER_SEP); sep > 0;
-                    sep = name.lastIndexOf(EDIFTools.EDIF_HIER_SEP, sep - 1)) {
-                EDIFHierCellInst parent = netlist.getHierCellInstFromName(name.substring(0, sep));
-                if (parent != null) {
-                    if (collapsed.contains(parent.getCellType())) {
-                        return true;
-                    }
-                    break;
-                }
-            }
-        }
-        return false;
     }
 
     private ReportRouteStatusResult run() {

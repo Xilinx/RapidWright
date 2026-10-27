@@ -1247,9 +1247,51 @@ public class TestReportRouteStatus {
         ReportRouteStatusResult after = ReportRouteStatus.reportRouteStatus(design, true);
         Assertions.assertEquals(before.toString(), after.toString());
         Assertions.assertEquals(before.netsByStatus, after.netsByStatus);
-        // (the report expands and collapses the macro again: the library holds the collapsed cell)
-        cell = design.getNetlist().getHDIPrimitivesLibrary().getCell(macro);
-        Assertions.assertTrue(cell != null && cell.isLeafCellOrBlackBox());
+        // (the report expands and collapses the macro again: the library holds the same collapsed cell)
+        Assertions.assertSame(cell, design.getNetlist().getHDIPrimitivesLibrary().getCell(macro));
+        Assertions.assertTrue(cell.isLeafCellOrBlackBox());
+    }
+
+    /**
+     * A netlist with a collapsed macro (RAM32X1D, as writing a checkpoint leaves it) and an expanded
+     * one (RAM64X1D): the report expands only the collapsed one, and leaves the netlist as it was
+     * found.
+     */
+    @Test
+    public void testReportRouteStatusCollapsedAndExpandedMacros() {
+        Design design = new Design("design", "xcvc1902-vsvd1760-2MP-e-S");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = netlist.getTopCell();
+        top.createChildCellInst("ram64", netlist.getHDIPrimitive(Unisim.RAM64X1D));
+        top.createChildCellInst("ram32", netlist.getHDIPrimitive(Unisim.RAM32X1D));
+        netlist.expandMacroUnisims(design.getSeries());
+        Cell ram64 = design.createAndPlaceCell("ram64/DP/RAMD64_INST", Unisim.LUT6, "SLICE_X235Y138/B6LUT");
+        ram64.setType(Unisim.RAM64X1D.name());
+        Cell ram32 = design.createAndPlaceCell("ram32/DP", Unisim.LUT6, "SLICE_X235Y139/B6LUT");
+        ram32.setType(Unisim.RAM32X1D.name());
+        ReportRouteStatusResult expanded = ReportRouteStatus.reportRouteStatus(design, true);
+
+        EDIFCell ram32Cell = netlist.getHDIPrimitivesLibrary().getCell(Unisim.RAM32X1D.name());
+        ram32Cell.makePrimitive();
+        EDIFCell ram64Cell = netlist.getHDIPrimitivesLibrary().getCell(Unisim.RAM64X1D.name());
+        List<EDIFCell> prims = new ArrayList<>(netlist.getHDIPrimitivesLibrary().getCells());
+        int ram64Insts = ram64Cell.getCellInsts().size();
+        int ram64Nets = ram64Cell.getNets().size();
+
+        ReportRouteStatusResult rrs = ReportRouteStatus.reportRouteStatus(design, true);
+        Assertions.assertEquals(expanded.toString(), rrs.toString());
+        Assertions.assertEquals(expanded.netsByStatus, rrs.netsByStatus);
+
+        Assertions.assertEquals(prims.size(), netlist.getHDIPrimitivesLibrary().getCells().size());
+        for (EDIFCell cell : prims) {
+            Assertions.assertSame(cell, netlist.getHDIPrimitivesLibrary().getCell(cell.getName()));
+        }
+        Assertions.assertTrue(ram32Cell.isLeafCellOrBlackBox());
+        Assertions.assertSame(ram32Cell, top.getCellInst("ram32").getCellType());
+        Assertions.assertSame(ram64Cell, top.getCellInst("ram64").getCellType());
+        Assertions.assertFalse(ram64Cell.isLeafCellOrBlackBox());
+        Assertions.assertEquals(ram64Insts, ram64Cell.getCellInsts().size());
+        Assertions.assertEquals(ram64Nets, ram64Cell.getNets().size());
     }
 
     /**
