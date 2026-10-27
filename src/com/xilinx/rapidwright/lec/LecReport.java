@@ -33,8 +33,8 @@ import java.util.Map;
  *
  * <h2>Why an undecided cone fails the run</h2>
  *
- * A comparison is naturally PASS or FAIL, but a solver timeout, a cone
- * too large to attempt, a genuine combinational loop or a variable that cannot
+ * A comparison is naturally PASS or FAIL, but a solver timeout, an exhausted
+ * solver budget, a genuine combinational loop or a variable that cannot
  * be matched between the two netlists all leave the question genuinely open.
  * Reporting PASS in that situation would present something that is not a proof
  * as though it were one, so by default an inconclusive cone fails the run and
@@ -232,7 +232,7 @@ public class LecReport {
         out.println("  refuted by solver        : " + engine.getRefutedBySat());
         out.println("  undecided                : " + engine.getInconclusiveQuestions());
         if (engine.getSkippedTooLarge() > 0) {
-            out.println("  skipped, cone too large  : " + engine.getSkippedTooLarge());
+            out.println("  large, budget exhausted  : " + engine.getSkippedTooLarge());
         }
         if (engine.getSkippedNoSolver() > 0) {
             out.println("  skipped, no solver       : " + engine.getSkippedNoSolver());

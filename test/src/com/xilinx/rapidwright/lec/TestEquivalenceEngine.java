@@ -99,6 +99,23 @@ public class TestEquivalenceEngine {
     }
 
     /**
+     * The size guards defer a wide cone rather than refuse it: with the support
+     * guard below this cone's four inputs, the solver must still be asked once
+     * the narrower work is done, and still prove it.
+     */
+    @Test
+    public void testConeBeyondTheSizeGuardIsStillSolved() {
+        LecConfig config = new LecConfig();
+        config.setSatMaxSupport(1);
+        LecHarness result = LecHarness.run(LecNetlistFixtures.resynthesisedFunction(false),
+                LecNetlistFixtures.resynthesisedFunction(true), config);
+        result.assertPass();
+        Assertions.assertTrue(result.getEngine().getProvenBySat() > 0,
+                "A cone beyond the guard must still reach the solver");
+        Assertions.assertEquals(0, result.getEngine().getSkippedTooLarge());
+    }
+
+    /**
      * The same comparison with the reference's function perturbed. This must
      * fail, and it must fail through simulation rather than the solver, because
      * a wrong function is almost always separated by a random pattern.
@@ -167,7 +184,7 @@ public class TestEquivalenceEngine {
     @Test
     public void testUnmatchableInputsYieldInconclusiveNotDifferent() {
         LecHarness result = LecHarness.run(LecNetlistFixtures.blackBoxDriven("bb_one"),
-                LecNetlistFixtures.blackBoxDriven("bb_two"));
+                LecNetlistFixtures.blackBoxDriven("bb_two"), strictBlackBoxes());
         Assertions.assertEquals(0,
                 result.getReport().getCount(LecDifferenceType.CONE_FUNCTION_DIFFERS),
                 "A cone fed by an unmatchable variable must not be reported as a proven "
@@ -178,17 +195,38 @@ public class TestEquivalenceEngine {
     }
 
     /**
-     * A black box keeps its name but not its function: the same name in both
-     * netlists says nothing about what reaches its inputs, so the cones it
-     * feeds must still be inconclusive rather than proven by structural hash.
+     * With {@code --strict-black-boxes} a black box keeps its name but not its
+     * function, so even a same-named one leaves the cones it feeds inconclusive
+     * rather than proven by structural hash.
      */
     @Test
-    public void testSameNamedBlackBoxIsNotProven() {
+    public void testStrictBlackBoxIsNotProven() {
         LecHarness result = LecHarness.run(LecNetlistFixtures.blackBoxDriven("bb_one"),
-                LecNetlistFixtures.blackBoxDriven("bb_one"));
+                LecNetlistFixtures.blackBoxDriven("bb_one"), strictBlackBoxes());
         Assertions.assertTrue(result.getReport().getCount(LecDifferenceType.CONE_INCONCLUSIVE) > 0,
-                "A cone through a black box must not be certified");
+                "A cone through a strict black box must not be certified");
         result.assertFail();
+    }
+
+    /**
+     * By default a black box is matched like a terminal: the same black box
+     * passes, and what reaches its inputs is checked, so tying one low fails.
+     */
+    @Test
+    public void testBlackBoxIsMatchedByNameAndItsInputsChecked() {
+        LecHarness.run(LecNetlistFixtures.blackBoxDriven("bb_one"),
+                LecNetlistFixtures.blackBoxDriven("bb_one")).assertPass();
+        LecHarness rewired = LecHarness.run(LecNetlistFixtures.blackBoxDriven("bb_one"),
+                LecNetlistFixtures.blackBoxDriven("bb_one", true));
+        rewired.assertFail();
+        Assertions.assertNotNull(rewired.findDifference(LecDifferenceType.CONE_FUNCTION_DIFFERS),
+                "The changed black box input must be reported as a differing cone");
+    }
+
+    private static LecConfig strictBlackBoxes() {
+        LecConfig config = new LecConfig();
+        config.setStrictBlackBoxes(true);
+        return config;
     }
 
     /**
@@ -197,7 +235,7 @@ public class TestEquivalenceEngine {
      */
     @Test
     public void testAllowInconclusiveDowngradesToPass() {
-        LecConfig config = new LecConfig();
+        LecConfig config = strictBlackBoxes();
         config.setAllowInconclusive(true);
         LecResult result = LogicEquivalenceChecker.compare(
                 LecNetlistFixtures.blackBoxDriven("bb_one"),

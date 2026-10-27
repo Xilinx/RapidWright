@@ -55,10 +55,9 @@ public enum CellRole {
     /**
      * A cell whose function this tool does not model: a black box, an encrypted
      * cell, or a primitive with no entry in the model library. Treated as an
-     * uninterpreted function - each output becomes a free variable. Whether that
-     * variable can be matched across the two netlists depends on where the cell
-     * sits; see {@link CellClassifier} and the stability rules in
-     * {@link TerminalKey}.
+     * uninterpreted function - each output becomes a free variable. By default
+     * that variable is matched across the two netlists by instance name, as for
+     * a terminal; see {@link CellClassifier#isMatchedByName(CellRole)}.
      */
     UNINTERPRETED;
 

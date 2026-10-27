@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.lec;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -202,13 +203,19 @@ public class EquivalenceEngine {
     }
 
     /**
-     * Asks the solver about whatever remains, subject to the size guards and the
-     * overall time budget. Anything skipped is reported inconclusive rather than
-     * silently passed, because a verdict that is not a proof must never read as
-     * a pass.
+     * Asks the solver about whatever remains, within the overall time budget.
+     * Anything not settled is reported inconclusive rather than silently passed,
+     * because a verdict that is not a proof must never read as a pass.
+     *
+     * The size guards order the work rather than exclude it. Cones within them
+     * are solved first; cones beyond them are then attempted smallest first
+     * with whatever budget is left. A large design can have a few hundred wide
+     * cones the solver settles quickly, and refusing them outright would fail
+     * the run for want of trying.
      */
     private void resolveWithSolver(Map<Long, List<Task>> groups) {
         boolean solverUsable = groups.isEmpty() || SatMiter.isAvailable();
+        List<LargeCone> largeCones = new ArrayList<>();
         for (Map.Entry<Long, List<Task>> entry : groups.entrySet()) {
             Task task = entry.getValue().get(0);
             if (!solverUsable) {
@@ -220,10 +227,7 @@ public class EquivalenceEngine {
             int[] union = support.support(new int[] { task.refLit, task.impLit });
             int coneSize = support.coneSize(new int[] { task.refLit, task.impLit });
             if (union.length > config.getSatMaxSupport() || coneSize > config.getSatMaxNodes()) {
-                skippedTooLarge++;
-                cache.put(entry.getKey(), inconclusive(task, "the cone is too large to solve ("
-                        + union.length + " inputs, " + coneSize + " nodes); consider raising "
-                        + "--sat-max-support and --sat-max-nodes"));
+                largeCones.add(new LargeCone(entry.getKey(), task, union.length, coneSize));
                 continue;
             }
             if (satSecondsUsed >= config.getSatBudgetSec()) {
@@ -233,6 +237,38 @@ public class EquivalenceEngine {
                 continue;
             }
             cache.put(entry.getKey(), solveOne(task));
+        }
+        largeCones.sort(Comparator.comparingInt((LargeCone c) -> c.inputs)
+                .thenComparingInt(c -> c.nodes));
+        for (LargeCone cone : largeCones) {
+            if (satSecondsUsed >= config.getSatBudgetSec()) {
+                skippedTooLarge++;
+                cache.put(cone.key, inconclusive(cone.task, "the cone is large (" + cone.inputs
+                        + " inputs, " + cone.nodes + " nodes) and the solver budget of "
+                        + config.getSatBudgetSec() + " seconds ran out before it was "
+                        + "attempted; consider raising --sat-budget"));
+                continue;
+            }
+            cache.put(cone.key, solveOne(cone.task));
+        }
+    }
+
+    /** A question beyond the size guards, deferred until the others are done. */
+    private static class LargeCone {
+
+        private final Long key;
+
+        private final Task task;
+
+        private final int inputs;
+
+        private final int nodes;
+
+        LargeCone(Long key, Task task, int inputs, int nodes) {
+            this.key = key;
+            this.task = task;
+            this.inputs = inputs;
+            this.nodes = nodes;
         }
     }
 

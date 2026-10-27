@@ -139,7 +139,14 @@ public class NetlistLoader {
                 + " MB of EDIF, extracting to parse in parallel)");
         Path temp = Files.createTempFile("rapidwright_lec_", ".edf");
         try {
-            extractEdif(file, temp);
+            try {
+                extractEdif(file, temp);
+            } catch (IOException e) {
+                throw new IOException(e.getMessage() + " while extracting " + (size >> 20)
+                        + " MB of EDIF to " + temp.getParent() + "; point java.io.tmpdir at a "
+                        + "larger file system, for example "
+                        + "JAVA_TOOL_OPTIONS=-Djava.io.tmpdir=<dir>", e);
+            }
             try {
                 return EDIFTools.loadEDIFFile(temp);
             } catch (RuntimeException e) {

@@ -100,7 +100,7 @@ public class NetlistSummary {
     private void collectTerminalCones(FlatNetlist flat, CellClassifier classifier,
             ConeBuilder cones, LecLog log) {
         for (int instId : flat.getLeafInstIds()) {
-            if (classifier.classify(flat.getCellType(instId)) != CellRole.TERMINAL) {
+            if (!classifier.isMatchedByName(classifier.classify(flat.getCellType(instId)))) {
                 continue;
             }
             String typeName = flat.getCellTypeName(instId);
@@ -122,9 +122,9 @@ public class NetlistSummary {
                 // The cone accounts for this pin's inversion either way, so the
                 // attribute is folded even where it reads zero.
                 foldedPins.add(basePin);
-                coneLiterals.put(TerminalKey.forPin(instName, pinName), lit);
+                putUnique(coneLiterals, TerminalKey.forPin(instName, pinName), lit);
             }
-            terminals.put(instName.isEmpty() ? typeName : instName,
+            putUnique(terminals, instName.isEmpty() ? typeName : instName,
                     TerminalAttributes.of(typeName, flat.getInst(instId), foldedPins));
         }
     }
@@ -158,16 +158,32 @@ public class NetlistSummary {
         for (int bit = 0; bit < index.getPortBitCount(); bit++) {
             EDIFDirection dir = index.getPortOfBit(bit).getDirection();
             checkPortNameIsUnambiguous(index.getPortBitName(bit));
-            terminals.put("top level port " + index.getPortBitName(bit),
+            putUnique(terminals, "top level port " + index.getPortBitName(bit),
                     TerminalAttributes.of(dir + " port", null, noFoldedPins));
             if (dir == EDIFDirection.INPUT) {
                 continue;
             }
             int localNet = index.getBoundaryNet(bit);
             int root = localNet < 0 ? -1 : conn.getRoot(flat.getGlobalNet(topId, localNet));
-            coneLiterals.put(TerminalKey.forTopPort(index.getPortBitName(bit)),
+            putUnique(coneLiterals, TerminalKey.forTopPort(index.getPortBitName(bit)),
                     dir == EDIFDirection.INOUT ? cones.literalOfInoutRoot(root)
                             : cones.literalOfNetRoot(root));
+        }
+    }
+
+    /**
+     * Records one endpoint, refusing a name another endpoint already has.
+     *
+     * Endpoints are matched between the two netlists by name, and a renamed EDIF
+     * name can contain any character, so two different endpoints can join to
+     * the same string: a top level instance renamed {@code a/b} beside instance
+     * {@code b} inside {@code a}, for example. Letting one overwrite the other
+     * would silently drop it from the comparison, so such a netlist is refused.
+     */
+    private <V> void putUnique(Map<String, V> map, String key, V value) {
+        if (map.putIfAbsent(key, value) != null) {
+            throw new LecException(label + ": two different endpoints are both named '" + key
+                    + "', so they cannot be told apart");
         }
     }
 
@@ -197,7 +213,7 @@ public class NetlistSummary {
                 pins = cones.takeShortedDriverPins()) {
             for (int pin : pins) {
                 int owner = flat.getPinOwner(pin);
-                coneLiterals.put(flat.getPinName(owner, flat.getPinPortBit(pin)),
+                putUnique(coneLiterals, flat.getPinName(owner, flat.getPinPortBit(pin)),
                         cones.literalOfPin(pin));
             }
         }
