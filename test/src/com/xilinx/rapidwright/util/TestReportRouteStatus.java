@@ -29,8 +29,11 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.eco.ECOTools;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
@@ -40,6 +43,7 @@ import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.rwroute.RWRoute;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult.NetRouteStatus;
 import com.xilinx.rapidwright.util.route_status.RouteStatusMutator;
@@ -779,6 +783,57 @@ public class TestReportRouteStatus {
                 "   ------------------------------------------- : ----------- :", rrs.toString());
         assertNetStatuses(rrs, new String[]{"GLOBAL_LOGIC0=CONFLICTS,HAS_ROUTING",
                 "GLOBAL_LOGIC1=CONFLICTS,HAS_ROUTING"});
+    }
+
+    /**
+     * GND tied off at the reset inverter of a Versal slice (the site routing of GND ends at its site
+     * pin, without routing) needs no routing: Vivado 2026.1 reports it as internally routed. (The
+     * design of TestECOTools.testConnectNetWithoutSource().)
+     */
+    @Test
+    public void testReportRouteStatusGroundTiedAtInverter() {
+        Design design = new Design("clock_gating_test", "vp1202");
+        EDIFCell top = design.getTopEDIFCell();
+        Net clk = design.createNet("clk");
+        clk.getLogicalNet().createPortInst(top.createPort("clk", EDIFDirection.INPUT, 1));
+        Net gate = design.createNet("gate");
+        gate.getLogicalNet().createPortInst(top.createPort("gate", EDIFDirection.INPUT, 1));
+        Cell clkIBUF = design.createAndPlaceCell(top, "clkIBUF", Unisim.IBUF, "IOB_X29Y0/IOB_M");
+        ECOTools.connectNet(design, clkIBUF, "I", clk);
+        Cell gateIBUF = design.createAndPlaceCell(top, "gateIBUF", Unisim.IBUF, "IOB_X29Y1/IOB_M");
+        ECOTools.connectNet(design, gateIBUF, "I", gate);
+        Net clkBUF = design.createNet("clkBUF");
+        ECOTools.connectNet(design, clkIBUF, "O", clkBUF);
+        Net gateBUF = design.createNet("gateBUF");
+        ECOTools.connectNet(design, gateIBUF, "O", gateBUF);
+        Cell lut = design.createAndPlaceCell("lut", Unisim.LUT2, "SLICE_X86Y67/C6LUT");
+        LUTTools.configureLUT(lut, "O=I1 & I0");
+        Net gatedClk = design.createNet("gated_clk");
+        ECOTools.connectNet(design, lut, "O", gatedClk);
+        ECOTools.connectNet(design, lut, "I0", clkBUF);
+        ECOTools.connectNet(design, lut, "I1", gateBUF);
+        for (String ff : new String[]{"ff1", "ff2"}) {
+            Cell cell = design.createAndPlaceCell(ff, Unisim.FDRE, "SLICE_X86Y67/" + (ff.equals("ff1") ? "CFF2" : "DFF2"));
+            ECOTools.connectNet(design, cell, "C", gatedClk);
+            Net feedback = design.createNet(ff + "_feedback");
+            ECOTools.connectNet(design, cell, "D", feedback);
+            ECOTools.connectNet(design, cell, "Q", feedback);
+            ECOTools.connectNet(design, cell, "CE", design.getVccNet());
+            ECOTools.connectNet(design, cell, "R", design.getGndNet());
+        }
+        RWRoute.routeDesignFullNonTimingDriven(design);
+        ReportRouteStatusResult rrs = ReportRouteStatus.reportRouteStatus(design, true);
+        Assertions.assertEquals("Design Route Status\n" +
+                "                                               :      # nets :\n" +
+                "   ------------------------------------------- : ----------- :\n" +
+                "   # of logical nets.......................... :           9 :\n" +
+                "       # of nets not needing routing.......... :           3 :\n" +
+                "           # of internally routed nets........ :           3 :\n" +
+                "       # of routable nets..................... :           6 :\n" +
+                "           # of fully routed nets............. :           6 :\n" +
+                "       # of nets with routing errors.......... :           0 :\n" +
+                "   ------------------------------------------- : ----------- :", rrs.toString());
+        assertNetStatuses(rrs, new String[]{"GLOBAL_LOGIC0=INTRASITE"});
     }
 
     private static void assertNetStatuses(ReportRouteStatusResult rrs, String[] netStatuses) {

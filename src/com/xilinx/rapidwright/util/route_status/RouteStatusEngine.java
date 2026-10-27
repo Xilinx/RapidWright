@@ -71,6 +71,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.PartitionPin;
 import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
@@ -557,14 +558,59 @@ public final class RouteStatusEngine {
 
     /**
      * Checks whether a static net (0 for GND, 1 for VCC) needs routing: if its loads are not all in
-     * one site, or any is fed from a site pin.
+     * one site, or any is fed from a site pin. (Loads that the site routing of GND ties off inside
+     * their site, e.g. at an optional inverter, do not count.)
      */
     private boolean staticNeedsRouting(int t) {
+        if (t == 0 && entries.nets.get(staticEntry[0]) != null && !entries.nets.get(staticEntry[0]).getSiteInsts().isEmpty()) {
+            return gndLoadsNeedRouting();
+        }
         Set<SiteInst> sites = new HashSet<>();
         for (FlatNet flat : staticFlats.get(t)) {
             flat.addPhysicalPinSites(design, sites);
             if (sites.size() > 1 || (flat.firstSite != null && flat.hasLoadOnSitePin(design))) {
                 return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Checks whether the loads of GND that its site routing does not tie off inside their site are
+     * in more than one site, or any is fed from a site pin.
+     */
+    private boolean gndLoadsNeedRouting() {
+        Net gnd = entries.nets.get(staticEntry[0]);
+        SiteInst site = null;
+        for (FlatNet flat : staticFlats.get(0)) {
+            for (LeafPin pin : flat.getLeafPins(design)) {
+                if (pin.isOutput() || !pin.isPlaced()) {
+                    continue;
+                }
+                SiteInst si = pin.cell.getSiteInst();
+                for (String physPin : pin.getPhysicalPins()) {
+                    BELPin belPin = pin.cell.getBEL().getPin(physPin);
+                    if (belPin == null || isTiedInsideSite(si, belPin, gnd)) {
+                        continue;
+                    }
+                    if (belPin.getConnectedSitePinName() != null || (site != null && site != si)) {
+                        return true;
+                    }
+                    site = si;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Checks whether the site wire of a BEL pin carries a net, driven by a BEL (not a site pin) in its site. */
+    private static boolean isTiedInsideSite(SiteInst si, BELPin belPin, Net net) {
+        if (si.getNetFromSiteWireIndex(belPin.getSiteWireIndex()) != net) {
+            return false;
+        }
+        for (BELPin driver : si.getSiteWirePins(belPin.getSiteWireIndex())) {
+            if (driver.isOutput()) {
+                return !driver.isSitePort();
             }
         }
         return false;
@@ -928,6 +974,12 @@ public final class RouteStatusEngine {
     /** Classifies a net without routing (that needs it, or is internal to a site). */
     private int classifyWithoutRouting(Net net, FlatNet flat, int entry, int s) {
         boolean usesInputSitePin = entries.sitePinKeys[entry] != null;
+        if (usesInputSitePin && net != null && net.isStaticNet()) {
+            // (the site pins of a static net whose site routing leads to no load that needs the
+            // constant, e.g. GND to an optional inverter, need no routing)
+            long[] stale = getStaleSitePinKeys(net, net.getType());
+            usesInputSitePin = Arrays.stream(entries.sitePinKeys[entry]).anyMatch((k) -> Arrays.binarySearch(stale, k) < 0);
+        }
         if (has(s, UNPLACED)) {
             // A net with some unplaced pins is reported as such instead of being routed, unrouted or
             // internal to a site. It is partially routed if a placed driver has loads (whether placed
