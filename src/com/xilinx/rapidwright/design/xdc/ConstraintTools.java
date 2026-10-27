@@ -23,27 +23,42 @@
 package com.xilinx.rapidwright.design.xdc;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import com.xilinx.rapidwright.design.ConstraintGroup;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.xdc.parser.RegularEdifCellLookup;
 import com.xilinx.rapidwright.design.xdc.parser.XDCTools;
+import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
+
+import tcl.lang.Parser;
+import tcl.lang.TCL;
+import tcl.lang.TclException;
+import tcl.lang.TclList;
+import tcl.lang.TclObject;
+import tcl.lang.TclParse;
+import tcl.lang.TclString;
+import tcl.lang.TclToken;
 
 /**
  * A collection of methods to access design constraints.
@@ -118,6 +133,19 @@ public class ConstraintTools {
      * either has no port of the same name for, or whose port of that name the black box connects
      * to it.
      * <p>
+     * In the other commands at the circuit's top scope, {@code get_ports} names the circuit's own
+     * ports, which are the pins of the black box in the design: it is given
+     * {@code -scoped_to_current_instance}, as Vivado writes it, so that it finds them. A
+     * {@code get_ports} that names only device pins is left as it is, since it finds them as
+     * top-level ports from inside the black box too, and the black box's pins are not valid timing
+     * startpoints or endpoints. A {@code get_ports} that names both is split into one for each,
+     * joined with {@code concat}. A pattern ({@code *} and {@code ?}, or under {@code -regexp})
+     * counts by the top-level ports and black box pins it matches; split, it is replaced by their
+     * names. A {@code get_ports} that already has the option, or names no ports (such as one given
+     * only {@code -of_objects}), is taken to refer to the circuit's ports. Options are told apart
+     * from port names as Vivado does: in any order, abbreviated, with values, and over continued
+     * lines.
+     * <p>
      * {@code current_instance} is followed as Vivado does: a path is relative to the current
      * instance, {@code ..} goes up a level, and no path (with or without {@code -quiet}) goes back
      * to the circuit's top. Each scope is written out as a {@code current_instance} of its full
@@ -137,16 +165,7 @@ public class ConstraintTools {
      */
     public static int addBlackBoxConstraints(Design design, Map<String, Design> blackBoxes) {
         EDIFNetlist netlist = design.getNetlist();
-        Set<String> topPorts = new HashSet<>();
-        for (EDIFPort port : netlist.getTopCell().getPorts()) {
-            topPorts.add(port.getBusName());
-            topPorts.add(port.getName());
-            if (port.isBus()) {
-                for (int i : port.getBitBlastedIndices()) {
-                    topPorts.add(port.getBusName() + "[" + i + "]");
-                }
-            }
-        }
+        Map<String, List<String>> topPorts = getPortBits(netlist.getTopCell());
 
         // The pblocks the design creates, which the circuits' context constraints create again
         Set<String> pblocks = new HashSet<>();
@@ -194,6 +213,27 @@ public class ConstraintTools {
         return added;
     }
 
+    /**
+     * @return The ports of a cell, by their own name, by the name of their bus and by the name of
+     *         each bit, each to the names of its bits. A bus's declared name, such as bus[1:0], is
+     *         not one: Vivado's get_ports finds no port by it.
+     */
+    private static Map<String, List<String>> getPortBits(EDIFCell cell) {
+        Map<String, List<String>> bits = new HashMap<>();
+        for (EDIFPort port : cell.getPorts()) {
+            if (!port.isBus()) {
+                bits.computeIfAbsent(port.getName(), k -> new ArrayList<>()).add(port.getName());
+                continue;
+            }
+            for (int i : port.getBitBlastedIndices()) {
+                String bit = port.getBusName() + "[" + i + "]";
+                bits.computeIfAbsent(bit, k -> new ArrayList<>()).add(bit);
+                bits.computeIfAbsent(port.getBusName(), k -> new ArrayList<>()).add(bit);
+            }
+        }
+        return bits;
+    }
+
     /** A Tcl word naming one object: braced, quoted, or bare with any [<n>] bus bit suffixes */
     private static final String NAME_WORD = "(\\{[^}]*\\}|\"[^\"]*\"|(?:[^\\s\\[\\]{}\"]|\\[\\d+\\])+)";
 
@@ -214,11 +254,24 @@ public class ConstraintTools {
     private static final Pattern GET_PBLOCKS =
             Pattern.compile("\\[get_pblocks\\s+(?:-quiet\\s+)?" + NAME_WORD + "\\s*\\]");
 
-    /** get_ports with a braced list of names, or one bare name, which may be a bus bit */
-    private static final Pattern GET_PORTS = Pattern.compile(
-            "\\bget_ports\\s+(?:-quiet\\s+)?(?:\\{([^}]*)\\}|((?:[^\\s\\[\\]{}\"]|\\[\\d+\\])+))");
+    private static final String SCOPED_TO_CURRENT_INSTANCE = "-scoped_to_current_instance";
 
-    private static final Pattern ANY_GET_PORTS = Pattern.compile("\\bget_ports\\b");
+    /** The options of get_ports, as Vivado lists them. */
+    private static final List<String> GET_PORTS_OPTIONS = Arrays.asList("-regexp", "-nocase", "-filter",
+            "-of_objects", "-match_style", SCOPED_TO_CURRENT_INSTANCE, "-no_traverse", "-prop_thru_buffers",
+            "-quiet", "-verbose");
+
+    /** Characters that make Vivado read a get_ports -regexp pattern as a regular expression */
+    private static final String REGEXP_CHARS = ".[*+?";
+
+    private static final Pattern MATCHES_NOTHING = Pattern.compile("(?!)");
+
+    /** A bus index, or range, or wildcard in brackets, which Vivado reads as part of a name */
+    private static final Pattern BUS_INDEX = Pattern.compile("\\[(?:\\d+(?::\\d+)?|[*?])\\]");
+
+    /** The options of get_ports that take a value. */
+    private static final Set<String> GET_PORTS_VALUE_OPTIONS =
+            new HashSet<>(Arrays.asList("-filter", "-of_objects", "-match_style"));
 
     /** Queries for objects named relative to the current instance */
     private static final Pattern GET_SCOPED_OBJECTS =
@@ -226,6 +279,177 @@ public class ConstraintTools {
 
     private static final Pattern PBLOCK_COMMAND = Pattern.compile("^(?:create_pblock|add_cells_to_pblock"
             + "|resize_pblock|remove_cells_from_pblock|delete_pblock)\\b|^set_property\\b.*\\[get_pblocks\\s[^\\]]*\\]$");
+
+    /**
+     * @return The option of get_ports that a word names, which Vivado lets be abbreviated as long as
+     *         it is unambiguous, or the word itself if it names none.
+     */
+    private static String getPortsOption(String word) {
+        String option = null;
+        for (String o : GET_PORTS_OPTIONS) {
+            if (o.equals(word)) return o;
+            if (o.startsWith(word)) {
+                if (option != null) return word;
+                option = o;
+            }
+        }
+        return option != null ? option : word;
+    }
+
+    /** The ports a get_ports names, sorted into device pins and ports of the circuit */
+    private static final class SortedPorts {
+        /** The device pins, or null if it names none */
+        List<String> devicePins;
+        /** The circuit's ports, or null if it names none */
+        List<String> circuitPorts;
+
+        void add(boolean devicePin, Collection<String> names) {
+            if (devicePin) {
+                devicePins = devicePins == null ? new ArrayList<>() : devicePins;
+                devicePins.addAll(names);
+            } else {
+                circuitPorts = circuitPorts == null ? new ArrayList<>() : circuitPorts;
+                circuitPorts.addAll(names);
+            }
+        }
+    }
+
+    /** A get_ports in a command. */
+    private static class GetPorts {
+        /** The index of the [ that starts it. */
+        final int start;
+        /** The index just after the name of the command, where its arguments start. */
+        final int argsStart;
+        /** The index just after the ] that ends it, or -1 if it has none. */
+        int end = -1;
+        /** Whether it has -scoped_to_current_instance. */
+        boolean scoped;
+        /** Whether it has -regexp, and -nocase. */
+        boolean regexp;
+        boolean nocase;
+        /** Whether it has -of_objects, or a port list given by a command, which can't be read. */
+        boolean indirect;
+        /** Its other options, each followed by its value if it takes one, as written. */
+        final List<String> options = new ArrayList<>();
+        /** The port names or patterns it is given. */
+        final List<String> patterns = new ArrayList<>();
+        /** Its ports, once sorted into device pins and the circuit's ports */
+        SortedPorts sorted;
+
+        GetPorts(int start, int argsStart) {
+            this.start = start;
+            this.argsStart = argsStart;
+        }
+    }
+
+    /** Token types of Tcl's parser, as in tcl.h */
+    private static final int TCL_TOKEN_TEXT = 4;
+    private static final int TCL_TOKEN_BS = 8;
+    private static final int TCL_TOKEN_COMMAND = 16;
+
+    /**
+     * @param cmd A command, either joined into one line, or with the lines it continues onto
+     *            separated by newlines.
+     * @return Each get_ports in the command, including those in the arguments of others, with its
+     *         options and patterns told apart as Tcl and get_ports read them, in the order they
+     *         start in.
+     */
+    private static List<GetPorts> findGetPorts(String cmd) {
+        // Tcl's parser expects a null character after the script
+        char[] script = (cmd + '\0').toCharArray();
+        List<GetPorts> found = new ArrayList<>();
+        findGetPorts(script, 0, cmd.length(), false, found);
+        found.sort(Comparator.comparingInt(g -> g.start));
+        return found;
+    }
+
+    /**
+     * Finds each get_ports in the commands of a script, and in the commands substituted into
+     * their words.
+     *
+     * @param script     The script, followed by a null character.
+     * @param from       The index the commands start at.
+     * @param to         The index the commands end at.
+     * @param bracketed  True if the commands are substituted, inside brackets.
+     * @param found      Where to add each get_ports found.
+     */
+    private static void findGetPorts(char[] script, int from, int to, boolean bracketed, List<GetPorts> found) {
+        int open = from - 1;
+        while (from < to) {
+            TclParse parse = Parser.parseCommand(null, script, from, to - from, null, 0, false);
+            if (parse.result != TCL.OK || parse.commandSize <= 0) return;
+            GetPorts getPorts = null;
+            boolean isValue = false;
+            int word = 0;
+            for (int t = 0; t < parse.numTokens; t += 1 + parse.getToken(t).numComponents, word++) {
+                TclToken wordToken = parse.getToken(t);
+                // The word's value, or null if a command or variable is substituted into it
+                StringBuilder value = new StringBuilder();
+                for (int c = t + 1; c <= t + wordToken.numComponents; c++) {
+                    TclToken token = parse.getToken(c);
+                    if (token.type == TCL_TOKEN_COMMAND && value != null && BUS_INDEX.matcher(
+                            new String(script, token.script_index, token.size)).matches()) {
+                        // Vivado reads a bus index after a name, such as bus[1] or bus[*], as is
+                        value.append(script, token.script_index, token.size);
+                    } else if (token.type == TCL_TOKEN_COMMAND) {
+                        findGetPorts(script, token.script_index + 1, token.script_index + token.size - 1, true, found);
+                        value = null;
+                    } else if (value != null && token.type == TCL_TOKEN_TEXT) {
+                        value.append(script, token.script_index, token.size);
+                    } else if (value != null && token.type == TCL_TOKEN_BS) {
+                        // A backslash and newline, with the spaces after it, make a space
+                        char next = script[token.script_index + 1];
+                        value.append(next == '\n' ? ' ' : next);
+                    } else if (token.type != TCL_TOKEN_TEXT && token.type != TCL_TOKEN_BS) {
+                        value = null;
+                    }
+                }
+                if (word == 0) {
+                    if (bracketed && value != null && value.toString().equals("get_ports")) {
+                        getPorts = new GetPorts(open, wordToken.script_index + wordToken.size);
+                        // Only the bracket's sole command can be replaced with the bracket
+                        if (from == open + 1 && parse.commandStart + parse.commandSize >= to) {
+                            getPorts.end = to + 1;
+                        }
+                    }
+                    continue;
+                }
+                if (getPorts == null) continue;
+                String text = new String(script, wordToken.script_index, wordToken.size);
+                if (isValue) {
+                    getPorts.options.add(text);
+                    isValue = false;
+                } else if (value == null) {
+                    getPorts.indirect = true;
+                } else if (value.length() > 0 && value.charAt(0) == '-') {
+                    String option = getPortsOption(value.toString());
+                    if (option.equals(SCOPED_TO_CURRENT_INSTANCE)) {
+                        getPorts.scoped = true;
+                    } else if (option.equals("-regexp")) {
+                        getPorts.regexp = true;
+                    } else if (option.equals("-nocase")) {
+                        getPorts.nocase = true;
+                    } else {
+                        getPorts.options.add(text);
+                    }
+                    getPorts.indirect |= option.equals("-of_objects");
+                    isValue = GET_PORTS_VALUE_OPTIONS.contains(option);
+                } else {
+                    try {
+                        for (TclObject name : TclList.getElements(null, TclString.newInstance(value.toString()))) {
+                            getPorts.patterns.add(name.toString());
+                        }
+                    } catch (TclException e) {
+                        getPorts.indirect = true;
+                    }
+                }
+            }
+            if (getPorts != null) {
+                found.add(getPorts);
+            }
+            from = parse.commandStart + parse.commandSize;
+        }
+    }
 
     /**
      * @return True if a constraint line returns to the top of the design.
@@ -312,16 +536,17 @@ public class ConstraintTools {
         private final EDIFNetlist netlist;
         private final EDIFHierCellInst box;
         private final String boxName;
-        private final Set<String> topPorts;
+        /** The design's top-level ports, by name, to the names of their bits */
+        private final Map<String, List<String>> topPorts;
         /** The pblocks the circuit adds its top cell to */
         private final Set<String> ownPblocks = new HashSet<>();
         /** The pblocks the design creates, including those the circuits' constraints added */
         private final Set<String> pblocks;
-        /** The names of the black box's pins, by their own name and by the name of their bus */
-        private final Map<String, List<String>> pins = new HashMap<>();
+        /** The black box's pins, by name, to the names of their bits */
+        private final Map<String, List<String>> pins;
 
-        BlackBoxScope(EDIFNetlist netlist, String boxName, Set<String> topPorts, Set<String> pblocks,
-                Collection<List<XDCCommand>> groups) {
+        BlackBoxScope(EDIFNetlist netlist, String boxName, Map<String, List<String>> topPorts,
+                Set<String> pblocks, Collection<List<XDCCommand>> groups) {
             this.netlist = netlist;
             this.pblocks = pblocks;
             this.box = netlist.getHierCellInstFromName(boxName);
@@ -336,17 +561,7 @@ public class ConstraintTools {
                 }
             }
             // From the ports of the box's cell, since an unconnected pin has no port instance
-            for (EDIFPort port : box.getCellType().getPorts()) {
-                if (!port.isBus()) {
-                    pins.computeIfAbsent(port.getName(), k -> new ArrayList<>()).add(port.getName());
-                    continue;
-                }
-                for (int i : port.getBitBlastedIndices()) {
-                    String bit = port.getBusName() + "[" + i + "]";
-                    pins.computeIfAbsent(bit, k -> new ArrayList<>()).add(bit);
-                    pins.computeIfAbsent(port.getBusName(), k -> new ArrayList<>()).add(bit);
-                }
-            }
+            this.pins = getPortBits(box.getCellType());
         }
 
         /**
@@ -379,7 +594,10 @@ public class ConstraintTools {
                     pblocks.add(createdPblock);
                 }
                 out.kept++;
-                String scope = current.equals(boxName) && namesOnlyDevicePins(c.text) ? "" : current;
+                // At the circuit's top scope, each get_ports, read once
+                String cmd = String.join("\n", c.lines);
+                List<GetPorts> found = current.equals(boxName) && !c.text.startsWith("#") ? findGetPorts(cmd) : null;
+                String scope = found != null && namesOnlyDevicePins(c.text, found) ? "" : current;
                 if (!scope.equals(written)) {
                     if (!"".equals(written)) {
                         out.lines.add("current_instance -quiet");
@@ -392,7 +610,14 @@ public class ConstraintTools {
                 if (c.srcInfo != null) {
                     out.lines.addAll(c.srcInfo);
                 }
-                out.lines.addAll(c.lines);
+                if (found != null && scope.equals(boxName)) {
+                    // At the circuit's top scope, get_ports names the circuit's own ports. Inside
+                    // the design, those are the pins of the black box, which get_ports only
+                    // returns when told to look in the current instance
+                    out.lines.addAll(scopeGetPorts(cmd, found));
+                } else {
+                    out.lines.addAll(c.lines);
+                }
             }
             if (written != null && !written.isEmpty()) {
                 out.lines.add("current_instance -quiet");
@@ -482,30 +707,194 @@ public class ConstraintTools {
         }
 
         /**
-         * @return True if a command names ports with get_ports, all of them device pins, and names
-         *         no cells, nets or pins.
+         * @param cmd   A command.
+         * @param found Its get_ports, as {@link #findGetPorts(String)} reads them.
+         * @return True if the command names ports with get_ports, all of them device pins, and
+         *         names no cells, nets or pins.
          */
-        private boolean namesOnlyDevicePins(String cmd) {
+        private boolean namesOnlyDevicePins(String cmd, List<GetPorts> found) {
             if (GET_SCOPED_OBJECTS.matcher(cmd).find()) return false;
-            Matcher m = GET_PORTS.matcher(cmd);
-            int found = 0;
-            boolean any = false;
-            while (m.find()) {
-                found++;
-                String names = m.group(1) != null ? m.group(1) : m.group(2);
-                for (String name : names.trim().split("\\s+")) {
-                    if (name.isEmpty()) continue;
-                    if (!isDevicePin(name)) return false;
-                    any = true;
+            for (GetPorts getPorts : found) {
+                if (!namesOnlyDevicePins(getPorts)) return false;
+            }
+            return !found.isEmpty();
+        }
+
+        /**
+         * @return True if a get_ports names ports, all of them device pins. One that has
+         *         -scoped_to_current_instance, or names no ports (as with only -of_objects), refers
+         *         to the circuit's ports.
+         */
+        private boolean namesOnlyDevicePins(GetPorts getPorts) {
+            if (getPorts.scoped || getPorts.indirect || getPorts.patterns.isEmpty()) return false;
+            return sortPorts(getPorts).circuitPorts == null;
+        }
+
+        /**
+         * Sorts the ports a get_ports names into device pins and ports of the circuit. A name is
+         * sorted as a whole. A pattern (with * or ?, or under -regexp with any of . [ * + ?) is
+         * sorted by the bits it matches, of the design's top-level ports and of the black box's
+         * pins, as Vivado matches them: * and ? are its only wildcards, a regular expression must
+         * match a whole name, and a bus's name matches each of its bits. A pattern that matches no
+         * device pin names ports of the circuit.
+         */
+        private SortedPorts sortPorts(GetPorts getPorts) {
+            if (getPorts.sorted != null) return getPorts.sorted;
+            SortedPorts sorted = new SortedPorts();
+            getPorts.sorted = sorted;
+            for (String pattern : getPorts.patterns) {
+                Pattern regex = portPattern(pattern, getPorts.regexp, getPorts.nocase);
+                if (regex == null) {
+                    sorted.add(isDevicePin(pattern), Collections.singletonList(pattern));
+                    continue;
+                }
+                Set<String> bits = new TreeSet<>();
+                for (Map<String, List<String>> ports : Arrays.asList(topPorts, pins)) {
+                    for (Map.Entry<String, List<String>> e : ports.entrySet()) {
+                        if (regex.matcher(e.getKey()).matches()) {
+                            bits.addAll(e.getValue());
+                        }
+                    }
+                }
+                List<String> devicePins = new ArrayList<>();
+                List<String> circuitPorts = new ArrayList<>();
+                for (String bit : bits) {
+                    (isDevicePin(bit) ? devicePins : circuitPorts).add(bit);
+                }
+                if (devicePins.isEmpty()) {
+                    sorted.add(false, circuitPorts);
+                } else {
+                    sorted.add(true, devicePins);
+                    if (!circuitPorts.isEmpty()) {
+                        sorted.add(false, circuitPorts);
+                    }
                 }
             }
-            // A get_ports whose names are not given as above, such as by a command substitution,
-            // cannot be checked
-            Matcher all = ANY_GET_PORTS.matcher(cmd);
-            while (all.find()) {
-                found--;
+            return sorted;
+        }
+
+        /**
+         * @return The regular expression that a get_ports pattern matches names with, or null if
+         *         it is a plain name (or not a valid regular expression).
+         */
+        private static Pattern portPattern(String pattern, boolean regexp, boolean nocase) {
+            if (regexp) {
+                // As Vivado reads -regexp: without any of these characters, a pattern is a
+                // plain name (case-sensitive even with -nocase), and with an alternation outside
+                // parentheses, it matches nothing
+                if (pattern.chars().noneMatch(c -> REGEXP_CHARS.indexOf(c) >= 0)) return null;
+                if (hasTopLevelAlternation(pattern)) return MATCHES_NOTHING;
+                try {
+                    return Pattern.compile(pattern, nocase ? Pattern.CASE_INSENSITIVE : 0);
+                } catch (PatternSyntaxException e) {
+                    return null;
+                }
             }
-            return any && found == 0;
+            if (pattern.indexOf('*') < 0 && pattern.indexOf('?') < 0) return null;
+            StringBuilder sb = new StringBuilder();
+            int from = 0;
+            for (int i = 0; i < pattern.length(); i++) {
+                char c = pattern.charAt(i);
+                if (c != '*' && c != '?') continue;
+                if (i > from) {
+                    sb.append(Pattern.quote(pattern.substring(from, i)));
+                }
+                sb.append(c == '*' ? ".*" : ".");
+                from = i + 1;
+            }
+            if (from < pattern.length()) {
+                sb.append(Pattern.quote(pattern.substring(from)));
+            }
+            return Pattern.compile(sb.toString());
+        }
+
+        /**
+         * @return True if a regular expression has a | outside parentheses and brackets.
+         */
+        private static boolean hasTopLevelAlternation(String regex) {
+            int depth = 0;
+            boolean inClass = false;
+            for (int i = 0; i < regex.length(); i++) {
+                char c = regex.charAt(i);
+                if (c == '\\') {
+                    i++;
+                } else if (inClass) {
+                    inClass = c != ']';
+                } else if (c == '[') {
+                    inClass = true;
+                } else if (c == '(') {
+                    depth++;
+                } else if (c == ')') {
+                    depth--;
+                } else if (c == '|' && depth == 0) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * @return A get_ports of the given names, with the given options.
+         */
+        private static String getPorts(List<String> options, List<String> names) {
+            StringBuilder sb = new StringBuilder("[get_ports");
+            for (String option : options) {
+                sb.append(' ').append(option);
+            }
+            sb.append(' ');
+            boolean plain = true;
+            for (String name : names) {
+                plain &= !name.isEmpty() && name.chars().noneMatch(c -> Character.isWhitespace(c)
+                        || c == '{' || c == '}' || c == '\\');
+            }
+            if (names.size() == 1) {
+                sb.append(XDCTools.quotedName(names.get(0)));
+            } else if (plain) {
+                sb.append('{').append(String.join(" ", names)).append('}');
+            } else {
+                sb.append("[list");
+                for (String name : names) {
+                    sb.append(' ').append(XDCTools.quotedName(name));
+                }
+                sb.append(']');
+            }
+            return sb.append(']').toString();
+        }
+
+        /**
+         * @param cmd   A command at the circuit's top scope, with the lines it continues onto
+         *              separated by newlines.
+         * @param found Its get_ports, as {@link #findGetPorts(String)} reads them.
+         * @return The lines of the command, with -scoped_to_current_instance given to each
+         *         get_ports that refers to the circuit's ports and does not have it. A get_ports of
+         *         only device pins is left as it is: it finds them as top-level ports from any
+         *         current instance, and the black box's pins of those names are not valid timing
+         *         startpoints or endpoints. A get_ports of both is split into one of each, joined
+         *         with concat, each given the names (or the bits matched by patterns) it finds; if
+         *         its patterns find none of the circuit's ports, only the device pins are kept.
+         */
+        private List<String> scopeGetPorts(String cmd, List<GetPorts> found) {
+            StringBuilder sb = new StringBuilder(cmd);
+            for (int i = found.size() - 1; i >= 0; i--) {
+                GetPorts getPorts = found.get(i);
+                if (getPorts.scoped) continue;
+                SortedPorts sorted = getPorts.indirect || getPorts.patterns.isEmpty() ? null : sortPorts(getPorts);
+                if (sorted != null && sorted.circuitPorts == null) continue;
+                if (sorted == null || sorted.devicePins == null || getPorts.end < 0) {
+                    sb.insert(getPorts.argsStart, " " + SCOPED_TO_CURRENT_INSTANCE);
+                    continue;
+                }
+                // The names are given as they are, so -regexp and -nocase no longer apply
+                String split = getPorts(getPorts.options, sorted.devicePins);
+                if (!sorted.circuitPorts.isEmpty()) {
+                    List<String> scopedOptions = new ArrayList<>();
+                    scopedOptions.add(SCOPED_TO_CURRENT_INSTANCE);
+                    scopedOptions.addAll(getPorts.options);
+                    split = "[concat " + split + " " + getPorts(scopedOptions, sorted.circuitPorts) + "]";
+                }
+                sb.replace(getPorts.start, getPorts.end, split);
+            }
+            return Arrays.asList(sb.toString().split("\n", -1));
         }
 
         /**
@@ -514,7 +903,7 @@ public class ConstraintTools {
          *         whose port of that name the black box connects to it.
          */
         private boolean isDevicePin(String name) {
-            if (!topPorts.contains(name)) return false;
+            if (!topPorts.containsKey(name)) return false;
             List<String> boxPins = pins.get(name);
             if (boxPins == null) return true;
             for (String pinName : boxPins) {
