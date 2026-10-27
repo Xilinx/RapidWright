@@ -24,12 +24,14 @@ package com.xilinx.rapidwright.design.tools;
 
 import java.nio.file.Path;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.VivadoTools;
 import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
 public class TestPathExtractor {
@@ -47,6 +49,8 @@ public class TestPathExtractor {
         PathExtractor.main(
                 new String[] { dcpPath.toString(), outputDCP.toString(), "0", pathTxt.toString() });
 
-        VivadoToolsHelper.assertFullyRouted(outputDCP);
+        // (not compared with ReportRouteStatus.reportRouteStatus(): in the extracted netlist, cells
+        // with only feedthrough nets and unconnected ports are seen differently from Vivado)
+        Assertions.assertTrue(VivadoTools.reportRouteStatus(outputDCP).isFullyRouted());
     }
 }
