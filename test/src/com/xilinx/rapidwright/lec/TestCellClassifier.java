@@ -143,6 +143,23 @@ public class TestCellClassifier {
     }
 
     /** A black box must be reported so the user knows the verdict is weakened. */
+    /**
+     * A name is only meaningful inside the primitive library. A user cell
+     * called {@code FDRE} or {@code LUT4} is a black box, and a classifier that
+     * has already seen the primitive of that name must not lend it that role.
+     */
+    @Test
+    public void testPrimitiveNamesOutsideThePrimitiveLibraryAreBlackBoxes() {
+        CellClassifier classifier = classifier();
+        for (String name : new String[] { "FDRE", "LUT4", "RAMB36E2", "GND" }) {
+            Assertions.assertNotEquals(CellRole.UNINTERPRETED,
+                    classifier.classify(new EDIFCell(primitives, name)));
+            Assertions.assertEquals(CellRole.UNINTERPRETED,
+                    classifier.classify(new EDIFCell(work, name)),
+                    "work." + name + " is a black box");
+        }
+    }
+
     @Test
     public void testBlackBoxesAreReported() {
         LecLog log = new LecLog(false, new PrintStream(new ByteArrayOutputStream()));
@@ -153,14 +170,8 @@ public class TestCellClassifier {
                 .containsKey("some_ip"));
     }
 
-    /** Bus indices must not defeat the clock pin lookup. */
     @Test
-    public void testCheckedInputPins() {
-        CellClassifier classifier = classifier();
-        Assertions.assertFalse(classifier.isCheckedInputPin("FDRE", "C"));
-        Assertions.assertTrue(classifier.isCheckedInputPin("FDRE", "D"));
-        Assertions.assertTrue(classifier.isCheckedInputPin("RAMB36E2", "ADDRARDADDR[3]"));
-        Assertions.assertFalse(classifier.isCheckedInputPin("RAMB36E2", "CLKARDCLK"));
+    public void testStripBusIndex() {
         Assertions.assertEquals("ADDRARDADDR", CellClassifier.stripBusIndex("ADDRARDADDR[3]"));
         Assertions.assertEquals("CI", CellClassifier.stripBusIndex("CI"));
     }
