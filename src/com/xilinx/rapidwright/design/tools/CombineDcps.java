@@ -44,6 +44,13 @@ import com.xilinx.rapidwright.util.Params;
  * {@link DesignTools#populateBlackBox(Design, Map, boolean)}, keeping the routing on its boundary,
  * which also adds each module's constraints to the design, scoped to its black box.
  * <p>
+ * The caller is responsible for every checkpoint having each of its physical nets named after its
+ * source, as populateBlackBox() requires. This is neither checked nor made so here, as doing so
+ * costs time on every net while checkpoints written by Vivado have so far been found to satisfy it.
+ * A physical net held under another name is missed, and its signal left split across two physical
+ * nets. A checkpoint that does not satisfy it can be written again after
+ * {@link DesignTools#makePhysNetNamesConsistent(Design)}.
+ * <p>
  * From the command line, the result is written in the 2024.1 DCP format
  * ({@link Params#RW_WRITE_DCP_2024_1}), which keeps everything Vivado needs to read such a design
  * back, including its DFX state.
