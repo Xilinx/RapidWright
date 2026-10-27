@@ -187,6 +187,28 @@ public class TestLecAcceptance {
     }
 
     /**
+     * A feedthrough must be named by the input it comes from, not by the output
+     * it drives, or rewiring it to a different input would go unseen.
+     */
+    @Test
+    public void testFeedthroughFromADifferentInputFails() {
+        LecHarness result = check(LecNetlistFixtures.feedthrough("z"),
+                LecNetlistFixtures.feedthrough("w"));
+        result.assertFail();
+    }
+
+    /**
+     * What the design drives onto a bidirectional port is checked: swapping the
+     * buffers on two such ports must fail.
+     */
+    @Test
+    public void testSwappedInoutDriversFail() {
+        LecHarness result = check(LecNetlistFixtures.ioBuffersOnInouts(false),
+                LecNetlistFixtures.ioBuffersOnInouts(true));
+        result.assertFail();
+    }
+
+    /**
      * The negative cases generalised: every destructive
      * change must produce a non-zero exit code.
      */

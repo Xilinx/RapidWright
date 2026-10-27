@@ -379,6 +379,8 @@ public class LecSelfCheck {
                 return ", counter-example verified against raw INIT bit " + index
                         + " (" + (refBit ? 1 : 0) + " vs " + (impBit ? 1 : 0) + ")";
             }
+            // The independent oracle rejects the witness: the checker is wrong.
+            failures++;
             return ", *** ORACLE DISAGREES: INIT bit " + index + " is identical ***";
         }
         return ", oracle: expected pin not among reported findings";

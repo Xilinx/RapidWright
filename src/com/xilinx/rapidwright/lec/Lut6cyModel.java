@@ -70,10 +70,13 @@ public class Lut6cyModel implements PrimitiveModel {
         if (outPin.equals("GE")) {
             return new int[0];
         }
-        int arity = outPin.equals("PROP") ? 4 : 5;
-        String[] pins = new String[arity];
-        for (int i = 0; i < arity; i++) {
-            pins[i] = "I" + i;
+        // As for a plain look up table, an input the INIT ignores is not support,
+        // or a packed half can appear to sit on a loop it is not part of.
+        int[] dependent = TruthTable.dependentVars(tableOf(index, inst, outPin, false),
+                arityOf(outPin));
+        String[] pins = new String[dependent.length];
+        for (int i = 0; i < dependent.length; i++) {
+            pins[i] = "I" + dependent[i];
         }
         return ModelUtils.bitsOf(index, pins);
     }
@@ -87,29 +90,46 @@ public class Lut6cyModel implements PrimitiveModel {
                     inst == null ? null : inst.getName());
             return Aig.FALSE;
         }
-        long init = readInit(index, inst);
-        if (outPin.equals("PROP")) {
-            return TruthTableSynth.synthesize(aig, init & 0xFFFFL, 4, inputLits);
+        long table = tableOf(index, inst, outPin, true);
+        // inputLits arrives in the reduced order supportOf declared.
+        int[] dependent = TruthTable.dependentVars(table, arityOf(outPin));
+        if (dependent.length == 0) {
+            return (table & 1L) != 0 ? Aig.TRUE : Aig.FALSE;
         }
-        if (outPin.equals("O52")) {
-            return TruthTableSynth.synthesize(aig, init >>> 32, 5, inputLits);
-        }
-        return TruthTableSynth.synthesize(aig, init & 0xFFFFFFFFL, 5, inputLits);
+        return TruthTableSynth.synthesize(aig, TruthTable.project(table, dependent),
+                dependent.length, inputLits);
     }
 
-    private long readInit(CellIndex index, EDIFCellInst inst) {
+    private static int arityOf(String outPin) {
+        return outPin.equals("PROP") ? 4 : 5;
+    }
+
+    /** @return The slice of the INIT that one output computes. */
+    private long tableOf(CellIndex index, EDIFCellInst inst, String outPin, boolean warn) {
+        long init = readInit(index, inst, warn);
+        if (outPin.equals("PROP")) {
+            return init & 0xFFFFL;
+        }
+        if (outPin.equals("O52")) {
+            return init >>> 32;
+        }
+        return init & 0xFFFFFFFFL;
+    }
+
+    private long readInit(CellIndex index, EDIFCellInst inst, boolean warn) {
         String init = ModelUtils.property(inst, LUTTools.LUT_INIT, null);
         if (init == null) {
-            log.warn(LutModel.MISSING_INIT, index.getCell().getName(),
-                    inst == null ? null : inst.getName());
+            if (warn) {
+                log.warn(LutModel.MISSING_INIT, index.getCell().getName(),
+                        inst == null ? null : inst.getName());
+            }
             return 0L;
         }
         try {
             return LUTTools.getInitValue(init);
         } catch (RuntimeException e) {
-            log.warn(LutModel.MISSING_INIT, index.getCell().getName() + " has unreadable INIT '"
-                    + init + "'", inst == null ? null : inst.getName());
-            return 0L;
+            throw new LecException(index.getCell().getName() + " " + inst.getName()
+                    + " has unreadable INIT '" + init + "'");
         }
     }
 }
