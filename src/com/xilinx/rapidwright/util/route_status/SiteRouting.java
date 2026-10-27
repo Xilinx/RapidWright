@@ -47,6 +47,7 @@ import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -208,12 +209,7 @@ final class SiteRouting {
      * macro tied through the macro's ports are tied off inside their site: not followed.)
      */
     static boolean isTiedTo(Cell cell, String logicalPin, NetType staticType) {
-        EDIFHierCellInst inst;
-        // The logical cell may be looked up by name, which is not thread safe (see
-        // FlatNet.getSegments())
-        synchronized (cell.getSiteInst().getDesign().getNetlist()) {
-            inst = cell.getEDIFHierCellInst();
-        }
+        EDIFHierCellInst inst = getLogicalCell(cell.getSiteInst().getDesign(), cell);
         EDIFPortInst epi = (inst == null) ? null : inst.getInst().getPortInst(logicalPin);
         EDIFNet net = (epi == null) ? null : epi.getNet();
         EDIFHierCellInst parent = (inst == null) ? null : inst.getParent();
@@ -238,6 +234,19 @@ final class SiteRouting {
             parent = parent.getParent();
         }
         return false;
+    }
+
+    /**
+     * Gets the logical cell of a (placed, not routethru) cell, looked up by name: the one the cell
+     * refers to may be gone, e.g. after the macro primitives of the netlist were collapsed and
+     * expanded again (see RouteStatusEngine.run()).
+     */
+    static EDIFHierCellInst getLogicalCell(Design design, Cell cell) {
+        EDIFNetlist netlist = design.getNetlist();
+        // Looking up hierarchical objects by name is not thread safe
+        synchronized (netlist) {
+            return netlist.getHierCellInstFromName(cell.getName());
+        }
     }
 
     /** Checks whether a site is an I/O site (with a pad). */

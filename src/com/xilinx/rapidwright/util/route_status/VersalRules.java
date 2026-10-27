@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.util.route_status;
 
 import static com.xilinx.rapidwright.util.route_status.NodeKeys.concat;
 import static com.xilinx.rapidwright.util.route_status.NodeKeys.sortedDistinct;
+import static com.xilinx.rapidwright.util.route_status.SiteRouting.getLogicalCell;
 import static com.xilinx.rapidwright.util.route_status.SiteRouting.getSiteTypes;
 
 import java.util.ArrayList;
@@ -87,7 +88,7 @@ final class VersalRules {
                 if (!Arrays.asList(SHARED_ROUTING_CLOCK_BUFFERS).contains(cell.getType())) {
                     continue;
                 }
-                EDIFHierCellInst inst = cell.getEDIFHierCellInst();
+                EDIFHierCellInst inst = getLogicalCell(design, cell);
                 List<Integer> others = new ArrayList<>();
                 int routed = (inst == null) ? -1 : findRoutedOutput(inst, entries, flatNetlist, others);
                 if (routed < 0) {

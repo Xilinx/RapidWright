@@ -31,6 +31,7 @@ import static com.xilinx.rapidwright.util.route_status.NetStatus.ROUTED;
 import static com.xilinx.rapidwright.util.route_status.NetStatus.UNROUTED;
 import static com.xilinx.rapidwright.util.route_status.NetStatus.has;
 import static com.xilinx.rapidwright.util.route_status.RouteStatusEngine.parallelFor;
+import static com.xilinx.rapidwright.util.route_status.SiteRouting.getLogicalCell;
 import static com.xilinx.rapidwright.util.route_status.SiteRouting.isBlockRamSite;
 import static com.xilinx.rapidwright.util.route_status.SiteRouting.isClockBufferSite;
 import static com.xilinx.rapidwright.util.route_status.SiteRouting.isReachableThroughRouting;
@@ -137,7 +138,7 @@ final class Series7Rules {
             List<EDIFHierPortInst> pins = new ArrayList<>();
             boolean invalid = routethruInvalid;
             for (Cell cell : si.getCells()) {
-                EDIFHierCellInst inst = cell.isRoutethru() ? null : cell.getEDIFHierCellInst();
+                EDIFHierCellInst inst = cell.isRoutethru() ? null : getLogicalCell(design, cell);
                 if (inst == null) {
                     continue;
                 }
@@ -328,7 +329,7 @@ final class Series7Rules {
                 continue;
             }
             for (Cell cell : si.getCells()) {
-                EDIFHierCellInst inst = cell.isRoutethru() ? null : cell.getEDIFHierCellInst();
+                EDIFHierCellInst inst = cell.isRoutethru() ? null : getLogicalCell(design, cell);
                 if (inst == null) {
                     continue;
                 }

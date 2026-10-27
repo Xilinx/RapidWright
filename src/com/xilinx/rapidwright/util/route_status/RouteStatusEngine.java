@@ -216,14 +216,21 @@ public final class RouteStatusEngine {
             return false;
         }
         for (Cell cell : design.getCells()) {
-            String name = cell.getName();
-            int sep = name.lastIndexOf(EDIFTools.EDIF_HIER_SEP);
-            if (cell.isRoutethru() || sep < 0) {
+            if (cell.isRoutethru()) {
                 continue;
             }
-            EDIFHierCellInst parent = netlist.getHierCellInstFromName(name.substring(0, sep));
-            if (parent != null && collapsed.contains(parent.getCellType())) {
-                return true;
+            // The closest instance above the cell in the netlist (macros may be nested, e.g. DSP58C in
+            // DSP58)
+            String name = cell.getName();
+            for (int sep = name.lastIndexOf(EDIFTools.EDIF_HIER_SEP); sep > 0;
+                    sep = name.lastIndexOf(EDIFTools.EDIF_HIER_SEP, sep - 1)) {
+                EDIFHierCellInst parent = netlist.getHierCellInstFromName(name.substring(0, sep));
+                if (parent != null) {
+                    if (collapsed.contains(parent.getCellType())) {
+                        return true;
+                    }
+                    break;
+                }
             }
         }
         return false;
