@@ -30,7 +30,6 @@ import java.util.concurrent.Future;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
-import com.xilinx.rapidwright.design.xdc.ConstraintTools;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.Params;
@@ -42,13 +41,12 @@ import com.xilinx.rapidwright.util.Params;
  * {@code read_checkpoint -cell} and {@code link_design}.
  * <p>
  * The checkpoints are read in parallel. Each black box is filled with
- * {@link DesignTools#populateBlackBox(Design, Map, boolean)}, keeping the routing on its boundary.
- * Physical nets whose names Vivado would resolve to another logical net are renamed
- * ({@link DesignTools#renameAmbiguousPhysNets(Design)}), and each module's constraints are added to
- * the design, scoped to its black box ({@link ConstraintTools#addBlackBoxConstraints(Design, Map)}).
+ * {@link DesignTools#populateBlackBox(Design, Map, boolean)}, keeping the routing on its boundary,
+ * which also adds each module's constraints to the design, scoped to its black box.
  * <p>
- * The result is written in the 2024.1 DCP format, which keeps everything Vivado needs to read such
- * a design back, including its DFX state.
+ * From the command line, the result is written in the 2024.1 DCP format
+ * ({@link Params#RW_WRITE_DCP_2024_1}), which keeps everything Vivado needs to read such a design
+ * back, including its DFX state.
  * <p>
  * A checkpoint with encrypted cells needs a readable EDIF, as for {@link Design#readCheckpoint(Path)}:
  * either one with the same name next to it (foo.dcp -> foo.edf), or one generated with Vivado.
@@ -68,7 +66,10 @@ public class CombineDcps {
      * @param staticDcp The design with the black boxes.
      * @param modules   The checkpoint to fill each black box with, keyed by the hierarchical name of
      *                  the black box cell.
-     * @param outputDcp Where to write the combined design.
+     * @param outputDcp Where to write the combined design, in the DCP format that
+     *                  {@link Params#RW_WRITE_DCP_2024_1} selects. That format should be the 2024.1
+     *                  one, as {@link #main(String[])} selects, for Vivado to read the design back
+     *                  with its DFX state.
      * @return The combined design.
      */
     public static Design combine(Path staticDcp, Map<String, Path> modules, Path outputDcp) {
@@ -88,19 +89,9 @@ public class CombineDcps {
 
         t.stop().start("Populate black boxes");
         DesignTools.populateBlackBox(design, blackBoxes, true);
-        DesignTools.renameAmbiguousPhysNets(design);
-
-        t.stop().start("Add constraints");
-        ConstraintTools.addBlackBoxConstraints(design, blackBoxes);
 
         t.stop().start("Write DCP");
-        boolean orig2024Dot1 = Params.RW_WRITE_DCP_2024_1;
-        Params.RW_WRITE_DCP_2024_1 = true;
-        try {
-            design.writeCheckpoint(outputDcp, CodePerfTracker.SILENT);
-        } finally {
-            Params.RW_WRITE_DCP_2024_1 = orig2024Dot1;
-        }
+        design.writeCheckpoint(outputDcp, CodePerfTracker.SILENT);
         t.stop().printSummary();
         return design;
     }
@@ -142,6 +133,15 @@ public class CombineDcps {
         if (!Files.isRegularFile(staticDcp)) {
             throw new IllegalArgumentException("Checkpoint not found: " + staticDcp);
         }
-        combine(staticDcp, parseModules(args, 2), Paths.get(args[1]));
+        Map<String, Path> modules = parseModules(args, 2);
+        // The format is a process-wide setting, so it is selected here, for the command line, rather
+        // than in combine(). It is restored for a caller that runs this inside its own process
+        boolean orig2024Dot1 = Params.RW_WRITE_DCP_2024_1;
+        Params.RW_WRITE_DCP_2024_1 = true;
+        try {
+            combine(staticDcp, modules, Paths.get(args[1]));
+        } finally {
+            Params.RW_WRITE_DCP_2024_1 = orig2024Dot1;
+        }
     }
 }
