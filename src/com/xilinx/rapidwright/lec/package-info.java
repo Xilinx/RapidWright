@@ -44,7 +44,9 @@
  * <i>logical</i> netlist is read, never the device database or the physical
  * netlist. The exit code is {@code 0} when every checked cone is proven
  * equivalent, {@code 1} when anything differs or could not be decided, and
- * {@code 2} on a tool error such as an unreadable netlist. For a large design,
+ * {@code 2} on a tool error such as an unreadable netlist. With a waiver such
+ * as {@code --allow-inconclusive}, {@code 0} means only that nothing was found
+ * to differ; the report counts what was waived. For a large design,
  * raise the heap, for example
  * {@code JAVA_TOOL_OPTIONS=-Xmx48g rapidwright LogicEquivalenceChecker ...}.
  * As a rough guide, allow about 20 GB of heap per million leaf primitives.
@@ -93,9 +95,7 @@
  * <ol>
  * <li><b>Load.</b> {@link com.xilinx.rapidwright.lec.NetlistLoader} reads the
  * EDIF straight out of the checkpoint without calling
- * {@code Design.readCheckpoint}. The reference is elaborated and its EDIF
- * released before the implementation is read, so only one heavy netlist is
- * ever resident.</li>
+ * {@code Design.readCheckpoint}.</li>
  * <li><b>Flatten and connect.</b>
  * {@link com.xilinx.rapidwright.lec.FlatNetlist} flattens to leaf primitives
  * and {@link com.xilinx.rapidwright.lec.ConnectivityBuilder} unions every net

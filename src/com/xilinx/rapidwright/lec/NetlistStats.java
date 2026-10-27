@@ -174,7 +174,10 @@ public class NetlistStats {
                 || typeName.startsWith("DSP") || typeName.equals("CFGLUT5");
     }
 
-    /** Top level ports are terminals: inputs are sources, outputs are cone roots. */
+    /**
+     * Top level ports are terminals: inputs are sources, outputs are cone roots,
+     * and bidirectional ports are both.
+     */
     private void countTopPorts(FlatNetlist flat) {
         int topId = flat.getTopInstId();
         if (flat.isLeaf(topId)) {
@@ -193,6 +196,7 @@ public class NetlistStats {
                 checkedPinCount++;
             } else if (dir == EDIFDirection.INOUT) {
                 topInoutBits++;
+                checkedPinCount++;
             }
         }
     }

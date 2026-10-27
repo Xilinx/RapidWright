@@ -646,6 +646,50 @@ public class LecNetlistFixtures {
 
 
     /**
+     * A top level output {@code a} fed straight from input {@code source}. The
+     * output sorts before both candidate inputs, {@code w} and {@code z}, so
+     * the node's first port is the output rather than its source.
+     */
+    public static EDIFNetlist feedthrough(String source) {
+        LecNetlistFixtures fixture = new LecNetlistFixtures("top");
+        EDIFCell top = fixture.getTop();
+        port(top, "a", EDIFDirection.OUTPUT);
+        port(top, "w", EDIFDirection.INPUT);
+        port(top, "z", EDIFDirection.INPUT);
+        add(top, "GND", fixture.gnd());
+        connect(top, "n", top, source, top, "a");
+        return fixture.getNetlist();
+    }
+
+    /**
+     * Two IOBUFs, driven from inputs {@code a} and {@code b}, onto the
+     * bidirectional ports {@code p} and {@code q}, or onto {@code q} and
+     * {@code p} when swapped.
+     */
+    public static EDIFNetlist ioBuffersOnInouts(boolean swapped) {
+        LecNetlistFixtures fixture = new LecNetlistFixtures("top");
+        EDIFCell top = fixture.getTop();
+        port(top, "a", EDIFDirection.INPUT);
+        port(top, "b", EDIFDirection.INPUT);
+        port(top, "p", EDIFDirection.INOUT);
+        port(top, "q", EDIFDirection.INOUT);
+        EDIFCell iobuf = fixture.primitive("IOBUF", new String[] { "I", "T" },
+                new String[] { "O" });
+        if (iobuf.getPort("IO") == null) {
+            iobuf.createPort("IO", EDIFDirection.INOUT, 1);
+        }
+        EDIFCellInst iobA = add(top, "iob_a", iobuf);
+        EDIFCellInst iobB = add(top, "iob_b", iobuf);
+        EDIFCellInst gndInst = add(top, "GND", fixture.gnd());
+        connect(top, "a", top, "a", iobA, "I");
+        connect(top, "b", top, "b", iobB, "I");
+        connect(top, "gnd", gndInst, "G", iobA, "T", iobB, "T");
+        connect(top, "p", top, "p", swapped ? iobB : iobA, "IO");
+        connect(top, "q", top, "q", swapped ? iobA : iobB, "IO");
+        return fixture.getNetlist();
+    }
+
+    /**
      * Complements the contents of every look up table in a netlist, which is a
      * blunt but reliable way to make a real design compute different logic.
      *

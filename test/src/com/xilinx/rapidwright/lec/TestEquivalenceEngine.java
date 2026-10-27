@@ -150,6 +150,20 @@ public class TestEquivalenceEngine {
     }
 
     /**
+     * A black box keeps its name but not its function: the same name in both
+     * netlists says nothing about what reaches its inputs, so the cones it
+     * feeds must still be inconclusive rather than proven by structural hash.
+     */
+    @Test
+    public void testSameNamedBlackBoxIsNotProven() {
+        LecHarness result = LecHarness.run(LecNetlistFixtures.blackBoxDriven("bb_one"),
+                LecNetlistFixtures.blackBoxDriven("bb_one"));
+        Assertions.assertTrue(result.getReport().getCount(LecDifferenceType.CONE_INCONCLUSIVE) > 0,
+                "A cone through a black box must not be certified");
+        result.assertFail();
+    }
+
+    /**
      * An undecided cone must fail by default, since presenting an unproven
      * result as a pass would be unsound, but the caller can choose otherwise.
      */

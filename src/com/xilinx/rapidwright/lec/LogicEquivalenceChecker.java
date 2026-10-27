@@ -55,12 +55,10 @@ import com.xilinx.rapidwright.util.RuntimeTrackerTree;
  * and equivalence is then an integer comparison. Whatever that does not settle
  * escalates to simulation and then to a solver.
  *
- * The reference is elaborated first and its EDIF object graph released before
- * the implementation is read, so only one netlist is ever resident.
- *
  * <h2>Exit codes</h2>
  * <ul>
- * <li>0 - PASS, every checked cone proven equivalent</li>
+ * <li>0 - PASS, every checked cone proven equivalent, or nothing found to
+ * differ when undecided cones or pre-existing loops were explicitly waived</li>
  * <li>1 - FAIL, at least one cone differs or could not be decided</li>
  * <li>2 - tool error, no verdict was reached</li>
  * </ul>
