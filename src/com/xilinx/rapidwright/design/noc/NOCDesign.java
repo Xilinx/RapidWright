@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Represents the Network-on-Chip solution for the current design
@@ -48,7 +49,7 @@ import java.util.Set;
  */
 public class NOCDesign implements Serializable {
 
-    private static final long serialVersionUID = -1303425805455056695L;
+    private static final long serialVersionUID = 1981204940249783931L;
 
     private Design design;
 
@@ -59,6 +60,10 @@ public class NOCDesign implements Serializable {
     private Map<String,NOCMaster> masterClients;
     private Map<String,NOCSlave> slaveClients;
     private Map<String,Integer> switchDestIDs;
+    /** Port-indexed solution components without a client (e.g. unused DDRMC ports), as JSON */
+    private List<String> unusedPortComponents;
+    /** Sites of client components in the loaded solution, with their port indices (if any) */
+    private Map<String,Set<Integer>> loadedClientSites;
     private List<NOCConnection> nocConnections;
     private List<String> dfxPaths; //List of RP cell names
 
@@ -85,6 +90,8 @@ public class NOCDesign implements Serializable {
         nocConnections = new ArrayList<NOCConnection>();
         dfxPaths = new ArrayList<String>();
         switchDestIDs = new HashMap<String,Integer>();
+        unusedPortComponents = new ArrayList<String>();
+        loadedClientSites = new HashMap<String,Set<Integer>>();
         isRouted = false;
         lockAllDestIDs = false;
         solutionType = SolutionType.NO_SOLUTION;
@@ -398,6 +405,9 @@ public class NOCDesign implements Serializable {
 
         //Components
         JSONArray componentArray = jsonSolution.getJSONArray(NOCJSONUtil.JSON_FIELD_COMPONENTS);
+        // State that describes one loaded solution (a later load replaces it)
+        unusedPortComponents.clear();
+        loadedClientSites.clear();
         for (int i=0; i<componentArray.length(); i++) {
             JSONObject component = componentArray.getJSONObject(i);
             if (!component.has(NOCJSONUtil.JSON_FIELD_DEST_ID) || !component.has(NOCJSONUtil.JSON_FIELD_NAME)) {
@@ -405,8 +415,17 @@ public class NOCDesign implements Serializable {
             }
             int destID = component.getInt(NOCJSONUtil.JSON_FIELD_DEST_ID);
             if (!component.has(NOCJSONUtil.JSON_FIELD_LOGICAL_INST)) {
-                switchDestIDs.put(component.getString(NOCJSONUtil.JSON_FIELD_NAME), destID);
+                if (component.has(NOCJSONUtil.JSON_FIELD_PORT_INDEX)) {
+                    unusedPortComponents.add(component.toString());
+                } else {
+                    switchDestIDs.put(component.getString(NOCJSONUtil.JSON_FIELD_NAME), destID);
+                }
                 continue;
+            }
+            Set<Integer> ports = loadedClientSites.computeIfAbsent(
+                    component.getString(NOCJSONUtil.JSON_FIELD_NAME), k -> new TreeSet<Integer>());
+            if (component.has(NOCJSONUtil.JSON_FIELD_PORT_INDEX)) {
+                ports.add(component.getInt(NOCJSONUtil.JSON_FIELD_PORT_INDEX));
             }
             String cellName = component.getString(NOCJSONUtil.JSON_FIELD_LOGICAL_INST);
             if (cellName == null)
@@ -432,7 +451,8 @@ public class NOCDesign implements Serializable {
             for (int i=0; i<pathArray.length(); i++) {
                 JSONObject pathSolution = pathArray.getJSONObject(i);
                 NOCMaster master = masterClients.get(pathSolution.getString(NOCJSONUtil.JSON_FIELD_FROM_CELL));
-                NOCConnection path = master.getConnectionTo(pathSolution.getString(NOCJSONUtil.JSON_FIELD_TO_CELL));
+                NOCConnection path = master.getConnectionTo(pathSolution.getString(NOCJSONUtil.JSON_FIELD_TO_CELL),
+                        pathSolution.optString(NOCJSONUtil.JSON_FIELD_PORT, null));
                 path.parseRoute(pathSolution);
             }
             isRouted = true;
@@ -493,7 +513,8 @@ public class NOCDesign implements Serializable {
                 phyComponents.remove(loc);
                 int numPorts = 1;
                 if (clt.isDDRC()) {
-                    numPorts = 4;
+                    // DDRMC (Gen 1) has 4 NoC ports, DDRMC5E (Gen 2) has 2
+                    numPorts = clt.getComponentType() == ComponentType.DDR5E ? 2 : 4;
                 }
                 for (int i = 0; i < numPorts; i++) {
                     JSONObject component = NOCJSONUtil.createOrderedJSONObject();
@@ -514,7 +535,42 @@ public class NOCDesign implements Serializable {
                 }
             }
             Device dev = design.getDevice();
+            Set<String> clientSites = new HashSet<String>();
+            for (NOCClient clt : getClients().values()) {
+                clientSites.add(clt.getLocation());
+            }
+            for (String json : unusedPortComponents) {
+                JSONObject component = new JSONObject(json);
+                if (!clientSites.contains(component.getString(NOCJSONUtil.JSON_FIELD_NAME))) {
+                    nocSolution.append(NOCJSONUtil.JSON_FIELD_COMPONENTS, component);
+                }
+            }
+            // Sites vacated by clients that have moved since the solution was loaded
+            for (Entry<String, Set<Integer>> e : loadedClientSites.entrySet()) {
+                String site = e.getKey();
+                if (clientSites.contains(site) || switchDestIDs.containsKey(site)) {
+                    continue;
+                }
+                // One unused entry per port for memory controllers, as Vivado writes them
+                List<Integer> ports = new ArrayList<Integer>(e.getValue());
+                if (ports.isEmpty()) {
+                    ports.add(null);
+                }
+                for (Integer port : ports) {
+                    JSONObject component = NOCJSONUtil.createOrderedJSONObject();
+                    component.put(NOCJSONUtil.JSON_FIELD_NAME, site);
+                    component.put(NOCJSONUtil.JSON_FIELD_DEST_ID, 0);
+                    if (port != null) {
+                        component.put(NOCJSONUtil.JSON_FIELD_PORT_INDEX, port.intValue());
+                    }
+                    nocSolution.append(NOCJSONUtil.JSON_FIELD_COMPONENTS, component);
+                }
+            }
             for (Entry<String, Integer> e : switchDestIDs.entrySet()) {
+                if (clientSites.contains(e.getKey())) {
+                    // Now occupied by a client that has moved there
+                    continue;
+                }
                 JSONObject component = NOCJSONUtil.createOrderedJSONObject();
                 component.put(NOCJSONUtil.JSON_FIELD_NAME, e.getKey());
                 component.put(NOCJSONUtil.JSON_FIELD_DEST_ID, e.getValue().intValue());
