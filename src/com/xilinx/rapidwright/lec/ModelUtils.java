@@ -70,27 +70,35 @@ public class ModelUtils {
             return defaultValue;
         }
         String value = raw.trim();
-        int quote = value.indexOf('\'');
-        if (quote >= 0 && quote + 2 <= value.length() - 1) {
-            return parseSizedLiteral(value.substring(quote + 1), defaultValue);
-        }
         if (value.equalsIgnoreCase("TRUE") || value.equalsIgnoreCase("yes")) {
             return true;
         }
         if (value.equalsIgnoreCase("FALSE") || value.equalsIgnoreCase("no")) {
             return false;
         }
-        return parseDigits(value, defaultValue);
+        Long bits = parseLiteral(value);
+        return bits == null ? defaultValue : bits != 0;
+    }
+
+    /**
+     * Parses a Verilog sized literal such as {@code 4'b0010}, or plain decimal
+     * digits.
+     *
+     * @return The value, or null if it cannot be read.
+     */
+    private static Long parseLiteral(String value) {
+        int quote = value.indexOf('\'');
+        if (quote >= 0 && quote + 2 <= value.length() - 1) {
+            return parseSizedLiteral(value.substring(quote + 1));
+        }
+        return parseDigits(value);
     }
 
     /**
      * Interprets the part of a Verilog sized literal after the apostrophe, such
-     * as the {@code b1} of {@code 1'b1}. Any non-zero value is true.
+     * as the {@code b1} of {@code 1'b1}.
      */
-    private static boolean parseSizedLiteral(String tail, boolean defaultValue) {
-        if (tail.isEmpty()) {
-            return defaultValue;
-        }
+    private static Long parseSizedLiteral(String tail) {
         int radix;
         switch (Character.toLowerCase(tail.charAt(0))) {
         case 'b':
@@ -106,20 +114,20 @@ public class ModelUtils {
             radix = 16;
             break;
         default:
-            return parseDigits(tail, defaultValue);
+            return parseDigits(tail);
         }
         try {
-            return Long.parseLong(tail.substring(1).trim(), radix) != 0;
+            return Long.parseLong(tail.substring(1).trim(), radix);
         } catch (NumberFormatException e) {
-            return defaultValue;
+            return null;
         }
     }
 
-    private static boolean parseDigits(String value, boolean defaultValue) {
+    private static Long parseDigits(String value) {
         try {
-            return Long.parseLong(value) != 0;
+            return Long.parseLong(value);
         } catch (NumberFormatException e) {
-            return defaultValue;
+            return null;
         }
     }
 
@@ -129,6 +137,29 @@ public class ModelUtils {
      */
     public static boolean isPinInverted(EDIFCellInst inst, String pinName) {
         return booleanProperty(inst, "IS_" + pinName + "_INVERTED", false);
+    }
+
+    /**
+     * @return True if one bit of a pin is inverted. A bus pin such as
+     *         {@code ALUMODE} carries a per bit mask, as in
+     *         {@code IS_ALUMODE_INVERTED = 4'b0010}, so only the bits set in the
+     *         mask are inverted.
+     */
+    public static boolean isPinBitInverted(EDIFCellInst inst, String basePinName, int bit) {
+        String raw = property(inst, "IS_" + basePinName + "_INVERTED", null);
+        if (raw == null) {
+            return false;
+        }
+        String value = raw.trim();
+        if (value.equalsIgnoreCase("TRUE") || value.equalsIgnoreCase("FALSE")) {
+            return bit == 0 && value.equalsIgnoreCase("TRUE");
+        }
+        Long mask = parseLiteral(value);
+        if (mask == null) {
+            throw new LecException("Unreadable IS_" + basePinName + "_INVERTED value '" + raw
+                    + "' on " + inst.getName());
+        }
+        return bit < 64 && ((mask >>> bit) & 1L) != 0;
     }
 
     /**

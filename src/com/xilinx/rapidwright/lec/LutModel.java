@@ -137,11 +137,9 @@ public class LutModel implements PrimitiveModel {
         try {
             value = LUTTools.getInitValue(init);
         } catch (RuntimeException e) {
-            if (warn) {
-                log.warn(MISSING_INIT, index.getCell().getName() + " has unreadable INIT '" + init
-                        + "'", inst == null ? null : inst.getName());
-            }
-            return 0L;
+            // Reading it as zero would let two different unreadable tables pass.
+            throw new LecException(index.getCell().getName() + " " + inst.getName()
+                    + " has unreadable INIT '" + init + "'");
         }
         return value & TruthTable.widthMask(arity);
     }

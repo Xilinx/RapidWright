@@ -290,6 +290,9 @@ public class TestPrimitiveModels {
                 new String[] { "O51", "O52", "PROP", "GE" });
         CellIndex index = CellIndex.get(cell);
         EDIFCellInst inst = instanceOf(cell, "lc");
+        // Parity of all six INIT index bits, so every slice depends on every input
+        // it can see and the support is decided by the pin alone.
+        LecNetlistFixtures.setProperty(inst, "INIT", "64'h6996966996696996");
         PrimitiveModel model = new Lut6cyModel(log);
 
         Assertions.assertEquals(new TreeSet<>(Arrays.asList("I0", "I1", "I2", "I3")),
@@ -299,6 +302,36 @@ public class TestPrimitiveModels {
                 supportNames(model, index, inst, "O51"));
         Assertions.assertTrue(supportNames(model, index, inst, "GE").isEmpty(),
                 "GE is never driven in the golden model");
+    }
+
+    /**
+     * A bus inversion attribute is a mask: only the bits set in it are inverted.
+     */
+    @Test
+    public void testBusInversionMaskIsPerBit() {
+        EDIFCell cell = fixture.primitive("DSP48E2", new String[] { "A" }, new String[] { "P" });
+        EDIFCellInst inst = instanceOf(cell, "dsp");
+        LecNetlistFixtures.setProperty(inst, "IS_ALUMODE_INVERTED", "4'b0010");
+        for (int bit = 0; bit < 4; bit++) {
+            Assertions.assertEquals(bit == 1, ModelUtils.isPinBitInverted(inst, "ALUMODE", bit),
+                    "ALUMODE[" + bit + "]");
+        }
+    }
+
+    /**
+     * As for a plain look up table, an input the INIT ignores is not support.
+     * Otherwise feedback into that input would be reported as a loop.
+     */
+    @Test
+    public void testLut6cySupportFollowsTheInit() {
+        EDIFCell cell = fixture.primitive("LUT6CY",
+                new String[] { "I0", "I1", "I2", "I3", "I4" },
+                new String[] { "O51", "O52", "PROP", "GE" });
+        EDIFCellInst inst = instanceOf(cell, "lc");
+        LecNetlistFixtures.setProperty(inst, "INIT", "64'hAAAAAAAAAAAAAAAA");
+        Assertions.assertEquals(new TreeSet<>(Arrays.asList("I0")),
+                supportNames(new Lut6cyModel(log), CellIndex.get(cell), inst, "O51"),
+                "INIT 0xAAAA... is I0 alone");
     }
 
     /**
