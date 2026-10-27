@@ -252,16 +252,22 @@ final class RouteGraph {
      * {@link #fanoutStart}, not yet summed), stubs and routethrus.
      */
     private void addEdges(Edges edges, int[] startIdx, int[] endIdx) {
+        boolean[] drivenForward = new boolean[nodes.length];
         for (int e = 0; e < edges.count; e++) {
             nodeObjects[startIdx[e]] = edges.startNodes[e];
             nodeObjects[endIdx[e]] = edges.endNodes[e];
             fanoutStart[startIdx[e] + 1]++;
             hasForwardFanout[startIdx[e]] = true;
-            if (driven[endIdx[e]] && !edges.isReversed[e]) {
-                if (drivenAgain == null) {
-                    drivenAgain = new boolean[nodes.length];
+            if (!edges.isReversed[e]) {
+                // (only PIPs used forward count: whatever the order the PIPs are stored in, a node
+                // reached backwards through a bidirectional PIP is not driven twice)
+                if (drivenForward[endIdx[e]]) {
+                    if (drivenAgain == null) {
+                        drivenAgain = new boolean[nodes.length];
+                    }
+                    drivenAgain[endIdx[e]] = true;
                 }
-                drivenAgain[endIdx[e]] = true;
+                drivenForward[endIdx[e]] = true;
             }
             driven[endIdx[e]] = true;
             if (edges.isBidir[e]) {

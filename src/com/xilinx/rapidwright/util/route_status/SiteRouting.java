@@ -163,10 +163,17 @@ final class SiteRouting {
         }
     }
 
-    /** Checks whether a BEL pin is the only input of its BEL, with a site PIP through the BEL */
+    /**
+     * Checks whether a BEL pin is the only input of its BEL, with a site PIP through the BEL, or the D
+     * input of an input mux register (IMR) of a Versal slice, which passes it through when no cell
+     * uses the register (RapidWright's site routing does not always store that routethru).
+     */
     static boolean isPassThroughPin(BELPin pin) {
         if (pin.getSitePIPs().isEmpty()) {
             return false;
+        }
+        if (pin.getName().equals("D") && pin.getBELName().endsWith("_IMR")) {
+            return true;
         }
         for (BELPin other : pin.getBEL().getPins()) {
             if (other != pin && other.isInput()) {
