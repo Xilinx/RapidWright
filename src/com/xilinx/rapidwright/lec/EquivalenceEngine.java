@@ -233,7 +233,7 @@ public class EquivalenceEngine {
             if (satSecondsUsed >= config.getSatBudgetSec()) {
                 cache.put(entry.getKey(), inconclusive(task,
                         "the overall solver budget of " + config.getSatBudgetSec()
-                                + " seconds was exhausted"));
+                                + " seconds was exhausted; consider raising --sat-budget"));
                 continue;
             }
             cache.put(entry.getKey(), solveOne(task));
@@ -290,7 +290,8 @@ public class EquivalenceEngine {
                     "the solver found a differing input assignment", result.getCounterExample());
         default:
             return inconclusive(task, "the solver reached its "
-                    + config.getSatTimeoutSec() + " second limit without deciding");
+                    + config.getSatTimeoutSec() + " second limit without deciding; consider "
+                    + "raising --sat-timeout");
         }
     }
 
