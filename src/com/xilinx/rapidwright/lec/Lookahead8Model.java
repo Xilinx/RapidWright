@@ -59,7 +59,9 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
  *
  * The {@code LOOK} attributes are fixed at build time, so they fold away to
  * constants; with all of them false the whole cell reduces to
- * {@code COUTx = CYx}.
+ * {@code COUTx = CYx}. Support follows suit: an input the configured function
+ * no longer reads is not support, or feedback into it, such as {@code COUTB}
+ * into {@code CIN} with {@code LOOKB} false, would be reported as a loop.
  *
  * The four outputs form a strictly increasing chain, {@code COUTB} then
  * {@code COUTD} then {@code COUTF} then {@code COUTH}, so the cell is
@@ -102,13 +104,47 @@ public class Lookahead8Model implements PrimitiveModel {
         if (stage < 0) {
             return null;
         }
-        return ModelUtils.bitsOf(index, supportPins(stage));
+        String[] candidates = supportPins(stage);
+        int[] live = liveInputs(inst, stage, candidates.length);
+        String[] pins = new String[live.length];
+        for (int i = 0; i < live.length; i++) {
+            pins[i] = candidates[live[i]];
+        }
+        return ModelUtils.bitsOf(index, pins);
     }
 
     @Override
     public int build(Aig aig, CellIndex index, EDIFCellInst inst, int outPortBit,
             int[] inputLits) {
         int stage = stageOf(index.getPortBitName(outPortBit));
+        // inputLits holds only the live inputs, in the order supportOf declared.
+        // Every other candidate is provably unread, so any constant will do.
+        int[] lits = new int[supportPins(stage).length];
+        int[] live = liveInputs(inst, stage, lits.length);
+        for (int i = 0; i < live.length; i++) {
+            lits[live[i]] = inputLits[i];
+        }
+        return buildStage(aig, inst, stage, lits);
+    }
+
+    /**
+     * @return The positions, among a stage's candidate inputs, of those its
+     *         function reads once the {@code LOOK} attributes are folded in,
+     *         ascending. Found by building the stage over fresh variables and
+     *         keeping the ones left in its cone.
+     */
+    private static int[] liveInputs(EDIFCellInst inst, int stage, int candidateCount) {
+        Aig scratch = new Aig();
+        int[] lits = new int[candidateCount];
+        for (int i = 0; i < candidateCount; i++) {
+            lits[i] = scratch.newInput(Integer.toString(i), true);
+        }
+        int root = buildStage(scratch, inst, stage, lits);
+        return new AigSupport(scratch).support(root);
+    }
+
+    /** Builds one stage over the full candidate input layout of supportPins. */
+    private static int buildStage(Aig aig, EDIFCellInst inst, int stage, int[] inputLits) {
         int pairs = 2 * (stage + 1);
         int cin = inputLits[0];
         int[] prop = new int[pairs];

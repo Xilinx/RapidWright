@@ -300,8 +300,8 @@ public class TestPrimitiveModels {
                 "PROP must not depend on I4");
         Assertions.assertEquals(new TreeSet<>(Arrays.asList("I0", "I1", "I2", "I3", "I4")),
                 supportNames(model, index, inst, "O51"));
-        Assertions.assertTrue(supportNames(model, index, inst, "GE").isEmpty(),
-                "GE is never driven in the golden model");
+        Assertions.assertNull(model.supportOf(index, inst, index.portBitIndexOfPinName("GE")),
+                "GE is never driven in the golden model, so it has no function to model");
     }
 
     /**
@@ -316,6 +316,19 @@ public class TestPrimitiveModels {
             Assertions.assertEquals(bit == 1, ModelUtils.isPinBitInverted(inst, "ALUMODE", bit),
                     "ALUMODE[" + bit + "]");
         }
+    }
+
+    /**
+     * A boolean attribute that is present but unreadable is an error, not its
+     * default: guessing could build the same function from two settings.
+     */
+    @Test
+    public void testUnreadableBooleanPropertyIsAnError() {
+        EDIFCell cell = lookahead8Cell();
+        EDIFCellInst inst = instanceOf(cell, "la");
+        LecNetlistFixtures.setProperty(inst, "LOOKB", "SOMETIMES");
+        Assertions.assertThrows(LecException.class,
+                () -> ModelUtils.booleanProperty(inst, "LOOKB", false));
     }
 
     /**
@@ -355,26 +368,28 @@ public class TestPrimitiveModels {
         int o51 = buildOutput(aig, model, index, inst, pins, "O51");
         int o52 = buildOutput(aig, model, index, inst, pins, "O52");
         int prop = buildOutput(aig, model, index, inst, pins, "PROP");
-        int ge = buildOutput(aig, model, index, inst, pins, "GE");
 
         AigEvaluation evaluation = evaluateInPinOrder(aig, pins, "I0", "I1", "I2", "I3", "I4");
         Assertions.assertEquals(init & 0xFFFFFFFFL, evaluation.tableOf(o51, 5));
         Assertions.assertEquals(init >>> 32, evaluation.tableOf(o52, 5));
         Assertions.assertEquals(init & 0xFFFFL, evaluation.tableOf(prop, 4));
-        Assertions.assertEquals(Aig.FALSE, ge, "GE must be constant zero");
     }
 
     // ------------------------------------------------------------ LOOKAHEAD8
 
     /**
-     * The four carry outputs form a strictly increasing chain, and the group
-     * enable inputs have no effect at all in the golden model.
+     * With lookahead enabled, the four carry outputs form a strictly increasing
+     * chain, and the group enable inputs have no effect at all in the golden
+     * model.
      */
     @Test
     public void testLookahead8SupportGrowsAndIgnoresGroupEnables() {
         EDIFCell cell = lookahead8Cell();
         CellIndex index = CellIndex.get(cell);
         EDIFCellInst inst = instanceOf(cell, "la");
+        for (String look : new String[] { "LOOKB", "LOOKD", "LOOKF", "LOOKH" }) {
+            LecNetlistFixtures.setProperty(inst, look, "TRUE");
+        }
         PrimitiveModel model = new Lookahead8Model();
 
         TreeSet<String> coutB = supportNames(model, index, inst, "COUTB");
@@ -389,6 +404,20 @@ public class TestPrimitiveModels {
         }
         Assertions.assertEquals(new TreeSet<>(Arrays.asList("CIN", "PROPA", "PROPB", "CYA",
                 "CYB")), coutB);
+    }
+
+    /**
+     * Support follows the {@code LOOK} attributes: with {@code LOOKB} false,
+     * {@code COUTB} is {@code CYB} alone, so feedback into {@code CIN} is not a
+     * loop.
+     */
+    @Test
+    public void testLookahead8SupportFollowsLookAttributes() {
+        EDIFCell cell = lookahead8Cell();
+        EDIFCellInst inst = instanceOf(cell, "la");
+        LecNetlistFixtures.setProperty(inst, "LOOKB", "FALSE");
+        Assertions.assertEquals(new TreeSet<>(Arrays.asList("CYB")),
+                supportNames(new Lookahead8Model(), CellIndex.get(cell), inst, "COUTB"));
     }
 
     /**
