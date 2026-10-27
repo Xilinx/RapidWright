@@ -94,10 +94,12 @@ public class CellClassifier {
      * two netlists exactly as it does for any other terminal, and treating it
      * as an opaque terminal is both sound and matchable.
      *
-     * A black box is user or IP logic whose contents were not elaborated.
-     * Nothing guarantees its name
-     * corresponds, so its outputs become unmatchable variables and any cone
-     * reaching one can only be reported inconclusive.
+     * A black box is user or IP logic whose contents were not elaborated. By
+     * default it is nevertheless matched like a terminal, see
+     * {@link #isMatchedByName(CellRole)}. With {@code --strict-black-boxes},
+     * nothing guarantees its name corresponds, so its outputs become
+     * unmatchable variables and any cone reaching one can only be reported
+     * inconclusive.
      *
      * This split also means a primitive introduced by a future architecture
      * degrades safely rather than being silently mistaken for combinational
@@ -174,6 +176,19 @@ public class CellClassifier {
     /** DSP slices, opaque in this release. */
     public static boolean isDsp(String name) {
         return name.startsWith("DSP");
+    }
+
+    /**
+     * @return True if cells of this role are matched between the two netlists
+     *         by instance name, with their inputs checked as cones and their
+     *         outputs shared variables: terminals, and black boxes unless
+     *         {@code --strict-black-boxes} is given. A matched black box rests on
+     *         the usual equivalence checking assumption that two black boxes of
+     *         the same type and properties compute the same function.
+     */
+    public boolean isMatchedByName(CellRole role) {
+        return role == CellRole.TERMINAL
+                || (role == CellRole.UNINTERPRETED && !config.isStrictBlackBoxes());
     }
 
     /**
