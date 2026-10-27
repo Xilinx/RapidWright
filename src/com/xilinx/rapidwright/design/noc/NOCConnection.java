@@ -22,6 +22,7 @@ package com.xilinx.rapidwright.design.noc;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -59,6 +60,24 @@ public class NOCConnection implements Serializable {
     boolean isSourceLocked;
     boolean isDestLocked;
 
+
+    /** Fields from the traffic file that this class does not model (as JSON), written back unchanged */
+    private String unmodeledFields;
+
+    /** Traffic file path fields modeled by NOCConnection */
+    private static final Set<String> modeledFields = new HashSet<>(Arrays.asList(
+            NOCJSONUtil.JSON_FIELD_PHASE,
+            NOCJSONUtil.JSON_FIELD_FROM_CELL,
+            NOCJSONUtil.JSON_FIELD_TO_CELL,
+            NOCJSONUtil.JSON_FIELD_PORT,
+            NOCJSONUtil.JSON_FIELD_COMMUNICATION_TYPE,
+            NOCJSONUtil.JSON_FIELD_READ_BANDWIDTH,
+            NOCJSONUtil.JSON_FIELD_READ_LATENCY,
+            NOCJSONUtil.JSON_FIELD_READ_AVERAGE_BURST,
+            NOCJSONUtil.JSON_FIELD_WRITE_BANDWIDTH,
+            NOCJSONUtil.JSON_FIELD_WRITE_LATENCY,
+            NOCJSONUtil.JSON_FIELD_WRITE_AVERAGE_BURST,
+            NOCJSONUtil.JSON_FIELD_EXCLUSIVE_GROUP));
 
     private static final ArrayList<String> unsupportedFields = new ArrayList<String>();
     private static final Set<String> warnedUnsupportedFields = new HashSet<>();
@@ -100,6 +119,7 @@ public class NOCConnection implements Serializable {
         this.writeLatency = templatePath.writeLatency;
         this.readAverageBurst = templatePath.readAverageBurst;
         this.writeAverageBurst = templatePath.writeAverageBurst;
+        this.unmodeledFields = templatePath.unmodeledFields;
     }
 
     /**
@@ -124,6 +144,7 @@ public class NOCConnection implements Serializable {
         if (json.has(NOCJSONUtil.JSON_FIELD_EXCLUSIVE_GROUP)) {
             exclusiveGroup = json.getString(NOCJSONUtil.JSON_FIELD_EXCLUSIVE_GROUP);
         }
+        unmodeledFields = NOCJSONUtil.getUnmodeledFields(json, modeledFields);
     }
 
     /**
@@ -161,6 +182,14 @@ public class NOCConnection implements Serializable {
         obj.put(NOCJSONUtil.JSON_FIELD_WRITE_AVERAGE_BURST,writeAverageBurst);
         if (exclusiveGroup != null) {
             obj.put(NOCJSONUtil.JSON_FIELD_EXCLUSIVE_GROUP, exclusiveGroup);
+        }
+        if (unmodeledFields != null) {
+            JSONObject fields = new JSONObject(unmodeledFields);
+            for (String key : fields.keySet()) {
+                if (!obj.has(key)) {
+                    obj.put(key, fields.get(key));
+                }
+            }
         }
         return obj;
     }
@@ -556,6 +585,7 @@ public class NOCConnection implements Serializable {
             ChannelType netChannel = ChannelType.stringToValue(net.getString(NOCJSONUtil.JSON_FIELD_NET_CHANNEL));
             channels.put(netChannel,new NOCChannel(net));
         }
+        isRouted = !channels.isEmpty();
     }
 
     /**
