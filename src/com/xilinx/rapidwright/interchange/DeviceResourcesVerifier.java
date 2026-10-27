@@ -23,7 +23,11 @@
 
 package com.xilinx.rapidwright.interchange;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.channels.ReadableByteChannel;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -55,6 +59,7 @@ import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Grade;
 import com.xilinx.rapidwright.device.IOStandard;
+import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.PIPType;
 import com.xilinx.rapidwright.device.Package;
@@ -66,6 +71,7 @@ import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
+import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDesign;
@@ -90,6 +96,7 @@ import com.xilinx.rapidwright.interchange.DeviceResources.Device.TileType;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.Direction;
 import com.xilinx.rapidwright.interchange.LogicalNetlist.Netlist.PropertyMap;
+import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.Pair;
 
 public class DeviceResourcesVerifier {
@@ -130,7 +137,9 @@ public class DeviceResourcesVerifier {
         expect(pin.getBEL().getName(), allStrings.get(belPin.getBel()));
     }
 
-    public static boolean verifyDeviceResources(String devResFileName, String deviceName) throws IOException {
+    public static boolean verifyDeviceResources(String devResFileName, String deviceName, CodePerfTracker t)
+            throws IOException {
+        t.start("*Verify  Init");
         allStrings = new StringEnumerator();
         verifiedSiteTypes = new HashSet<SiteTypeEnum>();
 
@@ -143,11 +152,13 @@ public class DeviceResourcesVerifier {
         DeviceResources.Device.Reader dReader = null;
         ReaderOptions readerOptions = new ReaderOptions(1024L * 1024L * 1024L * 64L, 64);
         MessageReader readMsg = null;
-        readMsg = Interchange.readInterchangeFile(devResFileName, readerOptions);
+        ReadableByteChannel rbc = Interchange.getReadableByteChannel(devResFileName);
+
+        readMsg = Interchange.readMessageFromChannel(rbc, readerOptions);
 
         dReader = readMsg.getRoot(DeviceResources.Device.factory);
 
-        boolean containsRoutingResources = dReader.getNodes().size() > 0;
+        boolean containsMultiMessageRoutingResources = !dReader.hasNodes();
         
         int strCount = dReader.getStrList().size();
         TextList.Reader reader = dReader.getStrList();
@@ -155,6 +166,8 @@ public class DeviceResourcesVerifier {
             String str = reader.get(i).toString();
             allStrings.addObject(str);
         }
+
+        t.stop().start("*Verify  Tiles & Sites");
 
         // Create a lookup map for tile types
         Map<String, TileType.Reader> tileTypeMap = new HashMap<String, TileType.Reader>();
@@ -480,13 +493,15 @@ public class DeviceResourcesVerifier {
             }
         }
 
+        t.stop().start("*Verify  Libraries");
+
         Netlist.Reader primLibs = dReader.getPrimLibs();
         LogNetlistReader netlistReader = new LogNetlistReader(allStrings, new HashMap<String, String>() {{
                     put(LogNetlistWriter.DEVICE_PRIMITIVES_LIB, EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME);
                 }}
             );
         EDIFNetlist primsAndMacros = netlistReader.readLogNetlist(primLibs,
-                /*skipTopStuff=*/true, /*expandMacros=*/false);
+                /* skipTopStuff= */true, /* expandMacros= */false, CodePerfTracker.SILENT);
 
         Set<String> libsFound = new HashSet<String>();
         libsFound.addAll(primsAndMacros.getLibrariesMap().keySet());
@@ -620,16 +635,87 @@ public class DeviceResourcesVerifier {
             }
         }
 
+        t.stop().start("*Verify  CellBelPins");
         verifyCellBelPinMaps(allStrings, dReader, design);
+        t.stop().start("*Verify  Packages");
         verifyPackages(allStrings, dReader, device);
+        t.stop();
 
-        if (containsRoutingResources) {
-            ConstantDefinitions.verifyConstants(allStrings, device, design, siteTypes, dReader.getConstants(), tileTypeEnumMap);            
+        if (containsMultiMessageRoutingResources) {
+            t.start("*Verify  Constants");
+            ConstantDefinitions.verifyConstants(allStrings, device, design, siteTypes, 
+                    dReader.getConstants(), tileTypeEnumMap);
+            t.stop().start("*Verify  Nodes & Wires");
+            verifyWireAndNodeMultiMessage(device, allStrings, rbc, readerOptions);
+            t.stop();
         }
 
 
+        rbc.close();
         return true;
     }
+    
+    private static void verifyWireAndNodeMultiMessage(Device device, StringEnumerator allStrings,
+            ReadableByteChannel rbc, ReaderOptions options) {
+        int numOfMessages = device.getRows();
+        
+        for (int row = 0; row < numOfMessages; row++) {
+            LongEnumerator allWires = new LongEnumerator();
+            DeviceResources.Device.Reader deviceReader = null;
+            try {
+                MessageReader mReader = Interchange.readMessageFromChannel(rbc, options);
+                deviceReader = mReader.getRoot(DeviceResources.Device.factory);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            StructList.Reader<DeviceResources.Device.Wire.Reader> wires = deviceReader.getWires();
+            StructList.Reader<DeviceResources.Device.Node.Reader> nodeList = deviceReader.getNodes();
+
+            int wireIdx = 0;
+            int nodeIdx = 0;
+            for (Tile tile : device.getTiles()[row]) {
+                for (int i = 0; i < tile.getWireCount(); i++) {
+                    Node node = Node.getNode(tile, i);
+                    if (node == null) {
+                        long nodeWireKey = DeviceResourcesWriter.makeKey(tile, i);
+                        Integer test = allWires.maybeGetIndex(nodeWireKey);
+                        if (test == null) {
+                            allWires.addObject(nodeWireKey);
+                            DeviceResources.Device.Wire.Reader readWire = wires.get(wireIdx++);
+                            expect(tile.getName(), allStrings.get(readWire.getTile()));
+                            expect(tile.getWireName(i), allStrings.get(readWire.getWire()));
+                            expect(tile.getWireIntentCode(i).ordinal(), readWire.getType());
+                        }
+                    }else if (node.getTile() == tile && node.getWireIndex() == i) {
+                        Wire[] nodeWires = node.getAllWiresInNode();
+                        for (Wire w : nodeWires) {
+                            long nodeWireKey = DeviceResourcesWriter.makeKey(w.getTile(), w.getWireIndex());
+                            Integer test = allWires.maybeGetIndex(nodeWireKey);
+                            if (test == null) {
+                                allWires.addObject(nodeWireKey);
+                                DeviceResources.Device.Wire.Reader readWire = wires.get(wireIdx++);
+                                expect(w.getTile().getName(), allStrings.get(readWire.getTile()));
+                                expect(w.getWireName(), allStrings.get(readWire.getWire()));
+                                expect(w.getIntentCode().ordinal(), readWire.getType());
+                            }
+                        }
+                        DeviceResources.Device.Node.Reader readNode = nodeList.get(nodeIdx++);
+                        PrimitiveList.Int.Reader readNodeWires = readNode.getWires();
+                        expect(nodeWires.length, readNodeWires.size());
+                        for (int j = 0; j < nodeWires.length; j++) {
+                            int wireKey = readNodeWires.get(j);
+                            Long wireEntry = allWires.get(wireKey);
+                            int tIdx = (int) (wireEntry >>> 32);
+                            int wIdx = (int) (wireEntry & 0xFFFFFFFF);
+                            expect(nodeWires[j].getTile().getUniqueAddress(), tIdx);
+                            expect(nodeWires[j].getWireIndex(), wIdx);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
 
     private static HashSet<SiteTypeEnum> verifiedSiteTypes;
 
