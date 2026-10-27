@@ -993,8 +993,10 @@ public final class RouteStatusEngine {
     /** Classifies a net without routing (that needs it, or is internal to a site). */
     private int classifyWithoutRouting(Net net, FlatNet flat, int entry, int s) {
         boolean usesInputSitePin = entries.sitePinKeys[entry] != null;
-        if (usesInputSitePin && net != null && net.getType() == NetType.GND) {
-            // (GND is tied off at optional inverters: their site pins need no routing)
+        if (usesInputSitePin && net != null && net.getType() == NetType.GND
+                && design.getDevice().getSeries() == Series.Versal) {
+            // (in Versal devices, GND is tied off at optional inverters: their site pins need no
+            // routing)
             usesInputSitePin = hasSitePinNotToInverter(net);
         }
         if (has(s, UNPLACED)) {
