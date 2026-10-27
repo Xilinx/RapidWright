@@ -415,6 +415,8 @@ public class TestConstraintTools {
                 // alternation outside parentheses, it matches nothing
                 "set_false_path -to [get_ports -regexp {^pad$ clk}]",
                 "set_false_path -to [get_ports -regexp {pa.|c.k}]",
+                // A pattern that matches nothing, beside a device pin
+                "set_false_path -to [get_ports {pad zz*}]",
                 "set_property IOSTANDARD LVCMOS18 [get_ports pa?]",
                 // A bare bus index wildcard, as Vivado reads it
                 "set_property IOSTANDARD LVCMOS18 [get_ports bus[*]]");
@@ -439,9 +441,40 @@ public class TestConstraintTools {
                 "set_false_path -to [concat [get_ports {bus[0]}] [get_ports -scoped_to_current_instance clk0]]",
                 "set_false_path -to [get_ports -scoped_to_current_instance -regexp {^pad$ clk}]",
                 "set_false_path -to [get_ports -scoped_to_current_instance -regexp {pa.|c.k}]",
+                "set_false_path -to [get_ports pad]",
                 "current_instance -quiet",
                 "set_property IOSTANDARD LVCMOS18 [get_ports pa?]",
                 "set_property IOSTANDARD LVCMOS18 [get_ports bus[*]]"), design.getXDCConstraints(ConstraintGroup.EARLY));
+    }
+
+    /**
+     * A bus's declared name, such as bus[1:0], names no port, so it is not a device pin, even when
+     * the design has a bus of that name.
+     */
+    @Test
+    public void testAddBlackBoxConstraintsBusDeclaredName() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        top.createPort("bus[1:0]", EDIFDirection.INPUT, 2);
+        EDIFCell rpType = new EDIFCell(top.getLibrary(), "rpType");
+        rpType.createPort("bus[1:0]", EDIFDirection.INPUT, 2);
+        EDIFCellInst rp = rpType.createCellInst("rp", top);
+        rp.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+
+        Design circuit = new Design("circuit", "xcvu3p");
+        circuit.getTopEDIFCell().createPort("bus[1:0]", EDIFDirection.INPUT, 2);
+        circuit.addXDCConstraint(ConstraintGroup.EARLY,
+                "set_property IOSTANDARD LVCMOS18 [get_ports bus[0]]",
+                "set_property IOSTANDARD LVCMOS18 [get_ports bus[1:0]]");
+
+        DesignTools.populateBlackBox(design, Collections.singletonMap("rp", circuit), false);
+
+        // The box's bus is not connected to the design's, so both name the circuit's ports
+        Assertions.assertEquals(Arrays.asList(
+                "current_instance rp",
+                "set_property IOSTANDARD LVCMOS18 [get_ports -scoped_to_current_instance bus[0]]",
+                "set_property IOSTANDARD LVCMOS18 [get_ports -scoped_to_current_instance bus[1:0]]",
+                "current_instance -quiet"), design.getXDCConstraints(ConstraintGroup.EARLY));
     }
 
     /**
