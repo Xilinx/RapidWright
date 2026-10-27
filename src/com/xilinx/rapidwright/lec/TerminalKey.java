@@ -88,14 +88,19 @@ public class TerminalKey {
     }
 
     /**
-     * The key of a net driven by several terminal outputs. Built from the sorted
+     * The key of a net driven by several leaf outputs. Built from the sorted
      * driver keys so that it is independent of the order drivers were found in,
-     * and therefore identical in both netlists whenever the driver set is.
+     * and therefore identical in both netlists whenever the driver set is. Each
+     * key is length prefixed, since a name can contain any separator.
      */
     public static String forMultiDriver(String[] driverPinKeys) {
         String[] sorted = Arrays.copyOf(driverPinKeys, driverPinKeys.length);
         Arrays.sort(sorted);
-        return MULTI_DRIVER_PREFIX + String.join("+", sorted);
+        StringBuilder sb = new StringBuilder(MULTI_DRIVER_PREFIX);
+        for (String key : sorted) {
+            sb.append(key.length()).append(':').append(key);
+        }
+        return sb.toString();
     }
 
     /**

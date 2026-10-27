@@ -250,6 +250,19 @@ public class TestLecAcceptance {
     }
 
     /**
+     * A top level port named like a terminal pin, here {@code ff/D} beside the
+     * flip flop {@code ff}, would share that pin's key. The netlist is refused
+     * rather than compared with the two aliased.
+     */
+    @Test
+    public void testPortNamedLikeATerminalPinIsRefused() {
+        EDIFNetlist imp = LecNetlistFixtures.clockedFlop("clk_a");
+        LecNetlistFixtures.port(imp.getTopCell(), "ff/D", EDIFDirection.OUTPUT);
+        Assertions.assertThrows(LecException.class,
+                () -> check(LecNetlistFixtures.clockedFlop("clk_a"), imp));
+    }
+
+    /**
      * The negative cases generalised: every destructive
      * change must produce a non-zero exit code.
      */

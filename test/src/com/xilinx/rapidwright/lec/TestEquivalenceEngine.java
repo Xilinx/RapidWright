@@ -71,6 +71,34 @@ public class TestEquivalenceEngine {
     }
 
     /**
+     * The solver's refutation path, which simulation normally pre-empts: a
+     * satisfiable miter must come back DIFFERENT with an assignment that really
+     * separates the two functions, checked here by evaluating both at that
+     * assignment without the solver. The pair differs at a single point and is
+     * not complementary.
+     */
+    @Test
+    public void testSolverCounterExampleSeparatesTheFunctions() {
+        Aig aig = new Aig();
+        int a = aig.newInput("a", true);
+        int b = aig.newInput("b", true);
+        int c = aig.newInput("c", true);
+        int ref = aig.or(aig.and(a, b), c);
+        int imp = aig.or(aig.and(a, b), aig.and(c, Aig.not(a)));
+        SatMiter.Result result = new SatMiter(aig, new AigSupport(aig)).solve(ref, imp, 10);
+        Assertions.assertEquals(SatMiter.Outcome.DIFFERENT, result.getOutcome());
+        long[] piValues = new long[aig.getPiCount()];
+        for (String name : new String[] { "a", "b", "c" }) {
+            Boolean value = result.getCounterExample().get(name);
+            Assertions.assertNotNull(value, "The assignment omits " + name);
+            piValues[aig.getPiIndex(Aig.nodeOf(aig.findInput(name)))] = value ? 1L : 0L;
+        }
+        AigEvaluation evaluation = AigEvaluation.of(aig, piValues);
+        Assertions.assertNotEquals(evaluation.bitOf(ref, 0), evaluation.bitOf(imp, 0),
+                "The counter-example must separate the two functions");
+    }
+
+    /**
      * The same comparison with the reference's function perturbed. This must
      * fail, and it must fail through simulation rather than the solver, because
      * a wrong function is almost always separated by a random pattern.
