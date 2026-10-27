@@ -189,6 +189,19 @@ public class TestLecAcceptance {
     }
 
     /**
+     * A physical pin attribute, such as the Versal hold fix delay a router puts
+     * on a flip flop input, changes timing but not logic, so it must not be
+     * reported.
+     */
+    @Test
+    public void testPinAttributeChangePasses() {
+        EDIFNetlist imp = LecNetlistFixtures.twoPartitionDesign("4'hE", false, true);
+        LecNetlistFixtures.setTerminalProperty(imp, "PART_2", "ff", "PinAttr:D:IMR_HOLD_FIX",
+                "PART_2/ff/C");
+        check(reference(), imp).assertPass();
+    }
+
+    /**
      * A feedthrough must be named by the input it comes from, not by the output
      * it drives, or rewiring it to a different input would go unseen.
      */

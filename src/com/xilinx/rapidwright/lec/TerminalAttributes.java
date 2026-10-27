@@ -58,6 +58,13 @@ public class TerminalAttributes {
     /** Attributes that describe implementation rather than logic. */
     private static final Set<String> IGNORED = buildIgnored();
 
+    /**
+     * Prefix of the physical attributes of a cell pin (e.g.
+     * {@code PinAttr:D:IMR_HOLD_FIX}, a Versal hold fix delay the router sets on
+     * a flip flop input), which describe implementation rather than logic.
+     */
+    private static final String PIN_ATTRIBUTE_PREFIX = "PinAttr:";
+
     private final String cellTypeName;
 
     private final Map<String, String> properties;
@@ -100,7 +107,8 @@ public class TerminalAttributes {
         if (inst != null && inst.getPropertiesMap() != null) {
             for (Map.Entry<String, EDIFPropertyValue> e : inst.getPropertiesMap().entrySet()) {
                 String key = e.getKey();
-                if (IGNORED.contains(key) || isFoldedInversion(key, foldedPins)) {
+                if (IGNORED.contains(key) || key.startsWith(PIN_ATTRIBUTE_PREFIX)
+                        || isFoldedInversion(key, foldedPins)) {
                     continue;
                 }
                 EDIFPropertyValue value = e.getValue();
