@@ -75,6 +75,8 @@ public class LecConfig {
 
     private boolean allowPreexistingLoops;
 
+    private boolean strictBlackBoxes;
+
     private boolean allowSeriesMismatch;
 
     private boolean elaborateOnly;
@@ -90,14 +92,13 @@ public class LecConfig {
     private double satBudgetSec = 1200.0;
 
     /**
-     * Cones wider than this are reported inconclusive rather than being sent to
-     * the solver.
+     * Cones wider than this, or larger than {@link #satMaxNodes}, are sent to the
+     * solver only after every smaller cone, smallest first, while the overall
+     * budget lasts.
      *
-     * Carry cones can be wide, notably around a Versal carry lookahead, and a
-     * much lower limit turns questions the solver settles in seconds into
-     * inconclusive results. The per cone timeout and the overall budget are the
-     * real protection against a hopeless solve; this limit only avoids spending
-     * any of that budget on cones that are obviously out of reach.
+     * The per cone timeout and the overall budget are the real protection
+     * against a hopeless solve; this limit only keeps the budget from being
+     * spent on wide cones while narrower ones are still waiting.
      */
     private int satMaxSupport = 128;
 
@@ -136,9 +137,11 @@ public class LecConfig {
                 .ofType(Double.class).describedAs("sec").defaultsTo(10.0);
         parser.accepts("sat-budget", "Total SAT time limit in seconds across all cones")
                 .withRequiredArg().ofType(Double.class).describedAs("sec").defaultsTo(1200.0);
-        parser.accepts("sat-max-support", "Skip SAT for cones with more inputs than this")
+        parser.accepts("sat-max-support", "Defer SAT for cones with more inputs than this until "
+                + "smaller cones are done")
                 .withRequiredArg().ofType(Integer.class).describedAs("n").defaultsTo(128);
-        parser.accepts("sat-max-nodes", "Skip SAT for cones larger than this many AIG nodes")
+        parser.accepts("sat-max-nodes", "Defer SAT for cones larger than this many AIG nodes "
+                + "until smaller cones are done")
                 .withRequiredArg().ofType(Integer.class).describedAs("n").defaultsTo(200000);
         parser.accepts("sweep", "NOT IMPLEMENTED: merge internal equivalences before comparison; "
                 + "this option parses but is rejected");
@@ -146,6 +149,8 @@ public class LecConfig {
         parser.accepts("allow-preexisting-loops", "Treat combinational loops present in BOTH "
                 + "netlists as a warning; loops introduced by the transform still fail");
         parser.accepts("allow-series-mismatch", "Permit the two netlists to target different series");
+        parser.accepts("strict-black-boxes", "Do not assume that same-named black boxes compute "
+                + "the same function; cones reaching one become inconclusive");
         parser.accepts("expand-macros", "Expand macro primitives instead of modelling them natively");
         parser.accepts("elaborate-only", "Build cones and report statistics without comparing");
         parser.accepts("classify-only", "Report connectivity and cell classification only");
@@ -180,6 +185,7 @@ public class LecConfig {
         config.allowInconclusive = options.has("allow-inconclusive");
         config.allowPreexistingLoops = options.has("allow-preexisting-loops");
         config.allowSeriesMismatch = options.has("allow-series-mismatch");
+        config.strictBlackBoxes = options.has("strict-black-boxes");
         config.expandMacros = options.has("expand-macros");
         config.elaborateOnly = options.has("elaborate-only");
         config.classifyOnly = options.has("classify-only");
@@ -328,6 +334,16 @@ public class LecConfig {
         return allowPreexistingLoops;
     }
 
+    /**
+     * @return True if black boxes are left unmatchable. By default a black box
+     *         is matched like a terminal: by instance name, with its cell type
+     *         and properties compared and its inputs checked, on the assumption
+     *         that two black boxes of the same type compute the same function.
+     */
+    public boolean isStrictBlackBoxes() {
+        return strictBlackBoxes;
+    }
+
     public boolean isAllowSeriesMismatch() {
         return allowSeriesMismatch;
     }
@@ -390,6 +406,14 @@ public class LecConfig {
 
     void setAllowPreexistingLoops(boolean allowPreexistingLoops) {
         this.allowPreexistingLoops = allowPreexistingLoops;
+    }
+
+    void setStrictBlackBoxes(boolean strictBlackBoxes) {
+        this.strictBlackBoxes = strictBlackBoxes;
+    }
+
+    void setSatMaxSupport(int satMaxSupport) {
+        this.satMaxSupport = satMaxSupport;
     }
 
     void setClassifyOnly(boolean classifyOnly) {

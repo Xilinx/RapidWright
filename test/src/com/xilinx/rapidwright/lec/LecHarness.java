@@ -51,9 +51,13 @@ public class LecHarness {
     }
 
     public static LecHarness run(EDIFNetlist ref, EDIFNetlist imp) {
+        return run(ref, imp, new LecConfig());
+    }
+
+    public static LecHarness run(EDIFNetlist ref, EDIFNetlist imp, LecConfig config) {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         PrintStream out = new PrintStream(buffer);
-        LecResult result = run(ref, imp, out);
+        LecResult result = LogicEquivalenceChecker.compare(ref, imp, config, out);
         out.flush();
         return new LecHarness(result, buffer.toString());
     }

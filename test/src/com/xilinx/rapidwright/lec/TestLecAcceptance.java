@@ -29,6 +29,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 
@@ -260,6 +261,35 @@ public class TestLecAcceptance {
         LecNetlistFixtures.port(imp.getTopCell(), "ff/D", EDIFDirection.OUTPUT);
         Assertions.assertThrows(LecException.class,
                 () -> check(LecNetlistFixtures.clockedFlop("clk_a"), imp));
+    }
+
+    /**
+     * Endpoints are matched by name, so two different endpoints whose names join
+     * to the same string would alias. Each such netlist is refused rather than
+     * compared with one endpoint silently dropped.
+     */
+    @Test
+    public void testCollidingEndpointNamesAreRefused() {
+        // A top level instance renamed a/b beside instance b inside block a.
+        EDIFNetlist nested = LecNetlistFixtures.clockedFlop("clk_a");
+        EDIFCell top = nested.getTopCell();
+        EDIFCell flop = top.getCellInst("ff").getCellType();
+        EDIFCell block = new EDIFCell(top.getLibrary(), "block_type");
+        LecNetlistFixtures.add(block, "b", flop);
+        LecNetlistFixtures.add(top, "a", block);
+        LecNetlistFixtures.add(top, "a/b", flop);
+        // A register named like the metadata key of top level port d.
+        EDIFNetlist portKey = LecNetlistFixtures.clockedFlop("clk_a");
+        LecNetlistFixtures.add(portKey.getTopCell(), "top level port d",
+                portKey.getTopCell().getCellInst("ff").getCellType());
+        // A top level output named like the cloud driver of a shorted net.
+        EDIFNetlist driverKey = LecNetlistFixtures.shortedNet("4'h8");
+        LecNetlistFixtures.port(driverKey.getTopCell(), "lut/O", EDIFDirection.OUTPUT);
+        LecNetlistFixtures.connect(driverKey.getTopCell(), "short", driverKey.getTopCell(),
+                "lut/O");
+        for (EDIFNetlist ambiguous : new EDIFNetlist[] { nested, portKey, driverKey }) {
+            Assertions.assertThrows(LecException.class, () -> check(ambiguous, ambiguous));
+        }
     }
 
     /**

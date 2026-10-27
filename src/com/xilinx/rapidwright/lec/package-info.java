@@ -56,15 +56,17 @@
  * <li>{@code --report <file>} writes the report to a file;
  * {@code --verbose} adds per-phase timing.</li>
  * <li>{@code --classify-only} audits the netlists without comparing them, and
- * lists every cell type with no functional model. Cones reaching such a cell
- * can only be reported inconclusive.</li>
+ * lists every cell type with no functional model: the black boxes whose
+ * contents the comparison takes on trust.</li>
  * <li>{@code --allow-preexisting-loops} accepts a combinational loop present
  * in <i>both</i> netlists. A loop only the implementation has always fails.</li>
  * <li>{@code --allow-inconclusive} downgrades undecided cones to a warning.</li>
- * <li>{@code --sat-max-support}, {@code --sat-max-nodes},
- * {@code --sat-timeout} and {@code --sat-budget} bound the solver. Raise them
- * when the report shows cones skipped as too large, which is common on
- * carry-heavy designs.</li>
+ * <li>{@code --strict-black-boxes} stops assuming that same-typed black boxes,
+ * such as encrypted IP, compute the same function.</li>
+ * <li>{@code --sat-timeout} and {@code --sat-budget} bound the solver. Cones
+ * beyond {@code --sat-max-support} inputs or {@code --sat-max-nodes} nodes are
+ * attempted last, smallest first, with whatever budget remains; raise
+ * {@code --sat-budget} when the report shows large cones left unattempted.</li>
  * </ul>
  *
  * <h2>What it checks</h2>
@@ -104,8 +106,11 @@
  * classified.</li>
  * <li><b>Classify.</b> {@link com.xilinx.rapidwright.lec.CellClassifier}
  * assigns every leaf a {@link com.xilinx.rapidwright.lec.CellRole}. A cell
- * with no functional model is a black box that poisons the cones reaching
- * it.</li>
+ * with no functional model is a black box, matched like a terminal: by instance
+ * name, with its type and properties compared and its inputs checked, on the
+ * standard assumption that two black boxes of the same type compute the same
+ * function. {@code --strict-black-boxes} drops that assumption, making every
+ * cone that reaches a black box inconclusive.</li>
  * <li><b>Elaborate.</b> {@link com.xilinx.rapidwright.lec.ConeBuilder} walks
  * backwards from every terminal input pin, clocks included, lowering each
  * primitive through {@link com.xilinx.rapidwright.lec.PrimitiveModelLibrary}.
@@ -138,8 +143,8 @@
  * banner. A run settled entirely by structural hash means the netlists are
  * structurally near-identical, which is expected for a pure relocation of
  * logic. A non-trivial count proven by the solver means genuinely different
- * structure was proven to compute the same function. Cones skipped as too large
- * are usually a budget problem rather than a logic problem.
+ * structure was proven to compute the same function. Large cones left
+ * unattempted are a budget problem rather than a logic problem.
  *
  * <h2>Verifying the checker</h2>
  *

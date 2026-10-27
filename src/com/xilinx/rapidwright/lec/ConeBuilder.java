@@ -64,8 +64,9 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
  * becomes a primary input of the shared graph named by its
  * {@link TerminalKey}. A terminal's key is stable, meaning the same name refers
  * to the same signal in both netlists, which is what lets two independently
- * built functions be compared. Loop breaks, multi-driver nets that cannot be
- * named from terminals, and black box outputs produce unstable variables
+ * built functions be compared. Black box outputs are named the same way unless
+ * {@code --strict-black-boxes} is given. Loop breaks, multi-driver nets with
+ * unknown drivers, and strict black box outputs produce unstable variables
  * instead, and any cone reaching one can only be reported inconclusive.
  */
 public class ConeBuilder {
@@ -440,7 +441,7 @@ public class ConeBuilder {
         }
         int bit = pin - flat.getGlobalPin(instId, 0);
         String name = flat.getPinName(instId, bit);
-        if (role == CellRole.TERMINAL) {
+        if (classifier.isMatchedByName(role)) {
             return aig.newInput(name, true);
         }
         return unstableInput(TerminalKey.OPAQUE_PREFIX, name);
@@ -485,7 +486,7 @@ public class ConeBuilder {
             for (int i = 0; i < drivers.length; i++) {
                 int owner = pinOwner[drivers[i]];
                 names[i] = flat.getPinName(owner, drivers[i] - flat.getGlobalPin(owner, 0));
-                if (roleOf(owner) != CellRole.TERMINAL) {
+                if (!classifier.isMatchedByName(roleOf(owner))) {
                     shortedDriverPins.add(drivers[i]);
                 }
             }

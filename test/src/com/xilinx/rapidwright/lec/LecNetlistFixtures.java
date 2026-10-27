@@ -617,6 +617,14 @@ public class LecNetlistFixtures {
      * than claiming a difference it cannot attribute.
      */
     public static EDIFNetlist blackBoxDriven(String blackBoxInstName) {
+        return blackBoxDriven(blackBoxInstName, false);
+    }
+
+    /**
+     * As above, optionally with the black box input tied low instead of driven
+     * from {@code a}.
+     */
+    public static EDIFNetlist blackBoxDriven(String blackBoxInstName, boolean inputTiedLow) {
         LecNetlistFixtures fixture = new LecNetlistFixtures("top");
         EDIFCell top = fixture.getTop();
         port(top, "a", EDIFDirection.INPUT);
@@ -636,7 +644,8 @@ public class LecNetlistFixtures {
         EDIFCellInst gndInst = add(part, "GND", fixture.gnd());
         EDIFCellInst vccInst = add(part, "VCC", fixture.vcc());
         EDIFCellInst ff = add(part, "ff", fixture.fdre());
-        connect(part, "a_i", part, "a", bb, "I");
+        connect(part, "a_i", part, "a");
+        connect(part, inputTiedLow ? "gnd" : "a_i", bb, "I");
         connect(part, "d", bb, "O", ff, "D");
         connect(part, "clk_i", part, "clk", ff, "C");
         connect(part, "vcc", vccInst, "P", ff, "CE");
