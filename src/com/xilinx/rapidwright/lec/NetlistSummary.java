@@ -22,7 +22,9 @@
 
 package com.xilinx.rapidwright.lec;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -72,8 +74,8 @@ public class NetlistSummary {
      * Elaborates one netlist into the shared graph and returns its summary.
      *
      * Every checked cone root becomes an entry in {@link #getConeLiterals()}:
-     * every non-clock input pin of every terminal, plus every top level output
-     * port bit, which is also a terminal.
+     * every input pin of every terminal, clocks included, plus every top level
+     * output port bit, which is also a terminal.
      */
     public static NetlistSummary build(String label, FlatNetlist flat, Connectivity conn,
             CellClassifier classifier, Aig aig, Series series, NetlistStats stats, LecLog log) {
@@ -83,6 +85,7 @@ public class NetlistSummary {
         int nodesBefore = aig.getNodeCount();
         summary.collectTerminalCones(flat, classifier, cones, log);
         summary.collectTopOutputCones(flat, conn, cones);
+        summary.collectShortedDriverCones(flat, cones);
         summary.loops = cones.getLoopReport();
         summary.aigNodesAdded = aig.getNodeCount() - nodesBefore;
         summary.maxConeDepth = cones.getMaxDepth();
@@ -90,7 +93,7 @@ public class NetlistSummary {
     }
 
     /**
-     * Walks every terminal, building a cone for each non-clock input pin and
+     * Walks every terminal, building a cone for each input pin and
      * recording the terminal's own configuration.
      */
     private void collectTerminalCones(FlatNetlist flat, CellClassifier classifier,
@@ -109,9 +112,6 @@ public class NetlistSummary {
                     continue;
                 }
                 String pinName = index.getPortBitName(bit);
-                if (classifier.isClockPin(typeName, pinName)) {
-                    continue;
-                }
                 int lit = cones.literalDriving(instId, bit);
                 String basePin = CellClassifier.stripBusIndex(pinName);
                 if (ModelUtils.isPinBitInverted(flat.getInst(instId), basePin,
@@ -142,6 +142,10 @@ public class NetlistSummary {
      * is a checked cone, as is the driven side of a bidirectional port. They
      * attach to a net rather than to a cell pin, so they are resolved from the
      * electrical node.
+     *
+     * Every port bit, inputs included, is also recorded as a terminal whose type
+     * is its direction, so a port added, removed or redirected is reported even
+     * where no cone reaches it.
      */
     private void collectTopOutputCones(FlatNetlist flat, Connectivity conn, ConeBuilder cones) {
         int topId = flat.getTopInstId();
@@ -149,8 +153,11 @@ public class NetlistSummary {
             return;
         }
         CellIndex index = flat.getIndex(topId);
+        Set<String> noFoldedPins = Collections.emptySet();
         for (int bit = 0; bit < index.getPortBitCount(); bit++) {
             EDIFDirection dir = index.getPortOfBit(bit).getDirection();
+            terminals.put("top level port " + index.getPortBitName(bit),
+                    TerminalAttributes.of(dir + " port", null, noFoldedPins));
             if (dir == EDIFDirection.INPUT) {
                 continue;
             }
@@ -159,6 +166,22 @@ public class NetlistSummary {
             coneLiterals.put(TerminalKey.forTopPort(index.getPortBitName(bit)),
                     dir == EDIFDirection.INOUT ? cones.literalOfInoutRoot(root)
                             : cones.literalOfNetRoot(root));
+        }
+    }
+
+    /**
+     * A shorted net is named from its driver pins, which only means the same
+     * thing in both netlists if its cloud drivers compute the same functions,
+     * so each is checked as a cone keyed by its pin.
+     */
+    private void collectShortedDriverCones(FlatNetlist flat, ConeBuilder cones) {
+        for (List<Integer> pins = cones.takeShortedDriverPins(); !pins.isEmpty();
+                pins = cones.takeShortedDriverPins()) {
+            for (int pin : pins) {
+                int owner = flat.getPinOwner(pin);
+                coneLiterals.put(flat.getPinName(owner, flat.getPinPortBit(pin)),
+                        cones.literalOfPin(pin));
+            }
         }
     }
 

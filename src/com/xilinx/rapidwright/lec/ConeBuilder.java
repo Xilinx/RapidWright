@@ -22,8 +22,10 @@
 
 package com.xilinx.rapidwright.lec;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.xilinx.rapidwright.design.CellPinStaticDefaults;
@@ -118,6 +120,9 @@ public class ConeBuilder {
     private final CellRole[] roleOfType;
 
     private final Map<Integer, Integer> multiDriverLits = new HashMap<>();
+
+    /** Cloud driver pins of shorted nets, still to be checked as cones. */
+    private List<Integer> shortedDriverPins = new ArrayList<>();
 
     private final Map<String, Unisim> unisimCache = new HashMap<>();
 
@@ -287,12 +292,7 @@ public class ConeBuilder {
                 || conn.getDriverPin(root) < 0 || conn.getExtraDrivers(root) != null) {
             return literalOfNetRoot(root);
         }
-        int lit = literalOfDriver(conn.getDriverPin(root));
-        if (lit == PUSHED) {
-            runLoop();
-            lit = literalOfDriver(conn.getDriverPin(root));
-        }
-        return lit;
+        return literalOfPin(conn.getDriverPin(root));
     }
 
     private int literalOfDriver(int driverPin) {
@@ -464,11 +464,14 @@ public class ConeBuilder {
     /**
      * Cuts a net that has several drivers.
      *
-     * When every driver is a terminal the net can still be named stably, from
-     * the sorted set of driver pins, and therefore still matched between the two
-     * netlists. When any driver is inside the combinational cloud no stable name
-     * exists, because cloud instance naming may differ arbitrarily,
-     * so the variable is unmatchable and taints the cones that reach it.
+     * The net is named from the sorted set of its driver pins, so the same short
+     * in both netlists is the same variable. That name alone only proves
+     * something when every driver is a terminal. A driver inside the
+     * combinational cloud is therefore queued, see
+     * {@link #takeShortedDriverPins()}, and checked as a cone of its own: with
+     * the same drivers computing the same functions, the short resolves the
+     * same way in both netlists. Without known drivers the variable is
+     * unmatchable and taints the cones that reach it.
      */
     private int multiDriverLit(int root) {
         Integer cached = multiDriverLits.get(root);
@@ -477,8 +480,15 @@ public class ConeBuilder {
         }
         int[] drivers = conn.getExtraDrivers(root);
         int lit;
-        String[] names = drivers == null ? null : namesIfAllTerminal(drivers);
-        if (names != null) {
+        if (drivers != null) {
+            String[] names = new String[drivers.length];
+            for (int i = 0; i < drivers.length; i++) {
+                int owner = pinOwner[drivers[i]];
+                names[i] = flat.getPinName(owner, drivers[i] - flat.getGlobalPin(owner, 0));
+                if (roleOf(owner) != CellRole.TERMINAL) {
+                    shortedDriverPins.add(drivers[i]);
+                }
+            }
             lit = aig.newInput(TerminalKey.forMultiDriver(names), true);
         } else {
             lit = unstableInput(TerminalKey.MULTI_DRIVER_PREFIX, "#" + (unstableCounter++));
@@ -490,19 +500,25 @@ public class ConeBuilder {
     }
 
     /**
-     * @return The driver pin names if every driver is a terminal, or null if any
-     *         driver is combinational cloud logic.
+     * @return The cloud driver pins of shorted nets met since the last call,
+     *         which must be checked as cones for the short's name to be
+     *         trusted. Building them can meet further shorts, so call until
+     *         empty.
      */
-    private String[] namesIfAllTerminal(int[] drivers) {
-        String[] names = new String[drivers.length];
-        for (int i = 0; i < drivers.length; i++) {
-            int owner = pinOwner[drivers[i]];
-            if (roleOf(owner) != CellRole.TERMINAL) {
-                return null;
-            }
-            names[i] = flat.getPinName(owner, drivers[i] - flat.getGlobalPin(owner, 0));
+    public List<Integer> takeShortedDriverPins() {
+        List<Integer> pins = shortedDriverPins;
+        shortedDriverPins = new ArrayList<>();
+        return pins;
+    }
+
+    /** Resolves the function of one leaf output pin. */
+    public int literalOfPin(int pin) {
+        int lit = literalOfDriver(pin);
+        if (lit == PUSHED) {
+            runLoop();
+            lit = literalOfDriver(pin);
         }
-        return names;
+        return lit;
     }
 
     private String exampleDriverName(int[] drivers) {

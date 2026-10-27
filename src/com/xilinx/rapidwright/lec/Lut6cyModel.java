@@ -48,15 +48,13 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
  * cells form a cycle. Widening this support would reintroduce false
  * combinational loops.
  *
- * {@code GE} is never assigned in the golden model, so it is treated as a
- * constant zero. Nothing consumes it either: {@code LOOKAHEAD8} ignores its own
- * {@code GE} inputs. A warning is raised if a {@code GE} net reaches anything
- * else, since that would mean the assumption no longer holds.
+ * {@code GE} is never assigned in the golden model, so it has no function to
+ * model. Nothing consumes it either: {@code LOOKAHEAD8} ignores its own
+ * {@code GE} inputs. Should a checked cone reach one anyway, it is an
+ * unmodelled output, so that cone is inconclusive rather than proven against a
+ * guessed constant.
  */
 public class Lut6cyModel implements PrimitiveModel {
-
-    /** Warning category for the undriven group enable output. */
-    public static final String GROUP_ENABLE_USED = "LUT6CY GE output treated as constant zero";
 
     private final LecLog log;
 
@@ -68,7 +66,7 @@ public class Lut6cyModel implements PrimitiveModel {
     public int[] supportOf(CellIndex index, EDIFCellInst inst, int outPortBit) {
         String outPin = index.getPortBitName(outPortBit);
         if (outPin.equals("GE")) {
-            return new int[0];
+            return null;
         }
         // As for a plain look up table, an input the INIT ignores is not support,
         // or a packed half can appear to sit on a loop it is not part of.
@@ -85,11 +83,6 @@ public class Lut6cyModel implements PrimitiveModel {
     public int build(Aig aig, CellIndex index, EDIFCellInst inst, int outPortBit,
             int[] inputLits) {
         String outPin = index.getPortBitName(outPortBit);
-        if (outPin.equals("GE")) {
-            log.warn(GROUP_ENABLE_USED, index.getCell().getName(),
-                    inst == null ? null : inst.getName());
-            return Aig.FALSE;
-        }
         long table = tableOf(index, inst, outPin, true);
         // inputLits arrives in the reduced order supportOf declared.
         int[] dependent = TruthTable.dependentVars(table, arityOf(outPin));

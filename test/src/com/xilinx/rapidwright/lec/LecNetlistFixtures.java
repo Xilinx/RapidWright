@@ -690,6 +690,53 @@ public class LecNetlistFixtures {
     }
 
     /**
+     * A flip flop capturing input {@code d}, clocked from input {@code clock},
+     * which is {@code clk_a} or {@code clk_b}.
+     */
+    public static EDIFNetlist clockedFlop(String clock) {
+        LecNetlistFixtures fixture = new LecNetlistFixtures("top");
+        EDIFCell top = fixture.getTop();
+        port(top, "clk_a", EDIFDirection.INPUT);
+        port(top, "clk_b", EDIFDirection.INPUT);
+        port(top, "d", EDIFDirection.INPUT);
+        EDIFCellInst ff = add(top, "ff", fixture.fdre());
+        EDIFCellInst gndInst = add(top, "GND", fixture.gnd());
+        EDIFCellInst vccInst = add(top, "VCC", fixture.vcc());
+        connect(top, "d", top, "d", ff, "D");
+        connect(top, clock, top, clock, ff, "C");
+        connect(top, "vcc", vccInst, "P", ff, "CE");
+        connect(top, "gnd", gndInst, "G", ff, "R");
+        return fixture.getNetlist();
+    }
+
+    /**
+     * A net shorted between a flip flop output and a look up table output,
+     * read by a second flip flop. Such shorts occur in real netlists.
+     *
+     * @param lutInit INIT of the look up table driving the short.
+     */
+    public static EDIFNetlist shortedNet(String lutInit) {
+        LecNetlistFixtures fixture = new LecNetlistFixtures("top");
+        EDIFCell top = fixture.getTop();
+        port(top, "a", EDIFDirection.INPUT);
+        port(top, "b", EDIFDirection.INPUT);
+        port(top, "clk", EDIFDirection.INPUT);
+        EDIFCellInst lut = add(top, "lut", fixture.lut(2));
+        setProperty(lut, "INIT", lutInit);
+        EDIFCellInst ffA = add(top, "ff_a", fixture.fdre());
+        EDIFCellInst ffB = add(top, "ff_b", fixture.fdre());
+        EDIFCellInst gndInst = add(top, "GND", fixture.gnd());
+        EDIFCellInst vccInst = add(top, "VCC", fixture.vcc());
+        connect(top, "a", top, "a", lut, "I0", ffA, "D");
+        connect(top, "b", top, "b", lut, "I1");
+        connect(top, "short", lut, "O", ffA, "Q", ffB, "D");
+        connect(top, "clk", top, "clk", ffA, "C", ffB, "C");
+        connect(top, "vcc", vccInst, "P", ffA, "CE", ffB, "CE");
+        connect(top, "gnd", gndInst, "G", ffA, "R", ffB, "R");
+        return fixture.getNetlist();
+    }
+
+    /**
      * Complements the contents of every look up table in a netlist, which is a
      * blunt but reliable way to make a real design compute different logic.
      *
