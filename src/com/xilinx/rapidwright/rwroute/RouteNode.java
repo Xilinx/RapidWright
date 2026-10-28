@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -54,8 +54,17 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
 
     /** The type of a rnode*/
     private byte type;
-    /** The tileXCoordinate and tileYCoordinate of the INT tile that the associated node stops at */
-    private final short endTileXCoordinate;
+    /**
+     * The X coordinate, in half tiles, of the INT tile half that the associated node stops at: twice its
+     * tileXCoordinate for its west half, plus one for its east half.
+     * Not final: {@link RouteNodeType#NON_LOCAL_INHERIT_PREV_SIDE} nodes serve both sides of their INT tile, so
+     * their side (the lowest bit) is not fixed but set during routing to that of the node they are reached from on
+     * the current path (see {@link #setInheritedSide(RouteNode)}). This lets each such node's side be read directly
+     * (rather than recomputed by walking back along the path), and is safe since, as with {@link #prev}, it is
+     * written once per search (when the node is pushed) before being read by its children.
+     */
+    private short endHalfTileXCoordinate;
+    /** The tileYCoordinate of the INT tile that the associated node stops at */
     private final short endTileYCoordinate;
     /** The wirelength of a rnode */
     private final short length;
@@ -92,7 +101,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         super(node);
         RouteNodeInfo nodeInfo = RouteNodeInfo.get(node, routingGraph);
         this.type = (byte) ((type == null) ? nodeInfo.type : type).ordinal();
-        endTileXCoordinate = nodeInfo.endTileXCoordinate;
+        endHalfTileXCoordinate = nodeInfo.endHalfTileXCoordinate;
         endTileYCoordinate = nodeInfo.endTileYCoordinate;
         length = nodeInfo.length;
         children = null;
@@ -119,17 +128,16 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 assert(length == 0 ||
                         (length <= 3 && (getIntentCode() == IntentCode.NODE_INTF2 || getIntentCode() == IntentCode.NODE_INTF4)));
                 break;
-            case EXCLUSIVE_SINK_BOTH:
-            case EXCLUSIVE_SINK_EAST:
-            case EXCLUSIVE_SINK_WEST:
+            case EXCLUSIVE_SINK:
+            case EXCLUSIVE_SINK_CTRL:
+            case EXCLUSIVE_SINK_SLL_INPUT:
                 assert(length == 0 ||
                        (length == 1 && (series == Series.UltraScalePlus || series == Series.UltraScale) && getIntentCode() == IntentCode.NODE_PINBOUNCE));
                 break;
-            case LOCAL_BOTH:
+            case LOCAL_SIDE_DEPENDS_ON_SINK:
                 assert(length == 0);
                 break;
-            case LOCAL_EAST:
-            case LOCAL_WEST:
+            case LOCAL:
             case LOCAL_RESERVED:
                 assert(length == 0 ||
                        (length == 1 && (
@@ -140,10 +148,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                        ))
                    );
                 break;
-            case LOCAL_EAST_LEADING_TO_NORTHBOUND_LAGUNA:
-            case LOCAL_WEST_LEADING_TO_NORTHBOUND_LAGUNA:
-            case LOCAL_EAST_LEADING_TO_SOUTHBOUND_LAGUNA:
-            case LOCAL_WEST_LEADING_TO_SOUTHBOUND_LAGUNA:
+            case LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
+            case LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
                 assert(length == 0 ||
                         (length == 1 && (
                                 (series == Series.UltraScalePlus && getWireName().matches("INODE_[EW]_\\d+_FT[01]")) ||
@@ -163,6 +169,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         (length == 1 && series == Series.UltraScalePlus && getWireName().equals("WW1_E_7_FT0")));
                 // Fall-through
             case NON_LOCAL:
+            case NON_LOCAL_INHERIT_PREV_SIDE:
                 short length = getLength();
                 // NOTE: IntentCode is device-dependent
                 IntentCode ic = getIntentCode();
@@ -366,7 +373,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         StringBuilder s = new StringBuilder();
         s.append("node " + super.toString());
         s.append(", ");
-        s.append("(" + endTileXCoordinate + "," + getEndTileYCoordinate() + ")");
+        s.append("(" + getEndTileXCoordinate() + (isOnEastSide() ? "E" : "W") + "," + getEndTileYCoordinate() + ")");
         s.append(", ");
         s.append(String.format("type = %s", getType()));
         s.append(", ");
@@ -384,6 +391,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      * @return true, if coordinates of a RouteNode is within the connection's bounding box.
      */
     public boolean isInConnectionBoundingBox(Connection connection) {
+        short endTileXCoordinate = getEndTileXCoordinate();
         return endTileXCoordinate > connection.getXMinBB() && endTileXCoordinate < connection.getXMaxBB() &&
                endTileYCoordinate > connection.getYMinBB() && endTileYCoordinate < connection.getYMaxBB();
     }
@@ -430,6 +438,16 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     }
 
     /**
+     * Checks if this RouteNode object ends on the east side of its INT tile (otherwise, the west side).
+     * For {@link RouteNodeType#NON_LOCAL_INHERIT_PREV_SIDE} nodes, this is the side inherited on the path that most
+     * recently reached them (see {@link #setInheritedSide(RouteNode)}).
+     * @return True if so.
+     */
+    public boolean isOnEastSide() {
+        return (endHalfTileXCoordinate & 1) != 0;
+    }
+
+    /**
      * Sets the type of a RouteNode object.
      * @param type New RouteNodeType value.
      */
@@ -445,7 +463,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 (RouteNodeType.isAnyLocal(this.type) && type == RouteNodeType.LOCAL_RESERVED && visited == 0) ||
                 // Or promotions to EXCLUSIVE_SINK_NON_LOCAL from NON_LOCAL (by PartialRouter.determineRoutingTargets()
                 // for the begin node of a locked path to sinks, before any routing)
-                (this.type == RouteNodeType.NON_LOCAL.ordinal() && type == RouteNodeType.EXCLUSIVE_SINK_NON_LOCAL && visited == 0)
+                ((this.type == RouteNodeType.NON_LOCAL.ordinal() || this.type == RouteNodeType.NON_LOCAL_INHERIT_PREV_SIDE.ordinal()) &&
+                        type == RouteNodeType.EXCLUSIVE_SINK_NON_LOCAL && visited == 0)
         );
         this.type = (byte) type.ordinal();
     }
@@ -476,7 +495,29 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      * @return The tileXCoordinate of the INT tile that the associated {@link Node} instance stops at.
      */
     public short getEndTileXCoordinate() {
-        return endTileXCoordinate;
+        return (short) (endHalfTileXCoordinate >> 1);
+    }
+
+    /**
+     * Gets the x coordinate, in half tiles, of the INT {@link Tile} half
+     * that the associated {@link Node} instance stops at (for {@link RouteNodeType#NON_LOCAL_INHERIT_PREV_SIDE}
+     * nodes, the half inherited on the path that most recently reached them; see {@link #setInheritedSide(RouteNode)}).
+     * @return Twice the tileXCoordinate of the INT tile that the associated {@link Node} instance stops at,
+     * plus one if it stops at the east half of that tile.
+     */
+    public short getEndHalfTileXCoordinate() {
+        return endHalfTileXCoordinate;
+    }
+
+    /**
+     * Sets the side (half) of its INT tile that a {@link RouteNodeType#NON_LOCAL_INHERIT_PREV_SIDE} node (which serves
+     * both sides) is considered to end on, as inherited from the node that it is reached from on the current path.
+     * Like the prev pointer, this is only valid within the search that set it.
+     * @param prev Node that this node is reached from (whose own side has already been set, if it is also such a node).
+     */
+    public void setInheritedSide(RouteNode prev) {
+        assert(getType() == RouteNodeType.NON_LOCAL_INHERIT_PREV_SIDE);
+        endHalfTileXCoordinate = (short) ((endHalfTileXCoordinate & ~1) | (prev.endHalfTileXCoordinate & 1));
     }
 
     /**

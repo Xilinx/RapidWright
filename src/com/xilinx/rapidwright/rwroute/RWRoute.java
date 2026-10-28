@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -732,17 +732,15 @@ public class RWRoute {
                     }
                     RouteNode altSinkRnode = routingGraph.getOrCreate(node, sinkType);
                     assert(altSinkRnode.getType() == sinkType);
+                    assert(altSinkRnode.isOnEastSide() == sinkRnode.isOnEastSide());
                     connection.addAltSinkRnode(altSinkRnode);
                 }
 
                 if (!connection.hasAltSinks()) {
                     // Since this connection only has a single sink target, make it exclusive
-                    sinkType = sinkType.isEastLocal() ? RouteNodeType.EXCLUSIVE_SINK_EAST :
-                               sinkType.isWestLocal() ? RouteNodeType.EXCLUSIVE_SINK_WEST :
-                               sinkType == RouteNodeType.LOCAL_BOTH ? RouteNodeType.EXCLUSIVE_SINK_BOTH :
-                               null;
-                    assert(sinkType != null);
-                    sinkRnode.setType(sinkType);
+                    // (it keeps the half of the INT tile that it is on)
+                    assert(sinkType != RouteNodeType.LOCAL_RESERVED);
+                    sinkRnode.setType(routingGraph.getExclusiveSinkType(sinkRnode));
 
                     // And increment its usage here immediately
                     sinkRnode.incrementUser(netWrapper);
@@ -804,7 +802,7 @@ public class RWRoute {
         if (routingGraph.isVersal) {
             for (Connection connection : indirectConnections) {
                 RouteNode sinkRnode = connection.getSinkRnode();
-                if (sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH) {
+                if (sinkRnode.getType().isExclusiveSinkCtrlOrSllInput()) {
                     IntentCode sinkIntent = sinkRnode.getIntentCode();
                     for (Node uphill : sinkRnode.getAllUphillNodes()) {
                         if (uphill.isTiedToVcc()) {
@@ -1921,28 +1919,22 @@ public class RWRoute {
                 }
                 RouteNodeType childType = childRNode.getType();
                 switch (childType) {
-                    case LOCAL_EAST_LEADING_TO_NORTHBOUND_LAGUNA:
-                    case LOCAL_EAST_LEADING_TO_SOUTHBOUND_LAGUNA:
-                    case LOCAL_WEST_LEADING_TO_NORTHBOUND_LAGUNA:
-                    case LOCAL_WEST_LEADING_TO_SOUTHBOUND_LAGUNA:
+                    case LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
+                    case LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
                         // Lookahead beyond child nodes leading to a Laguna if it won't get overused
                         lookahead = !childRNode.willOverUse(netWrapper);
                         // Fall-through
-                    case LOCAL_BOTH:
-                    case LOCAL_EAST:
-                    case LOCAL_WEST:
+                    case LOCAL:
+                    case LOCAL_SIDE_DEPENDS_ON_SINK:
                     case LOCAL_RESERVED:
                         if (!routingGraph.isAccessible(childRNode, rnode, connection)) {
                             continue;
                         }
-                        // Verify invariant that east/west wires stay east/west ...
-                        assert(!rnodeType.isEastLocal() || childType.isEastLocal() ||
+                        // Verify invariant that local wires on one side (half) stay on that side ...
+                        assert(!rnodeType.isSidedLocal() ||
+                                (childType.isSidedLocal() && rnode.isOnEastSide() == childRNode.isOnEastSide()) ||
                                 // ... unless it's an exclusive sink using a LOCAL_RESERVED node
-                                (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH) ||
-                                // ... or unless it's a Versal SLL input
-                                childRNode.getIntentCode() == IntentCode.NODE_SLL_INPUT);
-                        assert(!rnodeType.isWestLocal() || childType.isWestLocal() ||
-                                (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType() == RouteNodeType.EXCLUSIVE_SINK_BOTH) ||
+                                (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType().isExclusiveSinkCtrlOrSllInput()) ||
                                 // ... or unless it's a Versal SLL input
                                 childRNode.getIntentCode() == IntentCode.NODE_SLL_INPUT);
                         break;
@@ -1957,6 +1949,7 @@ public class RWRoute {
                         }
                         // Fall-through
                     case NON_LOCAL:
+                    case NON_LOCAL_INHERIT_PREV_SIDE:
                         // LOCALs cannot connect to NON_LOCALs except
                         //   (a) IMUX (LOCAL_*_LEADING_TO_*_LAGUNA) -> LAG_MUX_ATOM_\\d+_TXOUT
                         //   (b) via a LUT routethru: IMUX (LOCAL*) -> CLE_CLE_*_SITE_0_[A-H]_O
@@ -1984,18 +1977,19 @@ public class RWRoute {
                         // NOTE: UBUMP\\d+ wires have RouteNodeType.SUPER_LONG_LINE
                         lookahead |= (rnodeIsLaguna || Utils.isLaguna(childRNode.getTile().getTileTypeEnum()));
                         break;
-                    case EXCLUSIVE_SINK_BOTH:
-                    case EXCLUSIVE_SINK_EAST:
-                    case EXCLUSIVE_SINK_WEST:
+                    case EXCLUSIVE_SINK:
+                    case EXCLUSIVE_SINK_CTRL:
+                    case EXCLUSIVE_SINK_SLL_INPUT:
                     case EXCLUSIVE_SINK_NON_LOCAL:
-                        assert(childType != RouteNodeType.EXCLUSIVE_SINK_EAST || rnodeType == RouteNodeType.LOCAL_EAST ||
-                                // Must be an INODE that services Laguna but also feedsthrough above/below to a SLICE sink
+                        // An exclusive sink must be reached from a local node on the same side (half) ...
+                        assert(childType != RouteNodeType.EXCLUSIVE_SINK ||
+                                (rnodeType == RouteNodeType.LOCAL && rnode.isOnEastSide() == childRNode.isOnEastSide()) ||
+                                // ... or must be an INODE that services Laguna but also feedsthrough above/below to a SLICE sink
                                 rnodeType.isLocalLeadingToLaguna());
-                        assert(childType != RouteNodeType.EXCLUSIVE_SINK_WEST || rnodeType == RouteNodeType.LOCAL_WEST ||
-                                // Must be an INODE that services Laguna but also feedsthrough above/below to a SLICE sink
-                                rnodeType.isLocalLeadingToLaguna());
-                        assert(childType != RouteNodeType.EXCLUSIVE_SINK_BOTH || rnodeType == RouteNodeType.LOCAL_BOTH ||
-                               // [BC]NODEs are LOCAL_{EAST,WEST} since they connect to INODEs, but also service CTRL sinks
+                        // ... unless it is a CTRL sink (or SLL input) that can be reached from either side
+                        assert(!childType.isExclusiveSinkCtrlOrSllInput() ||
+                               rnodeType == RouteNodeType.LOCAL_SIDE_DEPENDS_ON_SINK ||
+                               // [BC]NODEs are LOCAL on the east/west side since they connect to INODEs, but also service CTRL sinks
                                (routingGraph.isVersal && EnumSet.of(IntentCode.NODE_CLE_BNODE, IntentCode.NODE_CLE_CNODE,
                                                                     IntentCode.NODE_INTF_BNODE, IntentCode.NODE_INTF_CNODE)
                                        .contains(rnode.getIntentCode())));
@@ -2086,9 +2080,45 @@ public class RWRoute {
         int childX = childRnode.getEndTileXCoordinate();
         int childY = childRnode.getEndTileYCoordinate();
         RouteNode sinkRnode = connection.getSinkRnode();
-        int sinkX = sinkRnode.getBeginTileXCoordinate();
+        // Sinks begin where they end (in X), other than Versal CTRL pins in CLE_BC_CORE/SLL tiles and SLL inputs,
+        // whose end is the INT tile column that they serve (see RouteNodeInfo.get())
+        int sinkX = sinkRnode.getEndTileXCoordinate();
+        assert(sinkX == sinkRnode.getBeginTileXCoordinate() ||
+                sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL || routingGraph.isOnBothSides(sinkRnode));
         int sinkY = sinkRnode.getBeginTileYCoordinate();
         int deltaX = Math.abs(childX - sinkX);
+        // Horizontal distance is measured in half tiles (each INT tile has a west and an east half) so that
+        // nodes arriving at the opposite side of an INT tile to the sink are estimated to be further away
+        int childHalfX = childRnode.getEndHalfTileXCoordinate();
+        int sinkHalfX = sinkRnode.getEndHalfTileXCoordinate();
+        RouteNodeType childType = childRnode.getType();
+        if ((childType == RouteNodeType.LOCAL_SIDE_DEPENDS_ON_SINK || childType == RouteNodeType.LOCAL_RESERVED) &&
+                sinkRnode.getType().isExclusiveSinkCtrlOrSllInput() && childRnode.getTile() == sinkRnode.getTile()) {
+            // INT_NODE_GLOBAL_* (UltraScale/UltraScale+) serve the CTRL_* pins on either side of their INT tile, as do
+            // the [BC]NODEs reserved for the CTRL pins and SLL inputs in Versal CLE_BC_CORE/INTF_*/SLL tiles
+            childHalfX = sinkHalfX;
+        }
+        if (childType == RouteNodeType.NON_LOCAL_INHERIT_PREV_SIDE) {
+            // Nodes that serve both sides of where they end are considered to be on the side that the path arrived
+            // from, so that moving onto them neither gains nor loses distance to the sink in X (only a subsequent
+            // move to a sided node does). Record that side on the node itself so that its own children can read it
+            // directly (rnode, if also such a node, had its side recorded when it was pushed)
+            childRnode.setInheritedSide(rnode);
+            childHalfX = childRnode.getEndHalfTileXCoordinate();
+        } else if (connection.isCrossSLR() && routingGraph.isOnBothSides(childRnode)) {
+            // Versal SLL input/output/data: between the east side of one INT tile (childHalfX) and the west side of
+            // the next; take whichever of those is nearer to the sink
+            childHalfX = Math.max(childHalfX, Math.min(childHalfX + 1, sinkHalfX));
+        }
+        int deltaHalfX;
+        if (sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK_SLL_INPUT) {
+            // A Versal SLL input sink is between two INT tiles (on both the east side of one, at sinkHalfX, and the
+            // west side of the next): measure to whichever is nearer
+            assert(routingGraph.isOnBothSides(sinkRnode));
+            deltaHalfX = (childHalfX <= sinkHalfX) ? sinkHalfX - childHalfX : Math.max(0, childHalfX - sinkHalfX - 1);
+        } else {
+            deltaHalfX = Math.abs(childHalfX - sinkHalfX);
+        }
         int deltaY = Math.abs(childY - sinkY);
         if (connection.isCrossSLR()) {
             assert(!childRnode.getType().isLocalLeadingToLaguna() || (
@@ -2114,6 +2144,7 @@ public class RWRoute {
                     // to get to the closest Laguna column and from there onto the sink.
                     // This optimization is not currently performed on Versal due to the
                     // distributed nature of its SLLs.
+                    // All distances are in half tiles, with Laguna columns being on the west half of their INT tile.
                     int nextLagunaColumn = routingGraph.nextLagunaColumn[childX];
                     int prevLagunaColumn = routingGraph.prevLagunaColumn[childX];
                     if (nextLagunaColumn == prevLagunaColumn) {
@@ -2122,52 +2153,54 @@ public class RWRoute {
                     } else {
                         assert(rnode.getType() != RouteNodeType.SUPER_LONG_LINE);
 
-                        final int deltaXToNextColumn;
-                        final int deltaXToPrevColumn;
-                        final int deltaXToAndFromNextColumn;
-                        final int deltaXToAndFromPrevColumn;
+                        final int deltaHalfXToNextColumn;
+                        final int deltaHalfXToPrevColumn;
+                        final int deltaHalfXToAndFromNextColumn;
+                        final int deltaHalfXToAndFromPrevColumn;
                         if (nextLagunaColumn == Integer.MAX_VALUE  || nextLagunaColumn >= connection.getXMaxBB()) {
-                            deltaXToNextColumn = Integer.MAX_VALUE;
-                            deltaXToAndFromNextColumn = Integer.MAX_VALUE;
+                            deltaHalfXToNextColumn = Integer.MAX_VALUE;
+                            deltaHalfXToAndFromNextColumn = Integer.MAX_VALUE;
                         } else {
-                            deltaXToNextColumn = Math.abs(nextLagunaColumn - childX);
-                            deltaXToAndFromNextColumn = deltaXToNextColumn + Math.abs(sinkX - nextLagunaColumn);
+                            deltaHalfXToNextColumn = Math.abs(2 * nextLagunaColumn - childHalfX);
+                            deltaHalfXToAndFromNextColumn = deltaHalfXToNextColumn + Math.abs(sinkHalfX - 2 * nextLagunaColumn);
                         }
                         if (prevLagunaColumn == Integer.MIN_VALUE || prevLagunaColumn <= connection.getXMinBB()) {
-                            deltaXToPrevColumn = Integer.MAX_VALUE;
-                            deltaXToAndFromPrevColumn = Integer.MAX_VALUE;
+                            deltaHalfXToPrevColumn = Integer.MAX_VALUE;
+                            deltaHalfXToAndFromPrevColumn = Integer.MAX_VALUE;
                         } else {
-                            deltaXToPrevColumn = Math.abs(prevLagunaColumn - childX);
-                            deltaXToAndFromPrevColumn = deltaXToPrevColumn + Math.abs(sinkX - prevLagunaColumn);
+                            deltaHalfXToPrevColumn = Math.abs(2 * prevLagunaColumn - childHalfX);
+                            deltaHalfXToAndFromPrevColumn = deltaHalfXToPrevColumn + Math.abs(sinkHalfX - 2 * prevLagunaColumn);
                         }
-                        if (deltaXToNextColumn == deltaXToPrevColumn) {
+                        final int maxDetourHalfX = 2 * maxDetourToSnapBackToPrevLagunaColumn;
+                        if (deltaHalfXToNextColumn == deltaHalfXToPrevColumn) {
                             // Equidistant from both columns, prefer the one closer when considering to/from the sink
-                            deltaX = Math.min(deltaXToAndFromNextColumn, deltaXToAndFromPrevColumn);
-                        } else if (deltaXToNextColumn < deltaXToPrevColumn &&
-                                deltaXToAndFromNextColumn <= deltaXToAndFromPrevColumn + maxDetourToSnapBackToPrevLagunaColumn) {
+                            deltaHalfX = Math.min(deltaHalfXToAndFromNextColumn, deltaHalfXToAndFromPrevColumn);
+                        } else if (deltaHalfXToNextColumn < deltaHalfXToPrevColumn &&
+                                deltaHalfXToAndFromNextColumn <= deltaHalfXToAndFromPrevColumn + maxDetourHalfX) {
                             // Closer to the next column and not detouring more than 4 tiles extra to/from using the prev column
-                            assert(deltaX <= deltaXToAndFromNextColumn);
-                            deltaX = deltaXToAndFromNextColumn;
-                        } else if (deltaXToPrevColumn < deltaXToNextColumn &&
-                                deltaXToAndFromPrevColumn <= deltaXToAndFromNextColumn + maxDetourToSnapBackToPrevLagunaColumn) {
+                            assert(deltaHalfX <= deltaHalfXToAndFromNextColumn);
+                            deltaHalfX = deltaHalfXToAndFromNextColumn;
+                        } else if (deltaHalfXToPrevColumn < deltaHalfXToNextColumn &&
+                                deltaHalfXToAndFromPrevColumn <= deltaHalfXToAndFromNextColumn + maxDetourHalfX) {
                             // Closer to the next column and not detouring more than 4 tiles extra to/from using the prev column
-                            assert(deltaX <= deltaXToAndFromPrevColumn);
-                            deltaX = deltaXToAndFromPrevColumn;
+                            assert(deltaHalfX <= deltaHalfXToAndFromPrevColumn);
+                            deltaHalfX = deltaHalfXToAndFromPrevColumn;
                         } else {
                             // Pretty much same distance to/from both columns; prefer the closer to column
-                            deltaX = (deltaXToNextColumn < deltaXToPrevColumn) ? deltaXToAndFromNextColumn
-                                                                               : deltaXToAndFromPrevColumn;
+                            deltaHalfX = (deltaHalfXToNextColumn < deltaHalfXToPrevColumn) ? deltaHalfXToAndFromNextColumn
+                                                                                           : deltaHalfXToAndFromPrevColumn;
                         }
                     }
-                    assert(deltaX >= 0 && deltaX < Integer.MAX_VALUE);
+                    assert(deltaHalfX >= 0 && deltaHalfX < Integer.MAX_VALUE);
                 }
             }
         }
 
-        int distanceToSink = deltaX + deltaY;
+        // Horizontal distance counts half as much per half tile as vertical distance does per tile
+        float distanceToSink = 0.5f * deltaHalfX + deltaY;
         float newTotalPathCost = newPartialPathCost + state.estWlWeight * distanceToSink / sharingFactor;
         if (config.isTimingDriven()) {
-            newTotalPathCost += state.estDlyWeight * (deltaX * 0.32f + deltaY * 0.16f);
+            newTotalPathCost += state.estDlyWeight * (deltaHalfX * 0.16f + deltaY * 0.16f);
         }
 
         push(state, childRnode, newPartialPathCost, newTotalPathCost, lookahead);
