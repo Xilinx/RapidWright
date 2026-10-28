@@ -895,14 +895,13 @@ class EDIFOptEditor {
                     batch.remove(pi);
                 }
             } else if (op instanceof RemoveNet) {
+                // Disconnected together with the other removals (one pass over the net)
                 EDIFNet rm = cell.getNet(((RemoveNet) op).net);
                 if (rm != null) {
-                    for (EDIFPortInst rpi : new ArrayList<>(rm.getPortInsts())) {
-                        rm.removePortInst(rpi);
+                    for (EDIFPortInst rpi : rm.getPortInsts()) {
+                        batch.remove(rpi);
                         if (rpi.getCellInst() != null) {
                             rpi.getCellInst().removePortInst(rpi);
-                        } else {
-                            cell.removeInternalPortMapEntry(rpi.getName());
                         }
                     }
                     cell.removeNet(rm);

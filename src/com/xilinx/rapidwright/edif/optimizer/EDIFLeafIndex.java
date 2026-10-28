@@ -101,9 +101,10 @@ public class EDIFLeafIndex {
     /**
      * Builds the index for the provided netlist, treating the ports of the hierarchical
      * instances selected by boundary as opaque: nets are not joined across them. Instead, each
-     * port of such an instance becomes a pair of port pins (leaf index {@link #BOUNDARY}), one on
-     * the outer net (a load for an input port, a driver for an output port) and one on the inner
-     * net (the reverse), just like top-level ports.
+     * port of such an instance becomes port pins (leaf index {@link #BOUNDARY}), one on the outer
+     * net (a load for an input port, a driver for an output port) and one on the inner net (the
+     * reverse), just like top-level ports. A side not connected to a net has no pin, while the
+     * other side keeps its own.
      * @param netlist The netlist to index.
      * @param boundary Selects hierarchical instances whose ports are opaque (may be null).
      */
@@ -303,8 +304,13 @@ public class EDIFLeafIndex {
         for (int i = 0; i < numSegs; i++) {
             uf[i] = i;
         }
+        // Ports of preserved instances: each side connected to a net (outside in the parent,
+        // inside the instance) gets a pin, even if the other side is not connected
         List<EDIFPortInst> boundaryOuter = new ArrayList<>();
         IntList boundaryHier = new IntList();
+        IntList boundaryOuterSeg = new IntList();
+        IntList boundaryInnerSeg = new IntList();
+        int boundaryPins = 0;
         for (int h = 1; h < numHier; h++) {
             int parent = hParent[h];
             DefInfo pd = defs.get(hCell[parent]);
@@ -313,13 +319,13 @@ public class EDIFLeafIndex {
             for (int p = pd.childPinStart[i]; p < pd.childPinStart[i + 1]; p++) {
                 int outer = pd.pinOuter[p];
                 int inner = pd.pinInner[p];
-                if (outer < 0 || inner < 0) {
-                    continue;
-                }
-                if (opaque) {
+                if (opaque && (outer >= 0 || inner >= 0)) {
                     boundaryOuter.add(pd.pins[p]);
                     boundaryHier.add(h);
-                } else {
+                    boundaryOuterSeg.add(outer < 0 ? -1 : hSegBase[parent] + outer);
+                    boundaryInnerSeg.add(inner < 0 ? -1 : hSegBase[h] + inner);
+                    boundaryPins += (outer < 0 ? 0 : 1) + (inner < 0 ? 0 : 1);
+                } else if (!opaque && outer >= 0 && inner >= 0) {
                     union(uf, hSegBase[parent] + outer, hSegBase[h] + inner);
                 }
             }
@@ -361,7 +367,7 @@ public class EDIFLeafIndex {
                 }
             }
         }
-        numPins = pinCount + topPins.size() + 2 * boundaryOuter.size();
+        numPins = pinCount + topPins.size() + boundaryPins;
         pPortInst = new EDIFPortInst[numPins];
         pLeaf = new int[numPins];
         pNet = new int[numPins];
@@ -394,28 +400,30 @@ public class EDIFLeafIndex {
         for (int i = 0; i < boundaryOuter.size(); i++) {
             EDIFPortInst pi = boundaryOuter.get(i);
             int h = boundaryHier.get(i);
-            EDIFNet inner = hCell[h].getInternalNet(pi);
-            EDIFPortInst innerPi = null;
-            for (EDIFPortInst q : inner.getPortInsts()) {
-                if (q.isTopLevelPort() && q.getName().equals(pi.getName())) {
-                    innerPi = q;
-                }
-            }
             EDIFDirection dir = pi.getPort().getDirection();
-            byte outerDir = dir == EDIFDirection.INPUT ? SINK
-                    : dir == EDIFDirection.OUTPUT ? DRIVER : BIDIR;
-            byte innerDir = dir == EDIFDirection.INPUT ? DRIVER
-                    : dir == EDIFDirection.OUTPUT ? SINK : BIDIR;
-            pPortInst[p] = pi;
-            pLeaf[p] = BOUNDARY;
-            pNet[p] = segNet[seg(hParent[h], pi.getNet())];
-            pDir[p] = outerDir;
-            p++;
-            pPortInst[p] = innerPi != null ? innerPi : pi;
-            pLeaf[p] = BOUNDARY;
-            pNet[p] = segNet[seg(h, inner)];
-            pDir[p] = innerDir;
-            p++;
+            if (boundaryOuterSeg.get(i) >= 0) {
+                pPortInst[p] = pi;
+                pLeaf[p] = BOUNDARY;
+                pNet[p] = segNet[boundaryOuterSeg.get(i)];
+                pDir[p] = dir == EDIFDirection.INPUT ? SINK
+                        : dir == EDIFDirection.OUTPUT ? DRIVER : BIDIR;
+                p++;
+            }
+            if (boundaryInnerSeg.get(i) >= 0) {
+                EDIFNet inner = hCell[h].getInternalNet(pi);
+                EDIFPortInst innerPi = null;
+                for (EDIFPortInst q : inner.getPortInsts()) {
+                    if (q.isTopLevelPort() && q.getName().equals(pi.getName())) {
+                        innerPi = q;
+                    }
+                }
+                pPortInst[p] = innerPi != null ? innerPi : pi;
+                pLeaf[p] = BOUNDARY;
+                pNet[p] = segNet[boundaryInnerSeg.get(i)];
+                pDir[p] = dir == EDIFDirection.INPUT ? DRIVER
+                        : dir == EDIFDirection.OUTPUT ? SINK : BIDIR;
+                p++;
+            }
         }
 
         lap("pins");

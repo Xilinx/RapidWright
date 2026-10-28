@@ -33,7 +33,9 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
@@ -119,9 +121,24 @@ public class EDIFLeafNetlistComparator {
         return inst.getCellType().isStaticSource();
     }
 
+    /** @return True if a cell is a library primitive (not a user-defined cell of that name). */
+    static boolean isPrimitive(EDIFCell cell) {
+        EDIFLibrary lib = cell.getLibrary();
+        return lib != null && lib.isHDIPrimitivesLibrary();
+    }
+
+    /** @return The type of a cell: its name, qualified by its library unless a primitive. */
+    static String typeName(EDIFCell cell) {
+        if (isPrimitive(cell) || cell.getLibrary() == null) {
+            return cell.getName();
+        }
+        return cell.getLibrary().getName() + ":" + cell.getName();
+    }
+
     /**
-     * Computes a name for whatever drives the net of pin p: a leaf pin name, top-level port name,
-     * constant or undriven marker. Results are cached per net in the provided array.
+     * Computes a name for whatever drives the net of pin p: a leaf pin name, top-level port name
+     * (including bidirectional pins, e.g. an I/O buffer pad pin and its INOUT port), constant or
+     * undriven marker. Results are cached per net in the provided array.
      */
     static String driverOf(EDIFLeafIndex idx, int p, String[] cache) {
         int n = idx.getPinNet(p);
@@ -135,7 +152,7 @@ public class EDIFLeafNetlistComparator {
         String driver = null;
         for (int i = idx.getNetPinStart(n); i < idx.getNetPinEnd(n); i++) {
             int q = idx.getNetPin(i);
-            if (idx.getPinDir(q) != EDIFLeafIndex.DRIVER) {
+            if (idx.getPinDir(q) == EDIFLeafIndex.SINK) {
                 continue;
             }
             String d;
@@ -188,7 +205,7 @@ public class EDIFLeafNetlistComparator {
      */
     static String lutFunction(EDIFCellInst inst, Map<String, String> drivers) {
         String type = inst.getCellType().getName();
-        if (!type.matches("LUT[1-6]")) {
+        if (!type.matches("LUT[1-6]") || !isPrimitive(inst.getCellType())) {
             return null;
         }
         int size = type.charAt(3) - '0';
@@ -258,20 +275,21 @@ public class EDIFLeafNetlistComparator {
             String name = e.getKey();
             EDIFCellInst gi = g.getLeafInst(e.getValue());
             Integer tl = tm.get(name);
-            String gType = gi.getCellType().getName();
+            String gType = typeName(gi.getCellType());
             if (tl == null) {
                 addDiff(Category.ONLY_GOLD, gType, name + " (" + gType + ")");
                 continue;
             }
             matched++;
             EDIFCellInst ti = t.getLeafInst(tl);
-            String tType = ti.getCellType().getName();
+            String tType = typeName(ti.getCellType());
             Map<String, String> gd = pinDrivers(g, e.getValue(), gc);
             Map<String, String> td = pinDrivers(t, tl, tc);
             if (!gType.equals(tType)) {
                 String gf = lutFunction(gi, gd);
                 if (gf != null && gf.equals(lutFunction(ti, td))) {
                     addDiff(Category.LUT_EQUIVALENT, gType, name + " " + gType + " vs " + tType);
+                    comparePropsAndPins(name, gType, gi, ti, gd, td, true);
                 } else {
                     addDiff(Category.TYPE, gType, name + " " + gType + " vs " + tType + " gold="
                             + describe(gi, gd) + " test=" + describe(ti, td));
@@ -290,7 +308,7 @@ public class EDIFLeafNetlistComparator {
         }
         for (Map.Entry<String, Integer> e : tm.entrySet()) {
             if (!gm.containsKey(e.getKey())) {
-                String tType = t.getLeafInst(e.getValue()).getCellType().getName();
+                String tType = typeName(t.getLeafInst(e.getValue()).getCellType());
                 addDiff(Category.ONLY_TEST, tType, e.getKey() + " (" + tType + ")");
             }
         }

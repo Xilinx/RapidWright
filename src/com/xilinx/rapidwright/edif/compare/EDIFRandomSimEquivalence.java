@@ -40,8 +40,8 @@ import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
-import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.edif.EDIFValueType;
@@ -663,7 +663,7 @@ public class EDIFRandomSimEquivalence {
         for (int l = 0; l < a.idx.getNumLeaves(); l++) {
             EDIFCell cell = a.idx.getLeafInst(l).getCellType();
             String type = cell.getName();
-            if (!observed[l] || b.byName.containsKey(a.names[l]) || !isPrimitive(cell)) {
+            if (!observed[l] || b.byName.containsKey(a.names[l]) || !EDIFLeafNetlistComparator.isPrimitive(cell)) {
                 continue;
             }
             if (type.matches("FD[RSCP]E|LD[CP]E")) {
@@ -684,16 +684,17 @@ public class EDIFRandomSimEquivalence {
                 }
             }
         }
-        // Async clear/preset tied active determine the constant regardless of INIT
+        // An asynchronous clear/preset that is always active determines the constant regardless
+        // of INIT. It must never change (a sampled value alone is no proof): this is checked
+        // again in every round below, as the nets that never change depend on the assumptions
         simulate(a, 0, forced);
+        Set<Integer> asyncActive = new java.util.HashSet<>();
+        byte[] fixed0 = a.fixedNets(forced);
         for (int l : removedFF) {
-            String type = a.idx.getLeafInst(l).getCellType().getName();
-            String rst = type.equals("FDRE") ? "R" : type.equals("FDSE") ? "S"
-                    : type.equals("FDCE") || type.equals("LDCE") ? "CLR" : "PRE";
-            Long r = type.startsWith("SRL") ? null : pinValue(a, l, rst);
-            if ((type.equals("FDCE") || type.equals("FDPE") || type.startsWith("LD"))
-                    && r != null && r == -1L) {
+            if (isAsyncAlwaysActive(a, l, fixed0)) {
+                String type = a.idx.getLeafInst(l).getCellType().getName();
                 forced.put(l, type.equals("FDCE") || type.equals("LDCE") ? 0L : -1L);
+                asyncActive.add(l);
             }
         }
         // Removed sequential cells that are not inductively constant were removed as dead
@@ -705,7 +706,8 @@ public class EDIFRandomSimEquivalence {
             for (int round = 0; round < rounds; round++) {
                 simulate(a, round, forced);
                 for (int l : removedFF) {
-                    if (!isInductivelyConstant(a, l, forced.get(l), fixed)) {
+                    if (!isInductivelyConstant(a, l, forced.get(l), fixed)
+                            || asyncActive.contains(l) && !isAsyncAlwaysActive(a, l, fixed)) {
                         if (DEBUG && notConst.add(l)) {
                             System.out.println("NOT_CONSTANT " + a.names[l] + " "
                                     + a.idx.getLeafInst(l).getCellType().getName() + " assumed="
@@ -733,6 +735,39 @@ public class EDIFRandomSimEquivalence {
         return mismatches;
     }
 
+    /** @return The asynchronous clear/preset pin of a flip-flop or latch, null if none. */
+    private static String asyncControl(String type) {
+        switch (type) {
+            case "FDCE":
+            case "LDCE":
+                return "CLR";
+            case "FDPE":
+            case "LDPE":
+                return "PRE";
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * @return True if the asynchronous clear/preset of leaf l is active in every pattern of the
+     * last simulation and is on a net that never changes, hence always active.
+     */
+    private static boolean isAsyncAlwaysActive(Model m, int l, byte[] fixed) {
+        String pin = asyncControl(m.idx.getLeafInst(l).getCellType().getName());
+        if (pin == null) {
+            return false;
+        }
+        for (int p = m.idx.getLeafPinStart(l); p < m.idx.getLeafPinEnd(l); p++) {
+            if (m.idx.getPinPortInst(p).getName().equals(pin)) {
+                int n = m.idx.getPinNet(p);
+                Long v = pinValue(m, l, pin);
+                return n >= 0 && fixed[n] != Model.NOT_FIXED && v != null && v == -1L;
+            }
+        }
+        return false;
+    }
+
     /** Prints the removed sequential cells found not to be constant (and why). */
     private static final boolean DEBUG = System.getProperty("rapidwright.equiv.debug") != null;
 
@@ -752,10 +787,21 @@ public class EDIFRandomSimEquivalence {
         return sb.toString();
     }
 
-    /** Properties a surviving cut cell may change (inversions are part of the simulation). */
-    private static boolean isIgnoredProperty(String key) {
+    /**
+     * Properties a surviving cut cell may change: OPT_MODIFIED, and the inversion of a single-bit
+     * pin (IS_[pin]_INVERTED), which is part of the simulation. Inversion masks of bus pins (e.g.
+     * a DSP's IS_ALUMODE_INVERTED) are not simulated, so they are compared.
+     */
+    private static boolean isIgnoredProperty(EDIFCell cell, String key) {
         String k = key.toUpperCase();
-        return k.equals("OPT_MODIFIED") || (k.startsWith("IS_") && k.endsWith("_INVERTED"));
+        if (k.equals("OPT_MODIFIED")) {
+            return true;
+        }
+        if (!k.startsWith("IS_") || !k.endsWith("_INVERTED")) {
+            return false;
+        }
+        EDIFPort port = cell.getPort(key.substring(3, key.length() - 9));
+        return port != null && !port.isBus();
     }
 
     /** Series of the original netlist (null if unknown), for the declared property types. */
@@ -780,23 +826,9 @@ public class EDIFRandomSimEquivalence {
         }
     }
 
-    /** @return True if a cell is a library primitive (not a user-defined cell of that name). */
-    private static boolean isPrimitive(EDIFCell cell) {
-        EDIFLibrary lib = cell.getLibrary();
-        return lib != null && lib.isHDIPrimitivesLibrary();
-    }
-
-    /** @return The type of a cell: its name, qualified by its library unless a primitive. */
-    private static String typeName(EDIFCell cell) {
-        if (isPrimitive(cell) || cell.getLibrary() == null) {
-            return cell.getName();
-        }
-        return cell.getLibrary().getName() + ":" + cell.getName();
-    }
-
     /** @return The declaration (type, default) of a property of a primitive cell, or null. */
     private VivadoProp declaredProperty(EDIFCell cell, String key) {
-        if (series == null || !isPrimitive(cell)) {
+        if (series == null || !EDIFLeafNetlistComparator.isPrimitive(cell)) {
             return null;
         }
         Map<String, VivadoProp> props = declared.computeIfAbsent(cell.getName(), t -> {
@@ -857,7 +889,7 @@ public class EDIFRandomSimEquivalence {
         EDIFCell cell = inst.getCellType();
         Map<String, String> props = new TreeMap<>();
         for (Map.Entry<String, EDIFPropertyValue> e : inst.getPropertiesMap().entrySet()) {
-            if (!isIgnoredProperty(e.getKey())) {
+            if (!isIgnoredProperty(cell, e.getKey())) {
                 props.put(e.getKey().toUpperCase(), normalize(cell, e.getKey(), e.getValue()));
             }
         }
@@ -885,8 +917,8 @@ public class EDIFRandomSimEquivalence {
                 continue;
             }
             String name = a.names[la];
-            String ta = typeName(a.idx.getLeafInst(la).getCellType());
-            String tb = typeName(b.idx.getLeafInst(lb).getCellType());
+            String ta = EDIFLeafNetlistComparator.typeName(a.idx.getLeafInst(la).getCellType());
+            String tb = EDIFLeafNetlistComparator.typeName(b.idx.getLeafInst(lb).getCellType());
             checked++;
             if (!ta.equals(tb) || a.cutType[la] != b.cutType[lb]) {
                 fail("cell " + name + " type " + ta + " -> " + tb);

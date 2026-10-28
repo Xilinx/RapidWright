@@ -43,6 +43,7 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
+import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
@@ -1003,6 +1004,199 @@ public class TestEDIFNetlistOptimizer {
                 + "instances that need different edits, e.g. u0"), report);
         // No report is written unless requested
         Assertions.assertNull(new EDIFOptOptions().getReport());
+    }
+
+    /** Two I/O buffers driving INOUT ports; swapped connects each buffer to the other port. */
+    private static EDIFNetlist ioBuffers(boolean swapped) {
+        OptProbes.B b = new OptProbes.B("iobufs");
+        b.in("a", "b");
+        for (String io : new String[] {"io0", "io1"}) {
+            EDIFPort port = b.top.createPort(io, EDIFDirection.INOUT, 1);
+            b.net(b.top, io).createPortInst(port);
+        }
+        b.inst(Unisim.IOBUF, "IOB0", "I=a", "T=0", "IO=" + (swapped ? "io1" : "io0"));
+        b.inst(Unisim.IOBUF, "IOB1", "I=b", "T=0", "IO=" + (swapped ? "io0" : "io1"));
+        return b.nl;
+    }
+
+    @Test
+    public void testLeafComparatorSeesBidirectionalConnections() {
+        Assertions.assertEquals(0, new EDIFLeafNetlistComparator().compare(ioBuffers(false),
+                ioBuffers(false)));
+        Assertions.assertTrue(new EDIFLeafNetlistComparator().compare(ioBuffers(false),
+                ioBuffers(true)) > 0);
+    }
+
+    /** A user-defined cell of the given library and name, with ports I0, I1 and O. */
+    private static EDIFCell userCell(EDIFNetlist nl, String library, String name) {
+        EDIFLibrary lib = nl.getLibrary(library);
+        if (lib == null) {
+            lib = nl.addLibrary(new EDIFLibrary(library));
+        }
+        EDIFCell cell = new EDIFCell(lib, name);
+        cell.createPort("I0", EDIFDirection.INPUT, 1);
+        cell.createPort("I1", EDIFDirection.INPUT, 1);
+        cell.createPort("O", EDIFDirection.OUTPUT, 1);
+        return cell;
+    }
+
+    private static EDIFNetlist userCellNetlist(String library, String name, boolean swapInputs) {
+        OptProbes.B b = new OptProbes.B("user_cells");
+        b.in("a", "b");
+        b.out("o");
+        b.inst(userCell(b.nl, library, name), "U", "I0=" + (swapInputs ? "b" : "a"),
+                "I1=" + (swapInputs ? "a" : "b"), "O=o", "@INIT=4'h6");
+        return b.nl;
+    }
+
+    @Test
+    public void testLeafComparatorQualifiesUserCellTypes() {
+        // Same cell name in another library: a different type
+        Assertions.assertTrue(new EDIFLeafNetlistComparator().compare(
+                userCellNetlist("work", "opaque", false),
+                userCellNetlist("libB", "opaque", false)) > 0);
+        // A black box named like a LUT, with its inputs swapped: not an equivalent LUT
+        Assertions.assertTrue(new EDIFLeafNetlistComparator().compare(
+                userCellNetlist("work", "LUT2", false),
+                userCellNetlist("work", "LUT2", true)) > 0);
+        Assertions.assertEquals(0, new EDIFLeafNetlistComparator().compare(
+                userCellNetlist("work", "opaque", false),
+                userCellNetlist("work", "opaque", false)));
+    }
+
+    @Test
+    public void testLeafComparatorComparesPropertiesOfEquivalentLuts() {
+        OptProbes.B g = new OptProbes.B("lut_props");
+        g.in("a", "b");
+        g.out("o");
+        g.lut("L", "6", "o", "a", "b");
+        // An equivalent LUT3 (I2 duplicates I0) that is DONT_TOUCH
+        OptProbes.B t = new OptProbes.B("lut_props");
+        t.in("a", "b");
+        t.out("o");
+        t.lut("L", "66", "o", "a", "b", "a").addProperty("DONT_TOUCH", "TRUE");
+        EDIFLeafNetlistComparator cmp = new EDIFLeafNetlistComparator();
+        Assertions.assertEquals(1, cmp.compare(g.nl, t.nl));
+        Assertions.assertEquals(1, cmp.getDiffCount(EDIFLeafNetlistComparator.Category.PROPERTY));
+        Assertions.assertEquals(1,
+                cmp.getDiffCount(EDIFLeafNetlistComparator.Category.LUT_EQUIVALENT));
+    }
+
+    /**
+     * An FDCE with INIT=1 and CE low, cleared by a NAND of six inputs (usually but not always
+     * active), or by a tied-high clear.
+     */
+    private static EDIFNetlist clearedFlipFlop(String prefix, boolean tiedClear) {
+        OptProbes.B b = new OptProbes.B("cleared_ff");
+        b.in("clk", "d");
+        b.out("q");
+        String[] ins = new String[6];
+        for (int i = 0; i < 6; i++) {
+            ins[i] = prefix + i;
+            b.in(ins[i]);
+        }
+        b.lut("N", "7FFFFFFFFFFFFFFF", "clr", ins);
+        b.inst(Unisim.FDCE, "F", "C=clk", "CE=0", "D=d", "CLR=" + (tiedClear ? "1" : "clr"),
+                "Q=q", "@INIT=1'b1");
+        return b.nl;
+    }
+
+    private static EDIFNetlist groundedOutput(String prefix) {
+        OptProbes.B b = new OptProbes.B("cleared_ff");
+        b.in("clk", "d");
+        b.out("q");
+        for (int i = 0; i < 6; i++) {
+            b.in(prefix + i);
+        }
+        b.inst(Unisim.GND, "G", "G=q");
+        return b.nl;
+    }
+
+    @Test
+    public void testRandomSimEquivalenceNeedsAlwaysActiveAsyncClear() {
+        // The flip-flop is 1 until the clear first becomes active: replacing it by ground is
+        // wrong, even when the clear happens to be active in all sampled patterns
+        for (int i = 0; i < 20; i++) {
+            String prefix = "s" + i + "_";
+            EDIFRandomSimEquivalence eq = new EDIFRandomSimEquivalence();
+            Assertions.assertTrue(eq.check(clearedFlipFlop(prefix, false), groundedOutput(prefix),
+                    2) > 0, prefix);
+        }
+        // With the clear tied active, it is constant 0
+        EDIFRandomSimEquivalence eq = new EDIFRandomSimEquivalence();
+        Assertions.assertEquals(0, eq.check(clearedFlipFlop("s_", true), groundedOutput("s_"),
+                2), eq.getExamples().toString());
+    }
+
+    private static EDIFNetlist dsp(String aluModeInverted) {
+        OptProbes.B b = new OptProbes.B("dsp");
+        b.in("clk", "a");
+        EDIFCellInst d = b.inst(Unisim.DSP58, "D", "CLK=clk",
+                "@IS_ALUMODE_INVERTED=" + aluModeInverted);
+        b.net(b.top, "a").createPortInst("ALUMODE", 0, d);
+        return b.nl;
+    }
+
+    @Test
+    public void testRandomSimEquivalenceComparesBusInversionMasks() {
+        // A bus pin's inversion mask is not simulated, so a change must be reported
+        Assertions.assertEquals(0, new EDIFRandomSimEquivalence().check(dsp("4'b0000"),
+                dsp("4'b0000"), 2));
+        Assertions.assertTrue(new EDIFRandomSimEquivalence().check(dsp("4'b0000"),
+                dsp("4'b0101"), 2) > 0);
+    }
+
+    /**
+     * A preserved instance with an input connected outside but unused inside (driven by D) and
+     * an output connected outside but undriven inside (loading E).
+     */
+    private static EDIFNetlist preservedUnusedPorts() {
+        OptProbes.B b = new OptProbes.B("dt_port");
+        b.in("a", "b", "c");
+        b.out("o", "p");
+        EDIFCell sub = b.cell("sub");
+        b.in(sub, "y");
+        b.out(sub, "z");
+        sub.createPort("x", EDIFDirection.INPUT, 1);
+        sub.createPort("w", EDIFDirection.OUTPUT, 1);
+        b.lut(sub, "SL", "1", "z", "y");
+        b.lut("D", "6", "dx", "a", "b");
+        b.inst(sub, "u0", "x=dx", "y=c", "z=o", "w=wn").addProperty("DONT_TOUCH", "TRUE");
+        b.lut("E", "6", "p", "wn", "a");
+        return b.nl;
+    }
+
+    @Test
+    public void testOptimizeKeepsUnusedPortsOfPreservedInstance() {
+        // As in Vivado (2025.1): D, E and both connections of u0 are kept
+        EDIFNetlist netlist = preservedUnusedPorts();
+        EDIFOptStats stats = EDIFTools.optimizeNetlist(netlist, new EDIFOptOptions());
+        EDIFCell top = netlist.getTopCell();
+        Assertions.assertEquals(0, stats.getRemoved(EDIFOptStats.Phase.SWEEP));
+        Assertions.assertNotNull(top.getCellInst("D"));
+        EDIFCellInst u0 = top.getCellInst("u0");
+        Assertions.assertSame(top.getCellInst("D").getPortInst("O").getNet(),
+                u0.getPortInst("x").getNet());
+        Assertions.assertSame(top.getCellInst("E").getPortInst("I0").getNet(),
+                u0.getPortInst("w").getNet());
+    }
+
+    @Test
+    public void testOrphanNetRemovalIsLinearInFanout() {
+        // A preserved flip-flop survives while all its loads are swept: its net is removed
+        OptProbes.B b = new OptProbes.B("orphan");
+        b.in("clk", "a", "c");
+        b.fdre("F", "a", "1", "0", "n", "0").addProperty("DONT_TOUCH", "TRUE");
+        int loads = 400000;
+        for (int i = 0; i < loads; i++) {
+            b.lut("L" + i, "6", "d" + i, "n", "c");
+        }
+        EDIFOptStats stats = EDIFTools.optimizeNetlist(b.nl, new EDIFOptOptions());
+        Assertions.assertEquals(loads, stats.getRemoved(EDIFOptStats.Phase.SWEEP));
+        Assertions.assertNull(b.top.getCellInst("F").getPortInst("Q"));
+        // Disconnecting the pins one at a time takes about 7s here (2s otherwise)
+        Assertions.assertTrue(stats.getTimes().get("Apply edits") < 5_000_000_000L,
+                stats.getTimes().toString());
     }
 
     @Test
