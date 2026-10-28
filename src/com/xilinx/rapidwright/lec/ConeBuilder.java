@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -145,8 +146,8 @@ public class ConeBuilder {
 
     private final String scope;
 
-    /** Registers whose outputs get variables private to this netlist. */
-    private Set<String> privateRegisters = Collections.emptySet();
+    /** Instances of the registers whose outputs get private variables. */
+    private Set<Integer> privateRegisters = Collections.emptySet();
 
     /**
      * @param scope Label of the netlist being built, such as {@code "REF"}. It
@@ -461,12 +462,20 @@ public class ConeBuilder {
      * registers a retiming certificate defines.
      */
     public void setPrivateRegisters(Set<String> registers) {
-        privateRegisters = registers;
+        // Resolved to instances once, so the check made at every cone boundary
+        // is a lookup rather than a hierarchical name built per call.
+        Set<Integer> ids = new HashSet<>();
+        for (String register : registers) {
+            int id = flat.findInstId(register);
+            if (id >= 0) {
+                ids.add(id);
+            }
+        }
+        privateRegisters = ids;
     }
 
     private boolean isPrivateRegister(int instId) {
-        return !privateRegisters.isEmpty()
-                && privateRegisters.contains(flat.getInstName(instId));
+        return !privateRegisters.isEmpty() && privateRegisters.contains(instId);
     }
 
     /** Mints an unstable variable private to this netlist. */
