@@ -370,6 +370,57 @@ public class FlatNetlist {
     }
 
     /**
+     * Finds an instance by its full hierarchical name, by walking down from the
+     * top cell, so the cost is the number of children per level along the path
+     * rather than the size of the netlist.
+     *
+     * A renamed EDIF instance can have a separator in its own name, so every
+     * child whose name is a prefix of the remaining path is followed, and a
+     * name that resolves to more than one instance is refused.
+     *
+     * @return The instance identifier, or -1 if no instance has that name.
+     */
+    public int findInstId(String hierName) {
+        int found = findInstId(0, hierName);
+        if (found == -2) {
+            throw new LecException("The hierarchical name '" + hierName + "' matches more than "
+                    + "one instance");
+        }
+        return found;
+    }
+
+    /** @return The match below an instance, -1 for none, -2 for several. */
+    private int findInstId(int instId, String remaining) {
+        if (childBase[instId] < 0) {
+            return -1;
+        }
+        int found = -1;
+        int children = getIndex(instId).getChildCount();
+        for (int i = 0; i < children; i++) {
+            int child = childBase[instId] + i;
+            String name = instObj[child].getName();
+            if (!remaining.startsWith(name)) {
+                continue;
+            }
+            int match;
+            if (remaining.length() == name.length()) {
+                match = child;
+            } else if (remaining.startsWith(EDIFTools.EDIF_HIER_SEP, name.length())) {
+                match = findInstId(child, remaining.substring(name.length() + 1));
+            } else {
+                continue;
+            }
+            if (match == -2 || (match >= 0 && found >= 0)) {
+                return -2;
+            }
+            if (match >= 0) {
+                found = match;
+            }
+        }
+        return found;
+    }
+
+    /**
      * @return The full hierarchical name of a leaf pin, such as
      *         {@code "u_top/u_core/reg0/D"}.
      */

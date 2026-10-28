@@ -65,6 +65,8 @@ public class LecConfig {
 
     private Path reportFile;
 
+    private Path retimingMapFile;
+
     private DspMode dspMode = DspMode.OPAQUE;
 
     private boolean distributedRamTerminal = true;
@@ -122,6 +124,9 @@ public class LecConfig {
         parser.acceptsAll(IMP_OPTS, "Implementation netlist (.dcp or .edf)").withRequiredArg()
                 .describedAs("file");
         parser.acceptsAll(REPORT_OPTS, "Write the report to a file instead of stdout")
+                .withRequiredArg().describedAs("file");
+        parser.accepts("retiming-map", "Retiming certificate: each line defines a register of "
+                + "one netlist by a pin of the other, and is proven")
                 .withRequiredArg().describedAs("file");
         parser.accepts("dsp-mode", "DSP handling: opaque. NOT IMPLEMENTED: combinational, "
                 + "register-aware; they parse but are rejected").withRequiredArg()
@@ -190,6 +195,9 @@ public class LecConfig {
         config.elaborateOnly = options.has("elaborate-only");
         config.classifyOnly = options.has("classify-only");
         config.verbose = options.has("verbose");
+        if (options.has("retiming-map")) {
+            config.retimingMapFile = Paths.get((String) options.valueOf("retiming-map"));
+        }
         if (options.has("report")) {
             config.reportFile = Paths.get((String) options.valueOf("report"));
         }
@@ -309,6 +317,11 @@ public class LecConfig {
         return reportFile;
     }
 
+    /** @return The retiming certificate to prove, or null for none. */
+    public Path getRetimingMapFile() {
+        return retimingMapFile;
+    }
+
     public DspMode getDspMode() {
         return dspMode;
     }
@@ -418,5 +431,9 @@ public class LecConfig {
 
     void setClassifyOnly(boolean classifyOnly) {
         this.classifyOnly = classifyOnly;
+    }
+
+    void setRetimingMapFile(Path retimingMapFile) {
+        this.retimingMapFile = retimingMapFile;
     }
 }

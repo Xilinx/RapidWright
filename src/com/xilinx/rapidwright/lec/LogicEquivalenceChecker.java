@@ -158,9 +158,12 @@ public class LogicEquivalenceChecker {
     /** The main flow: read both netlists, elaborate them, then compare. */
     private static int check(LecConfig config, PrintStream out) {
         LecLog log = new LecLog(config.isVerbose(), out);
+        // Read first, so a bad certificate fails before the slow netlist loads.
+        RetimingMap retiming = config.getRetimingMapFile() == null ? null
+                : RetimingMap.read(config.getRetimingMapFile());
         EDIFNetlist refNetlist = NetlistLoader.load(config.getRefFile(), config, log);
         EDIFNetlist impNetlist = NetlistLoader.load(config.getImpFile(), config, log);
-        return compare(refNetlist, impNetlist, config, out, log).getExitCode();
+        return compare(refNetlist, impNetlist, config, retiming, out, log).getExitCode();
     }
 
     /**
@@ -173,19 +176,37 @@ public class LogicEquivalenceChecker {
      */
     public static LecResult compare(EDIFNetlist refNetlist, EDIFNetlist impNetlist,
             LecConfig config, PrintStream out) {
-        return compare(refNetlist, impNetlist, config, out,
+        return compare(refNetlist, impNetlist, config, null, out);
+    }
+
+    /**
+     * Compares two netlists related by a retiming, proving the certificate that
+     * describes it along the way. See {@link RetimingMap} for its meaning.
+     *
+     * @param retiming The certificate, or null for a plain comparison.
+     */
+    public static LecResult compare(EDIFNetlist refNetlist, EDIFNetlist impNetlist,
+            LecConfig config, RetimingMap retiming, PrintStream out) {
+        return compare(refNetlist, impNetlist, config, retiming, out,
                 new LecLog(config.isVerbose(), out));
     }
 
     private static LecResult compare(EDIFNetlist refNetlist, EDIFNetlist impNetlist,
-            LecConfig config, PrintStream out, LecLog log) {
+            LecConfig config, RetimingMap retiming, PrintStream out, LecLog log) {
+        RetimingMap certificate = config.isClassifyOnly() || retiming == null
+                || retiming.isEmpty() ? null : retiming;
         RuntimeTrackerTree timers = new RuntimeTrackerTree("LogicEquivalenceChecker",
                 config.isVerbose());
         Aig aig = new Aig(1 << 20);
 
         printHeader(out, config);
-        NetlistSummary ref = elaborate(refNetlist, "REF", config, log, timers, aig);
-        NetlistSummary imp = elaborate(impNetlist, "IMP", config, log, timers, aig);
+        if (certificate != null) {
+            out.println("  Retiming : " + certificate.size() + " certificate entries");
+        }
+        NetlistSummary ref = elaborate(refNetlist, "REF", config, log, timers, aig,
+                certificate, RetimingMap.Side.REF);
+        NetlistSummary imp = elaborate(impNetlist, "IMP", config, log, timers, aig,
+                certificate, RetimingMap.Side.IMP);
         NetlistLoader.checkSeriesMatch(ref.getSeries(), imp.getSeries(), config, log);
 
         ref.getStats().print(out);
@@ -212,7 +233,16 @@ public class LogicEquivalenceChecker {
             return new LecResult(report, null, ref, imp, aig);
         }
 
-        EquivalenceEngine engine = compare(ref, imp, report, config, log, timers, aig);
+        RetimingCheck retimingCheck = null;
+        if (certificate != null) {
+            RuntimeTracker timer = timers.createRuntimeTracker("retiming",
+                    timers.getRootRuntimeTracker());
+            timer.start();
+            retimingCheck = RetimingCheck.prepare(certificate, ref, imp, aig);
+            timer.stop();
+        }
+        EquivalenceEngine engine = compare(ref, imp, report, config, log, timers, aig,
+                retimingCheck);
         log.printWarnings(out);
         ref.getLoopReport().print(out, 10);
         imp.getLoopReport().print(out, 10);
@@ -226,7 +256,8 @@ public class LogicEquivalenceChecker {
      * releases everything except the summary.
      */
     private static NetlistSummary elaborate(EDIFNetlist netlist, String label, LecConfig config,
-            LecLog log, RuntimeTrackerTree timers, Aig aig) {
+            LecLog log, RuntimeTrackerTree timers, Aig aig, RetimingMap retiming,
+            RetimingMap.Side side) {
         RuntimeTracker timer = timers.createRuntimeTracker("elaborate " + label,
                 timers.getRootRuntimeTracker());
         timer.start();
@@ -244,7 +275,12 @@ public class LogicEquivalenceChecker {
             if (config.isClassifyOnly()) {
                 return new NetlistSummary(label, NetlistLoader.getPartName(netlist), series, stats);
             }
-            return NetlistSummary.build(label, flat, conn, classifier, aig, series, stats, log);
+            if (retiming == null) {
+                return NetlistSummary.build(label, flat, conn, classifier, aig, series, stats,
+                        log);
+            }
+            return NetlistSummary.build(label, flat, conn, classifier, aig, series, stats, log,
+                    retiming.registersOn(side), retiming.pinsOn(side));
         } finally {
             CellIndex.clearCache();
             timer.stop();
@@ -256,17 +292,25 @@ public class LogicEquivalenceChecker {
      * then every cone the two have in common.
      */
     private static EquivalenceEngine compare(NetlistSummary ref, NetlistSummary imp,
-            LecReport report, LecConfig config, LecLog log, RuntimeTrackerTree timers, Aig aig) {
+            LecReport report, LecConfig config, LecLog log, RuntimeTrackerTree timers, Aig aig,
+            RetimingCheck retiming) {
         RuntimeTracker timer = timers.createRuntimeTracker("compare",
                 timers.getRootRuntimeTracker());
         timer.start();
         try {
             compareTerminals(ref, imp, report);
             List<EquivalenceEngine.Task> tasks = buildTasks(ref, imp, report);
+            int coneTasks = tasks.size();
+            if (retiming != null) {
+                tasks.addAll(retiming.getTasks());
+            }
             EquivalenceEngine engine = new EquivalenceEngine(aig, config, log);
             engine.run(tasks);
-            for (EquivalenceEngine.Task task : tasks) {
+            for (EquivalenceEngine.Task task : tasks.subList(0, coneTasks)) {
                 recordVerdict(task, report);
+            }
+            if (retiming != null) {
+                retiming.record(report);
             }
             return engine;
         } finally {
