@@ -27,6 +27,7 @@ import java.io.OutputStream;
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.util.LinkedHashMap;
+import java.util.Set;
 
 import org.json.JSONObject;
 
@@ -52,6 +53,7 @@ public class NOCJSONUtil implements Serializable {
     protected static final String JSON_FIELD_SYSTEM_PROPERTIES = "SystemProperties";
     protected static final String JSON_FIELD_DFX_PATHS = "DfxPaths";
     protected static final String JSON_FIELD_FREQUENCY = "Frequency";
+    protected static final String JSON_FIELD_DEVICE_NAME = "DeviceName";
     protected static final String JSON_FIELD_CLIENT_INSTANCES = "LogicalInstances";
     protected static final String JSON_FIELD_PATHS = "Paths";
     protected static final String JSON_FIELD_SOLUTION_TYPE = "SolutionType";
@@ -116,6 +118,25 @@ public class NOCJSONUtil implements Serializable {
             mapField.set(result, new LinkedHashMap<>());
         } catch (Exception e) {}
         return result;
+    }
+
+    /**
+     * Gets the fields of a JSON object that are not in a set of modeled fields,
+     * so they can be written back out unchanged.
+     * @param json The JSON object as read.
+     * @param modeledFields The names of the fields that are modeled (and written
+     * from the modeled state only).
+     * @return The unmodeled fields as a JSON string, or null if there are none.
+     * @since 2026.1.0
+     */
+    public static String getUnmodeledFields(JSONObject json, Set<String> modeledFields) {
+        JSONObject unmodeled = createOrderedJSONObject();
+        for (String key : json.keySet()) {
+            if (!modeledFields.contains(key)) {
+                unmodeled.put(key, json.get(key));
+            }
+        }
+        return unmodeled.length() == 0 ? null : unmodeled.toString();
     }
 
     /**
