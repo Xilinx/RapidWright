@@ -836,6 +836,102 @@ public class TestReportRouteStatus {
         assertNetStatuses(rrs, new String[]{"GLOBAL_LOGIC0=INTRASITE"});
     }
 
+    /**
+     * A LUT pair of a Versal slice used as two LUT5s (the output of the 6LUT on O5): Vivado 2026.1
+     * finds the site programming invalid if the cell of the 6LUT has inputs on both A5 and A6, with or
+     * without a cell in the 5LUT. All the nets with pins in the slice then conflict, and the routing
+     * into (or out of) it leads nowhere.
+     */
+    @ParameterizedTest(name = "6LUT {0} -> {1}, 5LUT cell {2}")
+    @CsvSource({
+            // Valid
+            "'A1,A6', O5, true, 11, 9, 0, 0",
+            "'A1,A5', O5, true, 11, 9, 0, 0",
+            "'A1,A5,A6', O6, true, 11, 9, 0, 0",
+            // Invalid
+            "'A1,A5,A6', O5, true, 11, 2, 7, 2",
+            "'A1,A5,A6', O5, false, 10, 4, 4, 1",
+    })
+    public void testReportRouteStatusInvalidVersalLutPair(String lut6Inputs, String lut6Output, boolean lut5Cell,
+                                                          int logicalNets, int fullyRouted, int errors,
+                                                          int partial) {
+        Design design = new Design("dual_lut5", "vp1202");
+        EDIFCell top = design.getTopEDIFCell();
+        Net clk = design.createNet("clk");
+        clk.getLogicalNet().createPortInst(top.createPort("clk", EDIFDirection.INPUT, 1));
+        Cell clkIBUF = design.createAndPlaceCell(top, "clkIBUF", Unisim.IBUF, "IOB_X29Y0/IOB_M");
+        ECOTools.connectNet(design, clkIBUF, "I", clk);
+        Net clkBUF = design.createNet("clkBUF");
+        ECOTools.connectNet(design, clkIBUF, "O", clkBUF);
+        List<Net> inputs = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            Cell src = design.createAndPlaceCell("src" + i, Unisim.FDRE, "SLICE_X86Y66/" + "ABCDE".charAt(i) + "FF");
+            Net in = design.createNet("in" + i);
+            ECOTools.connectNet(design, src, "Q", in);
+            ECOTools.connectNet(design, src, "D", in);
+            connectClockEnableReset(design, src, clkBUF);
+            inputs.add(in);
+        }
+        String[] lut6Pins = lut6Inputs.split(",");
+        Cell lut6 = design.createAndPlaceCell("lut6", Unisim.valueOf("LUT" + lut6Pins.length), "SLICE_X86Y67/C6LUT");
+        LUTTools.configureLUT(lut6, lut6Pins.length == 2 ? "O=I1 & I0" : "O=I2 & I1 & I0");
+        for (String pin : new ArrayList<>(lut6.getPinMappingsP2L().keySet())) {
+            lut6.removePinMapping(pin);
+        }
+        for (int i = 0; i < lut6Pins.length; i++) {
+            lut6.addPinMapping(lut6Pins[i], "I" + i);
+        }
+        lut6.addPinMapping(lut6Output, "O");
+        List<Cell> luts = new ArrayList<>(Arrays.asList(lut6));
+        if (lut5Cell) {
+            Cell lut5 = design.createAndPlaceCell("lut5", Unisim.LUT2, "SLICE_X86Y67/C5LUT");
+            LUTTools.configureLUT(lut5, "O=I1 | I0");
+            for (String pin : new ArrayList<>(lut5.getPinMappingsP2L().keySet())) {
+                lut5.removePinMapping(pin);
+            }
+            lut5.addPinMapping("A2", "I0");
+            lut5.addPinMapping("A3", "I1");
+            lut5.addPinMapping("O5", "O");
+            luts.add(lut5);
+        }
+        for (int i = 0; i < lut6Pins.length; i++) {
+            ECOTools.connectNet(design, lut6, "I" + i, inputs.get(i));
+        }
+        if (lut5Cell) {
+            ECOTools.connectNet(design, luts.get(1), "I0", inputs.get(3));
+            ECOTools.connectNet(design, luts.get(1), "I1", inputs.get(4));
+        }
+        for (int i = 0; i < luts.size(); i++) {
+            Cell ff = design.createAndPlaceCell("ff" + i, Unisim.FDRE, "SLICE_X86Y68/" + "AB".charAt(i) + "FF");
+            Net out = design.createNet(luts.get(i).getName() + "_O");
+            ECOTools.connectNet(design, luts.get(i), "O", out);
+            ECOTools.connectNet(design, ff, "D", out);
+            connectClockEnableReset(design, ff, clkBUF);
+        }
+        RWRoute.routeDesignFullNonTimingDriven(design);
+
+        ReportRouteStatusResult rrs = ReportRouteStatus.reportRouteStatus(design, true);
+        Assertions.assertEquals(logicalNets, rrs.logicalNets);
+        Assertions.assertEquals(logicalNets - 2, rrs.routableNets);
+        Assertions.assertEquals(fullyRouted, rrs.fullyRoutedNets);
+        Assertions.assertEquals(errors, rrs.netsWithRoutingErrors);
+        Assertions.assertEquals(errors, rrs.netsWithResourceConflicts);
+        Assertions.assertEquals(errors, rrs.netsWithAntennasOrIslands);
+        Assertions.assertEquals(partial, rrs.netsWithSomeUnroutedPins);
+        if (errors > 0) {
+            // (the inputs of the slice, its outputs, but not the nets of the other slices only)
+            assertNetStatuses(rrs, new String[]{"in0=CONFLICTS,ANTENNAS,HAS_ROUTING",
+                    "lut6_O=PARTIAL,CONFLICTS,ANTENNAS,HAS_ROUTING",
+                    "clkBUF=HAS_ROUTING,ROUTED"});
+        }
+    }
+
+    private static void connectClockEnableReset(Design design, Cell ff, Net clk) {
+        ECOTools.connectNet(design, ff, "C", clk);
+        ECOTools.connectNet(design, ff, "CE", design.getVccNet());
+        ECOTools.connectNet(design, ff, "R", design.getGndNet());
+    }
+
     private static void assertNetStatuses(ReportRouteStatusResult rrs, String[] netStatuses) {
         Map<String, EnumSet<NetRouteStatus>> statuses = rrs.getNetStatuses();
         for (String netStatus : netStatuses) {

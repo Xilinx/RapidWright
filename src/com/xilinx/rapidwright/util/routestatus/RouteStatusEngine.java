@@ -210,12 +210,29 @@ public final class RouteStatusEngine {
         }
         classifyStaticNets(missingTies);
         markConflicts();
-        series7.markInvalidSites(staticEntry);
+        markInvalidSites(staticEntry);
         series7.markOutputSitePinConflicts();
         listUnplacedAsNoPlacedPins();
         listPortsWithoutLoads();
         listUncountedStaticNets();
         return toResult();
+    }
+
+    /**
+     * Marks the nets with pins in sites whose site programming Vivado finds invalid (7-series block
+     * RAMs and slices, Versal slices).
+     * @param staticEntry The entries of GND and VCC (-1 if none).
+     */
+    private void markInvalidSites(int[] staticEntry) {
+        InvalidSites invalidSites = new InvalidSites(design, entries);
+        Series series = design.getDevice().getSeries();
+        if (series == Series.Series7) {
+            series7.findInvalidSites(invalidSites);
+        } else if (series == Series.Versal) {
+            VersalRules.findInvalidSites(design, invalidSites);
+        }
+        // (no UltraScale(+) sites were found invalid, e.g. block RAMs without site routing)
+        invalidSites.mark(staticEntry);
     }
 
     /** Flattens the netlist, looking up the segments named like physical nets. */

@@ -46,10 +46,11 @@ import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
+import com.xilinx.rapidwright.util.Utils;
 
 /**
  * The rules of the route status of Versal designs: clock buffers whose outputs share routing, the
- * leaf clock dividers and the clocking sites.
+ * leaf clock dividers, the clocking sites and invalid LUT programming.
  */
 final class VersalRules {
 
@@ -136,6 +137,29 @@ final class VersalRules {
             }
         }
         return routed;
+    }
+
+    /**
+     * Adds the slices whose LUT programming Vivado finds invalid: a cell of a 6LUT whose output is O5
+     * (a LUT pair used as two LUT5s) with inputs on both A5 and A6 (whether or not the 5LUT has a cell).
+     */
+    static void findInvalidSites(Design design, InvalidSites invalidSites) {
+        for (SiteInst si : design.getSiteInsts()) {
+            if (Utils.isSLICE(si) && hasInvalidLutPair(si)) {
+                invalidSites.add(si, InvalidSites.getPins(design, si));
+            }
+        }
+    }
+
+    private static boolean hasInvalidLutPair(SiteInst si) {
+        for (char letter = 'A'; letter <= 'H'; letter++) {
+            Cell lut6 = si.getCell(letter + "6LUT");
+            if (lut6 != null && !lut6.isRoutethru() && lut6.getLogicalPinMapping("O5") != null
+                    && lut6.getLogicalPinMapping("A5") != null && lut6.getLogicalPinMapping("A6") != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static boolean isVersalClockingSite(SiteInst si) {
