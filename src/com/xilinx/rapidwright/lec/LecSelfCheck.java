@@ -987,7 +987,7 @@ public class LecSelfCheck {
             EDIFCell parent = flop.getParentCell();
             EDIFNet gnd = findConstantNet(parent, false);
             if (gnd == null) {
-                continue;
+                gnd = addConstant(flop, false);
             }
             EDIFPortInst ce = flop.getPortInst("CE");
             ce.getNet().removePortInst(ce);
@@ -1285,12 +1285,32 @@ public class LecSelfCheck {
         EDIFCellInst flop = ctx.flat.getInst(id);
         EDIFNet constant = findConstantNet(flop.getParentCell(), high);
         if (constant == null) {
-            return null;
+            constant = addConstant(flop, high);
         }
         EDIFPortInst pi = flop.getPortInst(pin);
         pi.getNet().removePortInst(pi);
         constant.createPortInst(pin, flop);
         return pin + " tied " + (high ? "high" : "low");
+    }
+
+    /**
+     * Adds a tie cell and its net beside a register, for a netlist that has no
+     * constant of that value in that cell yet.
+     */
+    private static EDIFNet addConstant(EDIFCellInst flop, boolean high) {
+        String type = high ? "VCC" : "GND";
+        String port = high ? "P" : "G";
+        com.xilinx.rapidwright.edif.EDIFLibrary lib = flop.getCellType().getLibrary();
+        EDIFCell tie = lib.getCell(type);
+        if (tie == null) {
+            tie = new EDIFCell(lib, type);
+            tie.createPort(port, EDIFDirection.OUTPUT, 1);
+        }
+        EDIFCell parent = flop.getParentCell();
+        EDIFCellInst inst = parent.createChildCellInst("selfcheck_" + type, tie);
+        EDIFNet net = parent.createNet("selfcheck_" + type.toLowerCase());
+        net.createPortInst(port, inst);
+        return net;
     }
 
     /** Moves the register to the clock net of a register in another clock domain. */
