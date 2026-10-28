@@ -1187,33 +1187,44 @@ public class DesignTools {
             Net vccCell = cell.getVccNet();
             Net gndCell = cell.getGndNet();
             for (SiteInst si : cell.getSiteInsts()) {
-                // The names the site's routethru cells and their alternate pin mappings carry before
-                // its other cells are renamed. Renaming a cell may also rename those carrying its name
-                // (see Cell.updateName()), and a name changed that way is not prefixed again
-                Map<Cell, String> routethruNames = new IdentityHashMap<>();
-                Map<AltPinMapping, String> altCellNames = new IdentityHashMap<>();
-                for (Cell c : si.getCells()) {
-                    if (c.isRoutethru()) {
-                        routethruNames.put(c, c.getName());
+                // The names the site's cells and their alternate pin mappings carry before its other
+                // cells are renamed. Renaming a cell may also rename the routethrus and alternate pin
+                // mappings carrying its name (see Cell.updateName()), and a name changed that way is
+                // not prefixed again
+                Cell[] siteCells = si.getCells().toArray(new Cell[0]);
+                String[] oldNames = new String[siteCells.length];
+                List<AltPinMapping> altPinMappings = null;
+                List<String> oldAltCellNames = null;
+                for (int i = 0; i < siteCells.length; i++) {
+                    Cell c = siteCells[i];
+                    oldNames[i] = c.getName();
+                    if (c.isRoutethru() && c.hasAltPinMappings()) {
+                        if (altPinMappings == null) {
+                            altPinMappings = new ArrayList<>();
+                            oldAltCellNames = new ArrayList<>();
+                        }
                         for (AltPinMapping m : c.getAltPinMappings().values()) {
-                            altCellNames.put(m, m.getAltCellName());
+                            altPinMappings.add(m);
+                            oldAltCellNames.add(m.getAltCellName());
                         }
                     }
                 }
-                for (Cell c : new ArrayList<>(si.getCells())) {
+                for (Cell c : siteCells) {
                     if (!c.isRoutethru()) {
                         c.updateName(hierarchicalCellName + "/" + c.getName());
                         design.addCell(c);
                     }
                 }
-                for (Entry<Cell, String> rt : routethruNames.entrySet()) {
-                    if (rt.getKey().getName().equals(rt.getValue())) {
-                        rt.getKey().updateName(hierarchicalCellName + "/" + rt.getValue());
+                for (int i = 0; i < siteCells.length; i++) {
+                    Cell c = siteCells[i];
+                    if (c.isRoutethru() && c.getName().equals(oldNames[i])) {
+                        c.updateName(hierarchicalCellName + "/" + oldNames[i]);
                     }
                 }
-                for (Entry<AltPinMapping, String> alt : altCellNames.entrySet()) {
-                    if (alt.getKey().getAltCellName().equals(alt.getValue())) {
-                        alt.getKey().setAltCellName(hierarchicalCellName + "/" + alt.getValue());
+                for (int i = 0; altPinMappings != null && i < altPinMappings.size(); i++) {
+                    AltPinMapping m = altPinMappings.get(i);
+                    if (m.getAltCellName().equals(oldAltCellNames.get(i))) {
+                        m.setAltCellName(hierarchicalCellName + "/" + oldAltCellNames.get(i));
                     }
                 }
 
