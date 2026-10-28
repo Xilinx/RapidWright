@@ -787,6 +787,33 @@ public class TestEDIFNetlistOptimizer {
     }
 
     @Test
+    public void testUniquificationIsLinearInCopies() {
+        // Each instance of 'sub' absorbs a different inverter (through a new port named after
+        // its net), so each needs its own copy of the definition
+        OptProbes.B b = new OptProbes.B("uniq");
+        b.in("clk");
+        EDIFCell sub = b.cell("sub");
+        b.in(sub, "x");
+        b.out(sub, "z");
+        b.lut(sub, "L", "1", "z", "x");
+        int n = 20000;
+        for (int i = 0; i < n; i++) {
+            b.in("a" + i);
+            b.out("o" + i, "q" + i);
+            b.lut("IV" + i, "1", "n" + i, "a" + i);
+            b.fdre("F" + i, "n" + i, "1", "0", "q" + i, "0");
+            b.inst(sub, "u" + i, "x=n" + i, "z=o" + i);
+        }
+        EDIFOptStats stats = EDIFTools.optimizeNetlist(b.nl, new EDIFOptOptions());
+        Assertions.assertEquals(n - 1, stats.getCellsUniquified());
+        Assertions.assertNotSame(b.top.getCellInst("u0").getCellType(),
+                b.top.getCellInst("u" + (n - 1)).getCellType());
+        // Searching for a free name from _HD1 for every copy takes about 12s here
+        Assertions.assertTrue(stats.getTimes().get("Apply edits") < 4_000_000_000L,
+                stats.getTimes().toString());
+    }
+
+    @Test
     public void testBufferChainMergesAreLinear() {
         // A chain of buffers, each stage also loading a flip-flop: every stage's net merges into
         // the next one towards the input

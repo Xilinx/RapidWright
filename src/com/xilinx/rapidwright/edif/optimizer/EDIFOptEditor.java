@@ -728,6 +728,7 @@ class EDIFOptEditor {
                     .merge(sigId[h], 1, Integer::sum);
         }
         Map<EDIFCell, Map<Integer, EDIFCell>> defs = new IdentityHashMap<>();
+        Map<EDIFCell, Integer> nextCopy = new IdentityHashMap<>();
         EDIFCell[] newCell = new EDIFCell[numHier];
         newCell[0] = idx.getHierCell(0);
         int copies = 0;
@@ -755,11 +756,13 @@ class EDIFOptEditor {
             EDIFCell def = m.get(sigId[h]);
             if (def == null) {
                 EDIFLibrary lib = orig.getLibrary();
-                int k = 1;
+                // Suffixes already used for this definition are skipped
+                int k = nextCopy.getOrDefault(orig, 1);
                 String name;
                 do {
                     name = orig.getName() + "_HD" + k++;
                 } while (lib.containsCell(name));
+                nextCopy.put(orig, k);
                 def = new EDIFCell(lib, orig, name);
                 m.put(sigId[h], def);
                 copies++;
