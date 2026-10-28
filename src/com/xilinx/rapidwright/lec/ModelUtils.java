@@ -87,6 +87,22 @@ public class ModelUtils {
     }
 
     /**
+     * Reads a single bit attribute value, such as a register's {@code INIT} of
+     * {@code 1'b1}.
+     *
+     * @param raw  The attribute value.
+     * @param what What it is, for the error message.
+     * @return The bit.
+     */
+    static boolean parseBit(String raw, String what) {
+        Long bits = raw == null ? null : parseLiteral(raw.trim());
+        if (bits == null) {
+            throw new LecException("Unreadable " + what + " value '" + raw + "'");
+        }
+        return bits != 0;
+    }
+
+    /**
      * Parses a Verilog sized literal such as {@code 4'b0010}, or plain decimal
      * digits.
      *

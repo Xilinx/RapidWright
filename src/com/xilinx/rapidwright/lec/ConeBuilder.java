@@ -24,9 +24,11 @@ package com.xilinx.rapidwright.lec;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.xilinx.rapidwright.design.CellPinStaticDefaults;
 import com.xilinx.rapidwright.design.NetType;
@@ -142,6 +144,9 @@ public class ConeBuilder {
     private int unstableCounter;
 
     private final String scope;
+
+    /** Registers whose outputs get variables private to this netlist. */
+    private Set<String> privateRegisters = Collections.emptySet();
 
     /**
      * @param scope Label of the netlist being built, such as {@code "REF"}. It
@@ -473,6 +478,9 @@ public class ConeBuilder {
             return Aig.TRUE;
         }
         int bit = pin - flat.getGlobalPin(instId, 0);
+        if (isPrivateRegister(instId)) {
+            return aig.newInput(TerminalKey.forRetimed(scope, flat.getPinName(instId, bit)), false);
+        }
         if (classifier.isMatchedByName(role)) {
             return aig.newInput(flat.getPinName(instId, bit), true);
         }
@@ -488,6 +496,20 @@ public class ConeBuilder {
     private String unstablePinName(int instId, int bit) {
         String name = flat.getPinName(instId, bit);
         return flat.getKeyProperty() == null ? name : name + "#" + flat.getGlobalPin(instId, bit);
+    }
+
+    /**
+     * Gives the outputs of these registers variables private to this netlist,
+     * named by {@link TerminalKey#forRetimed(String, String)}: they are the
+     * registers a retiming certificate defines.
+     */
+    public void setPrivateRegisters(Set<String> registers) {
+        privateRegisters = registers;
+    }
+
+    private boolean isPrivateRegister(int instId) {
+        return !privateRegisters.isEmpty()
+                && privateRegisters.contains(flat.getInstName(instId));
     }
 
     /** Mints an unstable variable private to this netlist. */
@@ -525,7 +547,14 @@ public class ConeBuilder {
         }
         int[] drivers = conn.getExtraDrivers(root);
         int lit;
-        if (drivers != null && conn.getTopSourceCount(root) == 0) {
+        boolean privateDriver = false;
+        if (drivers != null) {
+            for (int driver : drivers) {
+                privateDriver |= isPrivateRegister(pinOwner[driver]);
+            }
+        }
+        boolean topSource = conn.getTopSourceCount(root) > 0;
+        if (drivers != null && !privateDriver && !topSource) {
             String[] names = new String[drivers.length];
             for (int i = 0; i < drivers.length; i++) {
                 int owner = pinOwner[drivers[i]];
@@ -538,7 +567,8 @@ public class ConeBuilder {
         } else {
             lit = unstableInput(TerminalKey.MULTI_DRIVER_PREFIX, "#" + (unstableCounter++));
             log.warn(UNSTABLE_MULTI_DRIVER, drivers == null ? "unknown drivers"
-                    : drivers.length + " drivers and a top level port", exampleDriverName(drivers));
+                    : drivers.length + (topSource ? " drivers and a top level port" : " drivers"),
+                    exampleDriverName(drivers));
         }
         multiDriverLits.put(root, lit);
         return lit;
