@@ -672,6 +672,42 @@ public class TestRWRoute {
                 getCriticalPathDelay(routeCapture.toString()));
     }
 
+    /**
+     * Tests LUT pin swapping when one net drives two inputs of the same LUT: each of the two
+     * connections may be routed to any free pin of the LUT, but not to the pin used by the other
+     * (each LUT input needs its own pin), even though routing normally lets connections of the
+     * same net share nodes.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testLutPinSwappingSameNetTwoLutInputs(boolean timingDriven) {
+        Design design = new Design("top", "xcvu3p");
+        Cell lut = design.createAndPlaceCell("lut", Unisim.LUT2, "SLICE_X40Y61/A6LUT");
+        LUTTools.configureLUT(lut, "O=I0&I1");
+        Cell ff = design.createAndPlaceCell("ff", Unisim.FDCE, "SLICE_X40Y60/AFF");
+
+        Net q = design.createNet("q");
+        ECOTools.connectNet(design, ff, "Q", q);
+        ECOTools.connectNet(design, lut, "I0", q);
+        ECOTools.connectNet(design, lut, "I1", q);
+        Net o = design.createNet("o");
+        ECOTools.connectNet(design, lut, "O", o);
+        ECOTools.connectNet(design, ff, "D", o);
+        design.routeSites();
+
+        RWRoute.routeDesignWithUserDefinedArguments(design, timingDriven
+                ? new String[] {"--lutPinSwapping"}
+                : new String[] {"--nonTimingDriven", "--lutPinSwapping"});
+
+        assertAllPinsRouted(design);
+        String i0 = lut.getPhysicalPinMapping("I0");
+        String i1 = lut.getPhysicalPinMapping("I1");
+        Assertions.assertNotNull(i0);
+        Assertions.assertNotNull(i1);
+        Assertions.assertNotEquals(i0, i1);
+        Assertions.assertEquals(3, q.getPins().size());
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     public void testDiscussion1245_20250807(boolean forceLagPin) {

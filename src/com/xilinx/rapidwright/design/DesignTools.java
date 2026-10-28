@@ -57,6 +57,7 @@ import java.util.stream.Collectors;
 import com.xilinx.rapidwright.design.blocks.PBlock;
 import com.xilinx.rapidwright.design.blocks.UtilizationType;
 import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.design.xdc.ConstraintTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELClass;
 import com.xilinx.rapidwright.device.BELPin;
@@ -875,24 +876,9 @@ public class DesignTools {
 
     private static String createInformativeCellInterfaceMismatchMessage(String hierCellInstName,
                                                     EDIFCell target, EDIFCell src) {
-        Map<String, EDIFPort> cellPorts = new HashMap<>(target.getPortMap());
         StringBuilder sb = new StringBuilder();
-        for (EDIFPort p : src.getPorts()) {
-            EDIFPort otherPort = cellPorts.remove(p.getBusName(true));
-            if (otherPort == null) {
-                otherPort = cellPorts.remove(p.getName());
-                if (otherPort == null) {
-                    sb.append("\n  port " + p.getName() + " doesn't exist on " + src);
-                }
-            }
-
-            if (!Objects.equals(p.getWidth(), p.getWidth()) ||
-               !Objects.equals(p.getDirection(), p.getDirection())) {
-                sb.append("\n  port " + p.getName() + " mismatch in direction/width");
-            }
-        }
-        for (String portName : cellPorts.keySet()) {
-            sb.append("\n  port " + portName + " is missing on " + src);
+        for (String mismatch : target.getInterfaceMismatches(src, true)) {
+            sb.append("\n  " + mismatch);
         }
 
         return "\nERROR: The destination instance " + hierCellInstName +
@@ -941,7 +927,13 @@ public class DesignTools {
      * ensures this, as does an earlier call to this method for the design. That is what lets both
      * sides of every port be found by name, in each netlist's parent net map, which is built first
      * if it is not already. This is not checked: a physical net held under any other name is
-     * missed, and its signal left split across two physical nets.
+     * missed, and its signal left split across two physical nets. The one exception is a signal in
+     * the design that nothing drives but a black box inout that the circuit drives: it has no
+     * source to be named after, so its physical nets are looked for under each of its names.
+     * <p>
+     * A black box inout may be filled by a circuit port that is an input or an output, as Vivado
+     * allows. Each port's direction is taken from the circuit, and only a port that is an inout on
+     * both sides is taken to be driven by the circuit if anything inside the circuit drives it.
      * <p>
      * A circuit's checkpoint written in the context of a shell can also hold physical nets that
      * have nothing on them and no logical net in the circuit, named as in the full design. These
@@ -953,6 +945,13 @@ public class DesignTools {
      * black box's prefix: such a net is rejected with the other entries' vetting, since it would
      * take the name meant for one of the circuit's own nets.
      * <p>
+     * Each circuit's BEL attributes are moved in as well, each onto the net it is on in the design
+     * afterwards. A circuit written against an abstract shell also holds attributes outside its own
+     * black box, on the shell's sites or another black box's boundary, naming nets as in the full
+     * design. These are combined as Vivado's link_design combines them: one the design already has
+     * is replaced only by that of a circuit naming a net of its own, under its black box, and one
+     * naming a net under another black box being filled is left to that box's circuit.
+     * <p>
      * Apart from those, only the physical nets on a signal that crosses a black box port are
      * touched. Those on each such signal, from whichever side, are merged onto the one named after
      * the signal's source once the boxes are filled -- or, having nothing on them to move, simply
@@ -960,6 +959,12 @@ public class DesignTools {
      * left where they are, as is every net in the design not on such a signal. The design's parent
      * net map is dropped, since the netlist has changed, and left for whichever caller next needs
      * it to rebuild.
+     * <p>
+     * Once the boxes are filled, the early and late constraints of each circuit are added to the
+     * design, scoped to its black box, as
+     * {@link ConstraintTools#addBlackBoxConstraints(Design, Map)} describes. A caller should
+     * therefore not copy a circuit's constraints into the design itself, nor call that method for
+     * these boxes: either adds every command a second time.
      * <p>
      * Every entry is vetted before anything is modified, but there is no rollback once insertion has
      * begun: a failure part way through -- a site overlap, say -- leaves the boxes filled so far in
@@ -1019,7 +1024,10 @@ public class DesignTools {
                 throw new RuntimeException("ERROR: The cell instance " + hierarchicalCellName
                         + " is not a black box.");
             }
-            if (!inst.getCellType().hasCompatibleInterface(cell.getTopEDIFCell())) {
+            // Any inout on the black box may be one that the circuit has resolved to an input or
+            // output, which Vivado accepts. A port to a device pin is the usual case, but nothing
+            // restricts it to one: the circuit's directions decide which side drives every port
+            if (!inst.getCellType().hasCompatibleInterface(cell.getTopEDIFCell(), true)) {
                 throw new RuntimeException(createInformativeCellInterfaceMismatchMessage(
                         hierarchicalCellName, inst.getCellType(), cell.getTopEDIFCell()));
             }
@@ -1090,7 +1098,12 @@ public class DesignTools {
                         : outer.getHierarchicalNetName();
                 portNames.add(shellName);
                 EDIFNet innerNet = cellNetlist.getTopCell().getInternalNet(portInst.getName());
-                if (shellOwner == null || (innerNet == null && portInst.isOutput())) {
+                // The circuit's port gives the direction: the black box's may be an inout that the
+                // circuit has resolved, and the instance only takes on the circuit's ports once
+                // filled, below
+                EDIFPort circuitPort = cellNetlist.getTopCell()
+                        .getPortByPortInstName(portInst.getName());
+                if (shellOwner == null || (innerNet == null && circuitPort.isOutput())) {
                     undriven.add(shellName);
                 }
                 if (innerNet == null) continue;
@@ -1102,19 +1115,28 @@ public class DesignTools {
                 if (innerOwner == null) {
                     undriven.add(innerName);
                 }
-                // An inout has no direction to go by, so it is the circuit that drives it if
-                // anything inside it does
-                boolean circuitDrives = portInst.isOutput() || (!portInst.isInput()
+                // An inout left unresolved has no direction to go by, so it is the circuit that
+                // drives it if anything inside it does
+                boolean circuitDrives = circuitPort.isOutput() || (!circuitPort.isInput()
                         && innerOwner != null
                         && !innerOwner.getNet().getSourcePortInsts(false).isEmpty());
-                String from = circuitDrives ? shellName : innerName;
                 String to = circuitDrives ? innerName : shellName;
-                String previous = portParents.put(from, to);
-                if (NetType.getNetTypeFromNetName(from).isStaticNetType()
-                        || (previous != null && !previous.equals(to))) {
-                    throw new RuntimeException("ERROR: The signal on black box port '" + e.getKey()
-                            + EDIFTools.EDIF_HIER_SEP + portInst.getName() + "' has more than one"
-                            + " source.");
+                List<String> froms = Collections.singletonList(circuitDrives ? shellName : innerName);
+                if (circuitDrives && shellOwner == null) {
+                    // Only an inout on the black box can leave the shell's side without a source
+                    // when the circuit drives it, and then nothing names the shell's physical net,
+                    // which may be held under any of the signal's names
+                    froms = getAliasNamesHeld(design, outer);
+                    portNames.addAll(froms);
+                }
+                for (String from : froms) {
+                    String previous = portParents.put(from, to);
+                    if (NetType.getNetTypeFromNetName(from).isStaticNetType()
+                            || (previous != null && !previous.equals(to))) {
+                        throw new RuntimeException("ERROR: The signal on black box port '"
+                                + e.getKey() + EDIFTools.EDIF_HIER_SEP + portInst.getName()
+                                + "' has more than one source.");
+                    }
                 }
             }
         }
@@ -1291,6 +1313,8 @@ public class DesignTools {
         // no routing is left to carry across. The design's GND or VCC net is the exception: it is
         // unrouted, in its entirety, only when something is merged onto it, a port merely tied to
         // a constant not being reason enough
+        // The parent of each net merged away, removed or renamed below, for the BEL attributes on it
+        Map<Net, String> mergedInto = new IdentityHashMap<>();
         for (String name : portNames) {
             String parent = resolveParent(portParents, undriven, name);
             Net net = design.getNet(name);
@@ -1301,6 +1325,7 @@ public class DesignTools {
                 unrouteSignalNet(target);
             }
             if (!toMerge) continue;
+            mergedInto.put(net, parent);
             if (!hasPhysicalPresence(net)) {
                 // Nothing to move, so the net is simply removed rather than left behind as an
                 // alias of its parent
@@ -1323,6 +1348,64 @@ public class DesignTools {
             }
         }
 
+        // The BEL attributes of each circuit (DDRMC and IMR settings, for example) are moved in as
+        // well, each onto the net it is on in the design now. A circuit written against an abstract
+        // shell also holds the shell's, on sites such as the GCLK_DELAYs of the clock spines, where
+        // it can name a different net than the shell or another circuit does: there, as Vivado's
+        // link_design does, the attribute of the circuit that names a net of its own -- one under
+        // its black box, once resolved, so not a port's net merged onto the shell's -- is the one
+        // kept. The shell can also hold another black box's boundary, so a circuit can name a net
+        // under another black box being filled, through a context net: that box's own circuit
+        // decides there, as in link_design
+        for (Entry<String, Design> b : blackBoxes.entrySet()) {
+            final String cellPrefix = b.getKey() + EDIFTools.EDIF_HIER_SEP;
+            Map<Site, SiteConfig> belAttrs = b.getValue().getBELAttrs();
+            if (belAttrs == null) continue;
+            for (SiteConfig siteConfig : belAttrs.values()) {
+                for (Entry<BEL, Map<String, BELAttr>> e : siteConfig.getBELAttributes().entrySet()) {
+                    for (BELAttr attr : e.getValue().values()) {
+                        Net net = attr.getNet();
+                        String parent = mergedInto.get(net);
+                        // The name of a net the design does not hold, as the circuit names it
+                        String contextName = null;
+                        if (net != null && net.isStaticNet()) {
+                            net = design.getStaticNet(net.getType());
+                        } else if (parent != null) {
+                            // Looked up only now, as a parent with no physical net when the net
+                            // was removed may have been given one since, by a later port's net
+                            // being renamed to it. If not, the attribute keeps no net
+                            net = design.getNet(parent);
+                        } else if (net != null) {
+                            Net named = design.getNet(net.getName());
+                            if (named != net) {
+                                // A net the design does not hold, such as a context net dropped
+                                // above, which the reader creates for a net named as in the full
+                                // design and which keeps that name, never having been moved in:
+                                // the design's net of that name is taken instead, which is written
+                                // out under the same name. With none, the attribute keeps the net
+                                // it had
+                                contextName = net.getName();
+                                if (named != null) {
+                                    net = named;
+                                }
+                            }
+                        }
+                        boolean ownNet = net != null && net.getName().startsWith(cellPrefix);
+                        if (!ownNet
+                                && isUnderOtherBox(contextName, b.getKey(), blackBoxes.keySet())) {
+                            continue;
+                        }
+                        if (!ownNet && hasBELAttr(design, siteConfig.getSite(), e.getKey(),
+                                attr.getName())) {
+                            continue;
+                        }
+                        design.addBELAttr(net, siteConfig.getSite(), siteConfig.getSiteTypeEnum(),
+                                e.getKey(), attr.getName(), attr.getValue());
+                    }
+                }
+            }
+        }
+
         // Where the routing is kept, a net can be handed the same PIPs more than once: the shell and
         // the circuit can each hold the routing of a signal up to the black box port, such as a
         // clock routed into the region of every black box. The design's GND and VCC nets can likewise
@@ -1331,6 +1414,32 @@ public class DesignTools {
         for (Net target : mergedOnto) {
             removeDuplicatePIPs(target);
         }
+
+        // As read_checkpoint -cell does, each circuit brings its constraints with it
+        ConstraintTools.addBlackBoxConstraints(design, blackBoxes);
+    }
+
+    /**
+     * @return True if a name is of an object under one of the black boxes other than the given one.
+     */
+    private static boolean isUnderOtherBox(String name, String box, Set<String> boxes) {
+        if (name == null) return false;
+        for (String other : boxes) {
+            if (!other.equals(box) && name.startsWith(other)
+                    && name.startsWith(EDIFTools.EDIF_HIER_SEP, other.length())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @return True if the design has a BEL attribute of the given name on the given BEL.
+     */
+    private static boolean hasBELAttr(Design design, Site site, BEL bel, String name) {
+        Map<Site, SiteConfig> attrs = design.getBELAttrs();
+        SiteConfig siteConfig = attrs == null ? null : attrs.get(site);
+        return siteConfig != null && siteConfig.getBELAttribute(bel, name) != null;
     }
 
     /**
@@ -1386,6 +1495,32 @@ public class DesignTools {
         if (type == NetType.GND) return Net.GND_NET;
         if (type == NetType.VCC) return Net.VCC_NET;
         return prefix + net.getHierarchicalNetName();
+    }
+
+    /**
+     * Gets the names a signal with no source may have its physical nets held under: that of the
+     * given net, and of each of its aliases that the design holds a physical net under. The aliases
+     * are found by walking the netlist from the net, which builds no parent net map.
+     *
+     * @param design The design.
+     * @param net    A logical net on the signal.
+     * @return The given net's name first, then the others, sorted.
+     */
+    private static List<String> getAliasNamesHeld(Design design, EDIFHierNet net) {
+        // Only the nets visited are wanted, not the pins found on them
+        Set<EDIFHierNet> aliases = new HashSet<>();
+        net.getLeafHierPortInsts(false, true, aliases);
+        String name = net.getHierarchicalNetName();
+        List<String> held = new ArrayList<>();
+        for (EDIFHierNet alias : aliases) {
+            String aliasName = alias.getHierarchicalNetName();
+            if (!aliasName.equals(name) && design.getNet(aliasName) != null) {
+                held.add(aliasName);
+            }
+        }
+        Collections.sort(held);
+        held.add(0, name);
+        return held;
     }
 
     /**
