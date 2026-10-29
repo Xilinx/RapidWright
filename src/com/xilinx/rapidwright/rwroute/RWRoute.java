@@ -2070,7 +2070,7 @@ public class RWRoute {
 
         float newPartialPathCost = rnode.getUpstreamPathCost();
         newPartialPathCost += state.rnodeCostWeight * getNodeCost(childRnode, connection, countSourceUses, sharingFactor);
-        newPartialPathCost += state.rnodeWLWeight * childRnode.getLength() / sharingFactor;
+        newPartialPathCost += state.rnodeWLWeight * 0.5f * childRnode.getHalfTileWirelength() / sharingFactor;
         if (config.isTimingDriven()) {
             newPartialPathCost += state.dlyWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode, longParent));
         }
@@ -2201,6 +2201,9 @@ public class RWRoute {
             // timing multiplier of 1), each unit here is worth 0.35 / ((1 - 0.35) / 100), or about 54ps, of path delay
             newTotalPathCost += state.estDlyWeight * (deltaHalfX * 0.14f + deltaY * 0.13f);
         }
+        if (RouteNode.isSingleDoubleQuadLong(childRnode.getIntentCode())) {
+            newTotalPathCost += state.rnodeCostWeight * RouteNode.PENDING_NODE_COST;
+        }
 
         push(state, childRnode, newPartialPathCost, newTotalPathCost, lookahead);
     }
@@ -2232,7 +2235,10 @@ public class RWRoute {
         // CRoute paper states that the bias factor cannot be more than half of the wire cost
         // (it may exceed this here because we may not be using the minimum-sized bounding box)
         float biasCost = baseCost / net.getConnections().size() * distToCenter / net.getDoubleHpwl();
-        float nodeCost = baseCost * rnode.getHistoricalCongestionCost() * presentCongestionCost / sharingFactor;
+        // Congestion (both multipliers being 1 when there is none) scales a base cost of no less than
+        // RouteNode.MIN_CONGESTED_BASE_COST
+        float congestionMultiplier = rnode.getHistoricalCongestionCost() * presentCongestionCost;
+        float nodeCost = (baseCost + Math.max(baseCost, RouteNode.MIN_CONGESTED_BASE_COST) * (congestionMultiplier - 1)) / sharingFactor;
         return nodeCost + Math.min(biasCost, nodeCost / 2);
     }
 

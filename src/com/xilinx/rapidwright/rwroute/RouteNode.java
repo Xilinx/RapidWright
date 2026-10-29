@@ -66,10 +66,50 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     private short endHalfTileXCoordinate;
     /** The tileYCoordinate of the INT tile that the associated node stops at */
     private final short endTileYCoordinate;
-    /** The wirelength of a rnode */
-    private final short length;
+    /** The wirelength of a rnode, in half INT tiles (see {@link RouteNodeInfo#halfTileWirelength}) */
+    private final short halfTileWirelength;
     /** The base cost of a rnode */
     private float baseCost;
+    /*
+     * Cost model. With RWRoute's default weights, for a connection with criticality 0 (as all connections are when not
+     * timing-driven) and on nodes not already used by its net, a node's lower bound is its path cost plus 0.8 per INT
+     * tile still to travel to the sink, and its path cost includes a wirelength cost of 0.2 per tile travelled (see
+     * getHalfTileWirelength()); so every single/double/quad/long travelling towards the sink reduces the lower bound by
+     * g = 0.8 - 0.2 - BASE_COST_PER_TILE = 0.5 per tile, in either axis. (All of these, but not PENDING_NODE_COST, are
+     * divided by a sharing factor on nodes already used by the net; dividing it too was measured to cost wirelength.)
+     */
+    /**
+     * Base cost per INT tile of the nominal distance travelled by singles, doubles, quads and longs, in either axis
+     * (see setBaseCost())
+     */
+    public static final float BASE_COST_PER_TILE = 0.1f;
+    /**
+     * Base cost of nodes that do not travel (e.g. SDQ nodes, INODEs, IMUXes and bounces) and other nodes that are not
+     * singles/doubles/quads/longs or super long lines; chosen empirically: lower values make chains of such nodes
+     * cheaper but cost wirelength and runtime on whole designs. A chain of three of them (1.2) costs less than the least
+     * increase in lower bound of a single/double/quad/long leaving the half of the INT tile that the sink is on (a
+     * horizontal or intra-tile single: 0.5 * BASE_COST_PER_TILE, plus a wirelength cost of 0.1, plus half a tile (0.4)
+     * further from the sink, plus PENDING_NODE_COST, i.e. 1.3).
+     */
+    public static final float LOCAL_BASE_COST = 0.4f;
+    /**
+     * Added by RWRoute to the lower bound (but not the path cost) of single/double/quad/long nodes: a bias, more than
+     * LOCAL_BASE_COST, that is removed again by the node that follows (since every single/double/quad/long must next
+     * pass through a node that does not travel, e.g. an SDQ node or INODE, or another long), so as to explore depth-first
+     * after a single/double/quad/long lands. Having landed one (with lower bound L), each of the nodes that it drives
+     * (at L + LOCAL_BASE_COST - this) is explored before any other node with a lower bound of at least L, and from the
+     * first of them, a vertical double, a horizontal quad or longer travelling towards the sink (at no more than
+     * L + LOCAL_BASE_COST - 2g) is explored before the others of them, but not a vertical single or horizontal double
+     * (at L + LOCAL_BASE_COST - g) nor a horizontal single. That requires max(LOCAL_BASE_COST plus any bias cost, g)
+     * < this < 2g, i.e. about 0.5-0.6 < this < 1.0; this is the middle of that window.
+     */
+    public static final float PENDING_NODE_COST = 0.75f;
+    /**
+     * The least base cost that congestion is applied to (see RWRoute.getNodeCost()), so that nodes with a smaller base
+     * cost (e.g. singles, which travel a shorter distance) are not discouraged so much less by the same congestion;
+     * chosen empirically.
+     */
+    public static final float MIN_CONGESTED_BASE_COST = 0.2f;
     /** A flag to indicate if this rnode is the target */
     private boolean isTarget;
     /** The children (downhill rnodes) of this rnode */
@@ -103,9 +143,9 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         this.type = (byte) ((type == null) ? nodeInfo.type : type).ordinal();
         endHalfTileXCoordinate = nodeInfo.endHalfTileXCoordinate;
         endTileYCoordinate = nodeInfo.endTileYCoordinate;
-        length = nodeInfo.length;
+        halfTileWirelength = nodeInfo.halfTileWirelength;
         children = null;
-        setBaseCost(routingGraph);
+        setBaseCost(routingGraph, nodeInfo.length);
         historicalCongestionCost = initialHistoricalCongestionCost;
         usersConnectionCounts = null;
         visited = 0;
@@ -120,9 +160,14 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         return (int) Math.signum(this.lowerBoundTotalPathCost - that.lowerBoundTotalPathCost);
     }
 
-    private void setBaseCost(RouteNodeGraph routingGraph) {
+    /**
+     * Sets the base cost of this node.
+     * @param routingGraph Graph that this node is part of.
+     * @param length Number of INT tiles that this node spans (see {@link RouteNodeInfo#length}).
+     */
+    private void setBaseCost(RouteNodeGraph routingGraph, short length) {
         final Series series = routingGraph.design.getSeries();
-        baseCost = 0.4f;
+        baseCost = LOCAL_BASE_COST;
         switch (getType()) {
             case EXCLUSIVE_SOURCE:
                 assert(length == 0 ||
@@ -168,7 +213,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 // Fall-through
             case NON_LOCAL:
             case NON_LOCAL_INHERIT_PREV_SIDE:
-                short length = getLength();
                 // NOTE: IntentCode is device-dependent
                 IntentCode ic = getIntentCode();
                 switch(ic) {
@@ -193,6 +237,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             // HSINGLE nodes that have a wirename INT_SDQ_* do not travel to any other
                             // tiles but still have downhill PIPs (and thus we cannot mark as being
                             // inaccessible without checking getAllDownhillPIPs() or getWireName())
+                            baseCost = (RouteNodeInfo.isVertical(ic, getWireName()) ? 1 : 0.5f) * BASE_COST_PER_TILE;
                             break;
                         }
                         // Fall through
@@ -202,7 +247,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             // U-turns and intra-tile INT_INT_SDQ_\\d+_INT_OUT[01]
                         } else {
                             assert(length <= 2); // 2 for feedthrough e.g. WW1_W_BEG7
-                            baseCost *= length;
                             if (getBeginTileXCoordinate() != getEndTileXCoordinate()) {
                                 // Horizontal
                             } else {
@@ -210,6 +254,9 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                                 assert(getBeginTileYCoordinate() != getEndTileYCoordinate());
                             }
                         }
+                        // Nominally travel a whole tile vertically, or half a tile horizontally (from one half of an
+                        // INT tile to the next, as do intra-tile singles between the halves of their INT tile)
+                        baseCost = (RouteNodeInfo.isVertical(ic, getWireName()) ? 1 : 0.5f) * BASE_COST_PER_TILE;
                         break;
                     case NODE_VDOUBLE: // Versal only
                     case NODE_HDOUBLE: // Versal only
@@ -244,7 +291,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                                 } else {
                                     // e.g. VU440's INT_X171Y827/EE2_E_BEG7 which feeds through to above
                                     assert(series == Series.UltraScale && length == 2);
-                                    baseCost *= length;
                                 }
                             } else {
                                 // Vertical
@@ -260,6 +306,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                                 }
                             }
                         }
+                        // Nominally travel two tiles vertically, or one tile (two halves) horizontally
+                        baseCost = (RouteNodeInfo.isVertical(ic, getWireName()) ? 2 : 1) * BASE_COST_PER_TILE;
                         break;
                     case NODE_HQUAD: // US/US+/Versal
                         if (length == 0) {
@@ -267,25 +315,27 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             // mark it as being inacccessible so that it will never be queued
                             assert(getAllDownhillPIPs().isEmpty());
                             type = (byte) RouteNodeType.INACCESSIBLE.ordinal();
-                        } else {
-                            // HQUADs are nominally length 2
-                            baseCost = 0.35f * length;
                         }
+                        // Nominally travel two tiles (four halves)
+                        baseCost = 2 * BASE_COST_PER_TILE;
                         break;
                     case NODE_VQUAD: // US/US+/Versal
                         if (length == 0) {
                             // On Versal, INT_X1Y380/OUT_NN4_W_BEG6 on vp1002 has no downhill PIPs
                             assert((series == Series.Versal && getAllWiresInNode().length == 1) ||
                                     !getAllDownhillPIPs().isEmpty());
-                        } else {
-                            // VQUADs are nominally length 4
-                            baseCost = 0.15f * length;
                         }
+                        // Nominally travel four tiles (UltraScale also has NN5/SS5)
+                        baseCost = 4 * BASE_COST_PER_TILE;
                         break;
 
                     case NODE_HLONG6:  // Versal only
+                        // Nominally travel three tiles (six halves)
+                        baseCost = 3 * BASE_COST_PER_TILE;
+                        break;
                     case NODE_HLONG10: // Versal only
-                        baseCost = 0.15f * (length == 0 ? 1 : length);
+                        // Nominally travel five tiles (ten halves)
+                        baseCost = 5 * BASE_COST_PER_TILE;
                         break;
                     case NODE_HLONG: // US/US+
                         if (length == 0) {
@@ -293,23 +343,22 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             // mark it as being inacccessible so that it will never be queued
                             assert(getAllDownhillPIPs().isEmpty());
                             type = (byte) RouteNodeType.INACCESSIBLE.ordinal();
-                        } else {
-                            // HLONGs are nominally length 6
-                            baseCost = 0.15f * length;
                         }
+                        // Nominally travel six tiles (twelve halves)
+                        baseCost = 6 * BASE_COST_PER_TILE;
                         break;
                     case NODE_VLONG7:  // Versal only
+                        // Nominally travel seven tiles
+                        baseCost = 7 * BASE_COST_PER_TILE;
+                        break;
                     case NODE_VLONG12: // Versal only
-                        baseCost = 0.15f * (length == 0 ? 1 : length);
+                        // Nominally travel twelve tiles
+                        baseCost = 12 * BASE_COST_PER_TILE;
                         break;
                     case NODE_VLONG:   // US/US+
-                        if (length == 0) {
-                            // e.g. INT_X167Y608/SS16_BEG0 in VU440
-                            assert(!getAllDownhillPIPs().isEmpty());
-                        } else {
-                            // VLONGs are nominally length 12 in US+ and 12/16 in US
-                        }
-                        baseCost = 0.7f;
+                        assert(length != 0 || !getAllDownhillPIPs().isEmpty()); // e.g. INT_X167Y608/SS16_BEG0 in VU440
+                        // Nominally travel twelve tiles (UltraScale also has NN16/SS16)
+                        baseCost = 12 * BASE_COST_PER_TILE;
                         break;
 
                     // Versal only
@@ -339,6 +388,33 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                 throw new RuntimeException(getType().toString());
         }
         assert(baseCost > 0);
+    }
+
+    /**
+     * Checks if an intent code is that of a single, double, quad or long (on UltraScale, UltraScale+ or Versal).
+     * @param ic Intent code in question.
+     * @return True if so.
+     */
+    public static boolean isSingleDoubleQuadLong(IntentCode ic) {
+        switch (ic) {
+            case NODE_SINGLE:   // US and US+
+            case NODE_DOUBLE:   // US and US+
+            case NODE_HSINGLE:  // Versal only
+            case NODE_VSINGLE:  // Versal only
+            case NODE_HDOUBLE:  // Versal only
+            case NODE_VDOUBLE:  // Versal only
+            case NODE_HQUAD:
+            case NODE_VQUAD:
+            case NODE_HLONG:    // US and US+
+            case NODE_VLONG:    // US and US+
+            case NODE_HLONG6:   // Versal only
+            case NODE_HLONG10:  // Versal only
+            case NODE_VLONG7:   // Versal only
+            case NODE_VLONG12:  // Versal only
+                return true;
+            default:
+                return false;
+        }
     }
 
     /**
@@ -579,11 +655,11 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     }
 
     /**
-     * Gets the wirelength.
-     * @return The wirelength, i.e. the number of INT tiles that the associated {@link Node} instance spans.
+     * Gets the wirelength, in half INT tiles (see {@link RouteNodeInfo#halfTileWirelength}).
+     * @return The wirelength in half INT tiles.
      */
-    public short getLength() {
-        return length;
+    public short getHalfTileWirelength() {
+        return halfTileWirelength;
     }
 
     /**

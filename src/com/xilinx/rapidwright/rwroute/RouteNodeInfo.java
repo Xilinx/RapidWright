@@ -39,16 +39,47 @@ public class RouteNodeInfo {
      */
     public final short endHalfTileXCoordinate;
     public final short endTileYCoordinate;
+    /** Number of INT tiles that the node spans */
     public final short length;
+    /**
+     * Wirelength of the node in half INT tiles: twice its {@link #length}, except for horizontal singles (including
+     * intra-tile singles; see {@link #isVertical(IntentCode, String)}), which only travel half a tile, from one half of
+     * an INT tile to the next (whereas they span 1 INT tile, or 0 for intra-tile singles)
+     */
+    public final short halfTileWirelength;
+
+    /**
+     * Checks if a single or double is vertical: from its intent code on Versal, or else (NODE_SINGLE and NODE_DOUBLE
+     * being used for both axes on UltraScale/UltraScale+) its wire name (e.g. NN1_E_BEG0 or SS2_W_BEG7, rather than
+     * EE1_E_BEG0 or the intra-tile INT_INT_SDQ_32_INT_OUT1).
+     * @param ic Intent code of the node's base wire.
+     * @param wireName Name of the node's base wire.
+     * @return True if so.
+     */
+    public static boolean isVertical(IntentCode ic, String wireName) {
+        switch (ic) {
+            case NODE_VSINGLE:
+            case NODE_VDOUBLE:
+                return true;
+            case NODE_HSINGLE:
+            case NODE_HDOUBLE:
+                return false;
+            default:
+                char c = wireName.charAt(0);
+                return c == 'N' || c == 'S';
+        }
+    }
 
     private RouteNodeInfo(RouteNodeType type,
                           short endHalfTileXCoordinate,
                           short endTileYCoordinate,
-                          short length) {
+                          short length,
+                          short halfTileWirelength) {
         this.type = type;
         this.endHalfTileXCoordinate = endHalfTileXCoordinate;
         this.endTileYCoordinate = endTileYCoordinate;
         this.length = length;
+        this.halfTileWirelength = halfTileWirelength;
     }
 
     /**
@@ -140,7 +171,16 @@ public class RouteNodeInfo {
             }
         }
 
-        return new RouteNodeInfo(type, endHalfTileXCoordinate, endTileYCoordinate, length);
+        short halfTileWirelength;
+        if ((baseIntentCode == IntentCode.NODE_HSINGLE || baseIntentCode == IntentCode.NODE_SINGLE) &&
+                !isVertical(baseIntentCode, node.getWireName())) {
+            // Horizontal (or intra-tile) single
+            halfTileWirelength = 1;
+        } else {
+            halfTileWirelength = (short) (2 * length);
+        }
+
+        return new RouteNodeInfo(type, endHalfTileXCoordinate, endTileYCoordinate, length, halfTileWirelength);
     }
 
     /**
