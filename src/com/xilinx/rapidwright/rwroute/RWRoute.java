@@ -1949,9 +1949,12 @@ public class RWRoute {
                     case NON_LOCAL:
                     case NON_LOCAL_INHERIT_PREV_SIDE:
                         // LOCALs cannot connect to NON_LOCALs except
-                        //   (a) IMUX (LOCAL_LEADING_TO_SLL) -> LAG_MUX_ATOM_\\d+_TXOUT
-                        //   (b) via a LUT routethru: IMUX (LOCAL*) -> CLE_CLE_*_SITE_0_[A-H]_O
-                        assert(!rnodeType.isAnyLocal() || rnodeType.isLocalLeadingToSLL() ||
+                        //   (a) via a LUT routethru: IMUX (LOCAL*) -> CLE_CLE_*_SITE_0_[A-H]_O
+                        //   (b) with LUT routethrus (with which every IMUX is in the routing graph): IMUX (LOCAL) ->
+                        //       a LAG_MUX_ATOM_\\d+_TXOUT whose super long line does not cross SLRs (those that do are
+                        //       LOCAL_LEADING_TO_SLL, as is the IMUX that drives them)
+                        //   (c) on Versal, CLE/*LAG*_PIN -> CLE/*[A-H]Q2?_PIN
+                        assert(!rnodeType.isAnyLocal() ||
                                (routingGraph.lutRoutethru && rnode.getIntentCode() == IntentCode.NODE_PINFEED) ||
                                 // Allow CLE/*LAG*_PIN -> CLE/*[A-H]Q2?_PIN
                                 (routingGraph.isVersal && connection.isCrossSLR() &&
@@ -2103,11 +2106,11 @@ public class RWRoute {
         // For a connection that must still cross SLRs: how many super long lines it must still take (each crossing one
         // SLR boundary, a whole SUPER_LONG_LINE_LENGTH_IN_TILES rows towards the sink), and, if this node is on the
         // sending side of a chain of nodes leading to one towards the sink and is given the crossing discount, the
-        // position from which that is taken
+        // half-tile X coordinate of the column from which that is taken (else -1)
         int deltaSLR = 0;
         int rnodeReceivingIndex = -1;
         int remainingReceivingNodes = 0;
-        int[] sendingPosition = null;
+        int sendingHalfX = -1;
         if (connection.isCrossSLR()) {
             assert(!childRnode.getType().isLocalLeadingToSLL() ||
                     (routingGraph.isNorthboundSLLRow(childRnode.getTile().getTileYCoordinate())
@@ -2118,14 +2121,30 @@ public class RWRoute {
             remainingReceivingNodes = getRemainingReceivingNodes(connection, childRnode, rnodeReceivingIndex);
             deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
             if (deltaSLR != 0) {
-                if (remainingReceivingNodes == 0) {
-                    sendingPosition = getSendingChainPosition(connection, rnode, childRnode);
-                    if (sendingPosition != null && childRnode.willOverUse(connection.getNetWrapper())) {
-                        // A sending-chain node that this net would overuse: no discount (priced as if not on a chain).
-                        // Only this node is checked, so a node further along the chain may be discounted again; that
-                        // node must still overcome this one's congestion (in its path cost), and those further along
-                        // are expected to be overused too
-                        sendingPosition = null;
+                if (remainingReceivingNodes == 0 && (childType == RouteNodeType.LOCAL_LEADING_TO_SLL ||
+                        childType == RouteNodeType.NON_LOCAL_LEADING_TO_SLL)) {
+                    // On the sending side of a chain (identified by type alone on all three series)
+                    boolean towardsSink = routingGraph.isNorthboundSLLRow(childY) ? connection.isCrossSLRnorth()
+                                                                                    : connection.isCrossSLRsouth();
+                    // Only an UltraScale/UltraScale+ SDQ node or intra-tile single (NON_LOCAL_LEADING_TO_SLL), which
+                    // every connection may use, can lead away from the sink: RouteNodeGraph.isAccessible() (rule (b))
+                    // keeps a crossing connection off LOCAL_LEADING_TO_SLL nodes outside the sink's SLR that do
+                    assert(towardsSink || childType == RouteNodeType.NON_LOCAL_LEADING_TO_SLL);
+                    // A sending-chain node that this net would overuse gets no discount (priced as if not on a chain).
+                    // Only this node is checked, so a node further along the chain may be discounted again; that node
+                    // must still overcome this one's congestion (in its path cost), and those further along are
+                    // expected to be overused too
+                    if (towardsSink && !childRnode.willOverUse(connection.getNetWrapper())) {
+                        // Where the super long line is taken from: on UltraScale/UltraScale+, the west half of the
+                        // node's INT tile column (see RouteNodeGraph.populateLagunaLookups()); on Versal, the east half
+                        // of the INT tile to the west of its SLL tile column, where an SLL input ends (see
+                        // RouteNodeInfo.get()) and next to which a BNODE in an SLL tile ends (on either side, at the
+                        // INT tile whose INODEs it also drives)
+                        int endHalfX = childRnode.getEndHalfTileXCoordinate();
+                        sendingHalfX = routingGraph.isVersal ? ((endHalfX - 1) & ~1) + 1 : endHalfX & ~1;
+                        assert(!routingGraph.isVersal || childRnode.getIntentCode() != IntentCode.NODE_CLE_BNODE ||
+                                (sendingHalfX == 2 * RouteNodeInfo.getWestIntTileXCoordinate(childRnode.getTile()) + 1 &&
+                                 childY == childRnode.getTile().getTileYCoordinate()));
                     }
                 }
                 // The rows that wires other than super long lines must still cover: those on this side of the super
@@ -2192,7 +2211,7 @@ public class RWRoute {
         // charged at its span, at the estimate's rate per row (see remainingCrossingCost())
         final int sllLength = routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
         float newTotalPathCost;
-        if (sendingPosition == null) {
+        if (sendingHalfX < 0) {
             newTotalPathCost = addEstimate(state, newPartialPathCost, deltaHalfX, deltaY + deltaSLR * sllLength,
                     sharingFactor);
             if (RouteNode.isSingleDoubleQuadLong(childRnode.getIntentCode())) {
@@ -2200,7 +2219,7 @@ public class RWRoute {
             }
             if (connection.isCrossSLR()) {
                 newTotalPathCost = remainingCrossingCost(state, childRnode, rnodeReceivingIndex,
-                        remainingReceivingNodes, null, newTotalPathCost);
+                        remainingReceivingNodes, -1, newTotalPathCost);
             }
         } else {
             // On the sending side of a crossing chain, with the discount: the rest of this chain is charged at its true
@@ -2209,12 +2228,12 @@ public class RWRoute {
             // same INT tile column (see RouteNodeGraph.populateLagunaLookups()); on Versal, either side of the same SLL
             // tile column, whichever is nearer to the sink (as for an SLL itself, above). (Not divided by the sharing
             // factor.)
-            int landHalfX = sendingPosition[0];
+            int landHalfX = sendingHalfX;
             if (routingGraph.isVersal) {
                 landHalfX = Math.max(landHalfX, Math.min(landHalfX + 1, sinkHalfX));
             }
             newTotalPathCost = remainingCrossingCost(state, childRnode, rnodeReceivingIndex, remainingReceivingNodes,
-                    sendingPosition, newPartialPathCost);
+                    sendingHalfX, newPartialPathCost);
             newTotalPathCost = addEstimate(state, newTotalPathCost, getDeltaHalfX(sinkRnode, landHalfX, sinkHalfX),
                     deltaY + (deltaSLR - 1) * sllLength, 1);
             // Lower than if it were charged as not being on a chain (at the span estimate), which it must be for the
@@ -2284,60 +2303,6 @@ public class RWRoute {
     }
 
     /**
-     * Gets the position from which the super long line is taken when a node is on the sending side of a chain of nodes
-     * leading to one that crosses towards the sink (see remainingCrossingCost()): on UltraScale/UltraScale+, the west
-     * half of the node's INT tile column (where the super long line lands; see
-     * RouteNodeGraph.populateLagunaLookups()); on Versal, that of an SLL input, or for a BNODE in an SLL tile that
-     * leads to one (both of type LOCAL_LEADING_TO_SLL), that of its own SLL tile (as such an SLL input's would be; see
-     * RouteNodeInfo.get()) rather than its own end (the INT tile whose INODEs it also drives).
-     * @param connection The connection being routed.
-     * @param rnode The parent of the node in question.
-     * @param childRnode The node in question.
-     * @return {half-tile X, INT tile Y} of that position, or null if the node in question is not on the sending side
-     * of such a chain.
-     */
-    private int[] getSendingChainPosition(Connection connection, RouteNode rnode, RouteNode childRnode) {
-        final RouteNodeType childType = childRnode.getType();
-        final int halfX;
-        final int y;
-        if (routingGraph.isVersal) {
-            if (childType != RouteNodeType.LOCAL_LEADING_TO_SLL) {
-                return null;
-            }
-            if (childRnode.getIntentCode() == IntentCode.NODE_SLL_INPUT) {
-                // SLL input (LAG_CASCOUT_TXI*)
-                halfX = childRnode.getEndHalfTileXCoordinate();
-                y = childRnode.getEndTileYCoordinate();
-            } else {
-                // BNODE in an SLL tile (BNODE_OUTS_[EW]*)
-                assert(childRnode.getIntentCode() == IntentCode.NODE_CLE_BNODE);
-                Tile sllTile = childRnode.getTile();
-                halfX = 2 * RouteNodeInfo.getWestIntTileXCoordinate(sllTile) + 1;
-                y = sllTile.getTileYCoordinate();
-            }
-        } else if (childType == RouteNodeType.NON_LOCAL_LEADING_TO_SLL || childType == RouteNodeType.LOCAL_LEADING_TO_SLL ||
-                (rnode.getType() == RouteNodeType.LOCAL_LEADING_TO_SLL &&
-                        Utils.isLaguna(childRnode.getTile().getTileTypeEnum()))) {
-            // SDQ node or intra-tile single, INODE or IMUX, or LAG_MUX_ATOM_*_TXOUT
-            halfX = 2 * childRnode.getEndTileXCoordinate();
-            y = childRnode.getEndTileYCoordinate();
-        } else {
-            return null;
-        }
-        final int sendingSLR = routingGraph.intYToSLRIndex[y];
-        final boolean north = routingGraph.isNorthboundSLLRow(y);
-        if (sendingSLR == connection.getSinkRnode().getSLRIndex(routingGraph) ||
-                (north ? !connection.isCrossSLRnorth() : !connection.isCrossSLRsouth())) {
-            // Does not lead towards the sink
-            return null;
-        }
-        assert(routingGraph.intYToSLRIndex[north ? y + routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES
-                                                 : y - routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES] ==
-                (north ? sendingSLR + 1 : sendingSLR - 1));
-        return new int[]{halfX, y};
-    }
-
-    /**
      * Adds to the lower bound of a node of a connection that must cross SLRs the cost of what remains of the crossing
      * chains ahead of it: the super long lines (an UltraScale/UltraScale+ UBUMP or a Versal SLL) that it must still
      * take, and the chains of nodes on either side of each, so that A* order alone takes a connection through each
@@ -2357,7 +2322,7 @@ public class RWRoute {
      * the estimate's rate per row, as though it were any other wire, which evaluateCostAndPush() adds as rows of the
      * estimate. That is far more than the true cost of its whole chain (by more than 30 for a Versal SLL of 75
      * rows).</li>
-     * <li>On the sending side of a chain (see getSendingChainPosition()), the crossing discount: the rest of the chain
+     * <li>On the sending side of a chain (see evaluateCostAndPush()), the crossing discount: the rest of the chain
      * at its true (uncongested) cost, the super long line itself and its whole receiving chain, in place of the span
      * estimate. The super long line's benefit is thereby front-loaded onto the sending chain: the lower bound falls on
      * entering it, so that it is entered and followed depth-first, rather than first exploring further towards the
@@ -2380,15 +2345,15 @@ public class RWRoute {
      * @param rnodeReceivingIndex How far along a receiving chain its parent is (see getReceivingChainIndex()).
      * @param remainingReceivingNodes How many nodes of a receiving chain remain after the node in question and are
      * charged (see getRemainingReceivingNodes()).
-     * @param sendingPosition The position from which the super long line is taken, if the node in question is on the
-     * sending side of a chain (see getSendingChainPosition()) and given the discount, else null.
+     * @param sendingHalfX Half-tile X coordinate of the column from which the super long line is taken, if the node in
+     * question is on the sending side of a chain and given the discount (see evaluateCostAndPush()), else -1.
      * @param lowerBound Lower bound of the node in question, so far.
      * @return Its lower bound with that cost added.
      */
     private float remainingCrossingCost(ConnectionState state, RouteNode childRnode, int rnodeReceivingIndex,
-                                        int remainingReceivingNodes, int[] sendingPosition, float lowerBound) {
+                                        int remainingReceivingNodes, int sendingHalfX, float lowerBound) {
         final float tieBreak = state.rnodeCostWeight * RouteNode.SLL_CHAIN_TIE_BREAK;
-        if (sendingPosition == null) {
+        if (sendingHalfX < 0) {
             // Children of a landing node
             if (rnodeReceivingIndex == sllReceivingChainNodes) {
                 lowerBound += state.rnodeCostWeight * RouteNode.SLL_LANDING_TIE_BREAK;
@@ -2414,18 +2379,28 @@ public class RWRoute {
                 // An SDQ node, still to take its intra-tile single
                 remainingSingles = 1;
             }
-        } else if (childType == RouteNodeType.LOCAL_LEADING_TO_SLL) {
-            // INODE or IMUX
-            remainingLocals = (childRnode.getIntentCode() == IntentCode.NODE_PINFEED) ? 1 : 2;
         } else {
-            // LAG_MUX_ATOM_*_TXOUT
-            remainingLocals = 0;
+            assert(childType == RouteNodeType.LOCAL_LEADING_TO_SLL);
+            switch (childRnode.getIntentCode()) {
+                case NODE_LOCAL:   // INODE
+                    remainingLocals = 2;
+                    break;
+                case NODE_PINFEED: // IMUX
+                    remainingLocals = 1;
+                    break;
+                default:           // LAG_MUX_ATOM_*_TXOUT (NODE_LAGUNA_OUTPUT on UltraScale+, INTENT_DEFAULT on UltraScale)
+                    assert(Utils.isLaguna(childRnode.getTile().getTileTypeEnum()));
+                    remainingLocals = 0;
+                    break;
+            }
         }
-        final int x = sendingPosition[0] >> 1;
-        final int y = sendingPosition[1];
+        final int x = sendingHalfX >> 1;
+        final int y = childRnode.getEndTileYCoordinate();
         final int sllLength = routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
-        // The super long line lands in the same column, a whole length to the north or south
-        final int landY = routingGraph.isNorthboundSLLRow(y) ? y + sllLength : y - sllLength;
+        // The super long line lands in the same column, a whole length to the north or south, in the next SLR
+        final boolean north = routingGraph.isNorthboundSLLRow(y);
+        final int landY = north ? y + sllLength : y - sllLength;
+        assert(routingGraph.intYToSLRIndex[landY] == routingGraph.intYToSLRIndex[y] + (north ? 1 : -1));
         lowerBound += remainingLocals * (getUncongestedNodeCost(state, RouteNode.LOCAL_BASE_COST, x, y) + tieBreak);
         lowerBound += remainingSingles * (getUncongestedNodeCost(state, 0.5f * RouteNode.BASE_COST_PER_TILE, x, y) +
                 state.rnodeWLWeight * 0.5f + tieBreak);

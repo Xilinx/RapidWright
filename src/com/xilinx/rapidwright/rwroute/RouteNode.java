@@ -219,7 +219,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                     case NODE_OUTPUT:        // CLE/LAGUNA_TILE/BRAM/etc. outputs (US)
                                              // LAG_LAG.LAG_LAGUNA_SITE_*_{T,R}XQ* (US+)
                     case NODE_CLE_OUTPUT:    // CLE outputs (US+ and Versal)
-                    case NODE_LAGUNA_OUTPUT: // LAG_LAG.{LAG_MUX_ATOM_*_TXOUT,RXD*} (US+)
+                    case NODE_LAGUNA_OUTPUT: // LAG_LAG.RXD* (US+), and LAG_LAG.LAG_MUX_ATOM_*_TXOUT other than those
+                                             // leading to an SLR crossing (which are LOCAL_LEADING_TO_SLL)
                     case NODE_LAGUNA_DATA:   // LAG_LAG.UBUMP* super long lines for u-turns at the boundary of the device (US+)
                     case NODE_SLL_INPUT:     // Versal only
                     case NODE_SLL_OUTPUT:    // Versal only

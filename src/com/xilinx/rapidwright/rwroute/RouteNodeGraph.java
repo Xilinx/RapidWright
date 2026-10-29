@@ -119,13 +119,15 @@ public class RouteNodeGraph {
      * Map indicating which wire indices within a tile lead to a super long line that crosses into another SLR, or
      * null if the device has no such super long lines. Indexed by tile, each entry holds two BitSets:
      * <ul>
-     * <li>UltraScale/UltraScale+ (Laguna-adjacent INT tiles; see {@link #populateLagunaLookups}): [0] IMUX and INODE
-     * wires (LOCAL_LEADING_TO_SLL), [1] INT_INT and SDQNODE wires (NON_LOCAL_LEADING_TO_SLL).</li>
+     * <li>UltraScale/UltraScale+ (Laguna-adjacent INT tiles and their Laguna tiles; see
+     * {@link #populateLagunaLookups}): [0] IMUX and INODE wires in an INT tile, or TXOUT (LAG_MUX_ATOM_*_TXOUT) wires
+     * in a Laguna tile (LOCAL_LEADING_TO_SLL), [1] INT_INT and SDQNODE wires in an INT tile
+     * (NON_LOCAL_LEADING_TO_SLL).</li>
      * <li>Versal (SLL tiles, each computed when first needed; see {@link #getWireIndicesLeadingToSLL(Tile)}):
      * [0] SLL inputs whose SLL crosses SLRs, [1] BNODEs that drive such an SLL input (both LOCAL_LEADING_TO_SLL).</li>
      * </ul>
-     * Keyed by INT tiles on UltraScale/UltraScale+ and by SLL tiles on Versal, so users that are specific to one
-     * series check the series rather than whether this is null.
+     * Keyed by INT and Laguna tiles on UltraScale/UltraScale+ and by SLL tiles on Versal, so users that are specific
+     * to one series check the series rather than whether this is null.
      */
     protected final Map<Tile, BitSet[]> wireIndicesLeadingToSLL;
 
@@ -910,7 +912,7 @@ public class RouteNodeGraph {
         for (Node downhill : node.getAllDownhillNodes()) {
             if (downhill.getIntentCode() == IntentCode.NODE_SLL_INPUT && isCrossingSLLInput(downhill)) {
                 assert(downhill.getTile() == node.getTile());
-                // ... and ends there (see RWRoute.getSendingChainPosition())
+                // ... and ends there (see RWRoute.evaluateCostAndPush())
                 assert(RouteNodeInfo.get(downhill, null).endHalfTileXCoordinate ==
                         2 * RouteNodeInfo.getWestIntTileXCoordinate(node.getTile()) + 1);
                 assert(RouteNodeInfo.get(downhill, null).endTileYCoordinate == node.getTile().getTileYCoordinate());
@@ -991,8 +993,8 @@ public class RouteNodeGraph {
                     final int intTileXCoordinate = isUltraScalePlus ? x + 1 : x;
                     crossingHalfColumns[2 * intTileXCoordinate] = true;
 
-                    // Examine all wires in each Laguna tile. Record those IMUX and INODE uphill of a Super Long Line
-                    // that originates in an INT tile
+                    // Examine all wires in each Laguna tile. Record those TXOUT, IMUX and INODE uphill of a Super Long
+                    // Line that originates in an INT tile
                     for (int wireIndex = 0; wireIndex < tile.getWireCount(); wireIndex++) {
                         if (!tile.getWireName(wireIndex).startsWith("UBUMP")) {
                             continue;
@@ -1010,6 +1012,17 @@ public class RouteNodeGraph {
                             assert(imux.getIntentCode() == IntentCode.NODE_PINFEED);
                             Tile imuxTile = imux.getTile();
                             assert(Utils.isInterConnect(imuxTile.getTileTypeEnum()));
+
+                            // The TXOUT itself (LAG_MUX_ATOM_*_TXOUT, of intent NODE_LAGUNA_OUTPUT on UltraScale+ and
+                            // INTENT_DEFAULT on UltraScale), keyed by its own Laguna tile. Each super long line here
+                            // crosses into the next SLR (towards the boundary nearer to the TXOUTs at either end, which
+                            // are in the same row, and so the same direction, as the IMUX that drives them)
+                            Tile txOutTile = txOut.getTile();
+                            assert(Utils.isLaguna(txOutTile.getTileTypeEnum()));
+                            assert(txOutTile.getTileYCoordinate() == imuxTile.getTileYCoordinate());
+                            assert(!enableComprehensiveAssertions || txOut.getWireName().matches("LAG_MUX_ATOM_\\d+_TXOUT"));
+                            wireIndicesLeadingToSLL.computeIfAbsent(txOutTile, k -> new BitSet[]{new BitSet(), new BitSet()})[0]
+                                    .set(txOut.getWireIndex());
 
                             BitSet[] bs = wireIndicesLeadingToSLL.computeIfAbsent(imuxTile, k -> new BitSet[]{new BitSet(), new BitSet()});
                             bs[0].set(imux.getWireIndex());
@@ -1618,15 +1631,14 @@ public class RouteNodeGraph {
 
                         TileTypeEnum childTileType = childRnode.getTile().getTileTypeEnum();
                         if (Utils.isLaguna(childTileType)) {
-                            assert(parentType.isLocalLeadingToSLL());
-                            // IMUX_[EW]\\d+ -> LAG_MUX_ATOM_\\d+_TXOUT
+                            // IMUX_[EW]\\d+ -> LAG_MUX_ATOM_\\d+_TXOUT whose super long line does not cross SLRs (at
+                            // the top or bottom edge of the device): those that do are of type LOCAL_LEADING_TO_SLL
+                            // (and are accessible by (b) below), and the IMUXes driving these are not in the routing
+                            // graph unless LUT routethrus are considered (see isExcluded())
+                            assert(lutRoutethru && !parentType.isLocalLeadingToSLL());
                             RouteNode sinkRnode = connection.getSinkRnode();
                             if (!connection.isCrossSLR() ||
                                 childRnode.getSLRIndex(this) == sinkRnode.getSLRIndex(this)) {
-                                assert(lutRoutethru ||
-                                        // Inadvertently approaching an SLL because we are Y +/- 1 to the sink tile
-                                        (childRnode.getEndTileXCoordinate() == sinkRnode.getBeginTileXCoordinate() &&
-                                         Math.abs(childRnode.getEndTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) <= 1));
                                 return false;
                             }
                         } else {
@@ -1651,6 +1663,8 @@ public class RouteNodeGraph {
 
         TileTypeEnum childTileType = childRnode.getTile().getTileTypeEnum();
         assert(childTileType == TileTypeEnum.INT ||
+                // UltraScale/UltraScale+ TXOUTs (LAG_MUX_ATOM_*_TXOUT) leading to an SLR crossing
+                (!isVersal && Utils.isLaguna(childTileType) && type.isLocalLeadingToSLL()) ||
                 (isVersal && EnumSet.of(TileTypeEnum.INTF_LOCF_TR_TILE, TileTypeEnum.INTF_LOCF_BR_TILE, TileTypeEnum.INTF_ROCF_TR_TILE, TileTypeEnum.INTF_ROCF_BR_TILE,
                                         TileTypeEnum.INTF_LOCF_TL_TILE, TileTypeEnum.INTF_LOCF_BL_TILE, TileTypeEnum.INTF_ROCF_TL_TILE, TileTypeEnum.INTF_ROCF_BL_TILE,
                                       TileTypeEnum.CLE_BC_CORE, TileTypeEnum.SLL)
@@ -1662,14 +1676,16 @@ public class RouteNodeGraph {
 
         if (lutRoutethru && (isVersal || !type.isLocalLeadingToSLL())) {
             // (a) considering LUT routethrus, other than (on UltraScale/UltraScale+ only) through local nodes leading to
-            // an SLL, which can only lead into a Laguna tile and never to a LUT input. (On Versal, where LUT
-            // routethrus are not yet supported, these include BNODEs in SLL tiles, which also drive INODEs.)
+            // an SLL, which can only lead into (or, for TXOUTs, are in) a Laguna tile and never to a LUT input. (On
+            // Versal, where LUT routethrus are not yet supported, these include BNODEs in SLL tiles, which also drive
+            // INODEs.)
             return true;
         }
 
         // (b) needs to cross an SLR and this is a local node leading to an SLL that crosses SLRs (including a Versal BNODE
         // in an SLL tile, which can end on the other side of that tile to what drives it, and which, being on the
-        // sending side of a chain, is not restricted to the side of the sink by (c))
+        // sending side of a chain, is not restricted to the side of the sink by (c); and an UltraScale/UltraScale+ TXOUT,
+        // in the Laguna tile in the same row as the IMUX that drives it, and so leading in the same direction)
         Tile childTile = childRnode.getTile();
         RouteNode sinkRnode = connection.getSinkRnode();
         int childX = childRnode.getEndTileXCoordinate();
@@ -1685,6 +1701,14 @@ public class RouteNodeGraph {
             }
             assert(getNextCrossingColumn(childX) == childX);
             return true;
+        }
+
+        if (!isVersal && Utils.isLaguna(childTileType)) {
+            // An UltraScale/UltraScale+ TXOUT (LAG_MUX_ATOM_*_TXOUT) that (b) did not accept: its super long line
+            // leaves this SLR, which a connection that does not need to cross SLRs from here never wants, whatever its
+            // side (it is driven by an IMUX that (c) to (e) below may accept, e.g. one Y +/- 1 from the sink)
+            assert(type.isLocalLeadingToSLL());
+            return false;
         }
 
         // (c) on the same side (half) as the sink

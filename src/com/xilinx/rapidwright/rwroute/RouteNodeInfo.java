@@ -394,11 +394,20 @@ public class RouteNodeInfo {
                 assert(tileTypeEnum == TileTypeEnum.LAG_LAG);
                 return RouteNodeType.SUPER_LONG_LINE;
 
+            case NODE_LAGUNA_OUTPUT: // UltraScale+: LAG_LAG.{LAG_MUX_ATOM_*_TXOUT,RXD*}
+                if (isTxOutLeadingToSLL(node, routingGraph)) {
+                    return RouteNodeType.LOCAL_LEADING_TO_SLL;
+                }
+                break;
+
             case INTENT_DEFAULT:
                 if (tileTypeEnum == TileTypeEnum.LAGUNA_TILE) { // UltraScale only
                     String wireName = node.getWireName();
                     if (wireName.startsWith("UBUMP")) {
                         return RouteNodeType.SUPER_LONG_LINE;
+                    }
+                    if (isTxOutLeadingToSLL(node, routingGraph)) {
+                        return RouteNodeType.LOCAL_LEADING_TO_SLL;
                     }
                 }
                 break;
@@ -408,5 +417,22 @@ public class RouteNodeInfo {
             return RouteNodeType.NON_LOCAL_INHERIT_PREV_SIDE;
         }
         return RouteNodeType.NON_LOCAL;
+    }
+
+    /**
+     * Checks whether an UltraScale/UltraScale+ node is a TXOUT (LAG_MUX_ATOM_*_TXOUT, in a Laguna tile) that drives a
+     * super long line crossing into another SLR, as looked up in RouteNodeGraph.wireIndicesLeadingToSLL (see
+     * RouteNodeGraph.populateLagunaLookups()). Such a TXOUT is the last node of the sending chain, after the IMUX that
+     * drives it; others (whose super long line stays within its SLR, at the top or bottom edge of the device) are not.
+     * @param node Node in question.
+     * @param routingGraph Graph the node is to be a part of.
+     * @return True if so.
+     */
+    private static boolean isTxOutLeadingToSLL(Node node, RouteNodeGraph routingGraph) {
+        if (routingGraph.wireIndicesLeadingToSLL == null || !Utils.isLaguna(node.getTile().getTileTypeEnum())) {
+            return false;
+        }
+        BitSet[] bs = routingGraph.wireIndicesLeadingToSLL.get(node.getTile());
+        return bs != null && bs[0].get(node.getWireIndex());
     }
 }
