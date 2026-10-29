@@ -389,34 +389,37 @@ public class FlatNetlist {
         return found;
     }
 
-    /** @return The match below an instance, -1 for none, -2 for several. */
+    /**
+     * @return The match below an instance, -1 for none, -2 for several. Each
+     *         prefix of the path that ends at a separator is looked up by name,
+     *         so siblings are never scanned.
+     */
     private int findInstId(int instId, String remaining) {
         if (childBase[instId] < 0) {
             return -1;
         }
+        EDIFCell cell = cellTypes.get(cellTypeId[instId]);
+        CellIndex index = getIndex(instId);
         int found = -1;
-        int children = getIndex(instId).getChildCount();
-        for (int i = 0; i < children; i++) {
-            int child = childBase[instId] + i;
-            String name = instObj[child].getName();
-            if (!remaining.startsWith(name)) {
+        int separator = -1;
+        do {
+            separator = remaining.indexOf(EDIFTools.EDIF_HIER_SEP, separator + 1);
+            String name = separator < 0 ? remaining : remaining.substring(0, separator);
+            EDIFCellInst child = cell.getCellInst(name);
+            int local = child == null ? -1 : index.localChildIndex(child);
+            if (local < 0) {
                 continue;
             }
-            int match;
-            if (remaining.length() == name.length()) {
-                match = child;
-            } else if (remaining.startsWith(EDIFTools.EDIF_HIER_SEP, name.length())) {
-                match = findInstId(child, remaining.substring(name.length() + 1));
-            } else {
-                continue;
-            }
+            int childId = childBase[instId] + local;
+            int match = separator < 0 ? childId
+                    : findInstId(childId, remaining.substring(separator + 1));
             if (match == -2 || (match >= 0 && found >= 0)) {
                 return -2;
             }
             if (match >= 0) {
                 found = match;
             }
-        }
+        } while (separator >= 0);
         return found;
     }
 

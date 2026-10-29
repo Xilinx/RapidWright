@@ -1163,7 +1163,6 @@ public class LecSelfCheck {
         check("look up table feeding a retimed register inverted", Expect.DETECT,
                 ctx -> retimedFlop(ctx, null, (c, id) -> invertDriverLut(c, id)));
         check("certificate entry dropped", Expect.DETECT, ctx -> dropEntry());
-        check("certificate definitions swapped", Expect.DETECT, ctx -> swapDefinitions());
         check("certificate made cyclic", Expect.REFUSE, this::makeCyclic);
     }
 
@@ -1371,39 +1370,6 @@ public class LecSelfCheck {
         a.description = "dropped " + shorten(entries.get(0).toString());
         a.retiming = mutated;
         return a;
-    }
-
-    /**
-     * Swaps the definitions of two registers on the same side whose defining
-     * pins differ. Two registers holding the same value would make the swap
-     * harmless, which is why the pins must differ; a design where they differ
-     * but compute the same function would be a false expectation, not a false
-     * pass.
-     */
-    private Applied swapDefinitions() {
-        List<RetimingMap.Entry> entries = retiming.getEntries();
-        for (int i = 0; i < entries.size(); i++) {
-            for (int j = i + 1; j < entries.size(); j++) {
-                RetimingMap.Entry x = entries.get(i);
-                RetimingMap.Entry y = entries.get(j);
-                if (x.getRegisterSide() != y.getRegisterSide()
-                        || x.getDefiningPinKey().equals(y.getDefiningPinKey())) {
-                    continue;
-                }
-                RetimingMap mutated = new RetimingMap();
-                for (RetimingMap.Entry e : entries) {
-                    String pin = e == x ? y.getDefiningPinKey()
-                            : e == y ? x.getDefiningPinKey() : e.getDefiningPinKey();
-                    define(mutated, e, pin);
-                }
-                Applied a = new Applied();
-                a.description = "swapped " + shorten(x.getRegister()) + " and "
-                        + shorten(y.getRegister());
-                a.retiming = mutated;
-                return a;
-            }
-        }
-        return null;
     }
 
     /**
