@@ -2083,12 +2083,6 @@ public class RWRoute {
         int childHalfX = childRnode.getEndHalfTileXCoordinate();
         int sinkHalfX = sinkRnode.getEndHalfTileXCoordinate();
         RouteNodeType childType = childRnode.getType();
-        if ((childType == RouteNodeType.LOCAL_SIDE_DEPENDS_ON_SINK || childType == RouteNodeType.LOCAL_RESERVED) &&
-                sinkRnode.getType().isExclusiveSinkCtrlOrSllInput() && childRnode.getTile() == sinkRnode.getTile()) {
-            // INT_NODE_GLOBAL_* (UltraScale/UltraScale+) serve the CTRL_* pins on either side of their INT tile, as do
-            // the [BC]NODEs reserved for the CTRL pins and SLL inputs in Versal CLE_BC_CORE/INTF_*/SLL tiles
-            childHalfX = sinkHalfX;
-        }
         if (childType == RouteNodeType.NON_LOCAL_INHERIT_PREV_SIDE) {
             // Nodes that serve both sides of where they end are considered to be on the side that the path arrived
             // from, so that moving onto them neither gains nor loses distance to the sink in X (only a subsequent
@@ -2096,10 +2090,24 @@ public class RWRoute {
             // directly (rnode, if also such a node, had its side recorded when it was pushed)
             childRnode.setInheritedSide(rnode);
             childHalfX = childRnode.getEndHalfTileXCoordinate();
-        } else if (connection.isCrossSLR() && routingGraph.isOnBothSides(childRnode)) {
-            // Versal SLL input/output/data: between the east side of one INT tile (childHalfX) and the west side of
-            // the next; take whichever of those is nearer to the sink
-            childHalfX = Math.max(childHalfX, Math.min(childHalfX + 1, sinkHalfX));
+        } else {
+            // Nodes that serve two adjacent halves for this connection are considered to be on whichever is nearer to
+            // the sink:
+            // - INT_NODE_GLOBAL_* (UltraScale/UltraScale+), the [BC]NODEs reserved for CTRL pins and SLL inputs in
+            //   Versal CLE_BC_CORE/INTF_*/SLL tiles, at the tile of a CTRL pin or SLL input sink, which they serve on
+            //   either side (so that is the sink's half);
+            // - Versal SLL inputs, outputs and data (super long lines) of a connection that crosses SLRs, between the
+            //   east side of one INT tile and the west side of the next
+            final boolean servesTwoHalves =
+                    ((childType == RouteNodeType.LOCAL_SIDE_DEPENDS_ON_SINK || childType == RouteNodeType.LOCAL_RESERVED) &&
+                     sinkRnode.getType().isExclusiveSinkCtrlOrSllInput() && childRnode.getTile() == sinkRnode.getTile()) ||
+                    (connection.isCrossSLR() && routingGraph.isOnBothSides(childRnode));
+            if (servesTwoHalves) {
+                final int lowerHalfX = getLowerOfTwoHalves(childHalfX);
+                final int nearerHalfX = Math.max(lowerHalfX, Math.min(lowerHalfX + 1, sinkHalfX));
+                assert(childRnode.getTile() != sinkRnode.getTile() || nearerHalfX == sinkHalfX);
+                childHalfX = nearerHalfX;
+            }
         }
         int deltaHalfX = getDeltaHalfX(sinkRnode, childHalfX, sinkHalfX);
         int deltaY = Math.abs(childY - sinkY);
@@ -2140,8 +2148,7 @@ public class RWRoute {
                         // of the INT tile to the west of its SLL tile column, where an SLL input ends (see
                         // RouteNodeInfo.get()) and next to which a BNODE in an SLL tile ends (on either side, at the
                         // INT tile whose INODEs it also drives)
-                        int endHalfX = childRnode.getEndHalfTileXCoordinate();
-                        sendingHalfX = routingGraph.isVersal ? ((endHalfX - 1) & ~1) + 1 : endHalfX & ~1;
+                        sendingHalfX = getLowerOfTwoHalves(childRnode.getEndHalfTileXCoordinate());
                         assert(!routingGraph.isVersal || childRnode.getIntentCode() != IntentCode.NODE_CLE_BNODE ||
                                 (sendingHalfX == 2 * RouteNodeInfo.getWestIntTileXCoordinate(childRnode.getTile()) + 1 &&
                                  childY == childRnode.getTile().getTileYCoordinate()));
@@ -2244,6 +2251,17 @@ public class RWRoute {
         }
 
         push(state, childRnode, newPartialPathCost, newTotalPathCost);
+    }
+
+    /**
+     * Gets the lower of the two adjacent half tiles that a node serving both of them is between: on
+     * UltraScale/UltraScale+, the west half of its INT tile; on Versal, the east half of the INT tile to the west of
+     * the tile column (e.g. SLL, CLE_BC_CORE) that it is in, beside the west half of the INT tile to the east.
+     * @param halfX Half-tile X coordinate of the node (either of the two).
+     * @return Half-tile X coordinate of the lower of the two.
+     */
+    private int getLowerOfTwoHalves(int halfX) {
+        return routingGraph.isVersal ? ((halfX - 1) & ~1) + 1 : halfX & ~1;
     }
 
     /**
