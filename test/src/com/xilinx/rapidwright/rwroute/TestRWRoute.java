@@ -427,16 +427,16 @@ public class TestRWRoute {
             // US+
             // One SLR crossing
             // (Too) Close
-            Device.AWS_F1 + ",SLICE_X9Y299,SLICE_X9Y300,200",    // On Laguna column
-            Device.AWS_F1 + ",SLICE_X9Y300,SLICE_X9Y299,200",
-            Device.AWS_F1 + ",SLICE_X0Y299,SLICE_X0Y300,200",    // Far from Laguna column
+            Device.AWS_F1 + ",SLICE_X9Y299,SLICE_X9Y300,100",    // On Laguna column
+            Device.AWS_F1 + ",SLICE_X9Y300,SLICE_X9Y299,100",
+            Device.AWS_F1 + ",SLICE_X0Y299,SLICE_X0Y300,100",    // Far from Laguna column
             Device.AWS_F1 + ",SLICE_X0Y300,SLICE_X0Y299,100",
-            Device.AWS_F1 + ",SLICE_X54Y299,SLICE_X56Y300,200",  // Slight closer to one Laguna column that is further from sink
+            Device.AWS_F1 + ",SLICE_X54Y299,SLICE_X56Y300,100",  // Slight closer to one Laguna column that is further from sink
             Device.AWS_F1 + ",SLICE_X54Y300,SLICE_X56Y299,200",
-            Device.AWS_F1 + ",SLICE_X50Y299,SLICE_X65Y300,200",
+            Device.AWS_F1 + ",SLICE_X50Y299,SLICE_X65Y300,100",
             Device.AWS_F1 + ",SLICE_X50Y300,SLICE_X65Y299,200",
             Device.AWS_F1 + ",SLICE_X55Y299,SLICE_X55Y300,200",  // Equidistant from two Laguna columns
-            Device.AWS_F1 + ",SLICE_X55Y300,SLICE_X55Y299,200",
+            Device.AWS_F1 + ",SLICE_X55Y300,SLICE_X55Y299,100",
             // Perfect
             Device.AWS_F1 + ",SLICE_X9Y241,SLICE_X9Y300,200",
             Device.AWS_F1 + ",SLICE_X9Y300,SLICE_X9Y241,200",
@@ -447,23 +447,23 @@ public class TestRWRoute {
             // Far
             Device.AWS_F1 + ",SLICE_X9Y240,SLICE_X9Y359,100",    // On Laguna
             Device.AWS_F1 + ",SLICE_X9Y359,SLICE_X9Y240,100",
-            Device.AWS_F1 + ",SLICE_X162Y240,SLICE_X162Y430,200",
+            Device.AWS_F1 + ",SLICE_X162Y240,SLICE_X162Y430,100",
 
             Device.AWS_F1 + ",SLICE_X162Y430,SLICE_X162Y240,200",
             Device.AWS_F1 + ",SLICE_X0Y240,SLICE_X12Y430,200",   // Far from Laguna
             Device.AWS_F1 + ",SLICE_X0Y430,SLICE_X12Y240,200",
 
             // Two SLR crossings
-            Device.AWS_F1 + ",SLICE_X162Y299,SLICE_X162Y599,200",
+            Device.AWS_F1 + ",SLICE_X162Y299,SLICE_X162Y599,100",
             Device.AWS_F1 + ",SLICE_X162Y599,SLICE_X162Y299,200",
 
             // Three SLR crossings
-            Device.AWS_F1 + ",SLICE_X79Y0,SLICE_X79Y899,300",    // Straight up: on Laguna column (opposite side of Laguna)
-            Device.AWS_F1 + ",SLICE_X78Y60,SLICE_X78Y839,300",   // Straight up: on Laguna column (same side as Laguna)
-            Device.AWS_F1 + ",SLICE_X0Y0,SLICE_X0Y899,400",      // Straight up: far from Laguna column
-            Device.AWS_F1 + ",SLICE_X168Y0,SLICE_X168Y899,300",  // Straight up: far from Laguna column
+            Device.AWS_F1 + ",SLICE_X79Y0,SLICE_X79Y899,200",    // Straight up: on Laguna column (opposite side of Laguna)
+            Device.AWS_F1 + ",SLICE_X78Y60,SLICE_X78Y839,200",   // Straight up: on Laguna column (same side as Laguna)
+            Device.AWS_F1 + ",SLICE_X0Y0,SLICE_X0Y899,300",      // Straight up: far from Laguna column
+            Device.AWS_F1 + ",SLICE_X168Y0,SLICE_X168Y899,200",  // Straight up: far from Laguna column
             Device.AWS_F1 + ",SLICE_X9Y0,SLICE_X162Y899,200",    // Up and right
-            Device.AWS_F1 + ",SLICE_X168Y162,SLICE_X9Y899,300",  // Up and left
+            Device.AWS_F1 + ",SLICE_X168Y162,SLICE_X9Y899,200",  // Up and left
     })
     public void testSLRCrossingNonTimingDriven(String deviceName, String srcSiteName, String dstSiteName, long nodesPoppedLimit) {
         testSingleConnectionHelper(deviceName, srcSiteName, "AQ", dstSiteName, "A1", nodesPoppedLimit);
@@ -578,7 +578,7 @@ public class TestRWRoute {
             "xcvu3p,IOB_X0Y47,I,SLICE_X77Y122,FX,100",
 
             // 240 CLB height SLR, no LAG tiles on Y0 (since HBM on bottom edge)
-            "xcu50,SLICE_X38Y239,AQ,SLICE_X38Y240,A1,200"
+            "xcu50,SLICE_X38Y239,AQ,SLICE_X38Y240,A1,100"
     })
     public void testSingleConnection(String partName,
                                      String srcSiteName, String srcPinName,

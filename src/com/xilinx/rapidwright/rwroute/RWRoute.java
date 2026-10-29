@@ -2204,6 +2204,16 @@ public class RWRoute {
         if (RouteNode.isSingleDoubleQuadLong(childRnode.getIntentCode())) {
             newTotalPathCost += state.rnodeCostWeight * RouteNode.PENDING_NODE_COST;
         }
+        if (childType == RouteNodeType.SUPER_LONG_LINE && routingGraph.wireIndicesLeadingToLaguna != null) {
+            // An UltraScale/UltraScale+ super long line (UBUMP) must next pass through three nodes on its receiving
+            // side (LAG_LAGUNA_SITE_*_RXD*, RXD*, then an INT_NODE_SDQ_*/SDQNODE_* on UltraScale+, or an
+            // INT_NODE_SINGLE_DOUBLE_*/INT_NODE_QUAD_LONG_*/SDND*/QLND* on UltraScale) before any wire can make progress
+            // towards the sink.
+            // Include them in its lower bound: otherwise, once one UBUMP has been popped (and its receiving side looked
+            // ahead into), its onward wires sit those three nodes above its sibling UBUMPs, which are then all popped
+            // (each with its own receiving side looked ahead into) before the search continues from the first
+            newTotalPathCost += state.rnodeCostWeight * 3 * RouteNode.LOCAL_BASE_COST;
+        }
 
         push(state, childRnode, newPartialPathCost, newTotalPathCost, lookahead);
     }
