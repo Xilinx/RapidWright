@@ -116,10 +116,18 @@ public class RouteNodeGraph {
     public final int[] prevCrossingHalfColumn;
 
     /**
-     * Map indicating which IMUX, INODE, INT_INT, or SDQNODE wire indices
-     * within a Laguna-adjacent INT tile service a Laguna-crossing
+     * Map indicating which wire indices within a tile lead to a super long line that crosses into another SLR, or
+     * null if the device has no such super long lines. Indexed by tile, each entry holds two BitSets:
+     * <ul>
+     * <li>UltraScale/UltraScale+ (Laguna-adjacent INT tiles; see {@link #populateLagunaLookups}): [0] IMUX and INODE
+     * wires (LOCAL_LEADING_TO_SLL), [1] INT_INT and SDQNODE wires (NON_LOCAL_LEADING_TO_SLL).</li>
+     * <li>Versal (SLL tiles, each computed when first needed; see {@link #getWireIndicesLeadingToSLL(Tile)}):
+     * [0] SLL inputs whose SLL crosses SLRs (LOCAL_LEADING_TO_SLL), [1] BNODEs that drive such an SLL input.</li>
+     * </ul>
+     * Keyed by INT tiles on UltraScale/UltraScale+ and by SLL tiles on Versal, so users that are specific to one
+     * series check the series rather than whether this is null.
      */
-    protected final Map<Tile, BitSet[]> wireIndicesLeadingToLaguna;
+    protected final Map<Tile, BitSet[]> wireIndicesLeadingToSLL;
 
     /** Map indicating (for UltraScale/UltraScale+ only) the wire indices corresponding to the [A-H]MUX output
      * to be blocked during LUT routethrus
@@ -678,16 +686,21 @@ public class RouteNodeGraph {
             }
 
             if (lagunaTiles != null) {
-                wireIndicesLeadingToLaguna = new IdentityHashMap<>();
+                wireIndicesLeadingToSLL = new IdentityHashMap<>();
                 populateLagunaLookups(device, lagunaTiles, crossingHalfColumns);
-            } else {
-                wireIndicesLeadingToLaguna = null;
-                if (isVersal) {
-                    populateSllCrossingHalfColumns(device, crossingHalfColumns);
+            } else if (isVersal) {
+                populateSllCrossingHalfColumns(device, crossingHalfColumns);
+                boolean anyCrossing = false;
+                for (boolean crossing : crossingHalfColumns) {
+                    anyCrossing |= crossing;
                 }
+                // Filled in for each SLL tile when first needed (see getWireIndicesLeadingToSLL())
+                wireIndicesLeadingToSLL = anyCrossing ? new ConcurrentHashMap<>() : null;
+            } else {
+                wireIndicesLeadingToSLL = null;
             }
         } else {
-            wireIndicesLeadingToLaguna = null;
+            wireIndicesLeadingToSLL = null;
         }
         int[] next = null;
         int[] prev = null;
@@ -777,6 +790,137 @@ public class RouteNodeGraph {
             }
         }
         return false;
+    }
+
+    /**
+     * Checks whether a (Versal) SLL input drives an SLL that crosses into another SLR: one with a wire in the same
+     * column of SLL tiles but in another SLR. This varies from tile to tile, rather than with the wire name (e.g.
+     * those in SLL_X16Y335 on xcv80 lead to SLL_X16Y410, except for one that leads to SLL_X16Y260, and none of those
+     * in SLL_X15Y335 leave their tile). Walks the SLL's wires: use {@link #wireIndicesLeadingToSLL} instead.
+     * @param sllInput NODE_SLL_INPUT node in question.
+     * @return True if so.
+     */
+    boolean isCrossingSLLInput(Node sllInput) {
+        Tile tile = sllInput.getTile();
+        for (Node ubump : sllInput.getAllDownhillNodes()) {
+            assert(ubump.getIntentCode() == IntentCode.NODE_SLL_DATA);
+            for (Wire wire : ubump.getAllWiresInNode()) {
+                Tile wireTile = wire.getTile();
+                if (wireTile.getTileXCoordinate() == tile.getTileXCoordinate() &&
+                        wireTile.getSLR().getId() != tile.getSLR().getId()) {
+                    // Crossing towards the nearer SLR boundary (see isNorthboundSLLRow())
+                    assert((wireTile.getTileYCoordinate() > tile.getTileYCoordinate()) ==
+                            isNorthboundSLLRow(tile.getTileYCoordinate()));
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** A (Versal) SLL tile's entry in {@link #wireIndicesLeadingToSLL} when it has none (never modified) */
+    private static final BitSet[] NO_WIRE_INDICES_LEADING_TO_SLL = {new BitSet(), new BitSet()};
+
+    /**
+     * Gets a tile's entry in {@link #wireIndicesLeadingToSLL}, which must not be null. On Versal, an SLL tile's entry
+     * is computed when first needed (see {@link #computeSllLookup(Tile)}).
+     * @param tile Tile in question.
+     * @return Its two BitSets, or null if it has none (on UltraScale/UltraScale+).
+     */
+    BitSet[] getWireIndicesLeadingToSLL(Tile tile) {
+        if (!isVersal) {
+            return wireIndicesLeadingToSLL.get(tile);
+        }
+        assert(tile.getTileTypeEnum() == TileTypeEnum.SLL);
+        // SLL inputs whose SLL crosses SLRs are only found within one SLL length of the SLR boundary that they
+        // cross, and so in the half of their SLR nearer to it (see isNorthboundSLLRow())
+        int y = tile.getTileYCoordinate();
+        int slr = intYToSLRIndex[y];
+        if (isNorthboundSLLRow(y) ? (slr == slrLastIntY.length - 1 || y <= slrLastIntY[slr] - SUPER_LONG_LINE_LENGTH_IN_TILES)
+                                  : (slr == 0 || y >= slrFirstIntY[slr] + SUPER_LONG_LINE_LENGTH_IN_TILES)) {
+            return NO_WIRE_INDICES_LEADING_TO_SLL;
+        }
+        return wireIndicesLeadingToSLL.computeIfAbsent(tile, this::computeSllLookup);
+    }
+
+    /**
+     * Computes a (Versal) SLL tile's entry in {@link #wireIndicesLeadingToSLL}: the wire indices of its SLL inputs
+     * whose SLL crosses into another SLR (see {@link #isCrossingSLLInput(Node)}), and of its BNODEs that drive at
+     * least one of those. BNODEs in an SLL tile only drive the SLL inputs of that tile, so all the SLL inputs that
+     * such a BNODE leads to are in the same row and cross in the same direction.
+     * @param tile SLL tile in question.
+     * @return Its two BitSets.
+     */
+    private BitSet[] computeSllLookup(Tile tile) {
+        BitSet[] bs = null;
+        for (int wireIndex = 0; wireIndex < tile.getWireCount(); wireIndex++) {
+            if (tile.getWireIntentCode(wireIndex) != IntentCode.NODE_SLL_INPUT) {
+                continue;
+            }
+            Node sllInput = Node.getNode(tile, wireIndex);
+            if (sllInput == null || sllInput.getTile() != tile || sllInput.getWireIndex() != wireIndex) {
+                // Not the base wire of its node
+                continue;
+            }
+            if (!isCrossingSLLInput(sllInput)) {
+                continue;
+            }
+            if (bs == null) {
+                bs = new BitSet[]{new BitSet(), new BitSet()};
+            }
+            bs[0].set(wireIndex);
+            for (Node uphill : sllInput.getAllUphillNodes()) {
+                if (uphill.getIntentCode() != IntentCode.NODE_CLE_BNODE) {
+                    continue;
+                }
+                assert(uphill.getTile() == tile);
+                bs[1].set(uphill.getWireIndex());
+            }
+        }
+        return (bs != null) ? bs : NO_WIRE_INDICES_LEADING_TO_SLL;
+    }
+
+    /**
+     * Checks whether a (Versal) node is a BNODE in an SLL tile that drives an SLL input whose SLL crosses into
+     * another SLR (see {@link #wireIndicesLeadingToSLL}). Such a BNODE also drives the INODEs of the INT tile at which
+     * it ends, so is not itself of a LEADING_TO_SLL type.
+     * @param node Node in question.
+     * @return True if so.
+     */
+    public boolean isBNodeLeadingToSLL(Node node) {
+        if (wireIndicesLeadingToSLL == null || node.getIntentCode() != IntentCode.NODE_CLE_BNODE) {
+            return false;
+        }
+        if (node.getTile().getTileTypeEnum() != TileTypeEnum.SLL) {
+            return false;
+        }
+        BitSet[] bs = getWireIndicesLeadingToSLL(node.getTile());
+        boolean leads = bs != null && bs[1].get(node.getWireIndex());
+        assert(!isVersal || leads == isBNodeLeadingToSLLByWalk(node));
+        return leads;
+    }
+
+    /**
+     * Checks {@link #isBNodeLeadingToSLL(Node)} by walking the node's downhill nodes, without creating any
+     * {@link RouteNode}, for use in assertions. Also checks that every SLL input whose SLL crosses SLRs that it
+     * drives is in its own tile, and ends there.
+     */
+    private boolean isBNodeLeadingToSLLByWalk(Node node) {
+        if (node.getTile().getTileTypeEnum() != TileTypeEnum.SLL) {
+            return false;
+        }
+        boolean leads = false;
+        for (Node downhill : node.getAllDownhillNodes()) {
+            if (downhill.getIntentCode() == IntentCode.NODE_SLL_INPUT && isCrossingSLLInput(downhill)) {
+                assert(downhill.getTile() == node.getTile());
+                // ... and ends there (see RWRoute.superLongLineLowerBound())
+                assert(RouteNodeInfo.get(downhill, null).endHalfTileXCoordinate ==
+                        2 * RouteNodeInfo.getWestIntTileXCoordinate(node.getTile()) + 1);
+                assert(RouteNodeInfo.get(downhill, null).endTileYCoordinate == node.getTile().getTileYCoordinate());
+                leads = true;
+            }
+        }
+        return leads;
     }
 
     /**
@@ -870,7 +1014,7 @@ public class RouteNodeGraph {
                             Tile imuxTile = imux.getTile();
                             assert(Utils.isInterConnect(imuxTile.getTileTypeEnum()));
 
-                            BitSet[] bs = wireIndicesLeadingToLaguna.computeIfAbsent(imuxTile, k -> new BitSet[]{new BitSet(), new BitSet()});
+                            BitSet[] bs = wireIndicesLeadingToSLL.computeIfAbsent(imuxTile, k -> new BitSet[]{new BitSet(), new BitSet()});
                             bs[0].set(imux.getWireIndex());
                             for (Node inode : imux.getAllUphillNodes()) {
                                 if (inode.isTiedToVcc()) {
@@ -1301,12 +1445,12 @@ public class RouteNodeGraph {
                 } else if (!lutRoutethru) {
                     // child does not already exist in our routing graph, meaning it's not a used site pin
                     // in our design, but it could be a IMUX that leads to a Laguna
-                    if (wireIndicesLeadingToLaguna == null) {
+                    if (wireIndicesLeadingToSLL == null) {
                         // No Laguna on this device
                         return true;
                     }
 
-                    BitSet[] bs2 = wireIndicesLeadingToLaguna.get(child.getTile());
+                    BitSet[] bs2 = wireIndicesLeadingToSLL.get(child.getTile());
                     if (bs2 == null || !bs2[0].get(child.getWireIndex())) {
                         // Doesn't lead to Laguna -- skip it
                         return true;
@@ -1315,7 +1459,7 @@ public class RouteNodeGraph {
             }
         }
 
-        if (wireIndicesLeadingToLaguna == null && Utils.isLaguna(child.getTile().getTileTypeEnum())) {
+        if (wireIndicesLeadingToSLL == null && Utils.isLaguna(child.getTile().getTileTypeEnum())) {
             // Exclude Laguna nodes on single SLR devices
             return true;
         }
@@ -1531,7 +1675,7 @@ public class RouteNodeGraph {
         if (connection.isCrossSLR() && type.isLocalLeadingToSLL() &&
                 childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
             assert(isVersal ? childRnode.getIntentCode() == IntentCode.NODE_SLL_INPUT
-                            : wireIndicesLeadingToLaguna.get(childTile) != null);
+                            : wireIndicesLeadingToSLL.get(childTile) != null);
             assert(childTile != sinkRnode.getTile());
             if (isNorthboundSLLRow(childTile.getTileYCoordinate()) ? !connection.isCrossSLRnorth() : !connection.isCrossSLRsouth()) {
                 // Does not lead to an SLL in the direction that we want

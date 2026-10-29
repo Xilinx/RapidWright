@@ -290,9 +290,9 @@ public class RouteNodeInfo {
             case NODE_LOCAL: { // US/US+
                 assert(tileTypeEnum == TileTypeEnum.INT);
 
-                if (routingGraph.wireIndicesLeadingToLaguna != null) {
+                if (routingGraph.wireIndicesLeadingToSLL != null) {
                     // Check for INODE or SDQNODE that leads to a Laguna
-                    BitSet[] bs2 = routingGraph.wireIndicesLeadingToLaguna.get(node.getTile());
+                    BitSet[] bs2 = routingGraph.wireIndicesLeadingToSLL.get(node.getTile());
                     if (bs2 != null) {
                         if (bs2[0].get(node.getWireIndex())) {
                             BitSet bs = routingGraph.ultraScalesLocalWires.get(tileTypeEnum);
@@ -320,25 +320,14 @@ public class RouteNodeInfo {
             }
 
             case NODE_SLL_INPUT: { // Versal only
-                // Only those SLL inputs driving an SLL that crosses into another SLR lead to an SLR crossing
-                // (e.g. those in SLL_X16Y335 on xcv80 lead to SLL_X16Y410, except for one that leads to SLL_X16Y260,
-                // and none of those in SLL_X15Y335 leave their tile); either way, not considered to be on any specific
-                // side (see RouteNodeGraph.isAccessible())
-                Tile tile = node.getTile();
-                for (Node ubump : node.getAllDownhillNodes()) {
-                    assert(ubump.getIntentCode() == IntentCode.NODE_SLL_DATA);
-                    for (Wire wire : ubump.getAllWiresInNode()) {
-                        Tile wireTile = wire.getTile();
-                        if (wireTile.getTileXCoordinate() == tile.getTileXCoordinate() &&
-                                wireTile.getSLR().getId() != tile.getSLR().getId()) {
-                            // Crossing towards the nearer SLR boundary (see RouteNodeGraph.isNorthboundSLLRow())
-                            assert((wireTile.getTileYCoordinate() > tile.getTileYCoordinate()) ==
-                                    routingGraph.isNorthboundSLLRow(tile.getTileYCoordinate()));
-                            return RouteNodeType.LOCAL_LEADING_TO_SLL;
-                        }
-                    }
-                }
-                return RouteNodeType.LOCAL;
+                // Only those SLL inputs driving an SLL that crosses into another SLR lead to an SLR crossing (see
+                // RouteNodeGraph.isCrossingSLLInput(), as looked up in RouteNodeGraph.wireIndicesLeadingToSLL);
+                // either way, not considered to be on any specific side (see RouteNodeGraph.isAccessible())
+                BitSet[] bs = (routingGraph.wireIndicesLeadingToSLL != null)
+                        ? routingGraph.getWireIndicesLeadingToSLL(node.getTile()) : null;
+                boolean leadsToSLL = bs != null && bs[0].get(node.getWireIndex());
+                assert(leadsToSLL == routingGraph.isCrossingSLLInput(node));
+                return leadsToSLL ? RouteNodeType.LOCAL_LEADING_TO_SLL : RouteNodeType.LOCAL;
             }
 
             case NODE_PINFEED:
@@ -351,9 +340,9 @@ public class RouteNodeInfo {
                     return RouteNodeType.LOCAL;
                 }
 
-                if (routingGraph.wireIndicesLeadingToLaguna != null) {
+                if (routingGraph.wireIndicesLeadingToSLL != null) {
                     // Check for IMUX that leads to a Laguna
-                    BitSet[] bs2 = routingGraph.wireIndicesLeadingToLaguna.get(node.getTile());
+                    BitSet[] bs2 = routingGraph.wireIndicesLeadingToSLL.get(node.getTile());
                     if (bs2 != null && bs2[0].get(node.getWireIndex())) {
                         assert(routingGraph.isSidedLocalWire(tileTypeEnum, node.getWireIndex()));
                         return RouteNodeType.LOCAL_LEADING_TO_SLL;
@@ -374,9 +363,9 @@ public class RouteNodeInfo {
                 return RouteNodeType.LOCAL;
 
             case NODE_SINGLE:
-                if (routingGraph.wireIndicesLeadingToLaguna != null) {
+                if (routingGraph.wireIndicesLeadingToSLL != null) {
                     // Check for INT_INT_ that leads to a Laguna
-                    BitSet[] bs2 = routingGraph.wireIndicesLeadingToLaguna.get(node.getTile());
+                    BitSet[] bs2 = routingGraph.wireIndicesLeadingToSLL.get(node.getTile());
                     if (bs2 != null && bs2[1].get(node.getWireIndex())) {
                         assert(node.getWireName().matches("INT_INT_SDQ_\\d+_INT_OUT[01]|WW1_E_7_FT0") ||    // UltraScale+
                                node.getWireName().matches("INT_INT_SINGLE_\\d+_INT_OUT|EE1_W_0_FTS"));      // UltraScale

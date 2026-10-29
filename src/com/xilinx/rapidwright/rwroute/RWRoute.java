@@ -2281,32 +2281,31 @@ public class RWRoute {
             }
         }
 
-        // Sending side: the local nodes and intra-tile singles that remain before the super long line, and the node
-        // whose position gives where the super long line lands (on Versal, the SLL input, since a BNODE in an SLL tile
-        // ends at the INT tile whose INODEs it drives)
-        RouteNode sendingNode = childRnode;
+        // Sending side: the local nodes and intra-tile singles that remain before the super long line, and the
+        // position (INT tile X and Y; on Versal, also half-tile X) from which the super long line is taken
         int remainingLocals;
         int remainingSingles = 0;
+        final int x;
+        final int y;
+        int sendingHalfX = 0;
         final RouteNodeType childType = childRnode.getType();
         if (isVersal) {
             if (childType == RouteNodeType.LOCAL_LEADING_TO_SLL) {
                 // SLL input (LAG_CASCOUT_TXI*)
                 remainingLocals = 0;
-            } else if (childRnode.getIntentCode() == IntentCode.NODE_CLE_BNODE &&
-                    childRnode.getTile().getTileTypeEnum() == TileTypeEnum.SLL) {
-                // BNODE in an SLL tile (BNODE_OUTS_[EW]*): find an SLL input that it drives whose SLL crosses SLRs
-                // (all those in a tile are in the same row, so cross in the same direction and land in the same place)
-                sendingNode = null;
-                for (RouteNode grandchild : childRnode.getChildren(routingGraph)) {
-                    if (grandchild.getType() == RouteNodeType.LOCAL_LEADING_TO_SLL) {
-                        sendingNode = grandchild;
-                        break;
-                    }
-                }
-                if (sendingNode == null) {
-                    return newTotalPathCost;
-                }
+                x = childRnode.getEndTileXCoordinate();
+                y = childRnode.getEndTileYCoordinate();
+                sendingHalfX = childRnode.getEndHalfTileXCoordinate();
+            } else if (routingGraph.isBNodeLeadingToSLL(childRnode)) {
+                // BNODE in an SLL tile (BNODE_OUTS_[EW]*) that drives an SLL input whose SLL crosses SLRs. A BNODE only
+                // drives the SLL inputs of its own SLL tile, so takes its position from that tile (as such an SLL
+                // input would; see RouteNodeInfo.get()) rather than from its own end (the INT tile whose INODEs it
+                // also drives)
                 remainingLocals = 1;
+                Tile sllTile = childRnode.getTile();
+                x = RouteNodeInfo.getWestIntTileXCoordinate(sllTile);
+                y = sllTile.getTileYCoordinate();
+                sendingHalfX = 2 * x + 1;
             } else {
                 return newTotalPathCost;
             }
@@ -2327,9 +2326,9 @@ public class RWRoute {
             } else {
                 return newTotalPathCost;
             }
+            x = childRnode.getEndTileXCoordinate();
+            y = childRnode.getEndTileYCoordinate();
         }
-        final int x = sendingNode.getEndTileXCoordinate();
-        final int y = sendingNode.getEndTileYCoordinate();
         int sendingSLR = routingGraph.intYToSLRIndex[y];
         int sinkSLR = sinkRnode.getSLRIndex(routingGraph);
         boolean north = routingGraph.isNorthboundSLLRow(y);
@@ -2348,8 +2347,7 @@ public class RWRoute {
         int sinkHalfX = sinkRnode.getEndHalfTileXCoordinate();
         int landHalfX;
         if (isVersal) {
-            landHalfX = sendingNode.getEndHalfTileXCoordinate();
-            landHalfX = Math.max(landHalfX, Math.min(landHalfX + 1, sinkHalfX));
+            landHalfX = Math.max(sendingHalfX, Math.min(sendingHalfX + 1, sinkHalfX));
         } else {
             landHalfX = 2 * x;
         }
