@@ -255,7 +255,17 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             }
                         }
                         // Nominally travel a whole tile vertically, or half a tile horizontally (from one half of an
-                        // INT tile to the next, as do intra-tile singles between the halves of their INT tile)
+                        // INT tile to the next, as do intra-tile singles between the halves of their INT tile).
+                        // All singles, doubles, quads and longs are costed by their nominal length, including the
+                        // feedthrough member of each family (one BEG index per INT tile on UltraScale(+), which carries an
+                        // extra *_BLN_*/*_BLS_* wire one tile further on, as measured on xcvu440 and xcvu3p):
+                        //  - vertical ones (UltraScale SS1/NN2/NN5, UltraScale+ NN4/SS4): their END wire at the nominal
+                        //    distance has no downhill PIPs, so they can only be left one tile further on (UltraScale's
+                        //    NN16 can be left at both);
+                        //  - horizontal ones (UltraScale EE2/EE4/WW12, UltraScale+ EE12/WW1_W): their END wire at the
+                        //    nominal distance can still be left, with the extra wire one row over as another exit;
+                        //  - EE1_W_0_FTS (UltraScale) and WW1_E_7_FT0 (UltraScale+), the only wires of their names: no
+                        //    horizontal reach, but exits in their own tile and one tile south/north respectively
                         baseCost = (RouteNodeInfo.isVertical(ic, getWireName()) ? 1 : 0.5f) * BASE_COST_PER_TILE;
                         break;
                     case NODE_VDOUBLE: // Versal only
@@ -325,8 +335,9 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             assert((series == Series.Versal && getAllWiresInNode().length == 1) ||
                                     !getAllDownhillPIPs().isEmpty());
                         }
-                        // Nominally travel four tiles (UltraScale also has NN5/SS5)
-                        baseCost = 4 * BASE_COST_PER_TILE;
+                        // Nominally travel four tiles, except UltraScale's NN5/SS5 (half of its vertical quads), which
+                        // travel five (feedthrough members are costed nominally too; see NODE_SINGLE)
+                        baseCost = ((series == Series.UltraScale && getWireName().charAt(2) == '5') ? 5 : 4) * BASE_COST_PER_TILE;
                         break;
 
                     case NODE_HLONG6:  // Versal only
@@ -357,8 +368,9 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         break;
                     case NODE_VLONG:   // US/US+
                         assert(length != 0 || !getAllDownhillPIPs().isEmpty()); // e.g. INT_X167Y608/SS16_BEG0 in VU440
-                        // Nominally travel twelve tiles (UltraScale also has NN16/SS16)
-                        baseCost = 12 * BASE_COST_PER_TILE;
+                        // Nominally travel twelve tiles, except UltraScale's NN16/SS16 (half of its vertical longs), which
+                        // travel sixteen (feedthrough members are costed nominally too; see NODE_SINGLE)
+                        baseCost = ((series == Series.UltraScale && getWireName().startsWith("16", 2)) ? 16 : 12) * BASE_COST_PER_TILE;
                         break;
 
                     // Versal only
