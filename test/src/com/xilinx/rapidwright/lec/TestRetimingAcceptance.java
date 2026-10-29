@@ -38,6 +38,7 @@ import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFTools;
 
 /**
@@ -330,6 +331,46 @@ public class TestRetimingAcceptance {
         assertRefused(ref, andAfterForward(), map("IMP r = REF h/O"), "top level input");
     }
 
+    /**
+     * A black box named like a register has no known next state, so it can
+     * neither be defined nor be read by a definition.
+     */
+    @Test
+    public void testBlackBoxNamedLikeARegisterIsRefused() {
+        Circuit ref = new Circuit().flop("FDRE", "p", "a", "qp", "vcc", "gnd").out("q", "qp");
+        EDIFCellInst p = ref.netlist().getTopCell().getCellInst("p");
+        EDIFCell blackBox = new EDIFCell(ref.netlist().getTopCell().getLibrary(), "FDRE");
+        for (EDIFPort port : p.getCellType().getPorts()) {
+            blackBox.createPort(port.getName(), port.getDirection(), port.getWidth());
+        }
+        p.setCellType(blackBox);
+        Circuit imp = new Circuit().flop("FDRE", "s", "a", "qs", "vcc", "gnd").out("q", "qs");
+        assertRefused(ref, imp, map("IMP s = REF p/Q"), "black box named FDRE");
+        assertRefused(ref, imp, map("REF p = IMP s/Q"), "black box named FDRE");
+    }
+
+    /**
+     * Instance lookup by hierarchical name: a renamed top level instance whose
+     * own name contains the separator, and an instance inside a block.
+     */
+    @Test
+    public void testHierarchicalNameLookup() {
+        Circuit circuit = new Circuit().flop("FDRE", "a/b", "a", "q1", "vcc", "gnd");
+        EDIFCell top = circuit.netlist().getTopCell();
+        EDIFCell block = new EDIFCell(top.getLibrary(), "block");
+        LecNetlistFixtures.add(block, "c", top.getCellInst("a/b").getCellType());
+        LecNetlistFixtures.add(top, "a", block);
+        LecLog log = new LecLog(false, new PrintStream(new ByteArrayOutputStream()));
+        FlatNetlist flat = FlatNetlist.build(circuit.netlist(), log);
+        Assertions.assertEquals("a/b", flat.getInstName(flat.findInstId("a/b")));
+        Assertions.assertEquals("a/c", flat.getInstName(flat.findInstId("a/c")));
+        Assertions.assertEquals(-1, flat.findInstId("a/x"));
+        LecNetlistFixtures.add(block, "b", top.getCellInst("a/b").getCellType());
+        CellIndex.clearCache();
+        FlatNetlist ambiguous = FlatNetlist.build(circuit.netlist(), log);
+        Assertions.assertThrows(LecException.class, () -> ambiguous.findInstId("a/b"));
+    }
+
     @Test
     public void testUnknownNamesAreRefused() {
         assertRefused(andBeforeRetiming("vcc", "gnd"), andAfterForward(),
@@ -369,7 +410,7 @@ public class TestRetimingAcceptance {
     public void testSelfCheckCampaign(@TempDir Path dir) throws IOException {
         Path ref = dir.resolve("ref.edf");
         Path imp = dir.resolve("imp.edf");
-        // A second retiming, c through a NOT, so two definitions can be swapped,
+        // A second retiming, c through a NOT, so there is more than one definition,
         // and a register on clk2, so a register can be moved to another clock.
         EDIFTools.writeEDIFFile(ref, andBeforeRetiming("en", "rst")
                 .flop("FDRE", "rd", "c", "qd", "vcc", "gnd")

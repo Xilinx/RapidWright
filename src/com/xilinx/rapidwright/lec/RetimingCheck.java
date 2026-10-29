@@ -158,11 +158,13 @@ class RetimingCheck {
         for (RetimingMap.Entry e : map.getEntries()) {
             NetlistSummary owner = e.getRegisterSide() == RetimingMap.Side.REF ? ref : imp;
             NetlistSummary definer = owner == ref ? imp : ref;
-            String type = owner.getTerminals().get(e.getRegister()).getCellTypeName();
-            if (!type.equals(FDRE) && !type.equals(FDSE)) {
+            TerminalAttributes attrs = owner.getTerminals().get(e.getRegister());
+            String type = attrs.getCellTypeName();
+            if (!isRetimable(attrs)) {
                 problems.add(e.getSource() + ": " + owner.getLabel() + " " + e.getRegister()
-                        + " is a " + type + "; only FDRE and FDSE registers can be retimed by a "
-                        + "certificate (FDCE and FDPE clear and preset asynchronously)");
+                        + " is " + describe(attrs) + "; only FDRE and FDSE primitives can be "
+                        + "retimed by a certificate (FDCE and FDPE clear and preset "
+                        + "asynchronously)");
                 continue;
             }
             int q = aig.newInput(TerminalKey.forRetimed(owner.getLabel(),
@@ -235,8 +237,8 @@ class RetimingCheck {
                 if (attrs == null) {
                     reason = "a pin that is not a register output";
                 } else if (!isRetimable(attrs)) {
-                    reason = "the output of a " + attrs.getCellTypeName()
-                            + ", which has no next-state model";
+                    reason = "the output of " + describe(attrs) + ", which has no next-state "
+                            + "model";
                 }
             }
             if (reason != null) {
@@ -421,7 +423,12 @@ class RetimingCheck {
 
     private static boolean isRetimable(TerminalAttributes attrs) {
         String type = attrs.getCellTypeName();
-        return type.equals(FDRE) || type.equals(FDSE);
+        return attrs.isDevicePrimitive() && (type.equals(FDRE) || type.equals(FDSE));
+    }
+
+    private static String describe(TerminalAttributes attrs) {
+        return attrs.isDevicePrimitive() ? "a " + attrs.getCellTypeName()
+                : "a black box named " + attrs.getCellTypeName();
     }
 
     /** @return The register's initial value; the unisim defaults are 0 and 1. */
