@@ -443,14 +443,14 @@ public class TestRWRoute {
             Device.AWS_F1 + ",SLICE_X9Y358,SLICE_X9Y299,100",
             Device.AWS_F1 + ",SLICE_X9Y299,SLICE_X9Y358,100",
             Device.AWS_F1 + ",SLICE_X53Y241,SLICE_X69Y300,100",
-            Device.AWS_F1 + ",SLICE_X53Y358,SLICE_X69Y299,200",
+            Device.AWS_F1 + ",SLICE_X53Y358,SLICE_X69Y299,100",
             // Far
             Device.AWS_F1 + ",SLICE_X9Y240,SLICE_X9Y359,100",    // On Laguna
             Device.AWS_F1 + ",SLICE_X9Y359,SLICE_X9Y240,100",
             Device.AWS_F1 + ",SLICE_X162Y240,SLICE_X162Y430,100",
 
             Device.AWS_F1 + ",SLICE_X162Y430,SLICE_X162Y240,200",
-            Device.AWS_F1 + ",SLICE_X0Y240,SLICE_X12Y430,200",   // Far from Laguna
+            Device.AWS_F1 + ",SLICE_X0Y240,SLICE_X12Y430,100",   // Far from Laguna
             Device.AWS_F1 + ",SLICE_X0Y430,SLICE_X12Y240,100",
 
             // Two SLR crossings

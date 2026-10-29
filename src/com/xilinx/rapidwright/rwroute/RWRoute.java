@@ -1692,6 +1692,9 @@ public class RWRoute {
 
         protected boolean earlyTermination;
 
+        /** Whether this connection's sink is driven only by INODEs (see Connection.isSinkDrivenByINodes()) */
+        protected boolean sinkDrivenByINodes;
+
         protected ConnectionState() {
             this.queue = new PriorityQueue<>();
             this.targets = new ArrayList<>();
@@ -1715,6 +1718,7 @@ public class RWRoute {
         state.estDlyWeight = connection.getCriticality() * timingWeight;
         state.nodesPopped = 0;
         state.earlyTermination = false;
+        state.sinkDrivenByINodes = connection.isSinkDrivenByINodes(routingGraph);
 
         PriorityQueue<RouteNode> queue = state.queue;
         assert(queue.isEmpty());
@@ -2227,6 +2231,13 @@ public class RWRoute {
             if (connection.isCrossSLR()) {
                 newTotalPathCost = remainingCrossingCost(state, childRnode, rnodeReceivingIndex,
                         remainingReceivingNodes, -1, newTotalPathCost);
+            }
+            if (state.sinkDrivenByINodes && deltaSLR == 0 && deltaHalfX == 0 && deltaY == 0 && !childRnode.isTarget() &&
+                    !RouteNode.isSingleDoubleQuadLong(childRnode.getIntentCode()) && !childRnode.isINode()) {
+                // At the sink's half tile, where the estimate is zero, a node other than an INODE (e.g. an SDQ node or
+                // a bounce) must still take an INODE (only INODEs drive the sink): charge it uncongested. (Singles,
+                // doubles, quads and longs already carry PENDING_NODE_COST, which is more.)
+                newTotalPathCost += getUncongestedNodeCost(state, RouteNode.LOCAL_BASE_COST, childX, childY);
             }
         } else {
             // On the sending side of a crossing chain, with the discount: the rest of this chain is charged at its true

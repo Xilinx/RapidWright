@@ -32,6 +32,7 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.util.Pair;
@@ -300,6 +301,23 @@ public class Connection implements Comparable<Connection>{
 
     public boolean hasAltSinks() {
         return altSinkRnodes != null && !altSinkRnodes.isEmpty();
+    }
+
+    /**
+     * Checks whether this connection's sink is driven only by INODEs: its one sink is an INT tile pin
+     * (UltraScale/UltraScale+: an IMUX, NODE_PINFEED; Versal: an IMUX, NODE_IMUX, or a bounce, NODE_PINBOUNCE). Not
+     * CTRL sinks, Versal SLL inputs, non-local sinks or alternate (LUT pin swapping) sinks.
+     * @param routingGraph The routing graph.
+     * @return True if so.
+     */
+    public boolean isSinkDrivenByINodes(RouteNodeGraph routingGraph) {
+        if (sinkRnode.getType() != RouteNodeType.EXCLUSIVE_SINK || hasAltSinks() ||
+                sinkRnode.getTile().getTileTypeEnum() != TileTypeEnum.INT) {
+            return false;
+        }
+        IntentCode ic = sinkRnode.getIntentCode();
+        return routingGraph.isVersal ? (ic == IntentCode.NODE_IMUX || ic == IntentCode.NODE_PINBOUNCE)
+                                     : ic == IntentCode.NODE_PINFEED;
     }
 
     public void addAltSinkRnode(RouteNode sinkRnode) {

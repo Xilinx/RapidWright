@@ -299,6 +299,22 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     }
 
     /**
+     * Checks if this is an INODE: on UltraScale/UltraScale+, a NODE_LOCAL node that serves only its side of its INT
+     * tile (INT_NODE_IMUX_*, INODE_*; see RouteNodeInfo.getType()); on Versal, a NODE_INODE.
+     * @return True if so.
+     */
+    public boolean isINode() {
+        switch (getIntentCode()) {
+            case NODE_INODE: // Versal only
+                return true;
+            case NODE_LOCAL: // US and US+ only
+                return getType().isSidedLocal();
+            default:
+                return false;
+        }
+    }
+
+    /**
      * Checks if an intent code is that of a single, double, quad or long (on UltraScale, UltraScale+ or Versal).
      * @param ic Intent code in question.
      * @return True if so.
