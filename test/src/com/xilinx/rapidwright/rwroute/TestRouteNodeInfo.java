@@ -156,8 +156,12 @@ public class TestRouteNodeInfo {
                         continue;
                     }
                     // ... and only those wires that stay within it (e.g. intra-tile singles)
-                    if (interTileIntentCodes.contains(downhill.getIntentCode()) && RouteNode.getLength(downhill) > 0) {
-                        continue;
+                    if (interTileIntentCodes.contains(downhill.getIntentCode())) {
+                        RouteNodeInfo info = RouteNodeInfo.get(downhill, null);
+                        if ((info.endHalfTileXCoordinate >> 1) != tile.getTileXCoordinate() ||
+                                info.endTileYCoordinate != tile.getTileYCoordinate()) {
+                            continue;
+                        }
                     }
                     nextQueue.add(downhill);
                 }
@@ -210,7 +214,7 @@ public class TestRouteNodeInfo {
             }
             RouteNodeInfo info = RouteNodeInfo.get(node, routingGraph);
             Assertions.assertEquals(isGnode ? RouteNodeType.LOCAL_SIDE_DEPENDS_ON_SINK : RouteNodeType.NON_LOCAL, info.type);
-            Assertions.assertTrue(isGnode || info.length > 0, node.toString());
+            Assertions.assertTrue(isGnode || info.halfTileWirelength > 0, node.toString());
             Tile endTile = device.getTile("INT_X" + (info.endHalfTileXCoordinate >> 1) + "Y" + info.endTileYCoordinate);
             Assertions.assertNotNull(endTile, node.toString());
 
@@ -292,7 +296,7 @@ public class TestRouteNodeInfo {
                 numBCNodes++;
             } else if (ic == IntentCode.NODE_CLE_CTRL || ic == IntentCode.NODE_INTF_CTRL) {
                 RouteNodeInfo info = RouteNodeInfo.get(node, routingGraph);
-                Assertions.assertEquals(0, info.length, node.toString());
+                Assertions.assertEquals(0, info.halfTileWirelength, node.toString());
                 Set<Short> uphillHalfTileXs = new HashSet<>();
                 for (Node uphill : node.getAllUphillNodes()) {
                     if (versalBCNodeIntentCodes.contains(uphill.getIntentCode())) {
@@ -347,7 +351,7 @@ public class TestRouteNodeInfo {
             IntentCode ic = node.getIntentCode();
             if (ic == IntentCode.NODE_SLL_INPUT) {
                 RouteNodeInfo info = RouteNodeInfo.get(node, routingGraph);
-                Assertions.assertEquals(0, info.length, node.toString());
+                Assertions.assertEquals(0, info.halfTileWirelength, node.toString());
                 Set<Short> uphillHalfTileXs = new HashSet<>();
                 for (Node uphill : node.getAllUphillNodes()) {
                     if (versalBCNodeIntentCodes.contains(uphill.getIntentCode())) {
@@ -361,9 +365,10 @@ public class TestRouteNodeInfo {
                 numSllInputs++;
             } else if (ic == IntentCode.NODE_SLL_DATA) {
                 RouteNodeInfo info = RouteNodeInfo.get(node, routingGraph);
-                Assertions.assertTrue(info.length == 0 || info.length == routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES,
-                        node + " has length " + info.length);
-                if (info.length == 0) {
+                Assertions.assertEquals(2 * routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES, info.halfTileWirelength,
+                        node.toString());
+                if (info.endTileYCoordinate == node.getTile().getTileYCoordinate()) {
+                    // U-turn
                     continue;
                 }
                 Tile landingTile = null;

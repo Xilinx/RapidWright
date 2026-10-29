@@ -92,6 +92,11 @@ public class RouteNodeGraph {
 
     private long createRnodeTime;
 
+    /** Length of a super long line on UltraScale and UltraScale+, in INT tiles */
+    public static final short ULTRASCALE_SUPER_LONG_LINE_LENGTH_IN_TILES = 60;
+    /** Length of a super long line on Versal, in INT tiles */
+    public static final short VERSAL_SUPER_LONG_LINE_LENGTH_IN_TILES = 75;
+
     public final short SUPER_LONG_LINE_LENGTH_IN_TILES;
 
     /** Array mapping an INT tile's Y coordinate to its SLR index */
@@ -272,7 +277,7 @@ public class RouteNodeGraph {
                     IntentCode.NODE_HQUAD,
                     IntentCode.NODE_VQUAD);
 
-            SUPER_LONG_LINE_LENGTH_IN_TILES = 60;
+            SUPER_LONG_LINE_LENGTH_IN_TILES = ULTRASCALE_SUPER_LONG_LINE_LENGTH_IN_TILES;
         } else {
             assert(isVersal);
 
@@ -311,7 +316,7 @@ public class RouteNodeGraph {
                     IntentCode.NODE_HQUAD,
                     IntentCode.NODE_VQUAD);
 
-            SUPER_LONG_LINE_LENGTH_IN_TILES = 75;
+            SUPER_LONG_LINE_LENGTH_IN_TILES = VERSAL_SUPER_LONG_LINE_LENGTH_IN_TILES;
         }
 
         // UltraScale+ longs and UltraScale quads, e.g. EE12_BEG0 (UltraScale+) or NN5_BEG0 (UltraScale)

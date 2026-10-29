@@ -27,14 +27,12 @@ package com.xilinx.rapidwright.rwroute;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 import com.xilinx.rapidwright.util.Utils;
 
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -161,7 +159,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         endTileYCoordinate = nodeInfo.endTileYCoordinate;
         halfTileWirelength = nodeInfo.halfTileWirelength;
         children = null;
-        setBaseCost(routingGraph, nodeInfo.length);
+        setBaseCost();
         historicalCongestionCost = initialHistoricalCongestionCost;
         usersConnectionCounts = null;
         visited = 0;
@@ -177,57 +175,40 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     }
 
     /**
-     * Sets the base cost of this node.
-     * @param routingGraph Graph that this node is part of.
-     * @param length Number of INT tiles that this node spans (see {@link RouteNodeInfo#length}).
+     * Checks if this node ends in the INT tile that it begins in.
+     * @return True if so.
      */
-    private void setBaseCost(RouteNodeGraph routingGraph, short length) {
-        final Series series = routingGraph.design.getSeries();
+    private boolean endsInBeginTile() {
+        return getBeginTileXCoordinate() == getEndTileXCoordinate() && getBeginTileYCoordinate() == endTileYCoordinate;
+    }
+
+    /**
+     * Sets the base cost of this node: {@link #BASE_COST_PER_TILE} for each tile of its nominal wirelength (see
+     * {@link RouteNodeInfo#halfTileWirelength}) for singles, doubles, quads, longs and super long lines, or else
+     * {@link #LOCAL_BASE_COST}.
+     */
+    private void setBaseCost() {
         baseCost = LOCAL_BASE_COST;
         switch (getType()) {
             case EXCLUSIVE_SOURCE:
-                assert(length == 0 ||
-                        (length <= 3 && (getIntentCode() == IntentCode.NODE_INTF2 || getIntentCode() == IntentCode.NODE_INTF4)));
-                break;
             case EXCLUSIVE_SINK:
             case EXCLUSIVE_SINK_CTRL:
             case EXCLUSIVE_SINK_SLL_INPUT:
-                assert(length == 0 ||
-                       (length == 1 && (series == Series.UltraScalePlus || series == Series.UltraScale) && getIntentCode() == IntentCode.NODE_PINBOUNCE));
-                break;
             case LOCAL_SIDE_DEPENDS_ON_SINK:
-                assert(length == 0);
-                break;
             case LOCAL:
             case LOCAL_RESERVED:
-                assert(length == 0 ||
-                       (length == 1 && (
-                               ((series == Series.UltraScalePlus || series == Series.UltraScale) && getIntentCode() == IntentCode.NODE_PINBOUNCE) ||
-                               (series == Series.UltraScalePlus && getWireName().matches("INODE_[EW]_\\d+_FT[01]")) ||
-                               (series == Series.UltraScale && getWireName().matches("INODE_[12]_[EW]_\\d+_FT[NS]")) ||
-                               (series == Series.Versal && EnumSet.of(IntentCode.NODE_CLE_BNODE, IntentCode.NODE_CLE_CNODE).contains(getIntentCode()))
-                       ))
-                   );
-                break;
             case LOCAL_LEADING_TO_SLL:
-                assert(length == 0 ||
-                        (length == 1 && (
-                                (series == Series.UltraScalePlus && getWireName().matches("INODE_[EW]_\\d+_FT[01]")) ||
-                                (series == Series.UltraScale && getWireName().matches("INODE_[12]_[EW]_\\d+_FT[NS]"))
-                        ))
-                );
+                // Including INODE/BOUNCE feedthroughs, which are charged wirelength (see
+                // RouteNodeInfo.halfTileWirelength) but not costed as wires
+                assert(halfTileWirelength == 0 || getIntentCode() == IntentCode.NODE_LOCAL ||
+                        getIntentCode() == IntentCode.NODE_PINBOUNCE);
                 break;
             case SUPER_LONG_LINE:
-                assert(length == 0 ||
-                       length == routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
-                // Nominally travel the whole length of the super long line, costed as other wires are
-                baseCost = BASE_COST_PER_TILE * routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
+                // Nominally travel the whole length of the super long line (even when U-turning at the edge of the
+                // device), costed as other wires are
+                baseCost = BASE_COST_PER_TILE * 0.5f * halfTileWirelength;
                 break;
             case NON_LOCAL_LEADING_TO_SLL:
-                assert(length == 0 ||
-                        (length == 1 && series == Series.UltraScale && getWireName().matches("SDND[NS]W_E_15_FTN")) ||
-                        (length == 1 && series == Series.UltraScalePlus && getWireName().equals("WW1_E_7_FT0")));
-                // Fall-through
             case NON_LOCAL:
             case NON_LOCAL_INHERIT_PREV_SIDE:
                 // NOTE: IntentCode is device-dependent
@@ -241,41 +222,37 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                     case NODE_SLL_INPUT:     // Versal only
                     case NODE_SLL_OUTPUT:    // Versal only
                     case INTENT_DEFAULT:     // INT.VCC_WIRE
-                        assert(length == 0);
+                    case NODE_SDQNODE:       // Versal only: INT.INT_NODE_SDQ_ATOM_*_OUT[01]
+                                             //              INT.OUT_[NESW]NODE_[EW]_*
+                        assert(halfTileWirelength == 0);
                         break;
-                    case NODE_LOCAL: // US and US+
-                        assert(length <= 1);
+                    case NODE_LOCAL:         // US and US+
                         break;
-                    case NODE_VSINGLE: // Versal-only
-                    case NODE_HSINGLE: // Versal-only
-                        if (length == 0 && getAllWiresInNode().length == 1) {
-                            assert(getAllDownhillPIPs().isEmpty() || // e.g. INT_X3Y383/OUT_NN1_E_BEG6 and INT_X19Y384/OUT_EE1_E_BEG8 on vp1002
-                                    (ic == IntentCode.NODE_HSINGLE && getWireName().startsWith("INT_SDQ_")));
-                            // HSINGLE nodes that have a wirename INT_SDQ_* do not travel to any other
-                            // tiles but still have downhill PIPs (and thus we cannot mark as being
-                            // inaccessible without checking getAllDownhillPIPs() or getWireName())
-                            baseCost = (RouteNodeInfo.isVertical(ic, getWireName()) ? 1 : 0.5f) * BASE_COST_PER_TILE;
-                            break;
+
+                    case NODE_VDOUBLE: // Versal only
+                    case NODE_HDOUBLE: // Versal only
+                        if (getAllWiresInNode().length == 1) {
+                            // e.g. INT_X2Y382/OUT_NN2_W_BEG2 and INT_X18Y384/OUT_WW2_W_BEG4 on vp1002
+                            assert(getAllDownhillPIPs().isEmpty());
+                            // This node has no downhill PIPs, mark these as inaccessible so that it will never be queued
+                            type = (byte) RouteNodeType.INACCESSIBLE.ordinal();
                         }
                         // Fall through
                     case NODE_SINGLE:  // US and US+
-                        assert(!getAllDownhillPIPs().isEmpty());
-                        if (length == 0) {
-                            // U-turns and intra-tile INT_INT_SDQ_\\d+_INT_OUT[01]
-                        } else {
-                            assert(length <= 2); // 2 for feedthrough e.g. WW1_W_BEG7
-                            if (getBeginTileXCoordinate() != getEndTileXCoordinate()) {
-                                // Horizontal
-                            } else {
-                                // Vertical
-                                assert(getBeginTileYCoordinate() != getEndTileYCoordinate());
-                            }
-                        }
-                        // Nominally travel a whole tile vertically, or half a tile horizontally (from one half of an
-                        // INT tile to the next, as do intra-tile singles between the halves of their INT tile).
-                        // All singles, doubles, quads and longs are costed by their nominal length, including the
-                        // feedthrough member of each family (one BEG index per INT tile on UltraScale(+), which carries an
-                        // extra *_BLN_*/*_BLS_* wire one tile further on, as measured on xcvu440 and xcvu3p):
+                    case NODE_DOUBLE:  // US and US+
+                    case NODE_HSINGLE: // Versal only
+                    case NODE_VSINGLE: // Versal only
+                    case NODE_VQUAD:   // US/US+/Versal
+                    case NODE_VLONG:   // US/US+
+                    case NODE_HLONG6:  // Versal only
+                    case NODE_HLONG10: // Versal only
+                    case NODE_VLONG7:  // Versal only
+                    case NODE_VLONG12: // Versal only
+                        // All singles, doubles, quads and longs are costed by their nominal length (see
+                        // RouteNodeInfo.getNominalHalfTileWirelength()), whatever their measured length: including
+                        // U-turns at the edge of the device, intra-tile singles between the halves of their INT tile,
+                        // and the feedthrough member of each family (one BEG index per INT tile on UltraScale(+), which
+                        // carries an extra *_BLN_*/*_BLS_* wire one tile further on, as measured on xcvu440 and xcvu3p):
                         //  - vertical ones (UltraScale SS1/NN2/NN5, UltraScale+ NN4/SS4): their END wire at the nominal
                         //    distance has no downhill PIPs, so they can only be left one tile further on (UltraScale's
                         //    NN16 can be left at both);
@@ -283,120 +260,19 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         //    nominal distance can still be left, with the extra wire one row over as another exit;
                         //  - EE1_W_0_FTS (UltraScale) and WW1_E_7_FT0 (UltraScale+), the only wires of their names: no
                         //    horizontal reach, but exits in their own tile and one tile south/north respectively
-                        baseCost = (RouteNodeInfo.isVertical(ic, getWireName()) ? 1 : 0.5f) * BASE_COST_PER_TILE;
-                        break;
-                    case NODE_VDOUBLE: // Versal only
-                    case NODE_HDOUBLE: // Versal only
-                        if (length == 0 && getAllWiresInNode().length == 1) {
-                            // e.g. INT_X2Y382/OUT_NN2_W_BEG2 and INT_X18Y384/OUT_WW2_W_BEG4 on vp1002
-                            assert(getAllDownhillPIPs().isEmpty());
-                            // This node has no downhill PIPs, mark these as inaccessible so that it will never be queued
-                            type = (byte) RouteNodeType.INACCESSIBLE.ordinal();
-                            break;
-                        }
-                        // Fall through
-                    case NODE_DOUBLE:  // US and US+
-                        if (length == 0) {
-                            // U-turn nodes
-                            String wireName = getWireName();
-                            if (series == Series.UltraScalePlus || series == Series.UltraScale) {
-                                if (wireName.charAt(0) == 'E' || wireName.charAt(0) == 'W') {
-                                    // Horizontal doubles can U-turn to get length 0
-                                    assert(!enableComprehensiveAssertions || wireName.matches("(EE|WW)2_[EW]_BEG[0-7]"));
-                                } else {
-                                    // Two specific vertical doubles have an extra PIP
-                                    assert(!enableComprehensiveAssertions || wireName.matches("(NN|SS)2_[EW]_BEG0"));
-                                }
-                            }
-                            assert(!getAllDownhillPIPs().isEmpty());
-                        } else {
-                            if (getBeginTileXCoordinate() != getEndTileXCoordinate()) {
-                                // Horizontal
-                                assert(series != Series.UltraScalePlus || getBeginTileYCoordinate() == getEndTileYCoordinate());
-                                if (length == 1) {
-                                    // Nominally length = 1 (since tile X is not equal)
-                                } else {
-                                    // e.g. VU440's INT_X171Y827/EE2_E_BEG7 which feeds through to above
-                                    assert(series == Series.UltraScale && length == 2);
-                                }
-                            } else {
-                                // Vertical
-                                assert(getBeginTileYCoordinate() != getEndTileYCoordinate());
-                                if (length == 2) {
-                                    // Nominally length = 2
-                                } else if (length == 3) {
-                                    // e.g. VU440's INT_X171Y827/NN2_E_BEG7 which feeds through to above
-                                    assert(series == Series.UltraScale);
-                                } else {
-                                    // U-turn
-                                    assert(length == 1);
-                                }
-                            }
-                        }
-                        // Nominally travel two tiles vertically, or one tile (two halves) horizontally
-                        baseCost = (RouteNodeInfo.isVertical(ic, getWireName()) ? 2 : 1) * BASE_COST_PER_TILE;
+                        baseCost = BASE_COST_PER_TILE * 0.5f * halfTileWirelength;
                         break;
                     case NODE_HQUAD: // US/US+/Versal
-                        if (length == 0) {
-                            // Since this node has zero length (and asserted to have no downhill PIPs)
-                            // mark it as being inacccessible so that it will never be queued
-                            assert(getAllDownhillPIPs().isEmpty());
-                            type = (byte) RouteNodeType.INACCESSIBLE.ordinal();
-                        }
-                        // Nominally travel two tiles (four halves)
-                        baseCost = 2 * BASE_COST_PER_TILE;
-                        break;
-                    case NODE_VQUAD: // US/US+/Versal
-                        if (length == 0) {
-                            // On Versal, INT_X1Y380/OUT_NN4_W_BEG6 on vp1002 has no downhill PIPs
-                            assert((series == Series.Versal && getAllWiresInNode().length == 1) ||
-                                    !getAllDownhillPIPs().isEmpty());
-                        }
-                        // Nominally travel four tiles, except UltraScale's NN5/SS5 (half of its vertical quads), which
-                        // travel five (feedthrough members are costed nominally too; see NODE_SINGLE)
-                        baseCost = ((series == Series.UltraScale && getWireName().charAt(2) == '5') ? 5 : 4) * BASE_COST_PER_TILE;
-                        break;
-
-                    case NODE_HLONG6:  // Versal only
-                        // Nominally travel three tiles (six halves)
-                        baseCost = 3 * BASE_COST_PER_TILE;
-                        break;
-                    case NODE_HLONG10: // Versal only
-                        // Nominally travel five tiles (ten halves)
-                        baseCost = 5 * BASE_COST_PER_TILE;
-                        break;
                     case NODE_HLONG: // US/US+
-                        if (length == 0) {
-                            // Since this node has zero length (and asserted to have no downhill PIPs)
+                        if (endsInBeginTile()) {
+                            // Since this node does not leave its tile (and asserted to have no downhill PIPs)
                             // mark it as being inacccessible so that it will never be queued
                             assert(getAllDownhillPIPs().isEmpty());
                             type = (byte) RouteNodeType.INACCESSIBLE.ordinal();
                         }
-                        // Nominally travel six tiles (twelve halves)
-                        baseCost = 6 * BASE_COST_PER_TILE;
-                        break;
-                    case NODE_VLONG7:  // Versal only
-                        // Nominally travel seven tiles
-                        baseCost = 7 * BASE_COST_PER_TILE;
-                        break;
-                    case NODE_VLONG12: // Versal only
-                        // Nominally travel twelve tiles
-                        baseCost = 12 * BASE_COST_PER_TILE;
-                        break;
-                    case NODE_VLONG:   // US/US+
-                        assert(length != 0 || !getAllDownhillPIPs().isEmpty()); // e.g. INT_X167Y608/SS16_BEG0 in VU440
-                        // Nominally travel twelve tiles, except UltraScale's NN16/SS16 (half of its vertical longs), which
-                        // travel sixteen (feedthrough members are costed nominally too; see NODE_SINGLE)
-                        baseCost = ((series == Series.UltraScale && getWireName().startsWith("16", 2)) ? 16 : 12) * BASE_COST_PER_TILE;
+                        baseCost = BASE_COST_PER_TILE * 0.5f * halfTileWirelength;
                         break;
 
-                    // Versal only
-                    case NODE_SDQNODE:      // INT.INT_NODE_SDQ_ATOM_*_OUT[01]
-                                            // INT.OUT_[NESW]NODE_[EW]_*
-                        assert(length == 0 ||
-                               // Feedthrough nodes to reach tiles immediately above/below
-                               (length == 1 && getWireName().matches("OUT_[NESW]NODE_[EW]_\\d+")));
-                        break;
                     // These nodes can appear as a result of the Vivado high-fanout net optimization that
                     // routes-thru leaf clock buffers; currently, they can only appear on preserved
                     // portions of partially-routed nets
@@ -465,10 +341,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      */
     public boolean isUsed() {
         return getOccupancy() > 0;
-    }
-
-    public static short getLength(Node node) {
-        return RouteNodeInfo.get(node, null).length;
     }
 
     @Override

@@ -39,14 +39,87 @@ public class RouteNodeInfo {
      */
     public final short endHalfTileXCoordinate;
     public final short endTileYCoordinate;
-    /** Number of INT tiles that the node spans */
-    public final short length;
     /**
-     * Wirelength of the node in half INT tiles: twice its {@link #length}, except for horizontal singles (including
-     * intra-tile singles; see {@link #isVertical(IntentCode, String)}), which only travel half a tile, from one half of
-     * an INT tile to the next (whereas they span 1 INT tile, or 0 for intra-tile singles)
+     * Wirelength of the node in half INT tiles: the nominal length given by its intent code and name (see
+     * {@link #getNominalHalfTileWirelength}), whatever the number of INT tiles it spans (which differs for U-turns at
+     * the device edge and for feedthroughs); zero for nodes other than singles, doubles, quads, longs, super long
+     * lines and UltraScale(+) INODE/BOUNCE feedthroughs.
      */
     public final short halfTileWirelength;
+
+    /**
+     * Gets the nominal wirelength, in half INT tiles, of a single, double, quad, long, super long line or UltraScale(+)
+     * INODE/BOUNCE feedthrough, from its intent code and name: 1 for a horizontal or intra-tile single (half a tile,
+     * from one half of an INT tile to the next), 2 for a vertical single, horizontal double or INODE/BOUNCE
+     * feedthrough, 4 for a vertical double or HQUAD, 8 for a VQUAD (10 for UltraScale's NN5/SS5), 12 for an HLONG, 24
+     * for a VLONG (32 for UltraScale's NN16/SS16), and on Versal 6/10 for HLONG6/HLONG10 and 14/24 for
+     * VLONG7/VLONG12; for a super long line, twice its length in tiles.
+     * @param ic Intent code of the node's base wire.
+     * @param wireName Name of the node's base wire.
+     * @param tileType Type of the node's base tile.
+     * @return That wirelength, or 0 if the node is none of these.
+     */
+    private static short getNominalHalfTileWirelength(IntentCode ic, String wireName, TileTypeEnum tileType) {
+        switch (ic) {
+            case NODE_LAGUNA_DATA: // UltraScale+ super long line (see getType())
+                return 2 * RouteNodeGraph.ULTRASCALE_SUPER_LONG_LINE_LENGTH_IN_TILES;
+            case INTENT_DEFAULT:
+                // UltraScale super long line (see getType())
+                return (short) ((tileType == TileTypeEnum.LAGUNA_TILE && wireName.startsWith("UBUMP")) ?
+                        2 * RouteNodeGraph.ULTRASCALE_SUPER_LONG_LINE_LENGTH_IN_TILES : 0);
+            case NODE_SLL_DATA:    // Versal super long line (see getType())
+                return 2 * RouteNodeGraph.VERSAL_SUPER_LONG_LINE_LENGTH_IN_TILES;
+            case NODE_LOCAL:       // US and US+
+                // INODE feedthroughs (INODE_[EW]_*_FT[01] on UltraScale+, INODE_[12]_[EW]_*_FT[NS] on UltraScale)
+                // travel one tile vertically, as measured on xcvu3p and xcku040 (but for a few at the device edge)
+                return (short) ((wireName.startsWith("INODE_") && isFeedthroughName(wireName)) ? 2 : 0);
+            case NODE_PINBOUNCE:   // US/US+/Versal
+                // BOUNCE feedthroughs (BOUNCE_[EW]_*_FT[01] on UltraScale+, BOUNCE_[EW]_*_FT[NS] on UltraScale) travel
+                // one tile vertically, as measured on xcvu3p and xcku040 (but for a few at the device edge); all other
+                // PINBOUNCEs (BYPASS_[EW]* on UltraScale(+), BOUNCE_[EW]* on Versal) stay within their tile
+                return (short) (isFeedthroughName(wireName) ? 2 : 0);
+            case NODE_SINGLE:  // US and US+
+            case NODE_HSINGLE: // Versal
+            case NODE_VSINGLE: // Versal
+                return (short) (isVertical(ic, wireName) ? 2 : 1);
+            case NODE_DOUBLE:  // US and US+
+            case NODE_HDOUBLE: // Versal
+            case NODE_VDOUBLE: // Versal
+                return (short) (isVertical(ic, wireName) ? 4 : 2);
+            case NODE_HQUAD:
+                return 4;
+            case NODE_VQUAD:
+                // UltraScale's NN5/SS5 (UltraScale+ NN4_*/SS4_* and Versal OUT_* names have no '5' there)
+                return (short) (wireName.charAt(2) == '5' ? 10 : 8);
+            case NODE_HLONG:   // US and US+
+                return 12;
+            case NODE_VLONG:   // US and US+
+                // UltraScale's NN16/SS16
+                return (short) (wireName.startsWith("16", 2) ? 32 : 24);
+            case NODE_HLONG6:  // Versal
+                return 6;
+            case NODE_HLONG10: // Versal
+                return 10;
+            case NODE_VLONG7:  // Versal
+                return 14;
+            case NODE_VLONG12: // Versal
+                return 24;
+            default:
+                // Not a single, double, quad, long, super long line or INODE/BOUNCE feedthrough: nominally travels
+                // nowhere
+                return 0;
+        }
+    }
+
+    /**
+     * Checks if a wire name ends with _FT followed by one character (e.g. INODE_E_5_FT1, BOUNCE_W_0_FTN).
+     * @param wireName Wire name in question.
+     * @return True if so.
+     */
+    private static boolean isFeedthroughName(String wireName) {
+        // Equivalent to endsWith("_FT?"), for any one character '?'
+        return wireName.startsWith("_FT", wireName.length() - 4);
+    }
 
     /**
      * Checks if a single or double is vertical: from its intent code on Versal, or else (NODE_SINGLE and NODE_DOUBLE
@@ -73,12 +146,10 @@ public class RouteNodeInfo {
     private RouteNodeInfo(RouteNodeType type,
                           short endHalfTileXCoordinate,
                           short endTileYCoordinate,
-                          short length,
                           short halfTileWirelength) {
         this.type = type;
         this.endHalfTileXCoordinate = endHalfTileXCoordinate;
         this.endTileYCoordinate = endTileYCoordinate;
-        this.length = length;
         this.halfTileWirelength = halfTileWirelength;
     }
 
@@ -124,8 +195,7 @@ public class RouteNodeInfo {
         }
         assert(baseIntentCode != IntentCode.NODE_CLE_CTRL || endTile != baseTile);
 
-        // Without a routing graph there is no type to be determined, nor anything to check the
-        // length against; only the length itself is recoverable
+        // Without a routing graph there is no type to be determined
         RouteNodeType type = (routingGraph != null) ? getType(node, routingGraph) : null;
         short endTileXCoordinate;
         boolean endsOnEastSide;
@@ -146,41 +216,12 @@ public class RouteNodeInfo {
         }
         short endHalfTileXCoordinate = (short) (2 * endTileXCoordinate + (endsOnEastSide ? 1 : 0));
         short endTileYCoordinate = (short) endTile.getTileYCoordinate();
-        short length = (short) Math.abs(endTileYCoordinate - baseTile.getTileYCoordinate());
-        if (baseTileType == TileTypeEnum.LAG_LAG) {
-            // Nodes in LAGUNA tiles must have no X distance
-            assert(baseTile.getTileXCoordinate() == endTileXCoordinate - 1);
-        } else if (baseIntentCode == IntentCode.NODE_CLE_CTRL || isOnBothSides) {
-            // Nor do (Versal) CTRL pins or nodes in SLL tiles, whose end tile X coordinate only serves to locate them
-        } else {
-            length += Math.abs(endTileXCoordinate - baseTile.getTileXCoordinate());
-        }
-        if (routingGraph != null) {
-            switch (baseTileType) {
-                case LAG_LAG:
-                case LAGUNA_TILE:
-                    assert(length == routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES ||
-                           // U-turn
-                           length == 0);
-                    break;
-                case INT:
-                    if (type.leadsToSLL()) {
-                        assert(length <= 1); // 1 only if INODE_[EW]_\d+_FT[01]
-                    }
-                    break;
-            }
-        }
+        // Nodes in LAGUNA tiles must have no X distance
+        assert(baseTileType != TileTypeEnum.LAG_LAG || baseTile.getTileXCoordinate() == endTileXCoordinate - 1);
 
-        short halfTileWirelength;
-        if ((baseIntentCode == IntentCode.NODE_HSINGLE || baseIntentCode == IntentCode.NODE_SINGLE) &&
-                !isVertical(baseIntentCode, node.getWireName())) {
-            // Horizontal (or intra-tile) single
-            halfTileWirelength = 1;
-        } else {
-            halfTileWirelength = (short) (2 * length);
-        }
+        short halfTileWirelength = getNominalHalfTileWirelength(baseIntentCode, node.getWireName(), baseTileType);
 
-        return new RouteNodeInfo(type, endHalfTileXCoordinate, endTileYCoordinate, length, halfTileWirelength);
+        return new RouteNodeInfo(type, endHalfTileXCoordinate, endTileYCoordinate, halfTileWirelength);
     }
 
     /**

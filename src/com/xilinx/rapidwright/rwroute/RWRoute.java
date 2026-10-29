@@ -148,7 +148,7 @@ public class RWRoute {
     /** State necessary to route the included connection */
     private ConnectionState connectionState;
 
-    /** Total wirelength of the routed design */
+    /** Total wirelength of the routed design, in half INT tiles (see {@link RouteNodeInfo#halfTileWirelength}) */
     private int totalWL;
     /** Total used INT tile nodes */
     private long totalINTNodes;
@@ -1422,7 +1422,7 @@ public class RWRoute {
                     continue;
                 }
                 totalINTNodes++;
-                int wl = RouteNode.getLength(node);
+                int wl = RouteNodeInfo.get(node, null).halfTileWirelength;
                 totalWL += wl;
 
                 RouterHelper.addNodeTypeLengthToMap(node, wl, nodeTypeUsage, nodeTypeLength);
@@ -2472,7 +2472,8 @@ public class RWRoute {
             List<IntentCode> nodeTypeList = (series == Series.Versal) ? nodeUsageForVersal : nodeUsageForUltraScale;
             for (IntentCode ic : nodeTypeList) {
                 long usage = nodeTypeUsage.getOrDefault(ic, 0L);
-                long length = nodeTypeLength.getOrDefault(ic, 0L);
+                // Accumulated in half INT tiles (see RouteNodeInfo.halfTileWirelength)
+                long length = nodeTypeLength.getOrDefault(ic, 0L) / 2;
                 System.out.printf(" %-16s  %13d  %12d\n", ic, usage, length);
             }
             System.out.println();
@@ -2521,7 +2522,7 @@ public class RWRoute {
         MessageGenerator.printHeader("Statistics");
         computesNodeUsageAndTotalWirelength();
         printNodeTypeUsageAndWirelength(config.isVerbose(), nodeTypeUsage, nodeTypeLength, design.getSeries());
-        printFormattedString("Total wirelength:", totalWL);
+        printFormattedString("Total wirelength:", totalWL / 2);
         if (config.isVerbose()) {
             printFormattedString("Total INT tile nodes:", totalINTNodes);
             printFormattedString("Total rnodes created:", routingGraph.numNodes());
