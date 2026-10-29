@@ -780,7 +780,7 @@ public class RouteNodeGraph {
     }
 
     /**
-     * Checks whether nodes leading to a super long line (see {@link RouteNodeType#leadsToSLL()}) in the given row lead
+     * Checks whether nodes leading to a super long line (see {@link RouteNodeType#LOCAL_LEADING_TO_SLL}) in the given row lead
      * to one crossing into the SLR to the north (else south): such nodes are only found in the band of rows next to an
      * SLR boundary, so those in the upper half of their SLR lead north, and those in the lower half south.
      * @param y INT tile Y coordinate of the node's base tile.
@@ -1519,7 +1519,7 @@ public class RouteNodeGraph {
                 (Utils.isClocking(childTileType) && childRnode.getIntentCode() == IntentCode.NODE_PINFEED && isPreserved(childRnode))
         );
 
-        if (lutRoutethru && !type.leadsToSLL()) {
+        if (lutRoutethru && !type.isLocalLeadingToSLL()) {
             // (a) considering LUT routethrus (that do not lead to an SLL)
             return true;
         }

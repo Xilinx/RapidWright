@@ -109,21 +109,23 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      */
     public static final float MIN_CONGESTED_BASE_COST = 0.2f;
     /**
-     * Added by RWRoute (UltraScale/UltraScale+ only) to the lower bound of a node on either side of a super long line,
-     * once for each node of that chain that remains (see RWRoute.lagunaLowerBound()), so that the lower bound falls
-     * slightly along the chain and ties between chains are broken depth-first. Small compared with LOCAL_BASE_COST, so
-     * as not to reorder anything else.
+     * Added by RWRoute to the lower bound of a node on either side of a super long line, once for each node of that
+     * chain that remains (see RWRoute.superLongLineLowerBound()), so that the lower bound falls slightly along the chain
+     * and ties between chains are broken depth-first. Small compared with LOCAL_BASE_COST, so as not to reorder
+     * anything else.
      */
-    public static final float LAGUNA_CHAIN_TIE_BREAK = 0.03f;
+    public static final float SLL_CHAIN_TIE_BREAK = 0.03f;
     /**
-     * Added by RWRoute (UltraScale/UltraScale+ only) to the lower bound of the children of an SDQ node that a super long
-     * line lands on (see RWRoute.lagunaLowerBound()), so that all the SDQ nodes driven by the same RXD are explored
-     * before any of their children. Otherwise a vertical double from the first SDQ node explored, whose lower bound
-     * falls by 2g - PENDING_NODE_COST = 0.25 (and which may land on the same SDQ node again, two tiles on), would be
-     * followed before a sibling SDQ node's quad, whose lower bound falls by 4g - PENDING_NODE_COST = 1.25. This must lie
-     * between those two drops.
+     * Added by RWRoute to the lower bound of the children of the last node on the receiving side of a super long line
+     * (the landing node: an SDQ node on UltraScale/UltraScale+, an [A-H]Q* CLE output on Versal; see
+     * RWRoute.superLongLineLowerBound()), so that all the landing nodes driven by the same super long line are explored
+     * before any of their children. Otherwise a vertical double from the first landing node explored, whose lower bound
+     * falls by 2g - PENDING_NODE_COST = 0.25 (and which on UltraScale+ may land on the same SDQ node again, two tiles
+     * on), would be followed before a sibling landing node's longer wire, whose lower bound falls by at least
+     * 3g - PENDING_NODE_COST = 0.75 (Versal's HLONG6; 4g - PENDING_NODE_COST = 1.25 for an UltraScale(+) quad). This
+     * must lie between those drops.
      */
-    public static final float LAGUNA_LANDING_TIE_BREAK = 0.3f;
+    public static final float SLL_LANDING_TIE_BREAK = 0.3f;
     /** A flag to indicate if this rnode is the target */
     private boolean isTarget;
     /** The children (downhill rnodes) of this rnode */

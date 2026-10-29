@@ -54,14 +54,22 @@ public enum RouteNodeType {
     SUPER_LONG_LINE,
 
     /**
-     * Denotes {@link RouteNode} objects that correspond to {@link Node} objects leading to a SUPER_LONG_LINE that
-     * crosses into another SLR: on UltraScale/UltraScale+, those that enter a Laguna tile from an adjacent INT tile,
-     * or those Laguna tile nodes leading to such a SUPER_LONG_LINE; on Versal, SLL inputs (NODE_SLL_INPUT) that
-     * drive such a SUPER_LONG_LINE (other SLL inputs are of type {@link #LOCAL}). Such nodes are only found in the
-     * band of rows next to an SLR boundary, which gives the direction they cross in (see
-     * RouteNodeGraph.isNorthboundSLLRow()).
+     * Denotes local {@link RouteNode} objects that correspond to {@link Node} objects leading to a SUPER_LONG_LINE
+     * that crosses into another SLR: on UltraScale/UltraScale+, the INODEs and IMUXes that lead into a Laguna tile
+     * (see RouteNodeGraph.populateLagunaLookups()); on Versal, SLL inputs (NODE_SLL_INPUT) that drive such a
+     * SUPER_LONG_LINE (other SLL inputs are of type {@link #LOCAL}). Such nodes are only found in the band of rows next
+     * to an SLR boundary, which gives the direction they cross in (see RouteNodeGraph.isNorthboundSLLRow()); they are
+     * only accessible to connections that must cross in that direction (see RouteNodeGraph.isAccessible()), and are
+     * otherwise treated as {@link #LOCAL} nodes, other than for their lower bounds (see
+     * RWRoute.superLongLineLowerBound()).
      */
     LOCAL_LEADING_TO_SLL,
+    /**
+     * Denotes non-local {@link RouteNode} objects that lead to {@link #LOCAL_LEADING_TO_SLL} nodes on
+     * UltraScale/UltraScale+: the SDQ nodes and intra-tile singles that drive their INODEs (see
+     * RouteNodeGraph.populateLagunaLookups()). Treated as {@link #NON_LOCAL} nodes, other than for their lower bounds
+     * (see RWRoute.superLongLineLowerBound()).
+     */
     NON_LOCAL_LEADING_TO_SLL,
 
     NON_LOCAL,
@@ -136,9 +144,5 @@ public enum RouteNodeType {
 
     public boolean isLocalLeadingToSLL() {
         return this == LOCAL_LEADING_TO_SLL;
-    }
-
-    public boolean leadsToSLL() {
-        return this == LOCAL_LEADING_TO_SLL || this == NON_LOCAL_LEADING_TO_SLL;
     }
 }
