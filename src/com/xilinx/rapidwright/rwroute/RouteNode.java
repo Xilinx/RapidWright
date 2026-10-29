@@ -204,7 +204,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
             case SUPER_LONG_LINE:
                 assert(length == 0 ||
                        length == routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
-                baseCost = 0.3f * routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
+                // Nominally travel the whole length of the super long line, costed as other wires are
+                baseCost = BASE_COST_PER_TILE * routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
                 break;
             case NON_LOCAL_LEADING_TO_SLL:
                 assert(length == 0 ||
