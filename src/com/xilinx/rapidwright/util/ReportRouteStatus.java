@@ -23,91 +23,33 @@
 package com.xilinx.rapidwright.util;
 
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.design.DesignTools;
-import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.PIP;
-import com.xilinx.rapidwright.edif.EDIFNetlist;
-import com.xilinx.rapidwright.rwroute.RouterHelper;
-
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import com.xilinx.rapidwright.util.routestatus.RouteStatusEngine;
 
 public class ReportRouteStatus {
+
     /**
-     * Compute the route status of given Design's physical nets by examining the
-     * {@link SitePinInst#isRouted()} state of each net's pins, as well as to discovering node conflicts
-     * between each net's PIPs.
-     * Freshly loaded designs, as well as designs that are not up-to-date, can call
-     * {@link DesignTools#updatePinsIsRouted(Design)} for recomputing the SitePinInst.isRouted() state.
-     * Note that currently this method does not check the Design's logical netlist nor its physical
-     * placement --- these are assumed to be correct.
+     * Compute the route status of the given Design the way Vivado's `report_route_status` does,
+     * such that every count in the returned summary matches Vivado's. It examines the logical
+     * netlist, the placement (including site routing) and the routing of the design, but does not
+     * rely on (nor modify) the {@link SitePinInst#isRouted()} state.
      * @param design Design to examine.
      * @return ReportRouteStatusResult object.
      */
     public static ReportRouteStatusResult reportRouteStatus(Design design) {
-        final EDIFNetlist netlist = design.getNetlist();
+        return reportRouteStatus(design, false);
+    }
 
-        ReportRouteStatusResult rrs = new ReportRouteStatusResult();
-        Map<Node, Net> nodesUsedByDesign = new HashMap<>();
-        Set<Net> conflictingNets = new HashSet<>();
-
-        Collection<Net> nets = design.getNets();
-        rrs.logicalNets = nets.size();
-        for (Net net : nets) {
-            if (net.isStaticNet()) {
-                if (net.getPins().isEmpty()) {
-                    rrs.logicalNets--;
-                    continue;
-                }
-            } else if (!RouterHelper.isRoutableNetWithSourceSinks(net)) {
-                if (netlist.getPhysicalPins(net) == null) {
-                    rrs.logicalNets--;
-                }
-                rrs.netsNotNeedingRouting++;
-                continue;
-            }
-            rrs.routableNets++;
-
-            boolean isFullyRouted = true;
-            boolean isPartiallyRouted = false;
-            for (SitePinInst spi : net.getPins()) {
-                if (spi.isRouted()) {
-                    isPartiallyRouted = true;
-                    continue;
-                }
-                isFullyRouted = false;
-            }
-
-            boolean isConflictFree = true;
-            for (PIP pip : net.getPIPs()) {
-                Node endNode = pip.isReversed() ? pip.getStartNode() : pip.getEndNode();
-                Net conflictingNet = nodesUsedByDesign.putIfAbsent(endNode, net);
-                if (conflictingNet != null && conflictingNet != net) {
-                    conflictingNets.add(conflictingNet);
-                    isConflictFree = false;
-                }
-            }
-
-            if (!isConflictFree) {
-                conflictingNets.add(net);
-            } else if (!isFullyRouted) {
-                if (isPartiallyRouted) {
-                    rrs.netsWithSomeUnroutedPins++;
-                } else {
-                    rrs.unroutedNets++;
-                }
-            }
-        }
-
-        rrs.netsWithResourceConflicts = conflictingNets.size();
-        rrs.netsWithRoutingErrors = rrs.netsWithSomeUnroutedPins + rrs.netsWithResourceConflicts;
-        rrs.fullyRoutedNets = rrs.routableNets - rrs.unroutedNets - rrs.netsWithRoutingErrors;
-        return rrs;
+    /**
+     * Compute the route status of the given Design the way Vivado's `report_route_status` does,
+     * see {@link #reportRouteStatus(Design)}.
+     * @param design Design to examine.
+     * @param perNet If true, also populate {@link ReportRouteStatusResult#netsByStatus} with the
+     * names of the nets having each status, as listed by `report_route_status -list_all_nets`.
+     * @return ReportRouteStatusResult object.
+     */
+    public static ReportRouteStatusResult reportRouteStatus(Design design, boolean perNet) {
+        return RouteStatusEngine.run(design, perNet);
     }
 
     public static void main(String[] args) {
@@ -117,8 +59,6 @@ public class ReportRouteStatus {
         }
 
         Design design = Design.readCheckpoint(args[0]);
-
-        DesignTools.updatePinsIsRouted(design);
 
         ReportRouteStatusResult rrs = reportRouteStatus(design);
 

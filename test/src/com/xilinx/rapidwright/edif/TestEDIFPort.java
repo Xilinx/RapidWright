@@ -107,6 +107,9 @@ public class TestEDIFPort {
                 Assertions.assertEquals(busOutput, portInst.getPort());
                 Assertions.assertEquals(portInst.getPort().getPortIndexFromNameIndex(i),
                         portInst.getIndex());
+                // (and back, also for ascending ranges not starting at 0)
+                Assertions.assertEquals(i, busOutput.getNameIndexFromPortIndex(portInst.getIndex()));
+                Assertions.assertEquals(portInstName, busOutput.getPortInstNameFromPort(portInst.getIndex()));
             }
 
             outer++;
