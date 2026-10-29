@@ -2195,7 +2195,11 @@ public class RWRoute {
         float distanceToSink = 0.5f * deltaHalfX + deltaY;
         float newTotalPathCost = newPartialPathCost + state.estWlWeight * distanceToSink / sharingFactor;
         if (config.isTimingDriven()) {
-            newTotalPathCost += state.estDlyWeight * (deltaHalfX * 0.16f + deltaY * 0.16f);
+            // Per half tile horizontally and per row vertically, no more than the delay of the fastest wires in each axis,
+            // so as not to overestimate: on UltraScale+, as little as 15.3ps per tile (7.65ps per half tile) horizontally
+            // (an HLONG on xcvu9p) and 7.2ps per row vertically (a VLONG). With the default timing weight of 0.35 (and
+            // timing multiplier of 1), each unit here is worth 0.35 / ((1 - 0.35) / 100), or about 54ps, of path delay
+            newTotalPathCost += state.estDlyWeight * (deltaHalfX * 0.14f + deltaY * 0.13f);
         }
 
         push(state, childRnode, newPartialPathCost, newTotalPathCost, lookahead);
