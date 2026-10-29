@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -301,14 +301,29 @@ public class EDIFCellInst extends EDIFPropertyObject {
 
 
     public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException{
+        exportEDIF(os, cache, stable, null);
+    }
+
+    /**
+     * Writes this instance as EDIF, as it is in the given view of the netlist with its macros
+     * collapsed.
+     * @param os The stream to write to.
+     * @param cache The cache of legal EDIF names.
+     * @param stable If true, the properties of this instance are written in sorted order.
+     * @param collapsedView The view of the netlist with its macros collapsed, or null to write this
+     *                      instance as it is.
+     */
+    void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable,
+            EDIFCollapsedView collapsedView) throws IOException {
+        EDIFCell type = collapsedView == null ? cellType : collapsedView.getInstanceType(cellType);
         os.write(EXPORT_CONST_INSTANCE_BEGIN);
         exportEDIFName(os, cache);
         os.write(EXPORT_CONST_VIEWREF);
         os.write(cache.getLegalEDIFName(getViewref().getName()));
         os.write(EXPORT_CONST_CELLREF);
-        os.write(cache.getLegalEDIFName(cellType.getName()));
+        os.write(cache.getLegalEDIFName(collapsedView == null ? type.getName() : collapsedView.getName(type)));
         os.write(EXPORT_CONST_LIBRARYREF);
-        os.write(cache.getLegalEDIFName(cellType.getLibrary().getName()));
+        os.write(cache.getLegalEDIFName(type.getLibrary().getName()));
         if (getPropertyCount() > 0) {
             os.write(EXPORT_CONST_CLOSE_WITH_PROPS);
             exportEDIFProperties(os,EXPORT_CONST_PROP_INDENT, cache, stable);

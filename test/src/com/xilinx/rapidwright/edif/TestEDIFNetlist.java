@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -148,8 +148,12 @@ class TestEDIFNetlist {
 
         testNetlist.expandMacroUnisims(part.getSeries());
 
-        Assertions.assertNotSame(obufdsCell, testNetlist.getHDIPrimitivesLibrary().getCell("OBUFDS"));
+        // Primitives are expanded in place, while the macro that collapsing removed is added anew
+        Assertions.assertSame(obufdsCell, testNetlist.getHDIPrimitivesLibrary().getCell("OBUFDS"));
         Assertions.assertNotSame(obufdsDualBufCell, testNetlist.getHDIPrimitivesLibrary().getCell("OBUFDS_DUAL_BUF"));
+        Assertions.assertSame(obufdsCell, wontBeExpanded.getCellType());
+        Assertions.assertSame(testNetlist.getHDIPrimitivesLibrary().getCell("OBUFDS_DUAL_BUF"),
+                willBeExpanded.getCellType());
     }
 
     @Test
@@ -202,10 +206,10 @@ class TestEDIFNetlist {
 
         testNetlist.expandMacroUnisims(part.getSeries());
 
-        // Expanded cell must not be the same cell as before, and be a copy
-        // of the macro library's cell
+        // Expanded cell must be the same cell as before, expanded in place with a copy
+        // of the contents of the macro library's cell
         EDIFCell expandedCell = netlistPrimLibrary.getCell(macroName);
-        Assertions.assertNotSame(expandedCell, cell);
+        Assertions.assertSame(expandedCell, cell);
         Assertions.assertNotSame(expandedCell, macroCell);
         Assertions.assertEquals(8, expandedCell.getCellInsts().size());
         for (EDIFCellInst eci : expandedCell.getCellInsts()) {
@@ -221,7 +225,7 @@ class TestEDIFNetlist {
         testNetlist.collapseMacroUnisims(part.getSeries());
 
         EDIFCell collapsedCell = netlistPrimLibrary.getCell(macroName);
-        Assertions.assertNotSame(collapsedCell, cell);
+        Assertions.assertSame(collapsedCell, cell);
         Assertions.assertTrue(collapsedCell.getCellInsts().isEmpty());
 
         // Check original macro cell wasn't affected

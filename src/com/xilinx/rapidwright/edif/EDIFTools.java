@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -42,6 +42,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -942,9 +943,18 @@ public class EDIFTools {
         return FileSystems.getDefault().getPath(tempEDIFFileName);
     }
 
+    /**
+     * Reads an EDIF netlist from a stream. Its macros are expanded (see
+     * {@link EDIFNetlist#expandMacroUnisims()}) if its part is known.
+     * @param is The stream to read the EDIF from.
+     * @param size The size of the EDIF in bytes.
+     * @return The netlist.
+     */
     public static EDIFNetlist loadEDIFStream(InputStream is, long size) throws IOException {
         try (EDIFParser p = new EDIFParser(is)) {
-            return p.parseEDIFNetlist();
+            EDIFNetlist netlist = p.parseEDIFNetlist();
+            netlist.expandMacroUnisims();
+            return netlist;
         }
     }
 
@@ -1026,7 +1036,15 @@ public class EDIFTools {
         }
     }
 
+    /**
+     * Reads an EDIF netlist from a file, in parallel if it is large enough. Its macros are expanded
+     * (see {@link EDIFNetlist#expandMacroUnisims()}) if its part is known.
+     * @param fileName The EDIF file, which may be gzipped.
+     * @param maxThreads The maximum number of threads to parse with.
+     * @return The netlist.
+     */
     public static EDIFNetlist loadEDIFFile(Path fileName, int maxThreads) {
+        EDIFNetlist netlist;
         try {
             final long size = Files.size(fileName);
             // Determined once here and threaded through, so the parser does not
@@ -1034,16 +1052,18 @@ public class EDIFTools {
             final boolean gzipped = isGzipped(fileName);
             if (ParallelEDIFParser.calcThreads(size, maxThreads, gzipped) > 1) {
                 try (ParallelEDIFParser p = new ParallelEDIFParser(fileName, size, gzipped)) {
-                    return p.parseEDIFNetlist();
+                    netlist = p.parseEDIFNetlist();
                 }
             } else {
                 try (EDIFParser p = new EDIFParser(fileName)) {
-                    return p.parseEDIFNetlist();
+                    netlist = p.parseEDIFNetlist();
                 }
             }
         } catch (IOException e) {
             throw new UncheckedIOException("ERROR: Couldn't read file : " + fileName, e);
         }
+        netlist.expandMacroUnisims();
+        return netlist;
     }
 
     public static EDIFNetlist loadEDIFFile(String fileName) {
@@ -1755,15 +1775,16 @@ public class EDIFTools {
     }
 
     /**
-     * Creates a flattened version of the provided netlist.
+     * Creates a flattened version of the provided netlist. Its leaf cells are those of the provided
+     * netlist, with macros as leaf cells rather than the cells they expand into, and black boxes.
+     * The provided netlist is not modified.
      * 
      * @param netlist  The netlist to flatten.
      * @param partName The target part of the netlist.
-     * @return A new flattened version of the provided netlist.
+     * @return A new flattened version of the provided netlist, with its macros expanded.
      */
     public static EDIFNetlist createFlatNetlist(EDIFNetlist netlist, String partName) {
         Part part = PartNameTools.getPart(partName);
-        netlist.collapseMacroUnisims(part.getSeries());
 
         EDIFNetlist flatNetlist = EDIFTools.createNewNetlist(netlist.getTopCell().getName());
         ensureCorrectPartInEDIF(flatNetlist, part.getName());
@@ -1771,44 +1792,84 @@ public class EDIFTools {
         EDIFLibrary prims = flatNetlist.getHDIPrimitivesLibrary();
         EDIFLibrary work = flatNetlist.getWorkLibrary();
 
-        // Copy all leaf cell instances except VCC/GND
-        boolean includeBlackBoxes = true;
-        for (EDIFHierCellInst inst : netlist.getAllLeafHierCellInstances(includeBlackBoxes)) {
+        // Find all leaf cell instances, with macros (any cell of the primitives library) as leaves
+        List<EDIFHierCellInst> leaves = new ArrayList<>();
+        Queue<EDIFHierCellInst> toProcess = new LinkedList<>();
+        netlist.getTopHierCellInst().addChildren(toProcess);
+        while (!toProcess.isEmpty()) {
+            EDIFHierCellInst inst = toProcess.poll();
             EDIFCell type = inst.getCellType();
-            if (type.isStaticSource()) continue;
-            String name = inst.getFullHierarchicalInstName();
-            EDIFCellInst flatInst = flatTop.createChildCellInst(name, type);
-            flatInst.setPropertiesMap(inst.getInst().createDuplicatePropertiesMap());
-            EDIFLibrary lib = !type.isPrimitive() ? work : prims;
-            if (!lib.containsCell(type)) {
-                lib.addCell(type);
+            if (type.getLibrary().isHDIPrimitivesLibrary() || type.isLeafCellOrBlackBox()) {
+                leaves.add(inst);
+            } else {
+                inst.addChildren(toProcess);
             }
         }
 
-        // Copy all physical parent nets and connect them to flattened cell instances
-        for (Entry<EDIFHierNet, List<EDIFHierPortInst>> e : netlist.getPhysicalNetPinMap().entrySet()) {
-            if (e.getKey().getNet().isGND() || e.getKey().getNet().isVCC()) {
-                continue;
+        // Copy all leaf cell instances except VCC/GND, with macros copied expanded
+        for (EDIFHierCellInst inst : leaves) {
+            EDIFCell type = inst.getCellType();
+            if (type.isStaticSource()) continue;
+            boolean isPrimitive = type.getLibrary().isHDIPrimitivesLibrary();
+            EDIFLibrary lib = isPrimitive ? prims : work;
+            EDIFCell flatType = lib.getCell(type.getName());
+            if (flatType == null) {
+                if (isPrimitive) {
+                    flatNetlist.copyCellAndSubCells(type);
+                    flatType = lib.getCell(type.getName());
+                } else {
+                    flatType = lib.addCell(type);
+                }
             }
-            String name = e.getKey().getHierarchicalNetName();
-            EDIFNet flatNet = flatTop.createNet(name);
+            String name = inst.getFullHierarchicalInstName();
+            EDIFCellInst flatInst = flatTop.createChildCellInst(name, flatType);
+            flatInst.setPropertiesMap(inst.getInst().createDuplicatePropertiesMap());
+        }
+
+        // Group the pins of the leaf cell instances into nets. Pins of a macro are outside of it, so
+        // grouping them by their parent net (in which macros are expanded) groups them as if the
+        // macros were collapsed
+        Map<EDIFHierNet, List<EDIFHierPortInst>> pinsByParentNet = new LinkedHashMap<>();
+        for (EDIFHierCellInst inst : leaves) {
+            for (EDIFPortInst portInst : inst.getInst().getPortInsts()) {
+                if (portInst.getNet() == null) continue;
+                EDIFHierPortInst pin = new EDIFHierPortInst(inst.getParent(), portInst);
+                EDIFHierNet parentNet = netlist.getParentNet(pin.getHierarchicalNet());
+                if (parentNet == null) continue;
+                pinsByParentNet.computeIfAbsent(parentNet, (k) -> new ArrayList<>()).add(pin);
+            }
+        }
+
+        // Create a single VCC/GND net
+        Map<NetType, EDIFNet> staticNets = new HashMap<>();
+        for (NetType staticType : new NetType[] { NetType.GND, NetType.VCC }) {
+            staticNets.put(staticType, EDIFTools.getStaticNet(staticType, flatTop, flatNetlist));
+        }
+
+        // Create each net, named as its parent net would be with macros collapsed, and connect it
+        for (Entry<EDIFHierNet, List<EDIFHierPortInst>> e : pinsByParentNet.entrySet()) {
+            EDIFHierPortInst source = null;
+            for (EDIFHierPortInst p : e.getValue()) {
+                if (p.isOutput()) {
+                    source = p;
+                    break;
+                }
+            }
+            EDIFNet flatNet;
+            if (source != null && source.getCellType().isStaticSource()) {
+                flatNet = staticNets.get(EDIFNetlist.identifyNetType(source));
+            } else {
+                EDIFHierNet parentNet = source != null ? source.getHierarchicalNet()
+                        : getCollapsedParentNet(netlist, e.getKey());
+                if (parentNet.getNet().isGND() || parentNet.getNet().isVCC()) {
+                    continue;
+                }
+                flatNet = flatTop.createNet(parentNet.getHierarchicalNetName());
+            }
             for (EDIFHierPortInst p : e.getValue()) {
                 if (p.getCellType().isStaticSource()) continue;
                 EDIFCellInst flatInst = flatTop.getCellInst(p.getFullHierarchicalInstName());
                 flatNet.createPortInst(p.getPortInst().getName(), flatInst);
-            }
-        }
-
-        // Create a single VCC/GND net and connect up ports
-        for (NetType staticType : new NetType[] { NetType.GND, NetType.VCC }) {
-            EDIFNet staticNet = EDIFTools.getStaticNet(staticType, flatTop, flatNetlist);
-            List<EDIFHierPortInst> physPins = staticType == NetType.GND 
-                    ? netlist.getPhysicalGndPins()
-                    : netlist.getPhysicalVccPins();
-            for (EDIFHierPortInst p : physPins) {
-                if (p.getCellType().isStaticSource()) continue;
-                EDIFCellInst flatInst = flatTop.getCellInst(p.getFullHierarchicalInstName());
-                staticNet.createPortInst(p.getPortInst().getName(), flatInst);
             }
         }
 
@@ -1837,11 +1898,39 @@ public class EDIFTools {
             }
         }
 
-        // Restore netlists to expanded state
-        netlist.expandMacroUnisims(part.getSeries());
-        flatNetlist.expandMacroUnisims(part.getSeries());
-
         return flatNetlist;
+    }
+
+    /**
+     * Gets the parent net that the given parent net (see {@link EDIFNetlist#getParentNet(EDIFHierNet)})
+     * of a net with no source among the pins of leaf cells (with macros as leaves) would have if the
+     * macros were collapsed. That is itself, unless it is inside a macro, as when the net's source is
+     * an inout port of the macro: then it is the top-level net of a top-level inout port that the
+     * net is on, if any.
+     */
+    private static EDIFHierNet getCollapsedParentNet(EDIFNetlist netlist, EDIFHierNet parentNet) {
+        boolean insideMacro = false;
+        for (EDIFHierCellInst inst = parentNet.getHierarchicalInst(); !inst.isTopLevelInst();
+                inst = inst.getParent()) {
+            if (inst.getCellType().getLibrary().isHDIPrimitivesLibrary()) {
+                insideMacro = true;
+                break;
+            }
+        }
+        if (insideMacro) {
+            EDIFHierCellInst top = netlist.getTopHierCellInst();
+            for (EDIFPort port : netlist.getTopCell().getPorts()) {
+                if (port.isOutput()) continue;
+                for (EDIFNet net : port.getInternalNets()) {
+                    if (net == null) continue;
+                    EDIFHierNet topNet = new EDIFHierNet(top, net);
+                    if (parentNet.equals(netlist.getParentNet(topNet))) {
+                        return topNet;
+                    }
+                }
+            }
+        }
+        return parentNet;
     }
 
     /**

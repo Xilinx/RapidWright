@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2020-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -23,9 +23,9 @@
 
 package com.xilinx.rapidwright.interchange;
 
-import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFCollapsedView;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
@@ -51,6 +51,7 @@ import org.capnproto.TextList;
 import org.capnproto.Void;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -103,6 +104,9 @@ public class LogNetlistWriter {
     private final IdentityEnumerator<EDIFPort> allPorts;
     private final StringEnumerator allStrings;
     private final Map<Integer, Integer> libraryRename;
+
+    /** The view of the netlist with its macros collapsed that is written, or null to write the netlist as it is */
+    private EDIFCollapsedView collapsedView;
 
     /**
      * Takes an EDIF property map and serializes (writes) it using the Cap'n Proto schema.  The
@@ -158,9 +162,15 @@ public class LogNetlistWriter {
         // in netlist description
         for (EDIFLibrary lib : n.getLibraries()) {
             for (EDIFCell cell : lib.getCells()) {
+                if (collapsedView != null && collapsedView.isOmitted(cell)) {
+                    continue;
+                }
                 allCells.addObject(cell);
                 for (EDIFPort port : cell.getPorts()) {
                     allPorts.addObject(port);
+                }
+                if (collapsedView != null && collapsedView.isCollapsed(cell)) {
+                    continue;
                 }
                 for (EDIFCellInst inst : cell.getCellInsts()) {
                     allInsts.addObject(inst);
@@ -207,7 +217,7 @@ public class LogNetlistWriter {
             EDIFCell cell = allCells.get(i);
             CellDeclaration.Builder cellDeclBuilder = cellDeclsList.get(i - start);
 
-            int idx = allStrings.getIndex(cell.getName());
+            int idx = allStrings.getIndex(collapsedView == null ? cell.getName() : collapsedView.getName(cell));
 
             cellDeclBuilder.setName(idx);
             populatePropertyMap(cellDeclBuilder::getPropMap, cell);
@@ -237,16 +247,21 @@ public class LogNetlistWriter {
             Cell.Builder cellBuilder = cellsList.get(i - start);
             cellBuilder.setIndex(i);
 
-            PrimitiveList.Int.Builder insts = cellBuilder.initInsts(cell.getCellInsts().size());
+            // A collapsed macro is written without its contents
+            boolean collapsed = collapsedView != null && collapsedView.isCollapsed(cell);
+            Collection<EDIFCellInst> cellInsts = collapsed ? Collections.emptyList() : cell.getCellInsts();
+            Collection<EDIFNet> cellNets = collapsed ? Collections.emptyList() : cell.getNets();
+
+            PrimitiveList.Int.Builder insts = cellBuilder.initInsts(cellInsts.size());
             int j = 0;
-            for (EDIFCellInst inst : cell.getCellInsts()) {
+            for (EDIFCellInst inst : cellInsts) {
                 insts.set(j, allInsts.maybeGetIndex(inst));
                 j++;
             }
 
-            StructList.Builder<Net.Builder> nets = cellBuilder.initNets(cell.getNets().size());
+            StructList.Builder<Net.Builder> nets = cellBuilder.initNets(cellNets.size());
             j = 0;
-            for (EDIFNet net : cell.getNets()) {
+            for (EDIFNet net : cellNets) {
                 Net.Builder netBuilder = nets.get(j);
                 netBuilder.setName(allStrings.getIndex(net.getName()));
                 populatePropertyMap(netBuilder::getPropMap, net);
@@ -255,13 +270,14 @@ public class LogNetlistWriter {
                 int k = 0;
                 for (EDIFPortInst portInst : net.getPortInsts()) {
                     PortInstance.Builder piBuilder = portInsts.get(k);
-                    piBuilder.setPort(allPorts.maybeGetIndex(portInst.getPort()));
+                    EDIFPort port = collapsedView == null ? portInst.getPort() : collapsedView.getPort(portInst);
+                    piBuilder.setPort(allPorts.maybeGetIndex(port));
                     if (portInst.getCellInst() != null) {
                         piBuilder.setInst(allInsts.maybeGetIndex(portInst.getCellInst()));
                     } else {
                         piBuilder.setExtPort(Void.VOID);
                     }
-                    if (portInst.getPort().isBus()) {
+                    if (port.isBus()) {
                         piBuilder.initBusIdx().setIdx(portInst.getIndex());
                     }
                     k++;
@@ -297,7 +313,9 @@ public class LogNetlistWriter {
             CellInstance.Builder ciBuilder = cellInstsList.get(i);
             ciBuilder.setName(allStrings.getIndex(inst.getName()));
             populatePropertyMap(ciBuilder::getPropMap, inst);
-            ciBuilder.setCell(allCells.maybeGetIndex(inst.getCellType()));
+            EDIFCell cellType = inst.getCellType();
+            ciBuilder.setCell(allCells.maybeGetIndex(collapsedView == null ? cellType
+                    : collapsedView.getInstanceType(cellType)));
             ciBuilder.setView(allStrings.getIndex(inst.getViewref().getName()));
         }
     }
@@ -316,8 +334,8 @@ public class LogNetlistWriter {
     }
 
     /**
-     * Writes a RapidWright netlist to a Cap'n Proto serialized file.  The method attempts to
-     * collapse macros in the netlist before writing.
+     * Writes a RapidWright netlist to a Cap'n Proto serialized file, with its macros collapsed (see
+     * {@link EDIFCollapsedView}). The netlist itself is not modified.
      * @param n RapidWright netlist
      * @param fileName Name of the file to write
      * @throws IOException
@@ -330,25 +348,19 @@ public class LogNetlistWriter {
      * Writes a RapidWright netlist to a Cap'n Proto serialized file.
      * @param n RapidWright netlist
      * @param fileName Name of the file to write
-     * @param collapseMacros If true, will attempt to collapse macros in netlist before writing.
+     * @param collapseMacros If true, macros are written collapsed (see {@link EDIFCollapsedView}),
+     *                       otherwise as they are in the netlist. The netlist itself is not modified.
      * @throws IOException
      */
     public static void writeLogNetlist(EDIFNetlist n, String fileName, boolean collapseMacros) throws IOException {
         CodePerfTracker t = new CodePerfTracker("Write LogNetlist");
-        t.start("Collapse Macros");
-        if (collapseMacros) {
-            Device device = n.getDevice();
-            if (device != null) {
-                n.collapseMacroUnisims(device.getSeries());
-            } else {
-                System.err.println("WARNING: Could not collapse macros in netlist as part target device"
-                        + " could not be identified.");
-            }
-        }
-        t.stop().start("Initialize");
+        t.start("Initialize");
         MessageBuilder message = new MessageBuilder();
         Netlist.Builder netlist = message.initRoot(Netlist.factory);
         LogNetlistWriter writer = new LogNetlistWriter();
+        if (collapseMacros) {
+            writer.collapsedView = new EDIFCollapsedView(n);
+        }
         t.stop();
         writer.populateNetlistBuilder(n, netlist, t);
         t.start("Write Top");

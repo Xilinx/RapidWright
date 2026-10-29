@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -67,9 +67,7 @@ public class TestBinaryEDIF {
         boolean noXdef = true;
         Design design = Design.readCheckpoint(dcp, noXdef);
         EDIFNetlist netlist = design.getNetlist();
-        // Reading the checkpoint will expand the macros automatically, we need to collapse
-        // before writing out the netlist
-        netlist.collapseMacroUnisims(design.getDevice().getSeries());
+        // Macros are expanded in memory, and collapsed when written out
         Path goldenPath = workingDir.resolve("golden.edf");
         netlist.exportEDIF(goldenPath);
 

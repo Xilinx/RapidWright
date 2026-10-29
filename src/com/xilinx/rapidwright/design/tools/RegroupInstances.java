@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (c) 2025, Advanced Micro Devices, Inc.
+ * Copyright (c) 2025-2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, AMD Research and Advanced Development.
@@ -144,7 +144,6 @@ public class RegroupInstances {
         if (args[1].endsWith(".dcp")) {
             design.writeCheckpoint(args[1], CodePerfTracker.SILENT);
         } else {
-            design.getNetlist().collapseMacroUnisims(design.getSeries());
             design.getNetlist().exportEDIF(args[1]);
         }
         t.stop().printSummary();
