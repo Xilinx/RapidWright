@@ -110,7 +110,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     public static final float MIN_CONGESTED_BASE_COST = 0.2f;
     /**
      * Added by RWRoute to the lower bound of a node on either side of a super long line, once for each node of that
-     * chain that remains (see RWRoute.superLongLineLowerBound()), so that the lower bound falls slightly along the chain
+     * chain that remains (see RWRoute.remainingCrossingCost()), so that the lower bound falls slightly along the chain
      * and ties between chains are broken depth-first. Small compared with LOCAL_BASE_COST, so as not to reorder
      * anything else.
      */
@@ -118,7 +118,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     /**
      * Added by RWRoute to the lower bound of the children of the last node on the receiving side of a super long line
      * (the landing node: an SDQ node on UltraScale/UltraScale+, an [A-H]Q* CLE output on Versal; see
-     * RWRoute.superLongLineLowerBound()), so that all the landing nodes driven by the same super long line are explored
+     * RWRoute.remainingCrossingCost()), so that all the landing nodes driven by the same super long line are explored
      * before any of their children. Otherwise a vertical double from the first landing node explored, whose lower bound
      * falls by 2g - PENDING_NODE_COST = 0.25 (and which on UltraScale+ may land on the same SDQ node again, two tiles
      * on), would be followed before a sibling landing node's longer wire, whose lower bound falls by at least
