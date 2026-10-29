@@ -125,18 +125,17 @@ public class Connection implements Comparable<Connection>{
         yMax = maxOfThree(sourceRnode.getEndTileYCoordinate(), sinkRnode.getEndTileYCoordinate(), yNetCenter);
         yMin = minOfThree(sourceRnode.getEndTileYCoordinate(), sinkRnode.getEndTileYCoordinate(), yNetCenter);
 
-        if (isCrossSLR() && !routingGraph.isVersal) {
-            // For SLR-crossing connections on UltraScale/UltraScale+, ensure the bounding box width contains at least
-            // one Laguna column before bounding box extension
-            // On Versal where Laguna columns do not exist and SLLs can be accessed in a distributed fashion,
-            // this optimization is not currently performed.
-            int nextLaguna = routingGraph.nextLagunaColumn[xMin];
-            int prevLaguna = routingGraph.prevLagunaColumn[xMax];
-            if (nextLaguna != Integer.MAX_VALUE) {
-                xMax = (short) Math.max(xMax, nextLaguna);
+        if (isCrossSLR() && routingGraph.nextCrossingHalfColumn != null) {
+            // For SLR-crossing connections, ensure the bounding box width contains at least one column from which
+            // super long lines can cross SLRs (Laguna on UltraScale/UltraScale+, SLL on Versal) before bounding box
+            // extension
+            int nextColumn = routingGraph.getNextCrossingColumn(xMin);
+            int prevColumn = routingGraph.getPrevCrossingColumn(xMax);
+            if (nextColumn != Integer.MAX_VALUE) {
+                xMax = (short) Math.max(xMax, nextColumn);
             }
-            if (prevLaguna != Integer.MIN_VALUE) {
-                xMin = (short) Math.min(xMin, prevLaguna);
+            if (prevColumn != Integer.MIN_VALUE) {
+                xMin = (short) Math.min(xMin, prevColumn);
             }
         }
 

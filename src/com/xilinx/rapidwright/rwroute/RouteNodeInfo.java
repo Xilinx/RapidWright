@@ -133,7 +133,7 @@ public class RouteNodeInfo {
                            length == 0);
                     break;
                 case INT:
-                    if (type.leadsToLaguna()) {
+                    if (type.leadsToSLL()) {
                         assert(length <= 1); // 1 only if INODE_[EW]_\d+_FT[01]
                     }
                     break;
@@ -158,7 +158,7 @@ public class RouteNodeInfo {
      * @param tile Tile in question (e.g. a Versal SLL tile).
      * @return That X coordinate.
      */
-    private static short getWestIntTileXCoordinate(Tile tile) {
+    static short getWestIntTileXCoordinate(Tile tile) {
         // On xcv80, for example, INT_X113Y461 is 3 columns to the west of SLL_X114Y461
         final int maxColumns = 8;
         for (int dx = 1; dx <= maxColumns; dx++) {
@@ -213,19 +213,16 @@ public class RouteNodeInfo {
                     // Check for INODE or SDQNODE that leads to a Laguna
                     BitSet[] bs2 = routingGraph.wireIndicesLeadingToLaguna.get(node.getTile());
                     if (bs2 != null) {
-                        boolean northbound = routingGraph.intYToNorthboundLaguna[node.getTile().getTileYCoordinate()];
                         if (bs2[0].get(node.getWireIndex())) {
                             BitSet bs = routingGraph.ultraScalesLocalWires.get(tileTypeEnum);
                             assert(bs.get(node.getWireIndex()));
                             assert(routingGraph.isSidedLocalWire(tileTypeEnum, node.getWireIndex()));
 
                             // INODE
-                            return northbound ? RouteNodeType.LOCAL_LEADING_TO_NORTHBOUND_LAGUNA
-                                              : RouteNodeType.LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA;
+                            return RouteNodeType.LOCAL_LEADING_TO_SLL;
                         } else if (bs2[1].get(node.getWireIndex())) {
                             // SDQNODE
-                            return northbound ? RouteNodeType.NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA
-                                              : RouteNodeType.NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA;
+                            return RouteNodeType.NON_LOCAL_LEADING_TO_SLL;
                         }
                     }
                 }
@@ -241,9 +238,27 @@ public class RouteNodeInfo {
                 return RouteNodeType.LOCAL_SIDE_DEPENDS_ON_SINK;
             }
 
-            case NODE_SLL_INPUT: // Versal only
-                // Not considered to be on any specific side (see RouteNodeGraph.isAccessible())
+            case NODE_SLL_INPUT: { // Versal only
+                // Only those SLL inputs driving an SLL that crosses into another SLR lead to an SLR crossing
+                // (e.g. those in SLL_X16Y335 on xcv80 lead to SLL_X16Y410, except for one that leads to SLL_X16Y260,
+                // and none of those in SLL_X15Y335 leave their tile); either way, not considered to be on any specific
+                // side (see RouteNodeGraph.isAccessible())
+                Tile tile = node.getTile();
+                for (Node ubump : node.getAllDownhillNodes()) {
+                    assert(ubump.getIntentCode() == IntentCode.NODE_SLL_DATA);
+                    for (Wire wire : ubump.getAllWiresInNode()) {
+                        Tile wireTile = wire.getTile();
+                        if (wireTile.getTileXCoordinate() == tile.getTileXCoordinate() &&
+                                wireTile.getSLR().getId() != tile.getSLR().getId()) {
+                            // Crossing towards the nearer SLR boundary (see RouteNodeGraph.isNorthboundSLLRow())
+                            assert((wireTile.getTileYCoordinate() > tile.getTileYCoordinate()) ==
+                                    routingGraph.isNorthboundSLLRow(tile.getTileYCoordinate()));
+                            return RouteNodeType.LOCAL_LEADING_TO_SLL;
+                        }
+                    }
+                }
                 return RouteNodeType.LOCAL;
+            }
 
             case NODE_PINFEED:
                 if (routingGraph.isVersal ||
@@ -260,9 +275,7 @@ public class RouteNodeInfo {
                     BitSet[] bs2 = routingGraph.wireIndicesLeadingToLaguna.get(node.getTile());
                     if (bs2 != null && bs2[0].get(node.getWireIndex())) {
                         assert(routingGraph.isSidedLocalWire(tileTypeEnum, node.getWireIndex()));
-                        boolean northbound = routingGraph.intYToNorthboundLaguna[node.getTile().getTileYCoordinate()];
-                        return northbound ? RouteNodeType.LOCAL_LEADING_TO_NORTHBOUND_LAGUNA
-                                          : RouteNodeType.LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA;
+                        return RouteNodeType.LOCAL_LEADING_TO_SLL;
                     }
                 }
                 // Fall through
@@ -286,9 +299,7 @@ public class RouteNodeInfo {
                     if (bs2 != null && bs2[1].get(node.getWireIndex())) {
                         assert(node.getWireName().matches("INT_INT_SDQ_\\d+_INT_OUT[01]|WW1_E_7_FT0") ||    // UltraScale+
                                node.getWireName().matches("INT_INT_SINGLE_\\d+_INT_OUT|EE1_W_0_FTS"));      // UltraScale
-                        boolean northbound = routingGraph.intYToNorthboundLaguna[node.getTile().getTileYCoordinate()];
-                        return northbound ? RouteNodeType.NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA
-                                          : RouteNodeType.NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA;
+                        return RouteNodeType.NON_LOCAL_LEADING_TO_SLL;
                     }
                 }
                 break;

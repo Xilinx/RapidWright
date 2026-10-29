@@ -1919,9 +1919,8 @@ public class RWRoute {
                 }
                 RouteNodeType childType = childRNode.getType();
                 switch (childType) {
-                    case LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
-                    case LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
-                        // Lookahead beyond child nodes leading to a Laguna if it won't get overused
+                    case LOCAL_LEADING_TO_SLL:
+                        // Lookahead beyond child nodes leading to an SLL if it won't get overused
                         lookahead = !childRNode.willOverUse(netWrapper);
                         // Fall-through
                     case LOCAL:
@@ -1938,12 +1937,11 @@ public class RWRoute {
                                 // ... or unless it's a Versal SLL input
                                 childRNode.getIntentCode() == IntentCode.NODE_SLL_INPUT);
                         break;
-                    case NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
-                    case NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
+                    case NON_LOCAL_LEADING_TO_SLL:
                         if (connection.isCrossSLR() && connection.getSinkRnode().getSLRIndex(routingGraph) != childRNode.getSLRIndex(routingGraph) &&
-                                ((connection.isCrossSLRnorth() && childType == RouteNodeType.NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA) ||
-                                 (connection.isCrossSLRsouth() && childType == RouteNodeType.NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA))) {
-                            // Only lookahead beyond child nodes leading to a Laguna if we require an SLR crossing in that direction,
+                                (routingGraph.isNorthboundSLLRow(childRNode.getTile().getTileYCoordinate())
+                                        ? connection.isCrossSLRnorth() : connection.isCrossSLRsouth())) {
+                            // Only lookahead beyond child nodes leading to an SLL if we require an SLR crossing in that direction,
                             // and it won't get overused
                             lookahead = !childRNode.willOverUse(netWrapper);
                         }
@@ -1951,9 +1949,9 @@ public class RWRoute {
                     case NON_LOCAL:
                     case NON_LOCAL_INHERIT_PREV_SIDE:
                         // LOCALs cannot connect to NON_LOCALs except
-                        //   (a) IMUX (LOCAL_*_LEADING_TO_*_LAGUNA) -> LAG_MUX_ATOM_\\d+_TXOUT
+                        //   (a) IMUX (LOCAL_LEADING_TO_SLL) -> LAG_MUX_ATOM_\\d+_TXOUT
                         //   (b) via a LUT routethru: IMUX (LOCAL*) -> CLE_CLE_*_SITE_0_[A-H]_O
-                        assert(!rnodeType.isAnyLocal() || rnodeType.isLocalLeadingToLaguna() ||
+                        assert(!rnodeType.isAnyLocal() || rnodeType.isLocalLeadingToSLL() ||
                                (routingGraph.lutRoutethru && rnode.getIntentCode() == IntentCode.NODE_PINFEED) ||
                                 // Allow CLE/*LAG*_PIN -> CLE/*[A-H]Q2?_PIN
                                 (routingGraph.isVersal && connection.isCrossSLR() &&
@@ -1985,7 +1983,7 @@ public class RWRoute {
                         assert(childType != RouteNodeType.EXCLUSIVE_SINK ||
                                 (rnodeType == RouteNodeType.LOCAL && rnode.isOnEastSide() == childRNode.isOnEastSide()) ||
                                 // ... or must be an INODE that services Laguna but also feedsthrough above/below to a SLICE sink
-                                rnodeType.isLocalLeadingToLaguna());
+                                rnodeType.isLocalLeadingToSLL());
                         // ... unless it is a CTRL sink (or SLL input) that can be reached from either side
                         assert(!childType.isExclusiveSinkCtrlOrSllInput() ||
                                rnodeType == RouteNodeType.LOCAL_SIDE_DEPENDS_ON_SINK ||
@@ -2121,11 +2119,10 @@ public class RWRoute {
         }
         int deltaY = Math.abs(childY - sinkY);
         if (connection.isCrossSLR()) {
-            assert(!childRnode.getType().isLocalLeadingToLaguna() || (
-                    (connection.isCrossSLRnorth() && childRnode.getType().leadsToNorthboundLaguna()) ||
-                    (connection.isCrossSLRsouth() && childRnode.getType().leadsToSouthboundLaguna()) ||
-                    (deltaX == 0 && deltaY <= 1)
-            ));
+            assert(!childRnode.getType().isLocalLeadingToSLL() ||
+                    (routingGraph.isNorthboundSLLRow(childRnode.getTile().getTileYCoordinate())
+                            ? connection.isCrossSLRnorth() : connection.isCrossSLRsouth()) ||
+                    (deltaX == 0 && deltaY <= 1));
 
             int deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
             if (deltaSLR != 0) {
@@ -2139,17 +2136,15 @@ public class RWRoute {
                     }
                 }
 
-                if (!routingGraph.isVersal) {
-                    // For UltraScale/UltraScale+, account for any detours that must be taken
-                    // to get to the closest Laguna column and from there onto the sink.
-                    // This optimization is not currently performed on Versal due to the
-                    // distributed nature of its SLLs.
-                    // All distances are in half tiles, with Laguna columns being on the west half of their INT tile.
-                    int nextLagunaColumn = routingGraph.nextLagunaColumn[childX];
-                    int prevLagunaColumn = routingGraph.prevLagunaColumn[childX];
-                    if (nextLagunaColumn == prevLagunaColumn) {
+                if (routingGraph.nextCrossingHalfColumn != null) {
+                    // Account for any detours that must be taken to get to the closest column from which super long
+                    // lines can cross SLRs (a Laguna column on UltraScale/UltraScale+, an SLL column on Versal) and
+                    // from there onto the sink.
+                    // All distances are in half tiles (see RouteNodeGraph.nextCrossingHalfColumn).
+                    int nextColumn = routingGraph.nextCrossingHalfColumn[childHalfX];
+                    int prevColumn = routingGraph.prevCrossingHalfColumn[childHalfX];
+                    if (nextColumn == prevColumn) {
                         // On top of the column
-                        assert(deltaX == Math.abs(sinkX - nextLagunaColumn));
                     } else {
                         assert(rnode.getType() != RouteNodeType.SUPER_LONG_LINE);
 
@@ -2157,19 +2152,19 @@ public class RWRoute {
                         final int deltaHalfXToPrevColumn;
                         final int deltaHalfXToAndFromNextColumn;
                         final int deltaHalfXToAndFromPrevColumn;
-                        if (nextLagunaColumn == Integer.MAX_VALUE  || nextLagunaColumn >= connection.getXMaxBB()) {
+                        if (nextColumn == Integer.MAX_VALUE || (nextColumn >> 1) >= connection.getXMaxBB()) {
                             deltaHalfXToNextColumn = Integer.MAX_VALUE;
                             deltaHalfXToAndFromNextColumn = Integer.MAX_VALUE;
                         } else {
-                            deltaHalfXToNextColumn = Math.abs(2 * nextLagunaColumn - childHalfX);
-                            deltaHalfXToAndFromNextColumn = deltaHalfXToNextColumn + Math.abs(sinkHalfX - 2 * nextLagunaColumn);
+                            deltaHalfXToNextColumn = nextColumn - childHalfX;
+                            deltaHalfXToAndFromNextColumn = deltaHalfXToNextColumn + Math.abs(sinkHalfX - nextColumn);
                         }
-                        if (prevLagunaColumn == Integer.MIN_VALUE || prevLagunaColumn <= connection.getXMinBB()) {
+                        if (prevColumn == Integer.MIN_VALUE || (prevColumn >> 1) <= connection.getXMinBB()) {
                             deltaHalfXToPrevColumn = Integer.MAX_VALUE;
                             deltaHalfXToAndFromPrevColumn = Integer.MAX_VALUE;
                         } else {
-                            deltaHalfXToPrevColumn = Math.abs(2 * prevLagunaColumn - childHalfX);
-                            deltaHalfXToAndFromPrevColumn = deltaHalfXToPrevColumn + Math.abs(sinkHalfX - 2 * prevLagunaColumn);
+                            deltaHalfXToPrevColumn = childHalfX - prevColumn;
+                            deltaHalfXToAndFromPrevColumn = deltaHalfXToPrevColumn + Math.abs(sinkHalfX - prevColumn);
                         }
                         final int maxDetourHalfX = 2 * maxDetourToSnapBackToPrevLagunaColumn;
                         if (deltaHalfXToNextColumn == deltaHalfXToPrevColumn) {

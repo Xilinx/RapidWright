@@ -55,6 +55,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
+import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
@@ -95,18 +96,25 @@ public class RouteNodeGraph {
 
     /** Array mapping an INT tile's Y coordinate to its SLR index */
     public final int[] intYToSLRIndex;
-    /** Array mapping an INT tile's X coordinate to the X of the next/previous Laguna column (UltraScale/UltraScale+ only) */
-    public final int[] nextLagunaColumn;
-    public final int[] prevLagunaColumn;
+    /** Array mapping an SLR index to the (lowest) Y coordinate of its first row of INT tiles */
+    public final int[] slrFirstIntY;
+    /** Array mapping an SLR index to the (highest) Y coordinate of its last row of INT tiles */
+    public final int[] slrLastIntY;
+    /**
+     * Arrays mapping a half-tile X coordinate (see {@link RouteNode#getEndHalfTileXCoordinate()}) to that of the
+     * next (at or above) or previous (at or below) INT tile half from which super long lines can cross into another
+     * SLR: the west half of an INT tile with a Laguna column (UltraScale/UltraScale+), or either half beside an SLL
+     * column with SLLs that cross SLRs (Versal). Integer.MAX_VALUE/Integer.MIN_VALUE if there is none; null if the
+     * device has no such columns. Every SLR boundary has the same such columns (on all multi-SLR devices examined).
+     */
+    public final int[] nextCrossingHalfColumn;
+    public final int[] prevCrossingHalfColumn;
 
     /**
      * Map indicating which IMUX, INODE, INT_INT, or SDQNODE wire indices
      * within a Laguna-adjacent INT tile service a Laguna-crossing
      */
     protected final Map<Tile, BitSet[]> wireIndicesLeadingToLaguna;
-
-    /** For one of the above leading-to-Laguna wires, indicate whether it leads to an SLL travelling northbound (else southbound) **/
-    public final boolean[] intYToNorthboundLaguna;
 
     /** Map indicating (for UltraScale/UltraScale+ only) the wire indices corresponding to the [A-H]MUX output
      * to be blocked during LUT routethrus
@@ -195,15 +203,26 @@ public class RouteNodeGraph {
 
         Device device = design.getDevice();
         intYToSLRIndex = new int[device.getRows()];
+        slrFirstIntY = new int[device.getNumOfSLRs()];
+        slrLastIntY = new int[device.getNumOfSLRs()];
+        Arrays.fill(slrFirstIntY, Integer.MAX_VALUE);
+        Arrays.fill(slrLastIntY, Integer.MIN_VALUE);
         Tile[][] intTiles = device.getTilesByRootName("INT");
         for (int y = 0; y < intTiles.length; y++) {
             Tile[] intTilesAtY = intTiles[y];
             for (Tile tile : intTilesAtY) {
                 if (tile != null) {
-                    intYToSLRIndex[y] = tile.getSLR().getId();
+                    int slr = tile.getSLR().getId();
+                    intYToSLRIndex[y] = slr;
+                    slrFirstIntY[slr] = Math.min(slrFirstIntY[slr], y);
+                    slrLastIntY[slr] = Math.max(slrLastIntY[slr], y);
                     break;
                 }
             }
+        }
+        for (int slr = 1; slr < slrFirstIntY.length; slr++) {
+            // SLR indices are expected to increase with Y
+            assert(slrFirstIntY[slr] > slrFirstIntY[slr - 1]);
         }
 
         Series series = device.getSeries();
@@ -640,7 +659,10 @@ public class RouteNodeGraph {
             ultraScalesMuxWiresToBlockWhenLutRoutethru = null;
         }
 
+        boolean[] crossingHalfColumns = null;
         if (device.getNumOfSLRs() > 1) {
+            // An over-approximation since this isn't in tiles
+            crossingHalfColumns = new boolean[2 * device.getColumns()];
             Tile[][] lagunaTiles;
             if (isUltraScalePlus) {
                 lagunaTiles = device.getTilesByRootName("LAG_LAG");
@@ -651,24 +673,44 @@ public class RouteNodeGraph {
             }
 
             if (lagunaTiles != null) {
-                final int maxTileColumns = device.getColumns(); // An over-approximation since this isn't in tiles
-                nextLagunaColumn = new int[maxTileColumns];
-                prevLagunaColumn = new int[maxTileColumns];
                 wireIndicesLeadingToLaguna = new IdentityHashMap<>();
-                intYToNorthboundLaguna = new boolean[device.getRows()];
-                populateLagunaLookups(device, lagunaTiles);
+                populateLagunaLookups(device, lagunaTiles, crossingHalfColumns);
             } else {
-                nextLagunaColumn = null;
-                prevLagunaColumn = null;
                 wireIndicesLeadingToLaguna = null;
-                intYToNorthboundLaguna = null;
+                if (isVersal) {
+                    populateSllCrossingHalfColumns(device, crossingHalfColumns);
+                }
             }
         } else {
-            nextLagunaColumn = null;
-            prevLagunaColumn = null;
             wireIndicesLeadingToLaguna = null;
-            intYToNorthboundLaguna = null;
         }
+        int[] next = null;
+        int[] prev = null;
+        if (crossingHalfColumns != null) {
+            next = new int[crossingHalfColumns.length];
+            prev = new int[crossingHalfColumns.length];
+            int nextHalfX = Integer.MAX_VALUE;
+            for (int halfX = crossingHalfColumns.length - 1; halfX >= 0; halfX--) {
+                if (crossingHalfColumns[halfX]) {
+                    nextHalfX = halfX;
+                }
+                next[halfX] = nextHalfX;
+            }
+            int prevHalfX = Integer.MIN_VALUE;
+            for (int halfX = 0; halfX < crossingHalfColumns.length; halfX++) {
+                if (crossingHalfColumns[halfX]) {
+                    prevHalfX = halfX;
+                }
+                prev[halfX] = prevHalfX;
+            }
+            if (prevHalfX == Integer.MIN_VALUE) {
+                // No columns found (e.g. a Versal device without SLL tiles)
+                next = null;
+                prev = null;
+            }
+        }
+        nextCrossingHalfColumn = next;
+        prevCrossingHalfColumn = prev;
 
         presentCongestionCosts = new float[MAX_OCCUPANCY];
 
@@ -682,7 +724,91 @@ public class RouteNodeGraph {
         }
     }
 
-    private void populateLagunaLookups(Device device, Tile[][] lagunaTiles) {
+    /**
+     * Marks the INT tile halves beside the (Versal) SLL columns whose SLLs cross SLRs, examining only the first SLR
+     * boundary: each SLL tile sits between the east half of the INT tile to its west and the west half of the next.
+     * SLLs that do not leave their tile, or that stay within an SLR, do not count; nor do "horizontal" SLLs (to an SLL
+     * tile in another column), which are excluded from the routing graph (see {@link #isExcluded(RouteNode, Node)}).
+     * @param device Device in question.
+     * @param crossingHalfColumns Array, indexed by half-tile X coordinate, to mark.
+     */
+    private static void populateSllCrossingHalfColumns(Device device, boolean[] crossingHalfColumns) {
+        final int numUbumps = 6; // UBUMP0..5 in each SLL tile
+        for (Tile tile : device.getAllTiles()) {
+            if (tile.getTileTypeEnum() != TileTypeEnum.SLL || tile.getSLR().getId() != 0) {
+                continue;
+            }
+            int westX = RouteNodeInfo.getWestIntTileXCoordinate(tile);
+            if (crossingHalfColumns[2 * westX + 1]) {
+                continue;
+            }
+            for (int i = 0; i < numUbumps; i++) {
+                Node ubump = Node.getNode(tile, "UBUMP" + i);
+                if (ubump == null) {
+                    continue;
+                }
+                for (Wire wire : ubump.getAllWiresInNode()) {
+                    Tile wireTile = wire.getTile();
+                    if (wireTile.getTileXCoordinate() == tile.getTileXCoordinate() && wireTile.getSLR().getId() != 0) {
+                        crossingHalfColumns[2 * westX + 1] = true;
+                        crossingHalfColumns[2 * westX + 2] = true;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Checks if a (Versal) SLL is "horizontal": connecting SLL tiles in different columns, rather than in the same
+     * column and different rows.
+     * @param node NODE_SLL_DATA node in question.
+     * @return True if so.
+     */
+    private static boolean isHorizontalSLL(Node node) {
+        int x = node.getTile().getTileXCoordinate();
+        for (Wire wire : node.getAllWiresInNode()) {
+            if (wire.getTile().getTileXCoordinate() != x) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Checks whether nodes leading to a super long line (see {@link RouteNodeType#leadsToSLL()}) in the given row lead
+     * to one crossing into the SLR to the north (else south): such nodes are only found in the band of rows next to an
+     * SLR boundary, so those in the upper half of their SLR lead north, and those in the lower half south.
+     * @param y INT tile Y coordinate of the node's base tile.
+     * @return True if northbound.
+     */
+    public boolean isNorthboundSLLRow(int y) {
+        int slr = intYToSLRIndex[y];
+        return 2 * y > slrFirstIntY[slr] + slrLastIntY[slr];
+    }
+
+    /**
+     * Gets the X coordinate of the next (at or above the given one) INT tile column from which super long lines can
+     * cross into another SLR (see {@link #nextCrossingHalfColumn}).
+     * @param x INT tile X coordinate.
+     * @return That X coordinate, or Integer.MAX_VALUE if there is none.
+     */
+    public int getNextCrossingColumn(int x) {
+        int halfX = nextCrossingHalfColumn[2 * x];
+        return (halfX == Integer.MAX_VALUE) ? halfX : halfX >> 1;
+    }
+
+    /**
+     * Gets the X coordinate of the previous (at or below the given one) INT tile column from which super long lines
+     * can cross into another SLR (see {@link #prevCrossingHalfColumn}).
+     * @param x INT tile X coordinate.
+     * @return That X coordinate, or Integer.MIN_VALUE if there is none.
+     */
+    public int getPrevCrossingColumn(int x) {
+        int halfX = prevCrossingHalfColumn[2 * x + 1];
+        return (halfX == Integer.MIN_VALUE) ? halfX : halfX >> 1;
+    }
+
+    private void populateLagunaLookups(Device device, Tile[][] lagunaTiles, boolean[] crossingHalfColumns) {
         final Series series = device.getSeries();
         final boolean isUltraScale = series == Series.UltraScale;
         final boolean isUltraScalePlus = series == Series.UltraScalePlus;
@@ -698,8 +824,6 @@ public class RouteNodeGraph {
         final Pattern sdqNodePattern = Pattern.compile(isUltraScalePlus ? "INT_NODE_SDQ_\\d+_INT_OUT[01]|SDQNODE_(W_91_FT1|E_93_FT0)"
                                                                         : "INT_NODE_SINGLE_DOUBLE_\\d+_INT_OUT|SDND[NS]W_E_15_FTN");
 
-        Arrays.fill(nextLagunaColumn, Integer.MAX_VALUE);
-        Arrays.fill(prevLagunaColumn, Integer.MIN_VALUE);
         for (int slr = 0; slr < device.getNumOfSLRs() - 1; slr++) {
             for (int yModSlrHeight = slrHeight - clockRegionHeight; yModSlrHeight < slrHeight; yModSlrHeight++) {
                 int y = slr * slrHeight + yModSlrHeight;
@@ -713,25 +837,13 @@ public class RouteNodeGraph {
                     assert(x == tile.getTileXCoordinate());
                     assert(y == tile.getTileYCoordinate());
 
-                    intYToNorthboundLaguna[y] = true;
+                    // Laguna tiles in the top clock region of an SLR lead north (see isNorthboundSLLRow())
+                    assert(isNorthboundSLLRow(y));
 
-                    // For LAGUNA tiles on the first SLR boundary
-                    if (nextLagunaColumn[x] == Integer.MAX_VALUE) {
-                        // Looks like (on US+) LAGUNA tiles are always on the left side of an INT tile,
-                        // with tile X coordinate one smaller
-                        final int intTileXCoordinate = isUltraScalePlus ? x + 1 : x;
-
-                        // Go backwards til beginning
-                        for (int i = intTileXCoordinate; i >= 0; i--) {
-                            if (nextLagunaColumn[i] != Integer.MAX_VALUE)
-                                break;
-                            nextLagunaColumn[i] = intTileXCoordinate;
-                        }
-                        // Go forwards til end
-                        for (int i = intTileXCoordinate; i < prevLagunaColumn.length; i++) {
-                            prevLagunaColumn[i] = intTileXCoordinate;
-                        }
-                    }
+                    // Looks like (on US+) LAGUNA tiles are always on the left side of an INT tile,
+                    // with tile X coordinate one smaller; consider them to be on the west half of that INT tile
+                    final int intTileXCoordinate = isUltraScalePlus ? x + 1 : x;
+                    crossingHalfColumns[2 * intTileXCoordinate] = true;
 
                     // Examine all wires in each Laguna tile. Record those IMUX and INODE uphill of a Super Long Line
                     // that originates in an INT tile
@@ -1167,6 +1279,11 @@ public class RouteNodeGraph {
                 // Disallow NODE_SLL_OUTPUT -> NODE_SLL_INPUT arcs (why are you able to come off an SLL just to go back onto one?)
                 return true;
             }
+
+            if (ic == IntentCode.NODE_SLL_DATA && isHorizontalSLL(child)) {
+                // Horizontal SLLs are not currently supported
+                return true;
+            }
         } else {
             assert(design.getSeries() == Series.UltraScale || design.getSeries() == Series.UltraScalePlus);
 
@@ -1174,7 +1291,7 @@ public class RouteNodeGraph {
                 // PINFEEDs can lead to a site pin, or into a Laguna tile
                 if (childRnode != null) {
                     assert(childRnode.getType().isAnyExclusiveSink() ||
-                           childRnode.getType().isLocalLeadingToLaguna() ||
+                           childRnode.getType().isLocalLeadingToSLL() ||
                            ((lutRoutethru || lutPinSwapping) && childRnode.getType().isAnyLocal()));
                 } else if (!lutRoutethru) {
                     // child does not already exist in our routing graph, meaning it's not a used site pin
@@ -1355,7 +1472,7 @@ public class RouteNodeGraph {
 
                         TileTypeEnum childTileType = childRnode.getTile().getTileTypeEnum();
                         if (Utils.isLaguna(childTileType)) {
-                            assert(parentType.isLocalLeadingToLaguna());
+                            assert(parentType.isLocalLeadingToSLL());
                             // IMUX_[EW]\\d+ -> LAG_MUX_ATOM_\\d+_TXOUT
                             RouteNode sinkRnode = connection.getSinkRnode();
                             if (!connection.isCrossSLR() ||
@@ -1378,8 +1495,7 @@ public class RouteNodeGraph {
                         return false;
                     }
                     break;
-                case NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA:
-                case NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA:
+                case NON_LOCAL_LEADING_TO_SLL:
                     break;
                 default:
                     throw new RuntimeException("ERROR: Unrecognized rnode type: " + type);
@@ -1398,25 +1514,25 @@ public class RouteNodeGraph {
                 (Utils.isClocking(childTileType) && childRnode.getIntentCode() == IntentCode.NODE_PINFEED && isPreserved(childRnode))
         );
 
-        if (lutRoutethru && !type.leadsToLaguna()) {
-            // (a) considering LUT routethrus (that do not lead to a Laguna)
+        if (lutRoutethru && !type.leadsToSLL()) {
+            // (a) considering LUT routethrus (that do not lead to an SLL)
             return true;
         }
 
-        // (b) needs to cross an SLR and this is a local node servicing a Laguna
+        // (b) needs to cross an SLR and this is a local node leading to an SLL that crosses SLRs
         Tile childTile = childRnode.getTile();
         RouteNode sinkRnode = connection.getSinkRnode();
         int childX = childRnode.getEndTileXCoordinate();
-        if (connection.isCrossSLR() && type.isLocalLeadingToLaguna() &&
+        if (connection.isCrossSLR() && type.isLocalLeadingToSLL() &&
                 childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
-            assert(wireIndicesLeadingToLaguna.get(childTile) != null);
+            assert(isVersal ? childRnode.getIntentCode() == IntentCode.NODE_SLL_INPUT
+                            : wireIndicesLeadingToLaguna.get(childTile) != null);
             assert(childTile != sinkRnode.getTile());
-            if ((type.leadsToNorthboundLaguna() && !connection.isCrossSLRnorth()) ||
-                (type.leadsToSouthboundLaguna() && !connection.isCrossSLRsouth())) {
-                // Does not lead to a Laguna in the direction that we want
+            if (isNorthboundSLLRow(childTile.getTileYCoordinate()) ? !connection.isCrossSLRnorth() : !connection.isCrossSLRsouth()) {
+                // Does not lead to an SLL in the direction that we want
                 return false;
             }
-            assert(nextLagunaColumn[childX] == childX);
+            assert(getNextCrossingColumn(childX) == childX);
             return true;
         }
 
@@ -1567,12 +1683,11 @@ public class RouteNodeGraph {
                     // CTRL pins that are not our target EXCLUSIVE_SINK will have been isExcluded() from the graph
                     break;
                 case NODE_SLL_INPUT:
-                    if (connection.isCrossSLR() &&
-                            childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
-                        assert(parentRnode.getIntentCode() != IntentCode.NODE_SLL_OUTPUT);
-                        return true;
-                    }
-                    // Otherwise only allow NODE_SLL_INPUT to be explored if it is the sink
+                    // SLL inputs leading to an SLL that crosses SLRs were handled by (b) above; others (whose SLL
+                    // does not leave their tile, stays within their SLR, or is horizontal) are only explored if
+                    // they are the sink
+                    assert(!type.isLocalLeadingToSLL() || !connection.isCrossSLR() ||
+                           childRnode.getSLRIndex(this) == sinkRnode.getSLRIndex(this));
                     return childRnode == sinkRnode;
             }
             throw new RuntimeException("ERROR: Unhandled IntentCode: " + childIntentCode);

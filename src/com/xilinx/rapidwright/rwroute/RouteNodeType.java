@@ -54,14 +54,15 @@ public enum RouteNodeType {
     SUPER_LONG_LINE,
 
     /**
-     * Denotes {@link RouteNode} objects that correspond to {@link Node} objects that enter
-     * a Laguna tile from an adjacent INT tile, or those Laguna tile nodes leading to a SUPER_LONG_LINE
-     * going in the given direction
+     * Denotes {@link RouteNode} objects that correspond to {@link Node} objects leading to a SUPER_LONG_LINE that
+     * crosses into another SLR: on UltraScale/UltraScale+, those that enter a Laguna tile from an adjacent INT tile,
+     * or those Laguna tile nodes leading to such a SUPER_LONG_LINE; on Versal, SLL inputs (NODE_SLL_INPUT) that
+     * drive such a SUPER_LONG_LINE (other SLL inputs are of type {@link #LOCAL}). Such nodes are only found in the
+     * band of rows next to an SLR boundary, which gives the direction they cross in (see
+     * RouteNodeGraph.isNorthboundSLLRow()).
      */
-    LOCAL_LEADING_TO_NORTHBOUND_LAGUNA,
-    LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA,
-    NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA,
-    NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA,
+    LOCAL_LEADING_TO_SLL,
+    NON_LOCAL_LEADING_TO_SLL,
 
     NON_LOCAL,
     /**
@@ -117,13 +118,12 @@ public enum RouteNodeType {
     }
 
     public boolean isAnyLocal() {
-        return this == LOCAL || this == LOCAL_SIDE_DEPENDS_ON_SINK || this == LOCAL_RESERVED ||
-               this == LOCAL_LEADING_TO_NORTHBOUND_LAGUNA || this == LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA;
+        return this == LOCAL || this == LOCAL_SIDE_DEPENDS_ON_SINK || this == LOCAL_RESERVED || this == LOCAL_LEADING_TO_SLL;
     }
 
     public static boolean isAnyLocal(int ordinal) {
         return ordinal == LOCAL.ordinal() || ordinal == LOCAL_SIDE_DEPENDS_ON_SINK.ordinal() || ordinal == LOCAL_RESERVED.ordinal() ||
-               ordinal == LOCAL_LEADING_TO_NORTHBOUND_LAGUNA.ordinal() || ordinal == LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA.ordinal();
+               ordinal == LOCAL_LEADING_TO_SLL.ordinal();
     }
 
     /**
@@ -131,23 +131,14 @@ public enum RouteNodeType {
      * @return True if so.
      */
     public boolean isSidedLocal() {
-        return this == LOCAL || this == LOCAL_LEADING_TO_NORTHBOUND_LAGUNA || this == LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA;
+        return this == LOCAL || this == LOCAL_LEADING_TO_SLL;
     }
 
-    public boolean isLocalLeadingToLaguna() {
-        return this == LOCAL_LEADING_TO_NORTHBOUND_LAGUNA || this == LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA;
+    public boolean isLocalLeadingToSLL() {
+        return this == LOCAL_LEADING_TO_SLL;
     }
 
-    public boolean leadsToLaguna() {
-        return this == LOCAL_LEADING_TO_NORTHBOUND_LAGUNA || this == NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA ||
-               this == LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA || this == NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA;
-    }
-
-    public boolean leadsToNorthboundLaguna() {
-        return this == LOCAL_LEADING_TO_NORTHBOUND_LAGUNA || this == NON_LOCAL_LEADING_TO_NORTHBOUND_LAGUNA;
-    }
-
-    public boolean leadsToSouthboundLaguna() {
-        return this == LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA || this == NON_LOCAL_LEADING_TO_SOUTHBOUND_LAGUNA;
+    public boolean leadsToSLL() {
+        return this == LOCAL_LEADING_TO_SLL || this == NON_LOCAL_LEADING_TO_SLL;
     }
 }

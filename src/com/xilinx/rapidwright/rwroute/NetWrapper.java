@@ -77,13 +77,13 @@ public class NetWrapper{
                 xMax = Integer.max(xMax, x);
                 yMax = Integer.max(yMax, y);
 
-                if (connection.isCrossSLR()
-                        && !routingGraph.isVersal) { // FIXME: Update this for Versal
-                    // For SLR-crossing connections, ensure it contains at least one Laguna column
-                    int nextLaguna = routingGraph.nextLagunaColumn[xMin];
-                    int prevLaguna = routingGraph.prevLagunaColumn[xMax];
-                    xMin = (short) Math.min(xMin, prevLaguna);
-                    xMax = (short) Math.max(xMax, nextLaguna);
+                if (connection.isCrossSLR() && routingGraph.nextCrossingHalfColumn != null) {
+                    // For SLR-crossing connections, ensure it contains at least one column from which super long
+                    // lines can cross SLRs (Laguna on UltraScale/UltraScale+, SLL on Versal)
+                    int nextColumn = routingGraph.getNextCrossingColumn(xMin);
+                    int prevColumn = routingGraph.getPrevCrossingColumn(xMax);
+                    xMin = (short) Math.min(xMin, prevColumn);
+                    xMax = (short) Math.max(xMax, nextColumn);
                 }
 
                 xSum += x;
