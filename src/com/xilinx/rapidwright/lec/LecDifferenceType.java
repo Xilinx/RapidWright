@@ -69,6 +69,18 @@ public enum LecDifferenceType {
     /** A terminal exists in the implementation but not the reference. */
     TERMINAL_MISSING_IN_REF("Terminal missing in REF"),
 
+    /**
+     * A register a retiming certificate defines does not keep its definition
+     * across a clock edge: the certificate, or the retiming, is wrong.
+     */
+    RETIMING_STEP_DIFFERS("Retimed register's next state differs"),
+
+    /** A defined register's initial value contradicts its definition. */
+    RETIMING_INIT_DIFFERS("Retimed register's initial value differs"),
+
+    /** A defined register is clocked differently from what its definition reads. */
+    RETIMING_CLOCK_DIFFERS("Retimed register's clock differs"),
+
     /** The comparison could not be decided, so nothing was proven. */
     CONE_INCONCLUSIVE("Cone inconclusive");
 

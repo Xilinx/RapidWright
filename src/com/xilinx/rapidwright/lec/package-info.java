@@ -166,6 +166,39 @@
  * excluded from the exercised count, so read that count before trusting a
  * pass on a new design family.
  *
+ * <h2>Retiming</h2>
+ *
+ * Registers moved across combinational logic no longer correspond by name, so
+ * a retimed netlist fails a plain comparison. Given a retiming certificate
+ * ({@link com.xilinx.rapidwright.lec.RetimingMap}), the comparison instead
+ * proves the retiming:
+ *
+ * <pre>
+ * rapidwright LogicEquivalenceChecker ref.dcp imp.dcp --retiming-map retiming.txt
+ * </pre>
+ *
+ * Each certificate line defines a register of one netlist as the combinational
+ * function at a pin of the other, such as {@code IMP r = REF lut_f/O} for a
+ * forward move or {@code REF q_reg = IMP lut_g/O} for a backward one. The
+ * certificate is proven, not trusted. Each definition must hold in the initial
+ * state, and must survive a clock edge: the register's next state, including
+ * clock enable and synchronous reset or set, must equal the definition
+ * advanced by one edge. The defined register and the registers its definition
+ * reads must share a clock. Every ordinary check then runs with the defined
+ * registers replaced by their definitions. These are combinational checks on
+ * the same graph, so a retimed comparison costs little more than a plain one.
+ *
+ * Registers present in one netlist only that a definition reads, such as the
+ * registers a forward move consumed, become free variables, so every check
+ * holds for all their values. A register that disappears or appears with no
+ * definition reading it is a terminal difference, as without a certificate.
+ * Defined registers, and the registers a definition reads, must be
+ * {@code FDRE} or {@code FDSE}, and a definition may not read a top level
+ * input, a black box or a memory. Because every check holds for all register
+ * values, a retiming that is only correct on states a reset can reach fails,
+ * which is safe. {@code LecSelfCheck} accepts {@code --retiming-map} too, and
+ * then also damages the retimed registers and the certificate itself.
+ *
  * <h2>Limitations</h2>
  *
  * <ul>
