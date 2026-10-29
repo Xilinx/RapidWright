@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -686,7 +686,6 @@ public class TestRWRoute {
         
         // Write out top EDIF that now has a black boxed cell
         Path opticalFlowTopEDIF = dir.resolve("optical-flow.edf");
-        design.getNetlist().collapseMacroUnisims(design.getSeries());
         design.getNetlist().exportEDIF(opticalFlowTopEDIF);
         
         // Re-load DCP with black boxed netlist

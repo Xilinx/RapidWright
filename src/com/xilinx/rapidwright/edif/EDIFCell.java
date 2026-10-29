@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -702,8 +702,26 @@ public class EDIFCell extends EDIFPropertyObject {
     public static final byte[] EXPORT_CONST_PROP_INDENT = "           ".getBytes(StandardCharsets.UTF_8);
 
     public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException {
+        exportEDIF(os, cache, stable, null);
+    }
+
+    /**
+     * Writes this cell as EDIF, as it is in the given view of the netlist with its macros collapsed.
+     * @param os The stream to write to.
+     * @param cache The cache of legal EDIF names.
+     * @param stable If true, the contents of this cell are written in sorted order.
+     * @param collapsedView The view of the netlist with its macros collapsed, or null to write this
+     *                      cell as it is.
+     */
+    void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable,
+            EDIFCollapsedView collapsedView) throws IOException {
         os.write(EXPORT_CONST_CELL_BEGIN);
-        exportEDIFName(os, cache);
+        if (collapsedView == null) {
+            exportEDIFName(os, cache);
+        } else {
+            String name = collapsedView.getName(this);
+            exportSomeEDIFName(os, name, cache.getEDIFRename(name));
+        }
         os.write(EXPORT_CONST_CELLTYPE);
         view.exportEDIFName(os, cache);
         os.write(EXPORT_CONST_VIEWTYPE);
@@ -711,10 +729,10 @@ public class EDIFCell extends EDIFPropertyObject {
             port.exportEDIF(os, cache, stable);
         }
         os.write(EXPORT_CONST_INTERFACE_END); // Interface end
-        if (hasContents()) {
+        if (hasContents() && (collapsedView == null || !collapsedView.isCollapsed(this))) {
             os.write(EXPORT_CONST_CONTENTS);
             for (EDIFCellInst i : EDIFTools.sortIfStable(getCellInsts(), stable)) {
-                i.exportEDIF(os, cache, stable);
+                i.exportEDIF(os, cache, stable, collapsedView);
             }
             for (EDIFNet n : EDIFTools.sortIfStable(getNets(), stable)) {
                 n.exportEDIF(os, cache, stable);
