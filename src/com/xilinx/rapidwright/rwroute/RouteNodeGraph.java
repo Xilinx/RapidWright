@@ -122,7 +122,7 @@ public class RouteNodeGraph {
      * <li>UltraScale/UltraScale+ (Laguna-adjacent INT tiles; see {@link #populateLagunaLookups}): [0] IMUX and INODE
      * wires (LOCAL_LEADING_TO_SLL), [1] INT_INT and SDQNODE wires (NON_LOCAL_LEADING_TO_SLL).</li>
      * <li>Versal (SLL tiles, each computed when first needed; see {@link #getWireIndicesLeadingToSLL(Tile)}):
-     * [0] SLL inputs whose SLL crosses SLRs (LOCAL_LEADING_TO_SLL), [1] BNODEs that drive such an SLL input.</li>
+     * [0] SLL inputs whose SLL crosses SLRs, [1] BNODEs that drive such an SLL input (both LOCAL_LEADING_TO_SLL).</li>
      * </ul>
      * Keyed by INT tiles on UltraScale/UltraScale+ and by SLL tiles on Versal, so users that are specific to one
      * series check the series rather than whether this is null.
@@ -882,21 +882,18 @@ public class RouteNodeGraph {
 
     /**
      * Checks whether a (Versal) node is a BNODE in an SLL tile that drives an SLL input whose SLL crosses into
-     * another SLR (see {@link #wireIndicesLeadingToSLL}). Such a BNODE also drives the INODEs of the INT tile at which
-     * it ends, so is not itself of a LEADING_TO_SLL type.
-     * @param node Node in question.
+     * another SLR (see {@link #wireIndicesLeadingToSLL}), and so is of type
+     * {@link RouteNodeType#LOCAL_LEADING_TO_SLL} (see RouteNodeInfo.getType()).
+     * @param node NODE_CLE_BNODE node in question.
      * @return True if so.
      */
-    public boolean isBNodeLeadingToSLL(Node node) {
-        if (wireIndicesLeadingToSLL == null || node.getIntentCode() != IntentCode.NODE_CLE_BNODE) {
+    boolean isBNodeLeadingToSLL(Node node) {
+        assert(isVersal && node.getIntentCode() == IntentCode.NODE_CLE_BNODE);
+        if (wireIndicesLeadingToSLL == null || node.getTile().getTileTypeEnum() != TileTypeEnum.SLL) {
             return false;
         }
-        if (node.getTile().getTileTypeEnum() != TileTypeEnum.SLL) {
-            return false;
-        }
-        BitSet[] bs = getWireIndicesLeadingToSLL(node.getTile());
-        boolean leads = bs != null && bs[1].get(node.getWireIndex());
-        assert(!isVersal || leads == isBNodeLeadingToSLLByWalk(node));
+        boolean leads = getWireIndicesLeadingToSLL(node.getTile())[1].get(node.getWireIndex());
+        assert(leads == isBNodeLeadingToSLLByWalk(node));
         return leads;
     }
 
@@ -913,7 +910,7 @@ public class RouteNodeGraph {
         for (Node downhill : node.getAllDownhillNodes()) {
             if (downhill.getIntentCode() == IntentCode.NODE_SLL_INPUT && isCrossingSLLInput(downhill)) {
                 assert(downhill.getTile() == node.getTile());
-                // ... and ends there (see RWRoute.superLongLineLowerBound())
+                // ... and ends there (see RWRoute.getSendingChainPosition())
                 assert(RouteNodeInfo.get(downhill, null).endHalfTileXCoordinate ==
                         2 * RouteNodeInfo.getWestIntTileXCoordinate(node.getTile()) + 1);
                 assert(RouteNodeInfo.get(downhill, null).endTileYCoordinate == node.getTile().getTileYCoordinate());
@@ -1663,16 +1660,20 @@ public class RouteNodeGraph {
                 (Utils.isClocking(childTileType) && childRnode.getIntentCode() == IntentCode.NODE_PINFEED && isPreserved(childRnode))
         );
 
-        if (lutRoutethru && !type.isLocalLeadingToSLL()) {
-            // (a) considering LUT routethrus (that do not lead to an SLL)
+        if (lutRoutethru && (isVersal || !type.isLocalLeadingToSLL())) {
+            // (a) considering LUT routethrus, other than (on UltraScale/UltraScale+ only) through local nodes leading to
+            // an SLL, which can only lead into a Laguna tile and never to a LUT input. (On Versal, where LUT
+            // routethrus are not yet supported, these include BNODEs in SLL tiles, which also drive INODEs.)
             return true;
         }
 
-        // (b) needs to cross an SLR and this is a local node leading to an SLL that crosses SLRs
+        // (b) needs to cross an SLR and this is a local node leading to an SLL that crosses SLRs, other than a Versal
+        // BNODE in an SLL tile (which also drives INODEs, and is subject to (c) as other BNODEs are)
         Tile childTile = childRnode.getTile();
         RouteNode sinkRnode = connection.getSinkRnode();
         int childX = childRnode.getEndTileXCoordinate();
         if (connection.isCrossSLR() && type.isLocalLeadingToSLL() &&
+                childRnode.getIntentCode() != IntentCode.NODE_CLE_BNODE &&
                 childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
             assert(isVersal ? childRnode.getIntentCode() == IntentCode.NODE_SLL_INPUT
                             : wireIndicesLeadingToSLL.get(childTile) != null);
@@ -1797,7 +1798,7 @@ public class RouteNodeGraph {
                             childTile.getTileTypeEnum() == TileTypeEnum.SLL &&
                             childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
                         // Allow CLE BNODEs since these are used to reach NODE_SLL_INPUT nodes
-                        // TODO: Only allow those that lead to a SLR crossing
+                        // TODO: Only allow those that lead to a SLR crossing (of type LOCAL_LEADING_TO_SLL)
                         return true;
                     }
                 case NODE_INTF_BNODE:

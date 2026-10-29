@@ -353,13 +353,18 @@ public class RouteNodeInfo {
             case NODE_INODE:        // INT.INT_NODE_IMUX_ATOM_*_INT_OUT[01]          (Versal only)
             case NODE_IMUX:         // INT.IMUX_B_[EW]*                              (Versal only)
             case NODE_CLE_CNODE:    // CLE_BC_CORE*.CNODE_OUTS_[EW]*                 (Versal only)
-            case NODE_CLE_BNODE:    // CLE_BC_CORE*.BNODE_OUTS_[EW]*                 (Versal only)
+            case NODE_CLE_BNODE:    // CLE_BC_CORE*/SLL.BNODE_OUTS_[EW]*             (Versal only)
             case NODE_INTF_BNODE:   // INTF_[LR]OCF_[TB][LR]_TILE.IF_INT_BNODE_OUTS* (Versal only)
             case NODE_INTF_CNODE:   // INTF_[LR]OCF_[TB][LR]_TILE.IF_INT_CNODE_OUTS* (Versal only)
                 // Other than CTRL_* pins (which are reachable from INT_NODE_GLOBAL_* on either side but are
                 // still on a specific side; see RouteNodeType.EXCLUSIVE_SINK_CTRL), these nodes serve one side only
                 assert(routingGraph.isSidedLocalWire(tileTypeEnum, node.getWireIndex()) ||
                        (!routingGraph.isVersal && node.getWireName().startsWith("CTRL_")));
+                if (ic == IntentCode.NODE_CLE_BNODE && routingGraph.isBNodeLeadingToSLL(node)) {
+                    // A BNODE in an SLL tile that drives an SLL input whose SLL crosses into another SLR (as looked
+                    // up in RouteNodeGraph.wireIndicesLeadingToSLL): still on the side of the INODEs that it drives
+                    return RouteNodeType.LOCAL_LEADING_TO_SLL;
+                }
                 return RouteNodeType.LOCAL;
 
             case NODE_SINGLE:

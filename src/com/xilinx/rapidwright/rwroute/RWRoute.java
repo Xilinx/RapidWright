@@ -2103,6 +2103,10 @@ public class RWRoute {
         int[] sendingPosition = null;
         if (connection.isCrossSLR()) {
             assert(!childRnode.getType().isLocalLeadingToSLL() ||
+                    // Versal BNODEs in SLL tiles are not restricted to the direction of their SLL (see
+                    // RouteNodeGraph.isAccessible()), but are only on the sending side of a chain in that direction (see
+                    // getSendingChainPosition())
+                    childRnode.getIntentCode() == IntentCode.NODE_CLE_BNODE ||
                     (routingGraph.isNorthboundSLLRow(childRnode.getTile().getTileYCoordinate())
                             ? connection.isCrossSLRnorth() : connection.isCrossSLRsouth()) ||
                     (deltaX == 0 && deltaY <= 1));
@@ -2273,8 +2277,8 @@ public class RWRoute {
      * leading to one that crosses towards the sink (see remainingCrossingCost()): on UltraScale/UltraScale+, the west
      * half of the node's INT tile column (where the super long line lands; see
      * RouteNodeGraph.populateLagunaLookups()); on Versal, that of an SLL input, or for a BNODE in an SLL tile that
-     * leads to one (see RouteNodeGraph.isBNodeLeadingToSLL()), that of its own SLL tile (as such an SLL input's would
-     * be; see RouteNodeInfo.get()) rather than its own end (the INT tile whose INODEs it also drives).
+     * leads to one (both of type LOCAL_LEADING_TO_SLL), that of its own SLL tile (as such an SLL input's would be; see
+     * RouteNodeInfo.get()) rather than its own end (the INT tile whose INODEs it also drives).
      * @param connection The connection being routed.
      * @param rnode The parent of the node in question.
      * @param childRnode The node in question.
@@ -2286,17 +2290,19 @@ public class RWRoute {
         final int halfX;
         final int y;
         if (routingGraph.isVersal) {
-            if (childType == RouteNodeType.LOCAL_LEADING_TO_SLL) {
+            if (childType != RouteNodeType.LOCAL_LEADING_TO_SLL) {
+                return null;
+            }
+            if (childRnode.getIntentCode() == IntentCode.NODE_SLL_INPUT) {
                 // SLL input (LAG_CASCOUT_TXI*)
                 halfX = childRnode.getEndHalfTileXCoordinate();
                 y = childRnode.getEndTileYCoordinate();
-            } else if (routingGraph.isBNodeLeadingToSLL(childRnode)) {
+            } else {
                 // BNODE in an SLL tile (BNODE_OUTS_[EW]*)
+                assert(childRnode.getIntentCode() == IntentCode.NODE_CLE_BNODE);
                 Tile sllTile = childRnode.getTile();
                 halfX = 2 * RouteNodeInfo.getWestIntTileXCoordinate(sllTile) + 1;
                 y = sllTile.getTileYCoordinate();
-            } else {
-                return null;
             }
         } else if (childType == RouteNodeType.NON_LOCAL_LEADING_TO_SLL || childType == RouteNodeType.LOCAL_LEADING_TO_SLL ||
                 (rnode.getType() == RouteNodeType.LOCAL_LEADING_TO_SLL &&
@@ -2387,7 +2393,7 @@ public class RWRoute {
         final RouteNodeType childType = childRnode.getType();
         if (routingGraph.isVersal) {
             // SLL input, or BNODE in an SLL tile leading to one
-            remainingLocals = (childType == RouteNodeType.LOCAL_LEADING_TO_SLL) ? 0 : 1;
+            remainingLocals = (childRnode.getIntentCode() == IntentCode.NODE_SLL_INPUT) ? 0 : 1;
         } else if (childType == RouteNodeType.NON_LOCAL_LEADING_TO_SLL) {
             remainingLocals = 3;
             if (childRnode.getIntentCode() != IntentCode.NODE_SINGLE) {
