@@ -34,6 +34,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
@@ -612,6 +614,62 @@ public class TestRWRoute {
         test_route.routeSites();
 
         RWRoute.routeDesignFullNonTimingDriven(test_route);
+    }
+
+    private static int getCriticalPathDelay(String report) {
+        Matcher matcher = Pattern.compile("Critical path delay \\(ps\\):\\s+(\\d+)").matcher(report);
+        Assertions.assertTrue(matcher.find());
+        return Integer.parseInt(matcher.group(1));
+    }
+
+    /**
+     * Tests timing-driven routing with LUT pin swapping on a minimal design: a flop drives a LUT input
+     * placed on the LUT's slowest pin (A1->O6 has a much larger logic delay than A6->O6), and the LUT
+     * drives the flop back. Routing must weigh each candidate pin's LUT logic delay, rather than route
+     * delay alone, so the input should move to one of the fastest pins; and the timing graph must
+     * follow the pin that the connection is routed to, so that RWRoute's own critical path matches a
+     * fresh timing analysis of the routed design.
+     */
+    @Test
+    public void testTimingDrivenLutPinSwapping() {
+        Design design = new Design("top", "xcvu3p");
+        Cell lut = design.createAndPlaceCell("lut", Unisim.LUT1, "SLICE_X40Y61/A6LUT");
+        LUTTools.configureLUT(lut, "O=I0");
+        lut.removePinMapping(lut.getPhysicalPinMapping("I0"));
+        lut.addPinMapping("A1", "I0");
+        Cell ff = design.createAndPlaceCell("ff", Unisim.FDCE, "SLICE_X40Y60/AFF");
+
+        Net q = design.createNet("q");
+        ECOTools.connectNet(design, ff, "Q", q);
+        ECOTools.connectNet(design, lut, "I0", q);
+        Net o = design.createNet("o");
+        ECOTools.connectNet(design, lut, "O", o);
+        ECOTools.connectNet(design, ff, "D", o);
+        design.routeSites();
+
+        ByteArrayOutputStream routeCapture = new ByteArrayOutputStream();
+        ByteArrayOutputStream reportCapture = new ByteArrayOutputStream();
+        PrintStream originalOut = System.out;
+        try {
+            System.setOut(new PrintStream(routeCapture, true));
+            RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--lutPinSwapping"});
+            System.setOut(new PrintStream(reportCapture, true));
+            RWRouteConfig config = new RWRouteConfig(new String[0]);
+            config.setTimingDriven(true);
+            new TimingAndWirelengthReport(design, config, false).computeStatisticsAndReport();
+        } finally {
+            System.setOut(originalOut);
+        }
+        System.out.print(routeCapture);
+        System.out.print(reportCapture);
+
+        // The A1..A6 -> O6 logic delays are 150/125/100/90/50/35 ps, whereas routing to the different
+        // input pins of the same LUT differs by much less (e.g. the A1..A6 site pin delays are 74..43 ps),
+        // so the input must move to one of the two fastest pins
+        String pin = lut.getPhysicalPinMapping("I0");
+        Assertions.assertTrue(pin.equals("A5") || pin.equals("A6"), "I0 routed to pin " + pin);
+        Assertions.assertEquals(getCriticalPathDelay(reportCapture.toString()),
+                getCriticalPathDelay(routeCapture.toString()));
     }
 
     /**

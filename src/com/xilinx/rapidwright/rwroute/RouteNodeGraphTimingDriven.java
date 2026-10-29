@@ -23,16 +23,25 @@
 
 package com.xilinx.rapidwright.rwroute;
 
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
+import com.xilinx.rapidwright.timing.DelayModel;
+import com.xilinx.rapidwright.timing.TimingEdge;
+import com.xilinx.rapidwright.timing.TimingGraph;
+import com.xilinx.rapidwright.timing.TimingManager;
+import com.xilinx.rapidwright.timing.TimingVertex;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -100,6 +109,114 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
     @Override
     public DelayEstimatorBase<InterconnectInfo> getDelayEstimator() {
         return delayEstimator;
+    }
+
+    /**
+     * Gets the LUT logic delay with a connection arriving at the given sink rnode (one of its
+     * candidate LUT input pins, with LUT pin swapping): the worst of the timing graph's logic edges
+     * from the LUT input(s) that the connection feeds, or zero if there are none (the timing graph
+     * has no logic edge from an input that the LUT's function does not depend on), or if the
+     * connection's sink pin cannot be swapped. These delays depend only on the LUT BEL and its
+     * pins, so they are looked up in the delay model rather than stored per connection.
+     * @param timingGraph The timing graph.
+     * @param connection The connection.
+     * @param sinkRnode One of the connection's sink rnodes.
+     * @param updateTimingGraph True to also set those logic edges' delays in the timing graph.
+     * @return The logic delay in ps.
+     */
+    @Override
+    protected float getLutLogicDelay(TimingGraph timingGraph, Connection connection, RouteNode sinkRnode,
+                                     boolean updateTimingGraph) {
+        // Only LUT pin swapping gives a connection alternate sinks
+        if (!connection.hasAltSinks()) {
+            return 0;
+        }
+        DelayModel delayModel = timingGraph.getintraSiteAndLogicDelayModel();
+        String sitePinName = sinkRnode.getSitePin().getPinName();
+        float worst = 0;
+        for (TimingEdge edge : connection.getTimingEdges()) {
+            TimingVertex input = edge.getDst();
+            String inputName = input.getName();
+            Cell cell = design.getCell(inputName.substring(0, inputName.lastIndexOf('/')));
+            BEL bel = cell.getBEL();
+            assert(bel.isLUT());
+            String inputPin = null;
+            for (BELPin belPin : bel.getPins()) {
+                if (belPin.isInput() && sitePinName.equals(belPin.getConnectedSitePinName())) {
+                    inputPin = belPin.getName();
+                    break;
+                }
+            }
+            if (inputPin == null) {
+                throw new RuntimeException("ERROR: Site pin " + sitePinName + " does not drive an input of " + bel);
+            }
+            short belIdx = delayModel.getBELIndex(bel.getName());
+            for (TimingEdge logic : timingGraph.outgoingEdgesOf(input)) {
+                String outputName = logic.getDst().getName();
+                String outputPin = cell.getPhysicalPinMapping(outputName.substring(outputName.lastIndexOf('/') + 1));
+                short delay = delayModel.getLogicDelay(belIdx, inputPin, outputPin);
+                if (delay < 0) {
+                    throw new RuntimeException("ERROR: No logic delay from " + bel + "." + inputPin + " to " + outputPin);
+                }
+                if (updateTimingGraph) {
+                    logic.setLogicDelay(delay);
+                }
+                worst = Math.max(worst, delay);
+            }
+        }
+        return worst;
+    }
+
+    /**
+     * Sets, for each of the connection's targets (its candidate LUT input pins), its LUT logic
+     * delay in excess of that of the fastest target.
+     * @param state State from the connection that is being routed, with its targets marked.
+     * @param timingManager The timing manager.
+     */
+    @Override
+    protected void setTargetExcessLogicDelays(RWRoute.ConnectionState state, TimingManager timingManager) {
+        TimingGraph timingGraph = timingManager.getTimingGraph();
+        List<RouteNode> targets = state.targets;
+        float[] excess = state.targetExcessLogicDelays;
+        assert(targets.size() <= excess.length);
+        float fastest = Float.MAX_VALUE;
+        for (int i = 0; i < targets.size(); i++) {
+            excess[i] = getLutLogicDelay(timingGraph, state.connection, targets.get(i), false);
+            fastest = Math.min(fastest, excess[i]);
+        }
+        for (int i = 0; i < targets.size(); i++) {
+            excess[i] -= fastest;
+        }
+    }
+
+    @Override
+    protected float getTargetExcessLogicDelay(RWRoute.ConnectionState state, RouteNode target) {
+        return state.targetExcessLogicDelays[state.targets.indexOf(target)];
+    }
+
+    /**
+     * Checks if routing a connection may terminate early on pushing the given (uncongested) target:
+     * if its excess LUT logic delay costs nothing (no other candidate LUT input pin has a lower
+     * logic delay, or the connection is not critical) and no other target is already queued. As
+     * for any other connection, this does not bound the routing cost to the other candidates.
+     * @param state State from the connection that is being routed.
+     * @param target The target being pushed.
+     * @return True if early termination is allowed.
+     */
+    @Override
+    protected boolean isEarlyTerminable(RWRoute.ConnectionState state, RouteNode target) {
+        List<RouteNode> targets = state.targets;
+        for (int i = 0; i < targets.size(); i++) {
+            RouteNode rnode = targets.get(i);
+            if (rnode == target) {
+                if (state.dlyWeight * state.targetExcessLogicDelays[i] != 0) {
+                    return false;
+                }
+            } else if (rnode.isVisited(state.sequence)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     protected static class RouteNodeTimingDriven extends RouteNode {

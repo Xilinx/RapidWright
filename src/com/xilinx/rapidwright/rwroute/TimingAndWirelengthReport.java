@@ -70,7 +70,7 @@ public class TimingAndWirelengthReport{
     /**
      * Computes the wirelength and delay for each net and reports the total wirelength and critical path delay.
      */
-    private void computeStatisticsAndReport() {
+    public void computeStatisticsAndReport() {
         computeNetsWirelengthAndDelay();
 
         Pair<Float, TimingVertex> maxDelayAndTimingVertex = timingManager.calculateArrivalRequiredTimes();
