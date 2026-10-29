@@ -40,6 +40,7 @@ import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
@@ -418,7 +419,7 @@ public class EDIFRandomSimEquivalence {
                 if (idx.getPinPortInst(p).getName().equals(pin)) {
                     int n = idx.getPinNet(p);
                     if (n >= 0) {
-                        val[n] = v;
+                        val[n] ^= v;
                     }
                 }
             }
@@ -543,13 +544,17 @@ public class EDIFRandomSimEquivalence {
         m.out(l, "COUT" + "BDFH".charAt(sub), couts[sub]);
     }
 
-    /** Assigns sources (ports, constants, cut outputs) and evaluates the logic. */
+    /**
+     * Assigns sources (ports, constants, cut outputs) and evaluates the logic. A net with several
+     * drivers (e.g. tri-state buffers) gets the XOR of their values: not their resolution, but
+     * any change in its set of drivers changes its value.
+     */
     private static void simulate(Model m, int round, Map<Integer, Long> forced) {
         Arrays.fill(m.val, 0L);
         EDIFLeafIndex idx = m.idx;
         for (int p = idx.getNumLeafPins(); p < idx.getNumPins(); p++) {
             if (idx.getPinDir(p) != EDIFLeafIndex.SINK && idx.getPinNet(p) >= 0) {
-                m.val[idx.getPinNet(p)] = rand("PORT:" + idx.getPinPortInst(p).getName(), round);
+                m.val[idx.getPinNet(p)] ^= rand("PORT:" + idx.getPinPortInst(p).getName(), round);
             }
         }
         for (int l = 0; l < idx.getNumLeaves(); l++) {
@@ -568,7 +573,7 @@ public class EDIFRandomSimEquivalence {
                 if (idx.getPinDir(p) == EDIFLeafIndex.SINK || n < 0) {
                     continue;
                 }
-                m.val[n] = gnd ? 0L : vcc ? -1L : f != null ? f
+                m.val[n] ^= gnd ? 0L : vcc ? -1L : f != null ? f
                         : rand(m.names[l] + "/" + idx.getPinPortInst(p).getName(), round);
             }
         }
@@ -635,10 +640,13 @@ public class EDIFRandomSimEquivalence {
      * Checks equivalence of the original and optimized netlists.
      * @param orig The original netlist.
      * @param opt The optimized netlist.
-     * @param rounds Number of 64-pattern simulation rounds.
+     * @param rounds Number of 64-pattern simulation rounds (at least 1).
      * @return The number of mismatching observations.
      */
     public int check(EDIFNetlist orig, EDIFNetlist opt, int rounds) {
+        if (rounds < 1) {
+            throw new IllegalArgumentException("At least one simulation round is needed: " + rounds);
+        }
         mismatches = 0;
         checked = 0;
         unchecked = 0;
@@ -789,8 +797,8 @@ public class EDIFRandomSimEquivalence {
 
     /**
      * Properties a surviving cut cell may change: OPT_MODIFIED, and the inversion of a single-bit
-     * pin (IS_[pin]_INVERTED), which is part of the simulation. Inversion masks of bus pins (e.g.
-     * a DSP's IS_ALUMODE_INVERTED) are not simulated, so they are compared.
+     * input pin (IS_[pin]_INVERTED), which is part of the simulation. Inversion masks of bus pins
+     * (e.g. a DSP's IS_ALUMODE_INVERTED) and of outputs are not simulated, so they are compared.
      */
     private static boolean isIgnoredProperty(EDIFCell cell, String key) {
         String k = key.toUpperCase();
@@ -801,7 +809,7 @@ public class EDIFRandomSimEquivalence {
             return false;
         }
         EDIFPort port = cell.getPort(key.substring(3, key.length() - 9));
-        return port != null && !port.isBus();
+        return port != null && !port.isBus() && port.getDirection() == EDIFDirection.INPUT;
     }
 
     /** Series of the original netlist (null if unknown), for the declared property types. */

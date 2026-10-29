@@ -1226,6 +1226,106 @@ public class TestEDIFNetlistOptimizer {
                 stats.getTimes().toString());
     }
 
+    /** Two tri-state buffers drive output o; without A, only B does. */
+    private static EDIFNetlist triStates(boolean withA) {
+        OptProbes.B b = new OptProbes.B("tristates");
+        b.in("a", "b", "t");
+        b.out("o");
+        if (withA) {
+            b.inst(Unisim.OBUFT, "A", "I=a", "T=t", "O=o");
+        }
+        b.inst(Unisim.OBUFT, "B", "I=b", "T=t", "O=o");
+        return b.nl;
+    }
+
+    @Test
+    public void testRandomSimEquivalenceSeesChangedDriversOfMultiDrivenNets() {
+        Assertions.assertEquals(0, new EDIFRandomSimEquivalence().check(triStates(true),
+                triStates(true), 2));
+        Assertions.assertTrue(new EDIFRandomSimEquivalence().check(triStates(true),
+                triStates(false), 2) > 0);
+    }
+
+    @Test
+    public void testRandomSimEquivalenceNeedsRounds() {
+        Assertions.assertThrows(IllegalArgumentException.class,
+                () -> new EDIFRandomSimEquivalence().check(triStates(true), triStates(true), 0));
+    }
+
+    private static EDIFNetlist opaqueWithOutputInversion(String inverted) {
+        OptProbes.B b = new OptProbes.B("out_inv");
+        b.in("a");
+        b.out("o");
+        EDIFCell cell = new EDIFCell(b.nl.getWorkLibrary(), "opaque");
+        cell.createPort("D", EDIFDirection.INPUT, 1);
+        cell.createPort("Q", EDIFDirection.OUTPUT, 1);
+        b.inst(cell, "X", "D=a", "Q=o", "@IS_Q_INVERTED=" + inverted);
+        return b.nl;
+    }
+
+    @Test
+    public void testRandomSimEquivalenceComparesOutputInversions() {
+        // Only input pin inversions are simulated; a changed output inversion is reported
+        Assertions.assertEquals(0, new EDIFRandomSimEquivalence().check(
+                opaqueWithOutputInversion("1'b0"), opaqueWithOutputInversion("1'b0"), 2));
+        Assertions.assertTrue(new EDIFRandomSimEquivalence().check(
+                opaqueWithOutputInversion("1'b0"), opaqueWithOutputInversion("1'b1"), 2) > 0);
+    }
+
+    @Test
+    public void testCleanupKeepsHierarchyWithPreservedNet() {
+        // 'sub' contains no cell, only a DONT_TOUCH net on its input
+        OptProbes.B b = new OptProbes.B("dt_net_only");
+        b.in("a");
+        b.out("o");
+        EDIFCell sub = b.cell("sub");
+        b.in(sub, "x");
+        sub.getNet("x").addProperty("DONT_TOUCH", "TRUE");
+        b.inst(sub, "u", "x=a");
+        b.lut("L", "2", "o", "a");
+        EDIFTools.optimizeNetlist(b.nl, new EDIFOptOptions());
+        Assertions.assertNotNull(b.top.getCellInst("u"));
+        Assertions.assertNotNull(b.top.getCellInst("u").getCellType().getNet("x"));
+    }
+
+    @Test
+    public void testCleanupLeavesPreservedHierarchyUntouched() {
+        // An empty child (only a port net) inside a DONT_TOUCH instance stays
+        OptProbes.B b = new OptProbes.B("dt_nested_empty");
+        b.in("a");
+        b.out("o");
+        EDIFCell empty = b.cell("empty");
+        b.in(empty, "x");
+        EDIFCell mid = b.cell("mid");
+        b.in(mid, "y");
+        b.out(mid, "z");
+        b.lut(mid, "L", "2", "z", "y");
+        b.instIn(mid, empty, "e", "x=y");
+        b.inst(mid, "u0", "y=a", "z=o").addProperty("DONT_TOUCH", "TRUE");
+        EDIFTools.optimizeNetlist(b.nl, new EDIFOptOptions());
+        Assertions.assertNotNull(b.top.getCellInst("u0").getCellType().getCellInst("e"));
+    }
+
+    @Test
+    public void testHierarchyRemovalCountsEveryInstance() {
+        // 'mid' (two instances) contains an empty child: two hierarchical instances removed
+        OptProbes.B b = new OptProbes.B("shared_empty");
+        b.in("a", "b");
+        b.out("o0", "o1");
+        EDIFCell empty = b.cell("empty");
+        b.in(empty, "x");
+        EDIFCell mid = b.cell("mid");
+        b.in(mid, "y");
+        b.out(mid, "z");
+        b.lut(mid, "L", "2", "z", "y");
+        b.instIn(mid, empty, "e", "x=y");
+        b.inst(mid, "m0", "y=a", "z=o0");
+        b.inst(mid, "m1", "y=b", "z=o1");
+        EDIFOptStats stats = EDIFTools.optimizeNetlist(b.nl, new EDIFOptOptions());
+        Assertions.assertNull(mid.getCellInst("e"));
+        Assertions.assertEquals(2, stats.getRemoved(EDIFOptStats.Phase.SWEEP));
+    }
+
     @Test
     public void testComparatorsResetBetweenComparisons() {
         Supplier<EDIFNetlist> s = OptProbes.getProbes().get("lut_chain");

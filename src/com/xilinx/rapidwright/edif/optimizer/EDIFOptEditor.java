@@ -1238,6 +1238,9 @@ class EDIFOptEditor {
         d.portGroup = new HashMap<>();
         Map<EDIFNet, String> rootPort = new IdentityHashMap<>();
         for (EDIFNet net : cell.getNets()) {
+            if (EDIFConstPropEngine.hasPreserveProp(net)) {
+                d.preserved = true;
+            }
             for (EDIFPortInst pi : net.getPortInsts()) {
                 if (pi.getCellInst() != null) {
                     continue;
@@ -1260,7 +1263,10 @@ class EDIFOptEditor {
      */
     private int removeEmptyHierInsts() {
         Map<EDIFCell, DefCleanup> memo = new IdentityHashMap<>();
-        int count = 0;
+        Map<EDIFCell, Long> occurrences = new IdentityHashMap<>();
+        Set<EDIFCell> preserved = Collections.newSetFromMap(new IdentityHashMap<>());
+        analyzeHierarchy(occurrences, preserved);
+        long count = 0;
         NetBatch batch = new NetBatch();
         Set<EDIFCell> parents = Collections.newSetFromMap(new IdentityHashMap<>());
         List<EDIFCell> todo = new ArrayList<>();
@@ -1269,6 +1275,10 @@ class EDIFOptEditor {
         visited.add(netlist.getTopCell());
         for (int i = 0; i < todo.size(); i++) {
             EDIFCell cell = todo.get(i);
+            if (preserved.contains(cell)) {
+                // Contents of a preserved instance are left untouched
+                continue;
+            }
             for (EDIFCellInst child : new ArrayList<>(cell.getCellInsts())) {
                 EDIFCell t = child.getCellType();
                 if (isLeaf(t)) {
@@ -1283,7 +1293,8 @@ class EDIFOptEditor {
                     cell.removeCellInst(child);
                     parents.add(cell);
                     int nested = countHierInsts(t);
-                    count += 1 + nested;
+                    // Once per instance of this cell in the hierarchy
+                    count += occurrences.getOrDefault(cell, 1L) * (1 + nested);
                     if (report != null) {
                         report.add("HIERARCHY_REMOVED", cell.getName() + ":" + child.getName(),
                                 t.getName(), "no leaf cells left and no signal passing through"
@@ -1316,7 +1327,57 @@ class EDIFOptEditor {
                 }
             }
         }
-        return count;
+        return (int) Math.min(count, Integer.MAX_VALUE);
+    }
+
+    /**
+     * Computes, for each hierarchical cell definition, its number of instances in the hierarchy,
+     * and the definitions instantiated (possibly indirectly) under a preserved instance.
+     */
+    private void analyzeHierarchy(Map<EDIFCell, Long> occurrences, Set<EDIFCell> preserved) {
+        EDIFCell top = netlist.getTopCell();
+        // Parent instantiations of each definition, then a topological pass from the top
+        Map<EDIFCell, Integer> parents = new IdentityHashMap<>();
+        List<EDIFCell> defs = new ArrayList<>();
+        defs.add(top);
+        Set<EDIFCell> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        seen.add(top);
+        for (int i = 0; i < defs.size(); i++) {
+            for (EDIFCellInst child : defs.get(i).getCellInsts()) {
+                EDIFCell t = child.getCellType();
+                if (isLeaf(t)) {
+                    continue;
+                }
+                parents.merge(t, 1, Integer::sum);
+                if (EDIFConstPropEngine.hasPreserveProp(child)) {
+                    preserved.add(t);
+                }
+                if (seen.add(t)) {
+                    defs.add(t);
+                }
+            }
+        }
+        List<EDIFCell> order = new ArrayList<>();
+        order.add(top);
+        occurrences.put(top, 1L);
+        for (int i = 0; i < order.size(); i++) {
+            EDIFCell cell = order.get(i);
+            long n = occurrences.get(cell);
+            boolean prot = preserved.contains(cell);
+            for (EDIFCellInst child : cell.getCellInsts()) {
+                EDIFCell t = child.getCellType();
+                if (isLeaf(t)) {
+                    continue;
+                }
+                occurrences.merge(t, n, Long::sum);
+                if (prot) {
+                    preserved.add(t);
+                }
+                if (parents.merge(t, -1, Integer::sum) == 0) {
+                    order.add(t);
+                }
+            }
+        }
     }
 
     private int countHierInsts(EDIFCell cell) {

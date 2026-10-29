@@ -410,13 +410,7 @@ public class EDIFLeafIndex {
                 p++;
             }
             if (boundaryInnerSeg.get(i) >= 0) {
-                EDIFNet inner = hCell[h].getInternalNet(pi);
-                EDIFPortInst innerPi = null;
-                for (EDIFPortInst q : inner.getPortInsts()) {
-                    if (q.isTopLevelPort() && q.getName().equals(pi.getName())) {
-                        innerPi = q;
-                    }
-                }
+                EDIFPortInst innerPi = hCell[h].getInternalNet(pi).getPortInst(null, pi.getName());
                 pPortInst[p] = innerPi != null ? innerPi : pi;
                 pLeaf[p] = BOUNDARY;
                 pNet[p] = segNet[boundaryInnerSeg.get(i)];
