@@ -1667,15 +1667,16 @@ public class RouteNodeGraph {
             return true;
         }
 
-        // (b) needs to cross an SLR and this is a local node leading to an SLL that crosses SLRs, other than a Versal
-        // BNODE in an SLL tile (which also drives INODEs, and is subject to (c) as other BNODEs are)
+        // (b) needs to cross an SLR and this is a local node leading to an SLL that crosses SLRs (including a Versal BNODE
+        // in an SLL tile, which can end on the other side of that tile to what drives it, and which, being on the
+        // sending side of a chain, is not restricted to the side of the sink by (c))
         Tile childTile = childRnode.getTile();
         RouteNode sinkRnode = connection.getSinkRnode();
         int childX = childRnode.getEndTileXCoordinate();
         if (connection.isCrossSLR() && type.isLocalLeadingToSLL() &&
-                childRnode.getIntentCode() != IntentCode.NODE_CLE_BNODE &&
                 childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
-            assert(isVersal ? childRnode.getIntentCode() == IntentCode.NODE_SLL_INPUT
+            assert(isVersal ? (childRnode.getIntentCode() == IntentCode.NODE_SLL_INPUT ||
+                               childRnode.getIntentCode() == IntentCode.NODE_CLE_BNODE)
                             : wireIndicesLeadingToSLL.get(childTile) != null);
             assert(childTile != sinkRnode.getTile());
             if (isNorthboundSLLRow(childTile.getTileYCoordinate()) ? !connection.isCrossSLRnorth() : !connection.isCrossSLRsouth()) {
@@ -1797,8 +1798,9 @@ public class RouteNodeGraph {
                     if (connection.isCrossSLR() &&
                             childTile.getTileTypeEnum() == TileTypeEnum.SLL &&
                             childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
-                        // Allow CLE BNODEs since these are used to reach NODE_SLL_INPUT nodes
-                        // TODO: Only allow those that lead to a SLR crossing (of type LOCAL_LEADING_TO_SLL)
+                        // Allow CLE BNODEs since these are used to reach NODE_SLL_INPUT nodes (those that lead to an
+                        // SLL crossing SLRs, of type LOCAL_LEADING_TO_SLL, were handled by (b) above)
+                        // TODO: Only allow those that lead to a SLR crossing
                         return true;
                     }
                 case NODE_INTF_BNODE:

@@ -1939,8 +1939,11 @@ public class RWRoute {
                                 (childType.isSidedLocal() && rnode.isOnEastSide() == childRNode.isOnEastSide()) ||
                                 // ... unless it's an exclusive sink using a LOCAL_RESERVED node
                                 (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType().isExclusiveSinkCtrlOrSllInput()) ||
-                                // ... or unless it's a Versal SLL input
-                                childRNode.getIntentCode() == IntentCode.NODE_SLL_INPUT);
+                                // ... or unless it's a Versal SLL input, or a BNODE in an SLL tile leading to one that
+                                // crosses SLRs (which can end on the other side of the SLL tile to what drives it, and
+                                // like such an SLL input is accessible from either side; see RouteNodeGraph.isAccessible())
+                                childRNode.getIntentCode() == IntentCode.NODE_SLL_INPUT ||
+                                (routingGraph.isVersal && childType.isLocalLeadingToSLL()));
                         break;
                     case NON_LOCAL_LEADING_TO_SLL: // UltraScale/UltraScale+ only
                     case NON_LOCAL:
@@ -2103,10 +2106,6 @@ public class RWRoute {
         int[] sendingPosition = null;
         if (connection.isCrossSLR()) {
             assert(!childRnode.getType().isLocalLeadingToSLL() ||
-                    // Versal BNODEs in SLL tiles are not restricted to the direction of their SLL (see
-                    // RouteNodeGraph.isAccessible()), but are only on the sending side of a chain in that direction (see
-                    // getSendingChainPosition())
-                    childRnode.getIntentCode() == IntentCode.NODE_CLE_BNODE ||
                     (routingGraph.isNorthboundSLLRow(childRnode.getTile().getTileYCoordinate())
                             ? connection.isCrossSLRnorth() : connection.isCrossSLRsouth()) ||
                     (deltaX == 0 && deltaY <= 1));

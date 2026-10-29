@@ -414,7 +414,7 @@ public class TestRWRoute {
             // One SLR crossing
             // (Too) close
             "xcv80,SLICE_X54Y331,SLICE_X54Y332,200",            // Source adjacent to crossing SLL (east)
-            "xcv80,SLICE_X53Y332,SLICE_X53Y331,200",            // Source adjacent to crossing SLL (west)
+            "xcv80,SLICE_X53Y332,SLICE_X53Y331,100",            // Source adjacent to crossing SLL (west)
             "xcv80,SLICE_X51Y331,SLICE_X51Y332,300",            // Close to crossing SLL
             // Perfect
             "xcv80,SLICE_X54Y331,SLICE_X54Y406,100",            // Source adjacent to crossing SLL (east, north)
@@ -775,7 +775,7 @@ public class TestRWRoute {
             "SLICE_X95Y621,SLICE_X92Y546,LAG_N,3, false",
 
             // Connecting to a non-LAG pin requires routethru
-            "SLICE_X95Y621,SLICE_X93Y456,FX,200,true",
+            "SLICE_X95Y621,SLICE_X93Y456,FX,100,true",
             "SLICE_X95Y621,SLICE_X92Y456,EX,100,true"
     })
     public void testRWRouteVersalSLRCrossingStraightIntoFlop(String srcSiteName, String dstSiteName, String dstPinName, int nodesPoppedLimit, boolean expectRoutethru) {
