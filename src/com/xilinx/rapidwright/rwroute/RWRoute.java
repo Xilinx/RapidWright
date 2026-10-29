@@ -1870,7 +1870,6 @@ public class RWRoute {
         final PriorityQueue<RouteNode> queue = state.queue;
         final NetWrapper netWrapper = connection.getNetWrapper();
         final RouteNodeType rnodeType = rnode.getType();
-        final boolean rnodeIsLaguna = Utils.isLaguna(rnode.getTile().getTileTypeEnum());
 
         for (RouteNode childRNode : rnode.getChildren(routingGraph)) {
             if (childRNode.isVisited(sequence)) {
@@ -1920,8 +1919,10 @@ public class RWRoute {
                 RouteNodeType childType = childRNode.getType();
                 switch (childType) {
                     case LOCAL_LEADING_TO_SLL:
-                        // Lookahead beyond child nodes leading to an SLL if it won't get overused
-                        lookahead = !childRNode.willOverUse(netWrapper);
+                        // On Versal, lookahead beyond child nodes leading to an SLL (SLL inputs) if it won't get
+                        // overused. UltraScale/UltraScale+ use no lookahead: instead, nodes leading to or from a super
+                        // long line get lower bounds that already account for it (see lagunaLowerBound())
+                        lookahead = routingGraph.isVersal && !childRNode.willOverUse(netWrapper);
                         // Fall-through
                     case LOCAL:
                     case LOCAL_SIDE_DEPENDS_ON_SINK:
@@ -1937,15 +1938,7 @@ public class RWRoute {
                                 // ... or unless it's a Versal SLL input
                                 childRNode.getIntentCode() == IntentCode.NODE_SLL_INPUT);
                         break;
-                    case NON_LOCAL_LEADING_TO_SLL:
-                        if (connection.isCrossSLR() && connection.getSinkRnode().getSLRIndex(routingGraph) != childRNode.getSLRIndex(routingGraph) &&
-                                (routingGraph.isNorthboundSLLRow(childRNode.getTile().getTileYCoordinate())
-                                        ? connection.isCrossSLRnorth() : connection.isCrossSLRsouth())) {
-                            // Only lookahead beyond child nodes leading to an SLL if we require an SLR crossing in that direction,
-                            // and it won't get overused
-                            lookahead = !childRNode.willOverUse(netWrapper);
-                        }
-                        // Fall-through
+                    case NON_LOCAL_LEADING_TO_SLL: // UltraScale/UltraScale+ only
                     case NON_LOCAL:
                     case NON_LOCAL_INHERIT_PREV_SIDE:
                         // LOCALs cannot connect to NON_LOCALs except
@@ -1966,14 +1959,6 @@ public class RWRoute {
                             // such as U-turn shape nodes near the boundary
                             continue;
                         }
-
-                        // Lookahead if parent or child is in a Laguna tile
-                        // (e.g. LAG_MUX_ATOM_\\d+_TXOUT -> UBUMP\\d+
-                        //       LAG_LAGUNA_SITE_[0-3]_RXD[0-5] -> RXD\\d+
-                        //       RXD\\d+ -> INT_NODE_SDQ_\\d+_INT_OUT[01]
-                        // )
-                        // NOTE: UBUMP\\d+ wires have RouteNodeType.SUPER_LONG_LINE
-                        lookahead |= (rnodeIsLaguna || Utils.isLaguna(childRNode.getTile().getTileTypeEnum()));
                         break;
                     case EXCLUSIVE_SINK:
                     case EXCLUSIVE_SINK_CTRL:
@@ -2204,18 +2189,142 @@ public class RWRoute {
         if (RouteNode.isSingleDoubleQuadLong(childRnode.getIntentCode())) {
             newTotalPathCost += state.rnodeCostWeight * RouteNode.PENDING_NODE_COST;
         }
-        if (childType == RouteNodeType.SUPER_LONG_LINE && routingGraph.wireIndicesLeadingToLaguna != null) {
-            // An UltraScale/UltraScale+ super long line (UBUMP) must next pass through three nodes on its receiving
-            // side (LAG_LAGUNA_SITE_*_RXD*, RXD*, then an INT_NODE_SDQ_*/SDQNODE_* on UltraScale+, or an
-            // INT_NODE_SINGLE_DOUBLE_*/INT_NODE_QUAD_LONG_*/SDND*/QLND* on UltraScale) before any wire can make progress
-            // towards the sink.
-            // Include them in its lower bound: otherwise, once one UBUMP has been popped (and its receiving side looked
-            // ahead into), its onward wires sit those three nodes above its sibling UBUMPs, which are then all popped
-            // (each with its own receiving side looked ahead into) before the search continues from the first
-            newTotalPathCost += state.rnodeCostWeight * 3 * RouteNode.LOCAL_BASE_COST;
+        if (routingGraph.wireIndicesLeadingToLaguna != null && connection.isCrossSLR()) {
+            newTotalPathCost = lagunaLowerBound(state, rnode, childRnode, newPartialPathCost, newTotalPathCost);
         }
 
         push(state, childRnode, newPartialPathCost, newTotalPathCost, lookahead);
+    }
+
+    /**
+     * Gets the cost that getNodeCost() would give an uncongested node with the given base cost at the given tile,
+     * for use in lower bounds.
+     * @param state State from the connection that is being routed.
+     * @param baseCost Base cost of the node.
+     * @param x INT tile X coordinate of the node.
+     * @param y INT tile Y coordinate of the node.
+     * @return That cost, including the bias cost and the connection's cost weight.
+     */
+    private static float getUncongestedNodeCost(ConnectionState state, float baseCost, int x, int y) {
+        NetWrapper net = state.connection.getNetWrapper();
+        float distToCenter = Math.abs(x - net.getXCenter()) + Math.abs(y - net.getYCenter());
+        float biasCost = baseCost / net.getConnections().size() * distToCenter / net.getDoubleHpwl();
+        return state.rnodeCostWeight * (baseCost + Math.min(biasCost, baseCost / 2));
+    }
+
+    /**
+     * Adjusts the lower bound of a node on either side of an UltraScale/UltraScale+ super long line (UBUMP), in place
+     * of looking ahead (which these devices do not use), so that A* order alone takes a connection through the
+     * crossing depth-first:
+     * <ul>
+     * <li>Sending side: the nodes leading to the super long line (an INT_NODE_SDQ_*-like node, an intra-tile single,
+     * an INODE, an IMUX, then LAG_MUX_ATOM_*_TXOUT; see RouteNodeGraph.populateLagunaLookups()) get the lower bound
+     * of the super long line that they lead to, when that is lower than their own: their path cost, plus the rest of
+     * that chain, the super long line, its receiving side, and the estimate from where it lands.</li>
+     * <li>Receiving side: a super long line must next pass through three nodes (LAG_LAGUNA_SITE_*_RXD*, RXD*, then an
+     * INT_NODE_SDQ_* or SDQNODE_* on UltraScale+, or an INT_NODE_SINGLE_DOUBLE_*, INT_NODE_QUAD_LONG_*, SDND* or QLND*
+     * on UltraScale) before any wire can make progress, so the super long line, its RXD site and its RXD are charged the
+     * cost of the three, two and one of those that remain. Otherwise, once one UBUMP has been popped, its onward
+     * wires would sit those nodes above its sibling UBUMPs, which would then all be popped first.</li>
+     * <li>Each node of either chain is also charged {@link RouteNode#LAGUNA_CHAIN_TIE_BREAK} for each node that
+     * remains, so that the lower bound falls slightly along a chain and ties are broken depth-first.</li>
+     * <li>The children of a receiving-side SDQ node are charged {@link RouteNode#LAGUNA_LANDING_TIE_BREAK}, so that
+     * all the SDQ nodes driven by the same RXD are explored before any of their children.</li>
+     * </ul>
+     * @param state State from the connection that is being routed.
+     * @param rnode The parent of the node in question.
+     * @param childRnode The node in question.
+     * @param newPartialPathCost Path cost of the node in question.
+     * @param newTotalPathCost Lower bound of the node in question, so far.
+     * @return Its adjusted lower bound.
+     */
+    private float lagunaLowerBound(ConnectionState state, RouteNode rnode, RouteNode childRnode,
+                                   float newPartialPathCost, float newTotalPathCost) {
+        final RouteNodeType childType = childRnode.getType();
+        final RouteNodeType rnodeType = rnode.getType();
+        final RouteNode prev = rnode.getPrev();
+        final float tieBreak = state.rnodeCostWeight * RouteNode.LAGUNA_CHAIN_TIE_BREAK;
+        final int childX = childRnode.getEndTileXCoordinate();
+        final int childY = childRnode.getEndTileYCoordinate();
+
+        // Children of a receiving-side SDQ node (super long line -> RXD site -> RXD -> SDQ node -> child)
+        if (prev != null && prev.getPrev() != null && prev.getPrev().getPrev() != null &&
+                prev.getPrev().getPrev().getType() == RouteNodeType.SUPER_LONG_LINE &&
+                Utils.isLaguna(prev.getTile().getTileTypeEnum()) && !Utils.isLaguna(rnode.getTile().getTileTypeEnum())) {
+            newTotalPathCost += state.rnodeCostWeight * RouteNode.LAGUNA_LANDING_TIE_BREAK;
+        }
+
+        // Receiving side
+        final int receivingSideNodes = 3;
+        int remainingReceivingSide = 0;
+        if (childType == RouteNodeType.SUPER_LONG_LINE) {
+            remainingReceivingSide = receivingSideNodes;
+        } else if (rnodeType == RouteNodeType.SUPER_LONG_LINE) {
+            remainingReceivingSide = receivingSideNodes - 1;
+        } else if (prev != null && prev.getType() == RouteNodeType.SUPER_LONG_LINE &&
+                Utils.isLaguna(childRnode.getTile().getTileTypeEnum())) {
+            remainingReceivingSide = receivingSideNodes - 2;
+        }
+        if (remainingReceivingSide > 0) {
+            return newTotalPathCost + remainingReceivingSide *
+                    (getUncongestedNodeCost(state, RouteNode.LOCAL_BASE_COST, childX, childY) + tieBreak);
+        }
+
+        // Sending side: the local nodes (INODE, IMUX, TXOUT) and intra-tile singles that remain before the super long line
+        int remainingLocals;
+        int remainingSingles = 0;
+        if (childType == RouteNodeType.NON_LOCAL_LEADING_TO_SLL) {
+            remainingLocals = 3;
+            if (childRnode.getIntentCode() != IntentCode.NODE_SINGLE) {
+                // An SDQ node, still to take its intra-tile single
+                remainingSingles = 1;
+            }
+        } else if (childType == RouteNodeType.LOCAL_LEADING_TO_SLL) {
+            remainingLocals = (childRnode.getIntentCode() == IntentCode.NODE_PINFEED) ? 1 : 2;
+        } else if (rnodeType == RouteNodeType.LOCAL_LEADING_TO_SLL && Utils.isLaguna(childRnode.getTile().getTileTypeEnum())) {
+            // LAG_MUX_ATOM_*_TXOUT
+            remainingLocals = 0;
+        } else {
+            return newTotalPathCost;
+        }
+        Connection connection = state.connection;
+        RouteNode sinkRnode = connection.getSinkRnode();
+        int childSLR = routingGraph.intYToSLRIndex[childY];
+        int sinkSLR = sinkRnode.getSLRIndex(routingGraph);
+        boolean north = routingGraph.isNorthboundSLLRow(childY);
+        if (childSLR == sinkSLR || (north ? !connection.isCrossSLRnorth() : !connection.isCrossSLRsouth())) {
+            // Does not lead towards the sink
+            return newTotalPathCost;
+        }
+        final int sllLength = routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
+        // The super long line lands on the west half of the same INT tile column (see RouteNodeGraph.populateLagunaLookups())
+        int landY = north ? childY + sllLength : childY - sllLength;
+        int landSLR = north ? childSLR + 1 : childSLR - 1;
+        int landHalfX = 2 * childX;
+
+        float lowerBound = newPartialPathCost;
+        lowerBound += remainingLocals * (getUncongestedNodeCost(state, RouteNode.LOCAL_BASE_COST, childX, childY) + tieBreak);
+        lowerBound += remainingSingles * (getUncongestedNodeCost(state, 0.5f * RouteNode.BASE_COST_PER_TILE, childX, childY) +
+                state.rnodeWLWeight * 0.5f + tieBreak);
+        // The super long line itself (as RouteNode.setBaseCost() and the wirelength cost in evaluateCostAndPush())
+        lowerBound += getUncongestedNodeCost(state, RouteNode.BASE_COST_PER_TILE * sllLength, childX, landY) +
+                state.rnodeWLWeight * sllLength;
+        // Its receiving side
+        lowerBound += receivingSideNodes * (getUncongestedNodeCost(state, RouteNode.LOCAL_BASE_COST, childX, landY) + tieBreak);
+        // The estimate from where it lands (as computed above for a node on a crossing column)
+        int deltaHalfX = Math.abs(landHalfX - sinkRnode.getEndHalfTileXCoordinate());
+        int deltaY = Math.abs(landY - sinkRnode.getBeginTileYCoordinate());
+        if (Math.abs(sinkSLR - landSLR) == 1) {
+            int overshootByY = deltaY - sllLength;
+            if (overshootByY < 0) {
+                deltaY = sllLength - overshootByY;
+            }
+        }
+        lowerBound += state.estWlWeight * (0.5f * deltaHalfX + deltaY);
+        if (config.isTimingDriven()) {
+            lowerBound += state.estDlyWeight * (deltaHalfX * 0.14f + deltaY * 0.13f);
+        }
+        return Math.min(lowerBound, newTotalPathCost);
     }
 
     /**
