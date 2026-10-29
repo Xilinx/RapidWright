@@ -2039,6 +2039,9 @@ public class RWRoute {
 
     /**
      * Evaluates the cost of a child of a rnode and pushes the child into the queue after cost evaluation.
+     * For a connection that must cross SLRs, a node on the sending side of a chain leading to a super long line towards
+     * the sink is given the crossing discount (see remainingCrossingCost()), unless this net would overuse it, when it
+     * is priced as if it were not on a chain.
      * @param state State from the connection that is being routed.
      * @param rnode The parent rnode of the child in question.
      * @param longParent A boolean value to indicate if the parent is a Long node
@@ -2099,7 +2102,8 @@ public class RWRoute {
         int deltaY = Math.abs(childY - sinkY);
         // For a connection that must still cross SLRs: how many super long lines it must still take (each crossing one
         // SLR boundary, a whole SUPER_LONG_LINE_LENGTH_IN_TILES rows towards the sink), and, if this node is on the
-        // sending side of a chain of nodes leading to one towards the sink, the position from which that is taken
+        // sending side of a chain of nodes leading to one towards the sink and is given the crossing discount, the
+        // position from which that is taken
         int deltaSLR = 0;
         int rnodeReceivingIndex = -1;
         int remainingReceivingNodes = 0;
@@ -2116,6 +2120,13 @@ public class RWRoute {
             if (deltaSLR != 0) {
                 if (remainingReceivingNodes == 0) {
                     sendingPosition = getSendingChainPosition(connection, rnode, childRnode);
+                    if (sendingPosition != null && childRnode.willOverUse(connection.getNetWrapper())) {
+                        // A sending-chain node that this net would overuse: no discount (priced as if not on a chain).
+                        // Only this node is checked, so a node further along the chain may be discounted again; that
+                        // node must still overcome this one's congestion (in its path cost), and those further along
+                        // are expected to be overused too
+                        sendingPosition = null;
+                    }
                 }
                 // The rows that wires other than super long lines must still cover: those on this side of the super
                 // long lines, and from where the last lands to the sink (when the sink is less than their length away
@@ -2177,8 +2188,8 @@ public class RWRoute {
             }
         }
 
-        // Each super long line still to be taken (other than the one that this node is on the sending chain of) is
-        // charged at the greed premium (see remainingCrossingCost()): its span, at the estimate's rate per row
+        // Each super long line still to be taken (other than the one whose discounted sending chain this node is on) is
+        // charged at its span, at the estimate's rate per row (see remainingCrossingCost())
         final int sllLength = routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
         float newTotalPathCost;
         if (sendingPosition == null) {
@@ -2192,11 +2203,12 @@ public class RWRoute {
                         remainingReceivingNodes, null, newTotalPathCost);
             }
         } else {
-            // On the sending side of a crossing chain: the rest of this chain is charged at its true cost, and it is no
-            // longer the estimate that takes the node to the crossing column but the rest of the chain, so estimate
-            // from where its super long line lands: on UltraScale/UltraScale+, the west half of the same INT tile
-            // column (see RouteNodeGraph.populateLagunaLookups()); on Versal, either side of the same SLL tile column,
-            // whichever is nearer to the sink (as for an SLL itself, above). (Not divided by the sharing factor.)
+            // On the sending side of a crossing chain, with the discount: the rest of this chain is charged at its true
+            // cost, and it is no longer the estimate that takes the node to the crossing column but the rest of the
+            // chain, so estimate from where its super long line lands: on UltraScale/UltraScale+, the west half of the
+            // same INT tile column (see RouteNodeGraph.populateLagunaLookups()); on Versal, either side of the same SLL
+            // tile column, whichever is nearer to the sink (as for an SLL itself, above). (Not divided by the sharing
+            // factor.)
             int landHalfX = sendingPosition[0];
             if (routingGraph.isVersal) {
                 landHalfX = Math.max(landHalfX, Math.min(landHalfX + 1, sinkHalfX));
@@ -2205,8 +2217,8 @@ public class RWRoute {
                     sendingPosition, newPartialPathCost);
             newTotalPathCost = addEstimate(state, newTotalPathCost, getDeltaHalfX(sinkRnode, landHalfX, sinkHalfX),
                     deltaY + (deltaSLR - 1) * sllLength, 1);
-            // Lower than if it were charged as not being on a chain (with the greed premium), which it must be for the
-            // premium to be one
+            // Lower than if it were charged as not being on a chain (at the span estimate), which it must be for the
+            // discount to be one
             assert(newTotalPathCost <= addEstimate(state, newPartialPathCost, deltaHalfX, deltaY + deltaSLR * sllLength,
                     sharingFactor) + (RouteNode.isSingleDoubleQuadLong(childRnode.getIntentCode()) ?
                     state.rnodeCostWeight * RouteNode.PENDING_NODE_COST : 0));
@@ -2341,17 +2353,20 @@ public class RWRoute {
      * </ul>
      * Charged, by where the node is:
      * <ul>
-     * <li>On the sending side of a chain (see getSendingChainPosition()): the rest of it at its true (uncongested) cost,
-     * the super long line itself and its whole receiving chain.</li>
+     * <li>Each super long line still to be taken beyond any discounted sending chain (below) is charged at its span at
+     * the estimate's rate per row, as though it were any other wire, which evaluateCostAndPush() adds as rows of the
+     * estimate. That is far more than the true cost of its whole chain (by more than 30 for a Versal SLL of 75
+     * rows).</li>
+     * <li>On the sending side of a chain (see getSendingChainPosition()), the crossing discount: the rest of the chain
+     * at its true (uncongested) cost, the super long line itself and its whole receiving chain, in place of the span
+     * estimate. The super long line's benefit is thereby front-loaded onto the sending chain: the lower bound falls on
+     * entering it, so that it is entered and followed depth-first, rather than first exploring further towards the
+     * sink by other wires. The discount is withheld (the node is priced as if it were not on a chain) from a
+     * sending-chain node that this net would overuse (see evaluateCostAndPush()), so that connections are not pulled
+     * into super long lines that they would overuse.</li>
      * <li>On the receiving side of a chain (including the super long line itself): the nodes of that receiving chain
      * that remain. Otherwise, once one super long line has been popped, its onward wires would sit those nodes above
      * its sibling super long lines, which would then all be popped first.</li>
-     * <li>Each super long line still to be taken beyond any such chain is charged at the greed premium: the cost of
-     * its whole chain plus P, where P is chosen so that it is charged at its span at the estimate's rate per row (as
-     * though it were any other wire), which evaluateCostAndPush() adds as rows of the estimate. Since that is far more
-     * than the true cost of a chain (by more than 30 for a Versal SLL of 75 rows), the lower bound falls on entering a
-     * chain, which is then explored depth-first, rather than first exploring further towards the sink by other wires.
-     * </li>
      * <li>{@link RouteNode#SLL_CHAIN_TIE_BREAK} for each node of either chain that remains, so that the lower bound
      * falls slightly along a chain and ties are broken depth-first.</li>
      * <li>The children of a landing node (the last node of the receiving chain) are charged
@@ -2366,7 +2381,7 @@ public class RWRoute {
      * @param remainingReceivingNodes How many nodes of a receiving chain remain after the node in question and are
      * charged (see getRemainingReceivingNodes()).
      * @param sendingPosition The position from which the super long line is taken, if the node in question is on the
-     * sending side of a chain (see getSendingChainPosition()), else null.
+     * sending side of a chain (see getSendingChainPosition()) and given the discount, else null.
      * @param lowerBound Lower bound of the node in question, so far.
      * @return Its lower bound with that cost added.
      */
