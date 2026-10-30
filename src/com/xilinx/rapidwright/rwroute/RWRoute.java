@@ -1699,8 +1699,12 @@ public class RWRoute {
 
         protected boolean earlyTermination;
 
-        /** Whether this connection's sink is driven only by INODEs (see Connection.isSinkDrivenByINodes()) */
-        protected boolean sinkDrivenByINodes;
+        /**
+         * Uncongested cost of an INODE at the sink's tile, if this connection's sink is driven only by INODEs (see
+         * Connection.isSinkDrivenByINodes()), else 0: charged to nodes at the sink's half tile that must still take one
+         * (see evaluateCostAndPush())
+         */
+        protected float sinkINodeCost;
 
         protected ConnectionState() {
             this.queue = new PriorityQueue<>();
@@ -1725,7 +1729,9 @@ public class RWRoute {
         state.estDlyWeight = connection.getCriticality() * timingWeight;
         state.nodesPopped = 0;
         state.earlyTermination = false;
-        state.sinkDrivenByINodes = connection.isSinkDrivenByINodes(routingGraph);
+        RouteNode sinkRnode = connection.getSinkRnode();
+        state.sinkINodeCost = connection.isSinkDrivenByINodes(routingGraph) ? getUncongestedNodeCost(state,
+                RouteNode.LOCAL_BASE_COST, sinkRnode.getEndTileXCoordinate(), sinkRnode.getBeginTileYCoordinate()) : 0;
 
         PriorityQueue<RouteNode> queue = state.queue;
         assert(queue.isEmpty());
@@ -2225,13 +2231,11 @@ public class RWRoute {
                     sharingFactor);
             if (RouteNode.isSingleDoubleQuadLong(childRnode.getIntentCode())) {
                 newTotalPathCost += state.rnodeCostWeight * RouteNode.PENDING_NODE_COST;
-            }
-            if (state.sinkDrivenByINodes && deltaSLR == 0 && deltaHalfX == 0 && deltaY == 0 && !childRnode.isTarget() &&
-                    !RouteNode.isSingleDoubleQuadLong(childRnode.getIntentCode()) && !childRnode.isINode()) {
+            } else if (deltaSLR == 0 && deltaHalfX == 0 && deltaY == 0 && !childRnode.isINode() && !childRnode.isTarget()) {
                 // At the sink's half tile, where the estimate is zero, a node other than an INODE (e.g. an SDQ node or
-                // a bounce) must still take an INODE (only INODEs drive the sink): charge it uncongested. (Singles,
+                // a bounce) must still take an INODE if only INODEs drive the sink: charge it uncongested. (Singles,
                 // doubles, quads and longs already carry PENDING_NODE_COST, which is more.)
-                newTotalPathCost += getUncongestedNodeCost(state, RouteNode.LOCAL_BASE_COST, childX, childY);
+                newTotalPathCost += state.sinkINodeCost;
             }
         } else if (isDiscountedSendingChainNode(rnode, connection)) {
             // Following a discounted node along its sending chain: inherit its lower bound, less the tie-break, so that
