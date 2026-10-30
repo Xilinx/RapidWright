@@ -65,14 +65,14 @@ public enum RouteNodeType {
      * to an SLR boundary, which gives the direction they cross in (see RouteNodeGraph.isNorthboundSLLRow()); they are
      * only accessible to connections that must cross in that direction (see RouteNodeGraph.isAccessible()), and are
      * otherwise treated as {@link #LOCAL} nodes (other than those TXOUTs, which are never accessible otherwise), other
-     * than for their lower bounds (see RWRoute.remainingCrossingCost()).
+     * than for their lower bounds (see RWRoute.evaluateCostAndPush()).
      */
     LOCAL_LEADING_TO_SLL,
     /**
      * Denotes non-local {@link RouteNode} objects that lead to {@link #LOCAL_LEADING_TO_SLL} nodes on
      * UltraScale/UltraScale+: the SDQ nodes and intra-tile singles that drive their INODEs (see
      * RouteNodeGraph.populateLagunaLookups()). Treated as {@link #NON_LOCAL} nodes, other than for their lower bounds
-     * (see RWRoute.remainingCrossingCost()).
+     * (see RWRoute.evaluateCostAndPush()).
      */
     NON_LOCAL_LEADING_TO_SLL,
 
@@ -148,5 +148,14 @@ public enum RouteNodeType {
 
     public boolean isLocalLeadingToSLL() {
         return this == LOCAL_LEADING_TO_SLL;
+    }
+
+    /**
+     * Checks if this is a type of node that leads to a SUPER_LONG_LINE crossing into another SLR:
+     * {@link #LOCAL_LEADING_TO_SLL} or {@link #NON_LOCAL_LEADING_TO_SLL}.
+     * @return True if so.
+     */
+    public boolean isLeadingToSLL() {
+        return this == LOCAL_LEADING_TO_SLL || this == NON_LOCAL_LEADING_TO_SLL;
     }
 }
