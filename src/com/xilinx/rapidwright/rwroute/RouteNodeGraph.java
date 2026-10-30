@@ -1799,9 +1799,11 @@ public class RouteNodeGraph {
                 case NODE_INODE:
                     if (connection.isCrossSLR() &&
                             childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
-                        // Allow INODEs needed for PINBOUNCE -> BNODE -> NODE_SLL_INPUT
-                        // TODO: Only allow those that lead to a SLR crossing
-                        return true;
+                        // Allow INODEs needed for PINBOUNCE -> BNODE -> NODE_SLL_INPUT: only those on a half column
+                        // beside an SLL column whose SLLs cross SLRs (see nextCrossingHalfColumn), whose bounces can
+                        // drive that column's BNODEs
+                        int halfX = childRnode.getEndHalfTileXCoordinate();
+                        return nextCrossingHalfColumn[halfX] == halfX;
                     }
                     // Block access to all INODEs outside the sink tile, since NODE_INODE -> NODE_IMUX -> NODE_PINFEED (or NODE_INODE -> NODE_PINBOUNCE)
                     assert(childTile != sinkTile);
