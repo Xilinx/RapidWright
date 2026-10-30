@@ -2230,11 +2230,11 @@ public class RWRoute {
             newTotalPathCost = addEstimate(state, newPartialPathCost, deltaHalfX, deltaY + deltaSLR * sllLength,
                     sharingFactor);
             if (RouteNode.isSingleDoubleQuadLong(childRnode.getIntentCode())) {
-                newTotalPathCost += state.rnodeCostWeight * RouteNode.PENDING_NODE_COST;
+                newTotalPathCost += state.rnodeCostWeight * RouteNode.DEPTH_FIRST_BIAS;
             } else if (deltaSLR == 0 && deltaHalfX == 0 && deltaY == 0 && !childRnode.isINode() && !childRnode.isTarget()) {
                 // At the sink's half tile, where the estimate is zero, a node other than an INODE (e.g. an SDQ node or
                 // a bounce) must still take an INODE if only INODEs drive the sink: charge it uncongested. (Singles,
-                // doubles, quads and longs already carry PENDING_NODE_COST, which is more.)
+                // doubles, quads and longs already carry DEPTH_FIRST_BIAS, which is more.)
                 newTotalPathCost += state.sinkINodeCost;
             }
         } else if (isDiscountedSendingChainNode(rnode, connection)) {
@@ -2262,7 +2262,7 @@ public class RWRoute {
         assert(sendingHalfX < 0 ||
                newTotalPathCost <= addEstimate(state, newPartialPathCost, deltaHalfX, deltaY + deltaSLR * sllLength,
                     sharingFactor) + (RouteNode.isSingleDoubleQuadLong(childRnode.getIntentCode()) ?
-                    state.rnodeCostWeight * RouteNode.PENDING_NODE_COST : 0));
+                    state.rnodeCostWeight * RouteNode.DEPTH_FIRST_BIAS : 0));
 
         push(state, childRnode, newPartialPathCost, newTotalPathCost);
     }
@@ -2392,7 +2392,7 @@ public class RWRoute {
         final int landY = north ? y + sllLength : y - sllLength;
         assert(routingGraph.intYToSLRIndex[landY] == routingGraph.intYToSLRIndex[y] + (north ? 1 : -1));
         float cost = sllSendingChainLocals * (getUncongestedNodeCost(state, RouteNode.LOCAL_BASE_COST, x, y) + tieBreak);
-        cost += singles * (getUncongestedNodeCost(state, 0.5f * RouteNode.BASE_COST_PER_TILE, x, y) +
+        cost += singles * (getUncongestedNodeCost(state, RouteNode.LOCAL_BASE_COST, x, y) +
                 state.rnodeWLWeight * 0.5f + tieBreak);
         // The super long line itself (as RouteNode.setBaseCost() and the wirelength cost in evaluateCostAndPush())
         cost += getUncongestedNodeCost(state, RouteNode.BASE_COST_PER_TILE * sllLength, x, landY) +
@@ -2431,10 +2431,7 @@ public class RWRoute {
         // CRoute paper states that the bias factor cannot be more than half of the wire cost
         // (it may exceed this here because we may not be using the minimum-sized bounding box)
         float biasCost = baseCost / net.getConnections().size() * distToCenter / net.getDoubleHpwl();
-        // Congestion (both multipliers being 1 when there is none) scales a base cost of no less than
-        // RouteNode.MIN_CONGESTED_BASE_COST
-        float congestionMultiplier = rnode.getHistoricalCongestionCost() * presentCongestionCost;
-        float nodeCost = (baseCost + Math.max(baseCost, RouteNode.MIN_CONGESTED_BASE_COST) * (congestionMultiplier - 1)) / sharingFactor;
+        float nodeCost = baseCost * rnode.getHistoricalCongestionCost() * presentCongestionCost / sharingFactor;
         return nodeCost + Math.min(biasCost, nodeCost / 2);
     }
 

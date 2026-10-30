@@ -72,42 +72,45 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      * Cost model. With RWRoute's default weights, for a connection with criticality 0 (as all connections are when not
      * timing-driven) and on nodes not already used by its net, a node's lower bound is its path cost plus 0.8 per INT
      * tile still to travel to the sink, and its path cost includes a wirelength cost of 0.2 per tile travelled (see
-     * getHalfTileWirelength()); so every single/double/quad/long travelling towards the sink reduces the lower bound by
-     * g = 0.8 - 0.2 - BASE_COST_PER_TILE = 0.5 per tile, in either axis. (All of these, but not PENDING_NODE_COST, are
-     * divided by a sharing factor on nodes already used by the net; dividing it too was measured to cost wirelength.)
+     * getHalfTileWirelength()); so a single/double/quad travelling n tiles towards the sink reduces the lower bound by
+     * (0.8 - 0.2) * n - LOCAL_BASE_COST, in either axis: by 0.2 for a vertical single or horizontal double, 0.8 for a
+     * vertical double or horizontal quad, 2.0 for a vertical quad (and a long by 0.6 * n - LONG_BASE_COST). (All of
+     * these, but not DEPTH_FIRST_BIAS, are divided by a sharing factor on nodes already used by the net; dividing it too
+     * was measured to cost wirelength.)
      */
     /**
-     * Base cost per INT tile of the nominal distance travelled by singles, doubles, quads and longs, in either axis
-     * (see setBaseCost())
+     * Base cost per INT tile of the nominal distance travelled by super long lines (see setBaseCost())
      */
     public static final float BASE_COST_PER_TILE = 0.1f;
     /**
-     * Base cost of nodes that do not travel (e.g. SDQ nodes, INODEs, IMUXes and bounces) and other nodes that are not
-     * singles/doubles/quads/longs or super long lines; chosen empirically: lower values make chains of such nodes
-     * cheaper but cost wirelength and runtime on whole designs. A chain of three of them (1.2) costs less than the least
-     * increase in lower bound of a single/double/quad/long leaving the half of the INT tile that the sink is on (a
-     * horizontal or intra-tile single: 0.5 * BASE_COST_PER_TILE, plus a wirelength cost of 0.1, plus half a tile (0.4)
-     * further from the sink, plus PENDING_NODE_COST, i.e. 1.3).
+     * Base cost of every node other than longs and super long lines: both those that do not travel (e.g. SDQ nodes,
+     * INODEs, IMUXes and bounces) and singles, doubles and quads, so that each hop costs the same, whatever its length
+     * (which is charged as wirelength), and gets dearer just as fast when congested; chosen empirically: lower values
+     * make chains of nodes that do not travel cheaper but cost wirelength and runtime on whole designs. A chain of three
+     * of them (1.2) costs less than the least increase in lower bound of a single/double/quad/long leaving the half of
+     * the INT tile that the sink is on (a horizontal or intra-tile single: this, plus a wirelength cost of 0.1, plus
+     * half a tile (0.4) further from the sink, plus DEPTH_FIRST_BIAS, i.e. 1.5).
      */
     public static final float LOCAL_BASE_COST = 0.4f;
     /**
-     * Added by RWRoute to the lower bound (but not the path cost) of single/double/quad/long nodes: a bias, more than
-     * LOCAL_BASE_COST, that is removed again by the node that follows (since every single/double/quad/long must next
-     * pass through a node that does not travel, e.g. an SDQ node or INODE, or another long), so as to explore depth-first
-     * after a single/double/quad/long lands. Having landed one (with lower bound L), each of the nodes that it drives
-     * (at L + LOCAL_BASE_COST - this) is explored before any other node with a lower bound of at least L, and from the
-     * first of them, a vertical double, a horizontal quad or longer travelling towards the sink (at no more than
-     * L + LOCAL_BASE_COST - 2g) is explored before the others of them, but not a vertical single or horizontal double
-     * (at L + LOCAL_BASE_COST - g) nor a horizontal single. That requires max(LOCAL_BASE_COST plus any bias cost, g)
-     * < this < 2g, i.e. about 0.5-0.6 < this < 1.0; this is the middle of that window.
+     * Base cost of longs: twice LOCAL_BASE_COST, since at LOCAL_BASE_COST, being the cheapest way to travel far, about
+     * twice as many were measured to be overused (on boom_med_pb at iteration 5: 1343 against 625).
      */
-    public static final float PENDING_NODE_COST = 0.75f;
+    public static final float LONG_BASE_COST = 2 * LOCAL_BASE_COST;
     /**
-     * The least base cost that congestion is applied to (see RWRoute.getNodeCost()), so that nodes with a smaller base
-     * cost (e.g. singles, which travel a shorter distance) are not discouraged so much less by the same congestion;
-     * chosen empirically.
+     * Added by RWRoute to the lower bound (but not the path cost) of single/double/quad/long nodes, wherever they land
+     * (including the sink's tile): a bias, more than LOCAL_BASE_COST, that is removed again by the node that follows
+     * (since every single/double/quad/long must next pass through a node that does not travel, e.g. an SDQ node or
+     * INODE, or another long), so as to explore depth-first after a single/double/quad/long lands. Having landed one
+     * (with lower bound L), each of the nodes that it drives (at L + LOCAL_BASE_COST - this) is explored before any
+     * other node with a lower bound of at least L, and from the first of them, a vertical double, a horizontal quad or
+     * longer travelling towards the sink (at no more than L + LOCAL_BASE_COST - 0.8) is explored before the others of
+     * them, but not a vertical single or horizontal double (at L + LOCAL_BASE_COST - 0.2) nor a horizontal single. That
+     * requires LOCAL_BASE_COST plus any bias cost < this < 1.2 - LOCAL_BASE_COST, i.e. 0.4 < this < 0.8; this is the
+     * middle of that window, 1.5 * LOCAL_BASE_COST. On the sink's half tile, where a landed wire must still take at
+     * least two more nodes (e.g. an SDQ node and an INODE) before the sink, this does not exceed their cost.
      */
-    public static final float MIN_CONGESTED_BASE_COST = 0.2f;
+    public static final float DEPTH_FIRST_BIAS = 1.5f * LOCAL_BASE_COST;
     /**
      * Charged by RWRoute, for each node of the sending chain of a super long line, to the lower bound of the node
      * entering that chain (see RWRoute.getSendingChainCost()), and taken off again by each node further along it as it
@@ -174,8 +177,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     }
 
     /**
-     * Sets the base cost of this node: {@link #BASE_COST_PER_TILE} for each tile of its nominal wirelength (see
-     * {@link RouteNodeInfo#halfTileWirelength}) for singles, doubles, quads, longs and super long lines, or else
+     * Sets the base cost of this node: {@link #LONG_BASE_COST} for longs, {@link #BASE_COST_PER_TILE} for each tile of
+     * its nominal wirelength (see {@link RouteNodeInfo#halfTileWirelength}) for super long lines, or else
      * {@link #LOCAL_BASE_COST}.
      */
     private void setBaseCost() {
@@ -235,12 +238,8 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                     case NODE_HSINGLE: // Versal only
                     case NODE_VSINGLE: // Versal only
                     case NODE_VQUAD:   // US/US+/Versal
-                    case NODE_VLONG:   // US/US+
-                    case NODE_HLONG6:  // Versal only
-                    case NODE_HLONG10: // Versal only
-                    case NODE_VLONG7:  // Versal only
-                    case NODE_VLONG12: // Versal only
-                        // All singles, doubles, quads and longs are costed by their nominal length (see
+                        // Singles, doubles and quads keep LOCAL_BASE_COST, whatever their length. All singles,
+                        // doubles, quads and longs are charged wirelength by their nominal length (see
                         // RouteNodeInfo.getNominalHalfTileWirelength()), whatever their measured length: including
                         // U-turns at the edge of the device, intra-tile singles between the halves of their INT tile,
                         // and the feedthrough member of each family (one BEG index per INT tile on UltraScale(+), which
@@ -252,7 +251,13 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         //    nominal distance can still be left, with the extra wire one row over as another exit;
                         //  - EE1_W_0_FTS (UltraScale) and WW1_E_7_FT0 (UltraScale+), the only wires of their names: no
                         //    horizontal reach, but exits in their own tile and one tile south/north respectively
-                        baseCost = BASE_COST_PER_TILE * 0.5f * halfTileWirelength;
+                        break;
+                    case NODE_VLONG:   // US/US+
+                    case NODE_HLONG6:  // Versal only
+                    case NODE_HLONG10: // Versal only
+                    case NODE_VLONG7:  // Versal only
+                    case NODE_VLONG12: // Versal only
+                        baseCost = LONG_BASE_COST;
                         break;
                     case NODE_HQUAD: // US/US+/Versal
                     case NODE_HLONG: // US/US+
@@ -262,7 +267,9 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                             assert(getAllDownhillPIPs().isEmpty());
                             type = (byte) RouteNodeType.INACCESSIBLE.ordinal();
                         }
-                        baseCost = BASE_COST_PER_TILE * 0.5f * halfTileWirelength;
+                        if (ic == IntentCode.NODE_HLONG) {
+                            baseCost = LONG_BASE_COST;
+                        }
                         break;
 
                     // These nodes can appear as a result of the Vivado high-fanout net optimization that
