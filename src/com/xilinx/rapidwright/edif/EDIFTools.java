@@ -1777,12 +1777,13 @@ public class EDIFTools {
             EDIFCell type = inst.getCellType();
             if (type.isStaticSource()) continue;
             String name = inst.getFullHierarchicalInstName();
-            EDIFCellInst flatInst = flatTop.createChildCellInst(name, type);
-            flatInst.setPropertiesMap(inst.getInst().createDuplicatePropertiesMap());
             EDIFLibrary lib = !type.isPrimitive() ? work : prims;
-            if (!lib.containsCell(type)) {
-                lib.addCell(type);
+            EDIFCell flatType = lib.getCell(type.getName());
+            if (flatType == null) {
+                flatType = lib.addCell(type);
             }
+            EDIFCellInst flatInst = flatTop.createChildCellInst(name, flatType);
+            flatInst.setPropertiesMap(inst.getInst().createDuplicatePropertiesMap());
         }
 
         // Copy all physical parent nets and connect them to flattened cell instances
