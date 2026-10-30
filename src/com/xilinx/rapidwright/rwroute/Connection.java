@@ -304,20 +304,19 @@ public class Connection implements Comparable<Connection>{
     }
 
     /**
-     * Checks whether this connection's sink is driven only by INODEs: its one sink is an INT tile pin
-     * (UltraScale/UltraScale+: an IMUX, NODE_PINFEED; Versal: an IMUX, NODE_IMUX, or a bounce, NODE_PINBOUNCE). Not
-     * CTRL sinks, Versal SLL inputs, non-local sinks or alternate (LUT pin swapping) sinks.
-     * @param routingGraph The routing graph.
+     * Checks whether this connection's sink (and any alternate, LUT pin swapping, sinks, which are in the same INT tile
+     * and on the same side) is driven only by INODEs: an INT tile pin (NODE_PINFEED: an UltraScale/UltraScale+ IMUX;
+     * NODE_PINBOUNCE: a bypass or bounce; NODE_IMUX: a Versal IMUX) other than an UltraScale/UltraScale+ CTRL pin
+     * (NODE_PINFEED, but driven by INT_NODE_GLOBAL_*), as found on xcvu9p, xcku040, xcvc1902 and xcv80.
      * @return True if so.
      */
-    public boolean isSinkDrivenByINodes(RouteNodeGraph routingGraph) {
-        if (sinkRnode.getType() != RouteNodeType.EXCLUSIVE_SINK || hasAltSinks() ||
+    public boolean isSinkDrivenByINodes() {
+        if (sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK_CTRL ||
                 sinkRnode.getTile().getTileTypeEnum() != TileTypeEnum.INT) {
             return false;
         }
         IntentCode ic = sinkRnode.getIntentCode();
-        return routingGraph.isVersal ? (ic == IntentCode.NODE_IMUX || ic == IntentCode.NODE_PINBOUNCE)
-                                     : ic == IntentCode.NODE_PINFEED;
+        return ic == IntentCode.NODE_PINFEED || ic == IntentCode.NODE_PINBOUNCE || ic == IntentCode.NODE_IMUX;
     }
 
     public void addAltSinkRnode(RouteNode sinkRnode) {

@@ -1730,7 +1730,7 @@ public class RWRoute {
         state.nodesPopped = 0;
         state.earlyTermination = false;
         RouteNode sinkRnode = connection.getSinkRnode();
-        state.sinkINodeCost = connection.isSinkDrivenByINodes(routingGraph) ? getUncongestedNodeCost(state,
+        state.sinkINodeCost = connection.isSinkDrivenByINodes() ? getUncongestedNodeCost(state,
                 RouteNode.LOCAL_BASE_COST, sinkRnode.getEndTileXCoordinate(), sinkRnode.getBeginTileYCoordinate()) : 0;
 
         PriorityQueue<RouteNode> queue = state.queue;
