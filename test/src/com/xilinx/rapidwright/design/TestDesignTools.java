@@ -64,6 +64,7 @@ import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.support.ChangeTrackingAssertions;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.Pair;
@@ -587,23 +588,20 @@ public class TestDesignTools {
         // Likewise for the site instances: all of them are new to this design. Each also needs what
         // its site is changing from, so that everything it holds counts as a difference. The sites
         // were free -- this pair of checkpoints leaves no static source in the way -- so the
-        // snapshots are blank
+        // originals are empty
         Map<String, SiteInst> originals = design.getOriginalSiteInsts();
         for (SiteInst si : incoming) {
             Assertions.assertTrue(design.getModifiedSiteInsts().contains(si), si.getName());
-            SiteInst original = originals.get(si.getName());
-            Assertions.assertNotNull(original, si.getName());
-            Assertions.assertSame(si.getSite(), original.getSite());
-            Assertions.assertTrue(original.getCells().isEmpty(), si.getName());
+            Assertions.assertSame(Design.EMPTY_ORIGINAL_SITE_INST, originals.get(si.getSiteName()),
+                    si.getName());
         }
     }
 
     /**
      * A black box may evict a static source from a site it wants, and populateBlackBox() installs
      * the circuit's own site instance there in its place. The evicted one is then gone from the
-     * design, but taking its pins marks it in the change tracking on the way out, so it would be
-     * left in getModifiedSiteInsts() alongside the live site instance that replaced it, were
-     * populateBlackBox() not to untrack it.
+     * design, and must not be left in getModifiedSiteInsts() alongside the live site instance that
+     * replaced it -- including once its pins are taken, which used to mark it again on the way out.
      *
      * Two entries for one site mean two writers of that site's configuration bits, and which of
      * them lands last depends on the iteration order of the modified set. That order changes as the
@@ -654,23 +652,22 @@ public class TestDesignTools {
         populateBlackBox(design, hierCellName, circuit, false);
 
         // It has left the design, and nothing the design has stopped holding may still be tracked
-        // as modified, nor its original kept
-        Assertions.assertNotSame(evicted, design.getSiteInstFromSite(contested));
-        Set<SiteInst> live = new HashSet<>(design.getSiteInsts());
-        for (SiteInst si : design.getModifiedSiteInsts()) {
-            Assertions.assertTrue(live.contains(si),
-                    "modified site instance is no longer in the design: " + si.getName());
-        }
+        // as modified
+        SiteInst arriving = design.getSiteInstFromSite(contested);
+        Assertions.assertNotSame(evicted, arriving);
+        Assertions.assertNull(evicted.getDesign());
+        Assertions.assertFalse(design.getSiteInsts().contains(evicted));
         Assertions.assertFalse(design.getModifiedSiteInsts().contains(evicted));
-        Assertions.assertNull(design.getOriginalSiteInsts().get(evicted.getName()));
 
-        // The invariant that actually matters to whoever walks the modified set: one entry per site
-        Map<Site, SiteInst> bySite = new HashMap<>();
-        for (SiteInst si : design.getModifiedSiteInsts()) {
-            SiteInst clash = bySite.put(si.getSite(), si);
-            Assertions.assertNull(clash, "two modified site instances on " + si.getSiteName()
-                    + ": " + si.getName() + " and " + (clash == null ? "" : clash.getName()));
-        }
+        // The site instance that took the site changes from what the site held before tracking
+        // began, which was nothing, the static source having been stood there since
+        Assertions.assertTrue(design.getModifiedSiteInsts().contains(arriving));
+        Assertions.assertSame(Design.EMPTY_ORIGINAL_SITE_INST,
+                design.getOriginalSiteInsts().get(contested.getName()));
+
+        // The invariant that actually matters to whoever walks the modified set: one entry per site,
+        // and that being the site instance the design holds there
+        ChangeTrackingAssertions.assertModifiedAreInDesign(design);
     }
 
     /**
@@ -850,10 +847,11 @@ public class TestDesignTools {
      * Calls populateBlackBox() with the design tracking its changes, so that what it changed is in
      * Design#getModifiedNets() for the caller to read. Then asserts what holds for every call: that
      * it left the design's parent net map unbuilt, since it drops the map once it has changed the
-     * netlist and must not build it again; that every net recorded is one the design still holds,
-     * since a merge deletes the net it merges away, and a deleted net must not be left in the
-     * record; and that every net recorded is named after its source, so is its own parent net, but
-     * for one on a signal that nothing drives, which has none.
+     * netlist and must not build it again; that every net and site instance recorded is one the
+     * design still holds, since a merge deletes the net it merges away and an eviction removes the
+     * site instance it evicts, and neither may be left in the record; and that every net recorded
+     * is named after its source, so is its own parent net, but for one on a signal that nothing
+     * drives, which has none.
      */
     private static void populateBlackBox(Design design, Map<String, Design> blackBoxes,
             boolean keepBoundaryRouting) {
@@ -861,9 +859,9 @@ public class TestDesignTools {
         DesignTools.populateBlackBox(design, blackBoxes, keepBoundaryRouting);
         EDIFNetlist netlist = design.getNetlist();
         Assertions.assertFalse(netlist.isParentNetMapBuilt());
+        ChangeTrackingAssertions.assertModifiedAreInDesign(design);
         // Checked only now, since asking for a parent builds the map
         for (Net net : design.getModifiedNets()) {
-            Assertions.assertSame(net, design.getNet(net.getName()), net.getName());
             if (net.isStaticNet()) continue;
             EDIFHierNet hierNet = netlist.getHierNetFromName(net.getName());
             Assertions.assertNotNull(hierNet, net.getName());
@@ -2094,6 +2092,96 @@ public class TestDesignTools {
                 () -> DesignTools.populateBlackBox(design, blackBoxes, false));
         Assertions.assertEquals("ERROR: Black boxes 'u0/bb' and 'u1/bb' are the same cell"
                 + " instance.", e.getMessage());
+    }
+
+    /**
+     * A static shell can hold site instances in a reconfigurable partition's region that do nothing
+     * but lock the site's BELs, with placeholder cells. A circuit filling the black box has its own
+     * site instances on those sites, which must take their place. A site instance holding anything
+     * else, such as another cell or site routing without a net, or nothing at all, is still an overlap.
+     * The circuit's site instance is usually named after the site, as the locked one is, but need not
+     * be ("onlyLockedRenamed"): what the site changes from goes with the site, not the name.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"onlyLocked", "onlyLockedRenamed", "otherCell", "nullNetSitePIP", "empty"})
+    public void testPopulateBlackBoxReplacesLockedSites(String shellSite) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", createBlackBox(top, "bb", EDIFDirection.INPUT));
+        Net inNet = design.createNet("in");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, inNet);
+
+        Site site = design.getDevice().getSite("SLICE_X1Y0");
+        SiteInst locked = design.createSiteInst(site);
+        Assertions.assertEquals(site.getName(), locked.getName());
+        if (!shellSite.equals("empty")) {
+            for (String belName : new String[] {"A6LUT", "B6LUT", "AFF"}) {
+                locked.addCell(new Cell(Cell.LOCKED, locked.getBEL(belName)));
+            }
+        }
+        if (shellSite.equals("otherCell")) {
+            design.createAndPlaceCell(top, "other", Unisim.LUT1, site.getName() + "/C6LUT");
+        } else if (shellSite.equals("nullNetSitePIP")) {
+            locked.addSitePIP("FFMUXA1", "D6");
+            Assertions.assertTrue(locked.getSiteWireToNetMap().isEmpty());
+        }
+        // The shell is as it was read: from here on, changes to it are tracked
+        design.setTrackingChanges(true);
+        design.setCopyingOriginalSiteInsts(true);
+
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT);
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        EDIFNet circuitIn = circuitTop.createNet("I");
+        circuitIn.createPortInst(circuitTop.getPort("I"));
+        boolean renamed = shellSite.equals("onlyLockedRenamed");
+        if (renamed) {
+            circuit.createSiteInst("incoming", site.getSiteTypeEnum(), site);
+        }
+        SitePinInst lutIn = addSinkLUT(circuit, circuitTop, "lut", site.getName(), circuitIn,
+                circuit.createNet("I"));
+        SiteInst incoming = lutIn.getSiteInst();
+        Assertions.assertEquals(renamed ? "incoming" : site.getName(), incoming.getName());
+        for (String belName : new String[] {"B6LUT", "AFF"}) {
+            incoming.addCell(new Cell(Cell.LOCKED, incoming.getBEL(belName)));
+        }
+
+        if (!shellSite.startsWith("onlyLocked")) {
+            RuntimeException e = Assertions.assertThrows(RuntimeException.class,
+                    () -> DesignTools.populateBlackBox(design, "bb", circuit));
+            Assertions.assertTrue(e.getMessage().startsWith("ERROR: Site overlap at SLICE_X1Y0"),
+                    e.getMessage());
+            return;
+        }
+
+        // Also asserts that every modified site instance is the one the design holds on its site,
+        // so that the locked one is not left in the modified set: as SiteInsts compare by name, it
+        // would otherwise stand in for the incoming one when the two share a name
+        populateBlackBox(design, "bb", circuit, false);
+
+        Assertions.assertSame(incoming, design.getSiteInstFromSite(site));
+        Assertions.assertSame(incoming, design.getSiteInst(incoming.getName()));
+        if (renamed) {
+            Assertions.assertNull(design.getSiteInst(locked.getName()));
+        }
+        Assertions.assertNull(locked.getDesign());
+        Assertions.assertTrue(design.getModifiedSiteInsts().contains(incoming));
+        Assertions.assertNotNull(design.getCell("bb/lut"));
+        Assertions.assertSame(inNet, lutIn.getNet());
+
+        // What the site changes from is the locked site instance it held, recorded under the site
+        // whatever the incoming site instance is called
+        SiteInst original = design.getOriginalSiteInsts().get(site.getName());
+        Assertions.assertNotNull(original);
+        Assertions.assertNotSame(Design.EMPTY_ORIGINAL_SITE_INST, original);
+        Assertions.assertSame(site, original.getSite());
+        Assertions.assertEquals(3, original.getCells().size());
+        for (Cell c : original.getCells()) {
+            Assertions.assertEquals(Cell.LOCKED, c.getName());
+        }
+        if (renamed) {
+            Assertions.assertNull(design.getOriginalSiteInsts().get(incoming.getName()));
+        }
     }
 
     @ParameterizedTest
