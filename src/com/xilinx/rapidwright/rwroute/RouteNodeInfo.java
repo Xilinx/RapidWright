@@ -322,7 +322,7 @@ public class RouteNodeInfo {
             case NODE_SLL_INPUT: { // Versal only
                 // Only those SLL inputs driving an SLL that crosses into another SLR lead to an SLR crossing (see
                 // RouteNodeGraph.isCrossingSLLInput(), as looked up in RouteNodeGraph.wireIndicesLeadingToSLL);
-                // either way, not considered to be on any specific side (see RouteNodeGraph.isAccessible())
+                // either way, between two INT tiles rather than on either side of one (see isOnBothSides())
                 BitSet[] bs = (routingGraph.wireIndicesLeadingToSLL != null)
                         ? routingGraph.getWireIndicesLeadingToSLL(node.getTile()) : null;
                 boolean leadsToSLL = bs != null && bs[0].get(node.getWireIndex());

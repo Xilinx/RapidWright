@@ -1730,11 +1730,10 @@ public class RouteNodeGraph {
                 if (childRnode.isOnEastSide() != sinkRnode.isOnEastSide()) {
                     if (type.isSidedLocal()) {
                         if (!isVersal ||
-                                // Versal SLL inputs are not on any specific side, and Versal PINFEEDs (only
-                                // CLE_SLICE[LM]_TOP_*_LAG_*_PIN, downhill of an SLL output in another SLR to the
-                                // sink) are only sided for their distance to the sink, not to restrict access
-                                (childRnode.getIntentCode() != IntentCode.NODE_SLL_INPUT &&
-                                 childRnode.getIntentCode() != IntentCode.NODE_PINFEED)) {
+                                // Versal PINFEEDs (only CLE_SLICE[LM]_TOP_*_LAG_*_PIN, downhill of an SLL output in
+                                // another SLR to the sink) are only sided for their distance to the sink, not to
+                                // restrict access
+                                childRnode.getIntentCode() != IntentCode.NODE_PINFEED) {
                             // Local wires on one side (half) of an INT tile can never reach a sink on the other side
                             return false;
                         }
