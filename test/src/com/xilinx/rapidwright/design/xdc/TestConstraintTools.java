@@ -140,7 +140,14 @@ public class TestConstraintTools {
                 "set_property SRC_FILE_INFO {cfile:a.xdc rfile:a.xdc id:1} [current_design]",
                 "set_property MAX_FANOUT 5 \\",
                 "    [get_nets m]");
-        circuit.addXDCConstraint(ConstraintGroup.LATE, "set_property IOSTANDARD LVCMOS12 [get_ports local]");
+        circuit.addXDCConstraint(ConstraintGroup.LATE,
+                "set_property IOSTANDARD LVCMOS12 [get_ports local]",
+                "set_false_path -from [get_clocks -of [get_ports clk]] -through [get_pins sub/y/Q]",
+                "set_property KEEP true [get_ports -scoped_to_current_instance already]",
+                "current_instance sub",
+                "set_false_path -through [get_ports -scoped_to_current_instance -no_traverse src_arst]",
+                "set_property DONT_TOUCH true [get_ports p]",
+                "current_instance -quiet");
         circuit.addXDCConstraint(ConstraintGroup.IN_CONTEXT, "create_clock -period 10 [get_ports clk]");
 
         // populateBlackBox() adds the constraints itself
@@ -162,9 +169,17 @@ public class TestConstraintTools {
                 "set_property MAX_FANOUT 5 \\",
                 "    [get_nets m]",
                 "current_instance -quiet");
+        // At the circuit's top scope, get_ports of the circuit's own ports is told to look in the
+        // current instance; in a scope nested below it, get_ports is left as it is
         List<String> late = Arrays.asList(
                 "current_instance rp",
-                "set_property IOSTANDARD LVCMOS12 [get_ports local]",
+                "set_property IOSTANDARD LVCMOS12 [get_ports -scoped_to_current_instance local]",
+                "set_false_path -from [get_clocks -of [get_ports -scoped_to_current_instance clk]] -through [get_pins sub/y/Q]",
+                "set_property KEEP true [get_ports -scoped_to_current_instance already]",
+                "current_instance -quiet",
+                "current_instance rp/sub",
+                "set_false_path -through [get_ports -scoped_to_current_instance -no_traverse src_arst]",
+                "set_property DONT_TOUCH true [get_ports p]",
                 "current_instance -quiet");
         Assertions.assertEquals(early, design.getXDCConstraints(ConstraintGroup.EARLY));
         Assertions.assertEquals(late, design.getXDCConstraints(ConstraintGroup.LATE));
@@ -176,7 +191,7 @@ public class TestConstraintTools {
         // same, counting the circuits' commands it kept
         design.getXDCConstraints(ConstraintGroup.EARLY).clear();
         design.getXDCConstraints(ConstraintGroup.LATE).clear();
-        Assertions.assertEquals(5, ConstraintTools.addBlackBoxConstraints(design, blackBoxes));
+        Assertions.assertEquals(9, ConstraintTools.addBlackBoxConstraints(design, blackBoxes));
         Assertions.assertEquals(early, design.getXDCConstraints(ConstraintGroup.EARLY));
         Assertions.assertEquals(late, design.getXDCConstraints(ConstraintGroup.LATE));
     }
@@ -316,6 +331,10 @@ public class TestConstraintTools {
                 // The circuit's clk port, not the device pin of the same name
                 "set_input_delay 1 [get_ports clk]",
                 "set_property IOSTANDARD LVCMOS18 [get_ports din]",
+                // A device pin the circuit also has a port of, with a pin of the circuit
+                "set_max_delay 3 -from [get_ports din] -to [get_pins y/D]",
+                // A device pin and a port of the circuit
+                "set_false_path -from [get_ports din] -to [get_ports clk]",
                 // A bus bit, unbraced as PackagePinConstraint writes it
                 "set_property IOSTANDARD LVCMOS18 [get_ports bus[1]]",
                 // Names that cannot be checked without evaluating the command
@@ -326,13 +345,135 @@ public class TestConstraintTools {
         Assertions.assertEquals(Arrays.asList(
                 "set_property IOSTANDARD LVCMOS18 [get_ports pad]",
                 "current_instance rp",
+                // In the box, but get_ports of device pins still finds them, and the box's pins
+                // would not be valid timing startpoints
                 "set_false_path -from [get_ports pad] -to [get_cells x]",
-                "set_input_delay 1 [get_ports clk]",
+                "set_input_delay 1 [get_ports -scoped_to_current_instance clk]",
                 "current_instance -quiet",
                 "set_property IOSTANDARD LVCMOS18 [get_ports din]",
+                "current_instance rp",
+                "set_max_delay 3 -from [get_ports din] -to [get_pins y/D]",
+                "set_false_path -from [get_ports din] -to [get_ports -scoped_to_current_instance clk]",
+                "current_instance -quiet",
                 "set_property IOSTANDARD LVCMOS18 [get_ports bus[1]]",
                 "current_instance rp",
-                "set_property IOSTANDARD LVCMOS12 [get_ports [list pad]]",
+                // Names that cannot be read are taken to be the circuit's ports
+                "set_property IOSTANDARD LVCMOS12 [get_ports -scoped_to_current_instance [list pad]]",
+                "current_instance -quiet"), design.getXDCConstraints(ConstraintGroup.EARLY));
+    }
+
+    /**
+     * A get_ports that names both device pins and ports of the circuit is split in two, and
+     * patterns count by the ports they match.
+     */
+    @Test
+    public void testAddBlackBoxConstraintsMixedGetPorts() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        top.createPort("pad", EDIFDirection.OUTPUT, 1);
+        top.createPort("clk", EDIFDirection.INPUT, 1);
+        top.createPort("din", EDIFDirection.INPUT, 1);
+        top.createPort("bus[1:0]", EDIFDirection.INPUT, 2);
+        EDIFCell rpType = new EDIFCell(top.getLibrary(), "rpType");
+        rpType.createPort("clk", EDIFDirection.INPUT, 1);
+        rpType.createPort("din", EDIFDirection.INPUT, 1);
+        rpType.createPort("clk0", EDIFDirection.INPUT, 1);
+        EDIFCellInst rp = rpType.createCellInst("rp", top);
+        rp.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+        // The box's din is on the device pin din; its clk is not on the device pin clk
+        EDIFNet din = top.createNet("din");
+        din.createPortInst(top.getPort("din"));
+        din.createPortInst("din", rp);
+
+        Design circuit = new Design("circuit", "xcvu3p");
+        circuit.getTopEDIFCell().createPort("clk", EDIFDirection.INPUT, 1);
+        circuit.getTopEDIFCell().createPort("din", EDIFDirection.INPUT, 1);
+        circuit.getTopEDIFCell().createPort("clk0", EDIFDirection.INPUT, 1);
+        circuit.addXDCConstraint(ConstraintGroup.EARLY,
+                // Both kinds in one get_ports
+                "set_max_delay 2 -from [get_ports {pad clk}] -to [get_pins y/D]",
+                "set_false_path -from [get_ports -quiet {din clk}]",
+                // Patterns that only match device pins
+                "set_max_delay 3 -from [get_ports pa*] -to [get_pins y/D]",
+                "set_max_delay 4 -from [get_ports -regexp {pa.}] -to [get_pins y/D]",
+                // Patterns that match both
+                "set_false_path -to [get_ports *]",
+                "set_false_path -to [get_ports -regexp {[cp].*}]",
+                // A pattern that only matches the circuit's port
+                "set_property KEEP true [get_ports -regexp -nocase {C.K}]",
+                // A list continued onto the next line
+                "set_max_delay 5 -from [get_ports {pad \\",
+                "    din}] -to [get_pins y/D]",
+                // Tcl's own reading: a list with a braced element, a quoted option, and a command
+                // name inside a braced pattern, which is not a command
+                "set_max_delay 6 -from [get_ports {{pad} clk}] -to [get_pins y/D]",
+                "set_max_delay 7 -from [get_ports \"-regexp\" {pa.}] -to [get_pins y/D]",
+                "set_false_path -from [get_ports -regexp {[get_ports]}] -to [get_pins y/D]",
+                // A bus's declared name, bus[1:0], is not matched by patterns
+                "set_false_path -to [get_ports *0*]",
+                // Without . [ * + or ?, Vivado takes a -regexp pattern as a name, and with an
+                // alternation outside parentheses, it matches nothing
+                "set_false_path -to [get_ports -regexp {^pad$ clk}]",
+                "set_false_path -to [get_ports -regexp {pa.|c.k}]",
+                // A pattern that matches nothing, beside a device pin
+                "set_false_path -to [get_ports {pad zz*}]",
+                "set_property IOSTANDARD LVCMOS18 [get_ports pa?]",
+                // A bare bus index wildcard, as Vivado reads it
+                "set_property IOSTANDARD LVCMOS18 [get_ports bus[*]]");
+
+        DesignTools.populateBlackBox(design, Collections.singletonMap("rp", circuit), false);
+
+        Assertions.assertEquals(Arrays.asList(
+                "current_instance rp",
+                "set_max_delay 2 -from [concat [get_ports pad] [get_ports -scoped_to_current_instance clk]] -to [get_pins y/D]",
+                "set_false_path -from [concat [get_ports -quiet din] [get_ports -scoped_to_current_instance -quiet clk]]",
+                "set_max_delay 3 -from [get_ports pa*] -to [get_pins y/D]",
+                "set_max_delay 4 -from [get_ports -regexp {pa.}] -to [get_pins y/D]",
+                // Split, a pattern is replaced by the names it matches, and -regexp is dropped
+                "set_false_path -to [concat [get_ports {bus[0] bus[1] din pad}] [get_ports -scoped_to_current_instance {clk clk0}]]",
+                "set_false_path -to [concat [get_ports pad] [get_ports -scoped_to_current_instance {clk clk0}]]",
+                "set_property KEEP true [get_ports -scoped_to_current_instance -regexp -nocase {C.K}]",
+                "set_max_delay 5 -from [get_ports {pad \\",
+                "    din}] -to [get_pins y/D]",
+                "set_max_delay 6 -from [concat [get_ports pad] [get_ports -scoped_to_current_instance clk]] -to [get_pins y/D]",
+                "set_max_delay 7 -from [get_ports \"-regexp\" {pa.}] -to [get_pins y/D]",
+                "set_false_path -from [get_ports -scoped_to_current_instance -regexp {[get_ports]}] -to [get_pins y/D]",
+                "set_false_path -to [concat [get_ports {bus[0]}] [get_ports -scoped_to_current_instance clk0]]",
+                "set_false_path -to [get_ports -scoped_to_current_instance -regexp {^pad$ clk}]",
+                "set_false_path -to [get_ports -scoped_to_current_instance -regexp {pa.|c.k}]",
+                "set_false_path -to [get_ports pad]",
+                "current_instance -quiet",
+                "set_property IOSTANDARD LVCMOS18 [get_ports pa?]",
+                "set_property IOSTANDARD LVCMOS18 [get_ports bus[*]]"), design.getXDCConstraints(ConstraintGroup.EARLY));
+    }
+
+    /**
+     * A bus's declared name, such as bus[1:0], names no port, so it is not a device pin, even when
+     * the design has a bus of that name.
+     */
+    @Test
+    public void testAddBlackBoxConstraintsBusDeclaredName() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        top.createPort("bus[1:0]", EDIFDirection.INPUT, 2);
+        EDIFCell rpType = new EDIFCell(top.getLibrary(), "rpType");
+        rpType.createPort("bus[1:0]", EDIFDirection.INPUT, 2);
+        EDIFCellInst rp = rpType.createCellInst("rp", top);
+        rp.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+
+        Design circuit = new Design("circuit", "xcvu3p");
+        circuit.getTopEDIFCell().createPort("bus[1:0]", EDIFDirection.INPUT, 2);
+        circuit.addXDCConstraint(ConstraintGroup.EARLY,
+                "set_property IOSTANDARD LVCMOS18 [get_ports bus[0]]",
+                "set_property IOSTANDARD LVCMOS18 [get_ports bus[1:0]]");
+
+        DesignTools.populateBlackBox(design, Collections.singletonMap("rp", circuit), false);
+
+        // The box's bus is not connected to the design's, so both name the circuit's ports
+        Assertions.assertEquals(Arrays.asList(
+                "current_instance rp",
+                "set_property IOSTANDARD LVCMOS18 [get_ports -scoped_to_current_instance bus[0]]",
+                "set_property IOSTANDARD LVCMOS18 [get_ports -scoped_to_current_instance bus[1:0]]",
                 "current_instance -quiet"), design.getXDCConstraints(ConstraintGroup.EARLY));
     }
 
@@ -530,5 +671,58 @@ public class TestConstraintTools {
                 "current_instance {rp[0]}",
                 "set_property MAX_FANOUT 10 [get_nets n]",
                 "current_instance -quiet"), design.getXDCConstraints(ConstraintGroup.EARLY));
+    }
+
+    /**
+     * get_ports is told apart from its options in any order, abbreviated, with values, and over
+     * continued lines.
+     */
+    @Test
+    public void testAddBlackBoxConstraintsGetPortsOptions() {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        top.createPort("pad", EDIFDirection.OUTPUT, 1);
+        top.createPort("bus[1:0]", EDIFDirection.OUTPUT, 2);
+        EDIFCell rpType = new EDIFCell(top.getLibrary(), "rpType");
+        rpType.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCellInst rp = rpType.createCellInst("rp", top);
+        rp.addProperty(EDIFCellInst.BLACK_BOX_PROP, true);
+
+        Design circuit = new Design("circuit", "xcvu3p");
+        circuit.getTopEDIFCell().createPort("I", EDIFDirection.INPUT, 1);
+        circuit.addXDCConstraint(ConstraintGroup.LATE,
+                "set_property KEEP true [get_ports -quiet -scoped_to_current_instance a]",
+                "set_property KEEP true [get_ports -sco b]",
+                "set_property IOSTANDARD LVCMOS18 [get_ports -nocase pad]",
+                "set_property KEEP true [get_ports -of_objects [get_nets n]]",
+                "set_property PULLDOWN true [get_ports -filter {DIRECTION == OUT} -quiet {bus[0]}]",
+                "set_property KEEP true [get_ports \\",
+                "    -scoped_to_current_instance d]",
+                "set_false_path -to [get_ports \\",
+                "    e]");
+
+        DesignTools.populateBlackBox(design, Collections.singletonMap("rp", circuit), false);
+
+        Assertions.assertEquals(Arrays.asList(
+                "current_instance rp",
+                // Already scoped, even if not first or abbreviated
+                "set_property KEEP true [get_ports -quiet -scoped_to_current_instance a]",
+                "set_property KEEP true [get_ports -sco b]",
+                // Options before the names of top-level ports
+                "current_instance -quiet",
+                "set_property IOSTANDARD LVCMOS18 [get_ports -nocase pad]",
+                "current_instance rp",
+                // No names, so the circuit's ports
+                "set_property KEEP true [get_ports -scoped_to_current_instance -of_objects [get_nets n]]",
+                // An option's value is not a name
+                "current_instance -quiet",
+                "set_property PULLDOWN true [get_ports -filter {DIRECTION == OUT} -quiet {bus[0]}]",
+                "current_instance rp",
+                // Options on the next line
+                "set_property KEEP true [get_ports \\",
+                "    -scoped_to_current_instance d]",
+                "set_false_path -to [get_ports -scoped_to_current_instance \\",
+                "    e]",
+                "current_instance -quiet"), design.getXDCConstraints(ConstraintGroup.LATE));
     }
 }
