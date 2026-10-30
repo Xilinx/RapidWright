@@ -38,8 +38,8 @@ import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicIntegerArray;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
@@ -79,6 +79,7 @@ public class TestParallelismTools {
     }
 
     /** Collect the results of invokeFirstSubmitRest() in order, checking that each task is run exactly once */
+    @SuppressWarnings("deprecation")
     private static void checkJoinFirstInOrder() {
         final AtomicIntegerArray runs = new AtomicIntegerArray(NUM_TASKS);
         final Deque<Future<Integer>> futures = ParallelismTools.invokeFirstSubmitRest(countingTasks(runs));
@@ -90,6 +91,7 @@ public class TestParallelismTools {
     }
 
     /** Submit tasks one by one and collect their results in order with joinFirst(), as EDIF export does */
+    @SuppressWarnings("deprecation")
     private static void checkSubmitJoinFirstInOrder() {
         final AtomicIntegerArray runs = new AtomicIntegerArray(NUM_TASKS);
         final Deque<Future<Integer>> futures = new ArrayDeque<>();
@@ -144,6 +146,22 @@ public class TestParallelismTools {
     }
 
     @Test
+    public void testJoinRunsEachUnsubmittedTaskOnce() {
+        // Tasks never submitted, so only run by the thread waiting for them
+        final AtomicIntegerArray runs = new AtomicIntegerArray(NUM_TASKS);
+        final List<Future<Integer>> futures = new ArrayList<>();
+        for (Callable<Integer> task : countingTasks(runs)) {
+            futures.add(ParallelismTools.adapt(task));
+        }
+        ParallelismTools.join(futures);
+        for (int i = 0; i < NUM_TASKS; i++) {
+            Assertions.assertEquals(i, ParallelismTools.get(futures.get(i)));
+        }
+        assertEachRunOnce(runs);
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
     public void testJoinRunsEachDeferredTaskOnce() {
         final AtomicIntegerArray runs = new AtomicIntegerArray(NUM_TASKS);
         final List<Future<Integer>> futures = new ArrayList<>(
@@ -156,6 +174,7 @@ public class TestParallelismTools {
     }
 
     @Test
+    @SuppressWarnings("deprecation")
     public void testExceptionRethrownAsIs() {
         final IllegalStateException thrown = new IllegalStateException("task 1");
         final Deque<Future<Integer>> futures = ParallelismTools.invokeFirstSubmitRest(
@@ -259,6 +278,7 @@ public class TestParallelismTools {
     }
 
     @Test
+    @SuppressWarnings("deprecation")
     public void testFirstTaskExceptionRethrownByJoinFirst() {
         final Deque<Future<Integer>> futures = ParallelismTools.invokeFirstSubmitRest(
                 () -> {
@@ -314,58 +334,6 @@ public class TestParallelismTools {
     }
 
     @Test
-    public void testRelayRunsOnceInputsReady() throws Exception {
-        final boolean wasParallel = ParallelismTools.getParallel();
-        try {
-            // With parallel processing disabled, each stage of a relay (as in EDIF export) runs as soon as it is
-            // chained, before the next task is supplied
-            ParallelismTools.setParallel(false);
-            final List<Integer> log = new ArrayList<>();
-            CompletableFuture<Void> relay = CompletableFuture.completedFuture(null);
-            for (int i = 0; i < 3; i++) {
-                final int index = i;
-                final CompletableFuture<Integer> piece = ParallelismTools.supplyAsync(() -> {
-                    log.add(2 * index);
-                    return index;
-                });
-                relay = relay.thenCombine(piece, (x, p) -> {
-                    log.add(2 * p + 1);
-                    return null;
-                });
-                Assertions.assertTrue(relay.isDone());
-            }
-            Assertions.assertEquals(Arrays.asList(0, 1, 2, 3, 4, 5), log);
-
-            // Otherwise, a stage runs only once both its inputs are complete, on the thread that completes the later
-            // Which needs parallel processing, which cannot be enabled if there is only one processor, or if it was
-            // disabled at startup (RW_PARALLEL=0): then, the blocked task below would run on this thread, and hang
-            Assumptions.assumeTrue(ParallelismTools.setParallel(true));
-            final CompletableFuture<Integer> previous = ParallelismTools.supplyAsync(() -> 1);
-            ParallelismTools.get(previous);
-            final CountDownLatch release = new CountDownLatch(1);
-            final AtomicReference<Thread> ranTask = new AtomicReference<>();
-            final AtomicReference<Thread> ranStage = new AtomicReference<>();
-            final CompletableFuture<Integer> piece = ParallelismTools.supplyAsync(() -> {
-                release.await();
-                ranTask.set(Thread.currentThread());
-                return 2;
-            });
-            final CompletableFuture<Integer> stage = previous.thenCombine(piece, (x, p) -> {
-                ranStage.set(Thread.currentThread());
-                return x + p;
-            });
-            Assertions.assertFalse(stage.isDone());
-            Assertions.assertNull(ranStage.get());
-            release.countDown();
-            Assertions.assertEquals(3, (int) stage.get());
-            Assertions.assertNotNull(ranTask.get());
-            Assertions.assertSame(ranTask.get(), ranStage.get());
-        } finally {
-            ParallelismTools.setParallel(wasParallel);
-        }
-    }
-
-    @Test
     public void testJoinAllCancelsRestAfterFailureParallel() {
         boolean wasParallel = ParallelismTools.getParallel();
         CountDownLatch release = new CountDownLatch(1);
@@ -404,20 +372,53 @@ public class TestParallelismTools {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
+    public void testChunkRangesMinChunkSize() {
+        boolean wasParallel = ParallelismTools.getParallel();
+        try {
+            // Where parallel processing cannot be enabled, there is a single chunk whatever the minimum
+            Assumptions.assumeTrue(ParallelismTools.setParallel(true));
+            // Ten items per chunk without a minimum
+            int size = 4 * ParallelismTools.maxParallelism() * 10;
+            Assertions.assertEquals(10, ParallelismTools.chunkSize(size));
+            Assertions.assertEquals(25, ParallelismTools.chunkSize(size, 25));
+
+            // Every index once, in order, in chunks of the minimum but the last
+            List<int[]> chunks = ParallelismTools.chunkRanges(3, 3 + size, 25).collect(Collectors.toList());
+            int next = 3;
+            for (int i = 0; i < chunks.size(); i++) {
+                int[] chunk = chunks.get(i);
+                Assertions.assertEquals(next, chunk[0]);
+                int chunkSize = chunk[1] - chunk[0];
+                Assertions.assertTrue(i < chunks.size() - 1 ? chunkSize == 25 : chunkSize > 0 && chunkSize <= 25);
+                next = chunk[1];
+            }
+            Assertions.assertEquals(3 + size, next);
+
+            // Fewer indices than the minimum: a single chunk, even with a minimum too large to add to an index
+            List<int[]> single = ParallelismTools.chunkRanges(5, 15, Integer.MAX_VALUE).collect(Collectors.toList());
+            Assertions.assertEquals(1, single.size());
+            Assertions.assertArrayEquals(new int[]{5, 15}, single.get(0));
+            Assertions.assertEquals(0, ParallelismTools.chunkRanges(5, 5, 25).count());
+        } finally {
+            ParallelismTools.setParallel(wasParallel);
+        }
+    }
+
+    @Test
+    @SuppressWarnings({"unchecked", "deprecation"})
     public void testInvokeFirstSubmitRestNoTasks() {
         Assertions.assertTrue(ParallelismTools.invokeFirstSubmitRest(new Callable[0]).isEmpty());
     }
 
     @Test
-    public void testJoinInOrder() {
+    public void testJoinOrdered() {
         final AtomicIntegerArray runs = new AtomicIntegerArray(NUM_TASKS);
         final List<Future<Integer>> futures = new ArrayList<>();
         for (Callable<Integer> task : countingTasks(runs)) {
             futures.add(ParallelismTools.submit(task));
         }
         // Each value in order, its element set to null once waited for
-        final Iterator<Integer> it = ParallelismTools.joinInOrder(futures);
+        final Iterator<Integer> it = ParallelismTools.joinOrdered(futures);
         for (int i = 0; i < NUM_TASKS; i++) {
             Assertions.assertTrue(it.hasNext());
             Assertions.assertEquals(i, it.next());
@@ -426,6 +427,154 @@ public class TestParallelismTools {
         Assertions.assertFalse(it.hasNext());
         Assertions.assertThrows(NoSuchElementException.class, it::next);
         assertEachRunOnce(runs);
+    }
+
+    @Test
+    public void testJoinUnordered() {
+        final AtomicIntegerArray runs = new AtomicIntegerArray(NUM_TASKS);
+        final List<CompletableFuture<Integer>> futures = new ArrayList<>();
+        for (Callable<Integer> task : countingTasks(runs)) {
+            futures.add(ParallelismTools.supplyAsync(task));
+        }
+        // Each value once, in whatever order the tasks complete, each set to null in the List once returned
+        final boolean[] returned = new boolean[NUM_TASKS];
+        final Iterator<CompletableFuture<Integer>> it = ParallelismTools.joinUnordered(futures);
+        while (it.hasNext()) {
+            final CompletableFuture<Integer> future = it.next();
+            Assertions.assertTrue(future.isDone());
+            Assertions.assertFalse(futures.contains(future));
+            final int value = ParallelismTools.get(future);
+            Assertions.assertFalse(returned[value]);
+            returned[value] = true;
+        }
+        Assertions.assertThrows(NoSuchElementException.class, it::next);
+        for (CompletableFuture<Integer> future : futures) {
+            Assertions.assertNull(future);
+        }
+        assertEachRunOnce(runs);
+    }
+
+    @Test
+    public void testJoinUnorderedItems() {
+        final AtomicIntegerArray runs = new AtomicIntegerArray(NUM_TASKS);
+        final List<Pair<CompletableFuture<Integer>, Integer>> items = new ArrayList<>();
+        int i = 0;
+        for (Callable<Integer> task : countingTasks(runs)) {
+            items.add(new Pair<>(ParallelismTools.supplyAsync(task), i++));
+        }
+        // Each item once, with what its CompletableFuture is for, set to null in the List once returned
+        int count = 0;
+        final Iterator<Pair<CompletableFuture<Integer>, Integer>> it = ParallelismTools.joinUnordered(items,
+                Pair::getFirst);
+        while (it.hasNext()) {
+            final Pair<CompletableFuture<Integer>, Integer> item = it.next();
+            Assertions.assertTrue(item.getFirst().isDone());
+            Assertions.assertFalse(items.contains(item));
+            Assertions.assertEquals(item.getSecond(), ParallelismTools.get(item.getFirst()));
+            count++;
+        }
+        Assertions.assertEquals(NUM_TASKS, count);
+        assertEachRunOnce(runs);
+    }
+
+    @Test
+    public void testJoinUnorderedReturnsDoneBeforeRunning() throws InterruptedException {
+        boolean wasParallel = ParallelismTools.getParallel();
+        // Which cannot be enabled if there is only one processor, or if it was disabled at startup (RW_PARALLEL=0):
+        // then, the blocked task below would run on this thread, and hang
+        Assumptions.assumeTrue(ParallelismTools.setParallel(true));
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try {
+            CompletableFuture<Integer> blocked = ParallelismTools.supplyAsync(() -> {
+                started.countDown();
+                release.await();
+                return 0;
+            });
+            // Claimed by a thread of the pool, so that joinUnordered() cannot run it
+            started.await();
+            CompletableFuture<Integer> other = ParallelismTools.supplyAsync(() -> 1);
+            List<CompletableFuture<Integer>> futures = new ArrayList<>(Arrays.asList(blocked, other));
+
+            // The other one (run by this thread, if not yet by another), rather than waiting for the blocked one
+            Iterator<CompletableFuture<Integer>> it = ParallelismTools.joinUnordered(futures);
+            Assertions.assertSame(other, it.next());
+            Assertions.assertFalse(blocked.isDone());
+
+            // Then the blocked one, waited for until it is released by another thread
+            new Thread(() -> {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    // Release it anyway
+                }
+                release.countDown();
+            }).start();
+            Assertions.assertSame(blocked, it.next());
+            Assertions.assertFalse(it.hasNext());
+            Assertions.assertEquals(0, ParallelismTools.get(blocked));
+        } finally {
+            release.countDown();
+            ParallelismTools.setParallel(wasParallel);
+        }
+    }
+
+    @Test
+    public void testJoinUnorderedFailed() {
+        IllegalStateException thrown = new IllegalStateException("task");
+        CompletableFuture<Integer> failed = ParallelismTools.supplyAsync(() -> {
+            throw thrown;
+        });
+        // Returned as any other, its exception left for get()
+        Assertions.assertSame(failed, ParallelismTools.joinUnordered(new ArrayList<>(Arrays.asList(failed))).next());
+        Assertions.assertSame(thrown,
+                Assertions.assertThrows(IllegalStateException.class, () -> ParallelismTools.get(failed)));
+    }
+
+    /**
+     * A task given to supplyAsync() that no thread of the pool has started yet is run by the thread waiting for its
+     * CompletableFuture with the CompletableFuture's own get(), timed get() or join(), rather than that thread only
+     * blocking; unless that thread has been interrupted, when get() throws without running it.
+     */
+    @Test
+    public void testSupplyAsyncOwnWaitRunsUnclaimedTask() throws Exception {
+        boolean wasParallel = ParallelismTools.getParallel();
+        // Parallel processing cannot be enabled if there is only one processor, or if it was disabled at startup
+        // (RW_PARALLEL=0): then, the blocked tasks below would run on this thread, and hang
+        Assumptions.assumeTrue(ParallelismTools.setParallel(true));
+        int threads = ForkJoinPool.getCommonPoolParallelism();
+        CountDownLatch started = new CountDownLatch(threads);
+        CountDownLatch release = new CountDownLatch(1);
+        try {
+            // Every thread of the pool busy until released, so that none starts the tasks supplied below
+            for (int i = 0; i < threads; i++) {
+                ParallelismTools.supplyAsync(() -> {
+                    started.countDown();
+                    release.await();
+                    return null;
+                });
+            }
+            started.await();
+            Thread self = Thread.currentThread();
+
+            Assertions.assertSame(self, ParallelismTools.supplyAsync(Thread::currentThread).get());
+            // Run to the end, whatever the timeout
+            Assertions.assertSame(self,
+                    ParallelismTools.supplyAsync(Thread::currentThread).get(1, TimeUnit.MILLISECONDS));
+            Assertions.assertSame(self, ParallelismTools.supplyAsync(Thread::currentThread).join());
+
+            // When interrupted, get() throws (clearing the interrupt status) without running it, as a Future's get()
+            // does if it would wait; join() is not interruptible, so then runs it
+            CompletableFuture<Thread> future = ParallelismTools.supplyAsync(Thread::currentThread);
+            self.interrupt();
+            Assertions.assertThrows(InterruptedException.class, future::get);
+            Assertions.assertFalse(Thread.interrupted());
+            Assertions.assertFalse(future.isDone());
+            Assertions.assertSame(self, future.join());
+        } finally {
+            release.countDown();
+            ParallelismTools.setParallel(wasParallel);
+        }
     }
 
     @Test
@@ -439,6 +588,7 @@ public class TestParallelismTools {
     }
 
     @Test
+    @SuppressWarnings("deprecation")
     public void testSingleThreaded() throws Exception {
         final boolean wasParallel = ParallelismTools.getParallel();
         ParallelismTools.setParallel(false);

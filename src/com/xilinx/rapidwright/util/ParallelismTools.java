@@ -45,9 +45,12 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.jetbrains.annotations.NotNull;
@@ -57,12 +60,11 @@ import org.jetbrains.annotations.NotNull;
  *
  * A class that abstracts away single-threaded and multi-threaded execution.
  * Single-threaded mode means that all tasks are executed on the current
- * thread: those given to {@link #submit(Callable)} (and all but the first
- * given to {@link #invokeFirstSubmitRest(Callable[])}) are deferred until they
+ * thread: those given to {@link #submit(Callable)} are deferred until they
  * are waited for ({@link #get(Future)}, {@link #join(List)},
- * {@link #joinAll(List)}, {@link #joinInOrder(List)} or
- * {@link #joinFirst(Deque)}, or the returned Future's own get()) or polled (its
- * own isDone()), which executes them on that thread, so a task submitted that
+ * {@link #joinAll(List)} or {@link #joinOrdered(List)}, or the returned
+ * Future's own get()) or polled (its own isDone()), which executes them on
+ * that thread, so a task submitted that
  * way is never executed if it is never waited for (or polled); all others are
  * executed immediately, including those given to
  * {@link #supplyAsync(Callable)}, so that the returned CompletableFuture is
@@ -143,12 +145,12 @@ public class ParallelismTools {
     /**
      * Submit a task-with-return-value to the common ForkJoinPool, as a {@link FutureTask}
      * (rather than a ForkJoinTask): any thread waiting for it with {@link #get(Future)},
-     * {@link #join(List)} or {@link #joinFirst(Deque)} runs it itself if no other thread
+     * {@link #join(List)} or {@link #joinAll(List)} runs it itself if no other thread
      * has claimed it yet, wherever it is in the pool's queues (and so even if the pool has
      * no threads), and any exception it throws is kept as-is.
      * When parallel processing is disabled, the task is not submitted, but deferred until
      * it is waited for, with {@link #get(Future)}, {@link #join(List)},
-     * {@link #joinAll(List)}, {@link #joinInOrder(List)}, {@link #joinFirst(Deque)} or the
+     * {@link #joinAll(List)}, {@link #joinOrdered(List)} or the
      * returned Future's own get(), or polled with its isDone(), which executes it on that
      * thread (see {@link LazyFutureTask}). So a task that is never waited for (or polled)
      * is never executed: for one whose result is not needed, use
@@ -196,8 +198,8 @@ public class ParallelismTools {
     /**
      * A FutureTask that is not submitted to the pool (as when parallel processing is disabled), but run by the first
      * thread to wait for it with its own get(), or to poll it with its own isDone(), as well as by
-     * {@link #get(Future)}, {@link #join(List)}, {@link #joinAll(List)}, {@link #joinInOrder(List)} or
-     * {@link #joinFirst(Deque)} (see {@link #runIfUnclaimed(Future)}). FutureTask.run() does nothing if another thread
+     * {@link #get(Future)}, {@link #join(List)}, {@link #joinAll(List)} or {@link #joinOrdered(List)}
+     * (see {@link #runIfUnclaimed(Future)}). FutureTask.run() does nothing if another thread
      * has already claimed the task (or it has been cancelled), so it is run at most once, and any other thread waiting
      * for it meanwhile waits for that one.
      */
@@ -206,22 +208,10 @@ public class ParallelismTools {
             super(task);
         }
 
-        /**
-         * As FutureTask.get() does if it would wait, throws InterruptedException (clearing the interrupt status) if
-         * this thread has been interrupted and the task is not done; otherwise runs the task if no thread has claimed
-         * it.
-         */
-        private void runUnlessInterrupted() throws InterruptedException {
-            // Not isDone(), which runs the task
-            if (!super.isDone() && Thread.interrupted()) {
-                throw new InterruptedException();
-            }
-            run();
-        }
-
         @Override
         public T get() throws InterruptedException, ExecutionException {
-            runUnlessInterrupted();
+            // Not isDone(), which runs the task
+            runUnlessInterrupted(super.isDone(), this);
             return super.get();
         }
 
@@ -232,7 +222,7 @@ public class ParallelismTools {
         @Override
         public T get(long timeout, @NotNull TimeUnit unit)
                 throws InterruptedException, ExecutionException, TimeoutException {
-            runUnlessInterrupted();
+            runUnlessInterrupted(super.isDone(), this);
             return super.get(timeout, unit);
         }
 
@@ -248,66 +238,93 @@ public class ParallelismTools {
     }
 
     /**
-     * A CompletableFuture completed by a FutureTask that runs its task: so that, once that FutureTask has been
-     * submitted to the pool, a thread waiting for the CompletableFuture with {@link #get(Future)}, {@link #join(List)}
-     * or {@link #joinFirst(Deque)} can run it itself if no other thread has started it (see
-     * {@link #runIfUnclaimed(Future)}), as for a Future from {@link #submit(Callable)}. A CompletableFuture's own task
-     * (e.g. from CompletableFuture.supplyAsync()) cannot be run that way: the CompletableFuture has no reference to
-     * it, and (unlike a FutureTask) it could run twice if run by a second thread.
+     * As a Future's get() does if it would wait, throws InterruptedException (clearing the interrupt status) if this
+     * thread has been interrupted and the task is not done; otherwise runs the task if no thread has claimed it.
+     * @param done Whether the task's Future is done.
+     * @param task Runs the task, unless another thread has claimed it.
      */
-    private static class CompletableFutureWithFutureTask<T> extends CompletableFuture<T> {
-        /** Runs the task and completes this, at most once */
-        protected final FutureTask<Void> task;
+    private static void runUnlessInterrupted(boolean done, Runnable task) throws InterruptedException {
+        if (!done && Thread.interrupted()) {
+            throw new InterruptedException();
+        }
+        task.run();
+    }
 
-        private CompletableFutureWithFutureTask(Callable<T> callable) {
-            task = new FutureTask<>(() -> {
+    /**
+     * A CompletableFuture that runs its own task, unless already done (e.g. cancelled), at most once, on whichever
+     * thread runs it first: a thread of the pool, if it was submitted to it, or a thread waiting for it, whether with
+     * its own get() or join(), or with {@link #get(Future)}, {@link #join(List)}, {@link #joinAll(List)} or
+     * {@link #joinUnordered(List)} (see {@link #runIfUnclaimed(Future)}). So it need not be submitted at all (as
+     * when parallel processing is disabled), as waiting for it runs it. A CompletableFuture's own task (e.g. from
+     * CompletableFuture.supplyAsync()) cannot be run that way: the CompletableFuture has no reference to it, and it
+     * could run twice if run by a second thread.
+     */
+    private static final class RunnableCompletableFuture<T> extends CompletableFuture<T> implements Runnable {
+        /** The task, until a thread claims it to run it */
+        private final AtomicReference<Callable<T>> task;
+
+        private RunnableCompletableFuture(Callable<T> task) {
+            this.task = new AtomicReference<>(task);
+        }
+
+        @Override
+        public void run() {
+            // Taken even if already done (e.g. cancelled), so that the task is not kept
+            final Callable<T> callable = task.getAndSet(null);
+            if (callable != null && !isDone()) {
                 try {
                     complete(callable.call());
                 } catch (Throwable e) {
                     completeExceptionally(e);
                 }
-                return null;
-            });
+            }
         }
 
-        /**
-         * Also cancels the FutureTask, so that it is not run if no thread has started it (as a CompletableFuture's
-         * own cancel() only completes it, which would leave the FutureTask to run when a pool thread dequeues it).
-         */
         @Override
-        public boolean cancel(boolean mayInterruptIfRunning) {
-            task.cancel(false);
-            return super.cancel(mayInterruptIfRunning);
+        public T get() throws InterruptedException, ExecutionException {
+            runUnlessInterrupted(isDone(), this);
+            return super.get();
+        }
+
+        @Override
+        public T get(long timeout, @NotNull TimeUnit unit)
+                throws InterruptedException, ExecutionException, TimeoutException {
+            runUnlessInterrupted(isDone(), this);
+            return super.get(timeout, unit);
+        }
+
+        @Override
+        public T join() {
+            run();
+            return super.join();
         }
     }
 
     /**
-     * Submit a task-with-return-value to the common ForkJoinPool, as {@link #submit(Callable)} does (so a thread
-     * waiting for it with {@link #get(Future)}, {@link #join(List)} or {@link #joinFirst(Deque)} also runs it itself if
-     * no other thread has started it), but returning a CompletableFuture, so that further work can be chained on its
-     * completion (by default, run by the thread that completes it), in any way. Any exception the task throws
-     * completes the CompletableFuture exceptionally.
+     * Submit a task-with-return-value to the common ForkJoinPool, as {@link #submit(Callable)} does, but returning a
+     * CompletableFuture, so that further work can be chained on its completion (by default, run by the thread that
+     * completes it), in any way. Any exception the task throws completes the CompletableFuture exceptionally. A thread
+     * waiting for it, whether with {@link #get(Future)}, {@link #join(List)}, {@link #joinAll(List)},
+     * {@link #joinOrdered(List)} or {@link #joinUnordered(List)}, or with the CompletableFuture's own get() or
+     * join(), runs the task itself if no other thread has started it (and a timed get() then runs it to the end,
+     * whatever the timeout).
      * When parallel processing is disabled, the task is executed immediately on the current thread, so that the
      * returned CompletableFuture is already complete: work chained on it then runs as soon as it is chained, on the
      * thread chaining it.
-     * Otherwise, waiting with the CompletableFuture's own get() or join() does not run the task (unlike waiting with
-     * {@link #get(Future)}, {@link #join(List)} or {@link #joinAll(List)}). (From Java 9,
-     * a thread of the pool that does so helps, within the JDK, which cannot be done from outside it, but only by
-     * running CompletableFutures' own tasks, e.g. from CompletableFuture.supplyAsync(), at the head of its own queue.)
      * @param task Task to be performed.
      * @param <T> Type returned by task.
      * @return A CompletableFuture holding the value returned by task.
      */
     public static <T> CompletableFuture<T> supplyAsync(Callable<T> task) {
-        final CompletableFutureWithFutureTask<T> future = new CompletableFutureWithFutureTask<>(task);
+        final RunnableCompletableFuture<T> future = new RunnableCompletableFuture<>(task);
         if (getParallel()) {
-            ForkJoinPool.commonPool().execute(future.task);
+            ForkJoinPool.commonPool().execute(future);
         } else {
             // Run now, rather than deferring it until waited for as submit() does: work chained on the returned
             // CompletableFuture is a CompletableFuture of its own (e.g. from thenApply(), or allOf(), which builds its
             // dependents directly), with no reference to this task, so a thread waiting for that work could not run
             // it, and would wait forever
-            future.task.run();
+            future.run();
         }
         return future;
     }
@@ -404,12 +421,16 @@ public class ParallelismTools {
      * In single-threaded mode, all but the first task are not executed here but are
      * deferred, as by {@link #submit(Callable)}, until they are passed to
      * {@link #joinFirst(Deque)} (or waited for by {@link #get(Future)},
-     * {@link #join(List)}, {@link #joinAll(List)}, {@link #joinInOrder(List)} or the
+     * {@link #join(List)}, {@link #joinAll(List)}, {@link #joinOrdered(List)} or the
      * Future's own get(), or polled by its own isDone()).
      * @param tasks List of tasks to be executed (if none, an empty Deque is returned).
      * @param <T> Type returned by all tasks.
      * @return A Deque of Future objects corresponding to each task (in order).
+     * @deprecated Submit each task with {@link #submit(Callable)} into a List, and wait for
+     *             them in order with {@link #joinOrdered(List)}, which also runs any not yet
+     *             started.
      */
+    @Deprecated
     @SafeVarargs
     public static <T> Deque<Future<T>> invokeFirstSubmitRest(@NotNull Callable<T>... tasks) {
         final Deque<Future<T>> futures = new ArrayDeque<>(tasks.length);
@@ -436,7 +457,10 @@ public class ParallelismTools {
      *                submitted tasks.
      * @param <T> Type returned by all tasks.
      * @return The value returned by the first task.
+     * @deprecated Wait for the Futures in order with {@link #joinOrdered(List)}, which
+     *             likewise steals subsequent unclaimed tasks while waiting for each.
      */
+    @Deprecated
     public static <T> T joinFirst(Deque<Future<T>> futures) {
         final Future<T> first = futures.removeFirst();
         if (!runIfUnclaimed(first)) {
@@ -503,7 +527,7 @@ public class ParallelismTools {
      *                ArrayList), and are each set to null once completed.
      */
     public static void joinAll(@NotNull List<? extends Future<?>> futures) {
-        final Iterator<?> it = joinInOrder(futures);
+        final Iterator<?> it = joinOrdered(futures);
         while (it.hasNext()) {
             it.next();
         }
@@ -523,7 +547,10 @@ public class ParallelismTools {
      * that threw) as they are, so that the List no longer keeps a Future (or
      * its value) once it has been waited for. So the List must be modifiable,
      * and may be read between calls to next() (e.g. to cancel the Futures not
-     * yet waited for), when each Future already waited for is null.
+     * yet waited for), when each Future already waited for is null. Futures may
+     * also be added to its end between calls to next() (e.g. as tasks are
+     * submitted while earlier ones are consumed): hasNext() and next() then
+     * include them, and next() may steal their tasks.
      * @param futures A modifiable List of Future objects corresponding to
      *                previously submitted tasks, whose elements are accessed by
      *                index (so should be a random-access list, such as an
@@ -531,7 +558,7 @@ public class ParallelismTools {
      * @param <T> Type returned by all tasks.
      * @return An Iterator over the values of the Futures, in order.
      */
-    public static <T> Iterator<T> joinInOrder(@NotNull List<? extends Future<? extends T>> futures) {
+    public static <T> Iterator<T> joinOrdered(@NotNull List<? extends Future<? extends T>> futures) {
         return new Iterator<T>() {
             // The index of the next Future to wait for
             private int i = 0;
@@ -565,6 +592,85 @@ public class ParallelismTools {
                 }
                 futures.set(i++, null);
                 return value;
+            }
+        };
+    }
+
+    /**
+     * As {@link #joinUnordered(List, Function)}, for a List of CompletableFutures themselves.
+     * @param futures A modifiable List of CompletableFutures, e.g. from {@link #supplyAsync(Callable)}.
+     * @param <F> Type of the CompletableFutures.
+     * @return An Iterator over the CompletableFutures, in the order they are done.
+     */
+    public static <F extends CompletableFuture<?>> Iterator<F> joinUnordered(@NotNull List<F> futures) {
+        return joinUnordered(futures, Function.identity());
+    }
+
+    /**
+     * For a given List of items that each have a CompletableFuture (such as pairs of a CompletableFuture and what it is
+     * for), return an Iterator over the items in the order their CompletableFutures are done, each of whose next()
+     * waits for one of those not yet returned to be done: one already done, if any; else one whose task this thread
+     * runs itself, the first in the List's order not yet claimed by another thread (so, when parallel processing is
+     * disabled, as by {@link #supplyAsync(Callable)}, each is already done and they are returned in the List's
+     * order); else, as every one is running on another thread, whichever is done first. Useful when each result is
+     * consumed by this thread as soon as it is ready, in whatever order the tasks complete. Its value, or the exception
+     * its task threw, is not taken here: get it with {@link #get(Future)}, which rethrows such an exception as
+     * described for this class.
+     * As with {@link #joinOrdered(List)}, the given List is modified: each next() sets the element of the item it
+     * returns to null, so that the List no longer keeps it once returned. So the List must be modifiable, and may be
+     * read between calls to next() (e.g. to close the results of those not yet returned if consuming one fails), when
+     * each item already returned is null. Items may also be added to its end between calls to next(): hasNext() and
+     * next() then include them.
+     * Only CompletableFutures can be waited for this way, as for any one of them (CompletableFuture.anyOf()): any other
+     * Future (e.g. from {@link #submit(Callable)}) could only be polled.
+     * @param items A modifiable List of items, none of them null, whose elements are accessed by index (so should be a
+     *              random-access list, such as an ArrayList).
+     * @param futureOf The CompletableFuture of an item.
+     * @param <E> Type of the items.
+     * @return An Iterator over the items, in the order their CompletableFutures are done.
+     */
+    public static <E> Iterator<E> joinUnordered(@NotNull List<E> items,
+                                                @NotNull Function<? super E, ? extends CompletableFuture<?>> futureOf) {
+        return new Iterator<E>() {
+            // The number of items returned so far, each of whose elements is null
+            private int returned = 0;
+
+            @Override
+            public boolean hasNext() {
+                return returned < items.size();
+            }
+
+            @Override
+            public E next() {
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                while (true) {
+                    int done = indexOf((f) -> f.isDone());
+                    if (done < 0) {
+                        done = indexOf((f) -> runIfUnclaimed(f));
+                    }
+                    if (done >= 0) {
+                        returned++;
+                        return items.set(done, null);
+                    }
+                    // Every one has been claimed by another thread (so will complete without this one), and none is
+                    // done yet. The exception of the one done, if any, is left for get(), as handle() completes
+                    // normally
+                    getUnwrapped(CompletableFuture.anyOf(items.stream().filter((item) -> item != null).map(futureOf)
+                            .toArray(CompletableFuture<?>[]::new)).handle((r, e) -> null));
+                }
+            }
+
+            /** The index of the first item not yet returned whose CompletableFuture passes the given test, if any */
+            private int indexOf(Predicate<CompletableFuture<?>> test) {
+                for (int i = 0; i < items.size(); i++) {
+                    E item = items.get(i);
+                    if (item != null && test.test(futureOf.apply(item))) {
+                        return i;
+                    }
+                }
+                return -1;
             }
         };
     }
@@ -607,8 +713,8 @@ public class ParallelismTools {
      * ForkJoinPool does not support for tasks given to execute()): FutureTask.run()
      * does nothing if another thread has already claimed the task, so the pool
      * worker that eventually dequeues it finds it already done, which costs it
-     * very little. Likewise for the FutureTask of a
-     * {@link CompletableFutureWithFutureTask}. Any other Future (e.g. a ForkJoinTask,
+     * very little. Likewise for a {@link RunnableCompletableFuture}, whose run()
+     * does nothing once its task has been claimed. Any other Future (e.g. a ForkJoinTask,
      * which, unlike a FutureTask, could run again if run while another thread is
      * running it) is left to the thread that runs it.
      * @param future Future representing a previously submitted task.
@@ -617,12 +723,11 @@ public class ParallelismTools {
      *         false if it is not (e.g. another thread is still running it).
      */
     private static <T> boolean runIfUnclaimed(Future<T> future) {
+        // Each does nothing unless the task is unclaimed (and so not done)
         if (future instanceof FutureTask) {
-            // Does nothing unless the task is unclaimed (and so not done)
             ((FutureTask<T>) future).run();
-        } else if (future instanceof CompletableFutureWithFutureTask && !future.isDone()) {
-            // Not if already completed some other way (e.g. by its own complete()), as its task would still run
-            ((CompletableFutureWithFutureTask<T>) future).task.run();
+        } else if (future instanceof RunnableCompletableFuture) {
+            ((RunnableCompletableFuture<T>) future).run();
         }
         return future.isDone();
     }
@@ -642,6 +747,93 @@ public class ParallelismTools {
     }
 
     /**
+     * A stream of the given array's items, as {@link #stream(Collection)} is of a collection's: a parallel one (run on
+     * the common ForkJoinPool) when parallel processing is enabled, else a sequential one, in the array's order.
+     * @param items The items to stream.
+     * @param <T> Item type.
+     * @return {@code stream(Arrays.asList(items))}, which wraps the array without copying it.
+     */
+    public static <T> Stream<T> stream(@NotNull T[] items) {
+        return stream(Arrays.asList(items));
+    }
+
+    /**
+     * The number of items in each chunk when the given number of items are split into chunks for a task to be run on
+     * each in parallel, as {@link #chunkRanges(int, int)} does: when parallel processing is enabled, roughly four
+     * chunks per {@link #maxParallelism()} thread (or one item per chunk, if there are fewer items), else a single
+     * chunk of all the items.
+     * @param size The number of items.
+     * @return The number of items in each chunk (the last may have fewer), at least 1.
+     */
+    public static int chunkSize(int size) {
+        return chunkSize(size, 1);
+    }
+
+    /**
+     * As {@link #chunkSize(int)}, but with at least the given number of items in each chunk (but the last), so fewer
+     * chunks when there are few items (a single one, if there are no more items than that): e.g. when each chunk has a
+     * cost of its own (such as a buffer, or a task's overhead) that is only worth paying for enough items.
+     * @param size The number of items.
+     * @param minChunkSize The fewest items in each chunk (but the last).
+     * @return The number of items in each chunk (the last may have fewer), at least minChunkSize, and at least 1.
+     */
+    public static int chunkSize(int size, int minChunkSize) {
+        return Math.max(Math.max(1, minChunkSize), getParallel() ? size / (4 * maxParallelism()) : size);
+    }
+
+    /**
+     * The indices from start (inclusive) to end (exclusive) in chunks of consecutive indices, in order, for a task to
+     * be run on each chunk in parallel: when parallel processing is enabled, roughly four chunks per
+     * {@link #maxParallelism()} thread (or one per index, if there are fewer), else a single chunk of all the indices.
+     * Every index is in exactly one chunk, and no chunk is empty.
+     * @param start The first index.
+     * @param end One past the last index.
+     * @return A sequential stream of the chunks, in order, each as {@code {from, to}}: the indices from from
+     *         (inclusive) to to (exclusive); none if end is not after start. Call parallel() on it to run a task on
+     *         each chunk in parallel.
+     */
+    public static Stream<int[]> chunkRanges(int start, int end) {
+        return chunkRanges(start, end, 1);
+    }
+
+    /**
+     * As {@link #chunkRanges(int, int)}, but with at least the given number of indices in each chunk (but the last),
+     * as for {@link #chunkSize(int, int)}.
+     * @param start The first index.
+     * @param end One past the last index.
+     * @param minChunkSize The fewest indices in each chunk (but the last).
+     * @return A sequential stream of the chunks, in order, each as {@code {from, to}}: the indices from from
+     *         (inclusive) to to (exclusive); none if end is not after start.
+     */
+    public static Stream<int[]> chunkRanges(int start, int end, int minChunkSize) {
+        // When parallel processing is disabled, chunkSize() is at least size, so there is a single chunk, if any
+        final int size = end - start;
+        final int chunkSize = chunkSize(size, minChunkSize);
+        // Without adding chunkSize to an index, which could overflow if minChunkSize is large
+        final int chunks = size > 0 ? (size - 1) / chunkSize + 1 : 0;
+        return IntStream.range(0, chunks).mapToObj(i -> new int[]{start + i * chunkSize,
+                (int) Math.min(start + (long) (i + 1) * chunkSize, end)});
+    }
+
+    /**
+     * The given items in chunks of consecutive items, in order, for a task to be run on each chunk in parallel: when
+     * parallel processing is enabled, the chunks of {@link #chunkRanges(int, int)} (roughly four per
+     * {@link #maxParallelism()} thread, or one per item, if there are fewer), else a single chunk of all the items.
+     * Each chunk is a view of the given list (see {@link List#subList(int, int)}), so the list must not be
+     * structurally modified while any chunk is in use.
+     * @param items The items, which should be a random-access list (such as an ArrayList), as each chunk starts at
+     *              an index.
+     * @param <T> Item type.
+     * @return The chunks, in encounter order, none if there are no items: when parallel processing is enabled, a
+     *         parallel stream of them (so use an operation that respects encounter order, such as forEachOrdered(), if
+     *         their order matters), else a sequential one.
+     */
+    public static <T> Stream<List<T>> chunkedStream(@NotNull List<T> items) {
+        final Stream<List<T>> chunks = chunkRanges(0, items.size()).map(r -> items.subList(r[0], r[1]));
+        return getParallel() ? chunks.parallel() : chunks;
+    }
+
+    /**
      * Run the specified task on all items, blocking until all have been completed.
      * When parallel processing is enabled, a parallel stream is used, where the calling thread
      * splits the items (using the collection's own Spliterator) into roughly four pieces per
@@ -654,18 +846,8 @@ public class ParallelismTools {
      * @param <T> item type
      */
     public static <T> void forEach(Collection<T> items, Consumer<T> task) {
-        if (!getParallel()) {
-            try {
-                for (T item : items) {
-                    task.accept(item);
-                }
-            } catch (RuntimeException | Error e) {
-                throw rethrow(e);
-            }
-            return;
-        }
         try {
-            items.parallelStream().forEach(task);
+            stream(items).forEach(task);
         } catch (RuntimeException | Error e) {
             throw rethrow(e);
         }
@@ -694,17 +876,11 @@ public class ParallelismTools {
             forEach(items, task);
             return;
         }
-        final int size = items.size();
-        final int chunkSize = Math.max(1, size / (4 * maxParallelism()));
-        for (int from = 0; from < size; from += chunkSize) {
-            final int start = from;
-            final int end = Math.min(size, from + chunkSize);
-            submit(parent, () -> {
-                for (int i = start; i < end; i++) {
-                    task.accept(items.get(i));
-                }
-            });
-        }
+        chunkedStream(items).forEachOrdered(chunk -> submit(parent, () -> {
+            for (T item : chunk) {
+                task.accept(item);
+            }
+        }));
     }
 
     /**
@@ -769,19 +945,8 @@ public class ParallelismTools {
      *         order (its iteration order, if the collection is ordered)
      */
     public static <T,R> List<R> invokeAll(Collection<T> items, Function<T,R> task) {
-        if (!getParallel()) {
-            final List<R> results = new ArrayList<>(items.size());
-            try {
-                for (T item : items) {
-                    results.add(task.apply(item));
-                }
-            } catch (RuntimeException | Error e) {
-                throw rethrow(e);
-            }
-            return results;
-        }
         try {
-            return items.parallelStream().map(task).collect(Collectors.toList());
+            return stream(items).map(task).collect(Collectors.toList());
         } catch (RuntimeException | Error e) {
             throw rethrow(e);
         }

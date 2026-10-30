@@ -1985,10 +1985,11 @@ public class FileTools {
         if (!destDir.exists()) {
             destDir.mkdirs();
         }
-        try (FileInputStream fis = new FileInputStream(zipFileName);
-            ZipInputStream zin = new ZipInputStream(fis)) {
-            ZipEntry e;
-            while ((e = zin.getNextEntry()) != null) {
+        // A ZipFile, which reads each entry's sizes from the central directory, rather than a ZipInputStream, which
+        // before Java 23 misreads ZIP64 (8-byte) sizes in the data descriptor after an entry under 4 GB, as some ZIP
+        // files are written (https://bugs.openjdk.org/browse/JDK-8303866)
+        try (ZipFile zip = new ZipFile(zipFileName)) {
+            for (ZipEntry e : Collections.list(zip.entries())) {
                 String destFilePath = destDirectory + File.separator + e.getName();
                 if (e.isDirectory()) {
                     new File(destFilePath).mkdirs();
@@ -1996,7 +1997,8 @@ public class FileTools {
                     File currFile = new File(destFilePath);
                     String parentName = currFile.getParentFile().getAbsolutePath();
                     makeDirs(parentName);
-                    try (FileOutputStream fos = new FileOutputStream(destFilePath);
+                    try (InputStream zin = zip.getInputStream(e);
+                        FileOutputStream fos = new FileOutputStream(destFilePath);
                         BufferedOutputStream bos = new BufferedOutputStream(fos)) {
                         int read;
                         while ( (read = zin.read(buffer)) != -1) {
