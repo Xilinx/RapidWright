@@ -55,6 +55,8 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.router.RouteThruHelper;
+import com.xilinx.rapidwright.timing.TimingGraph;
+import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 import com.xilinx.rapidwright.util.ParallelismTools;
@@ -1264,6 +1266,49 @@ public class RouteNodeGraph {
      */
     public DelayEstimatorBase<InterconnectInfo> getDelayEstimator() {
         return null;
+    }
+
+    /**
+     * Gets the LUT logic delay with a connection arriving at the given sink rnode (one of its
+     * candidate LUT input pins, with LUT pin swapping).
+     * @param timingGraph The timing graph.
+     * @param connection The connection.
+     * @param sinkRnode One of the connection's sink rnodes.
+     * @param updateTimingGraph True to also set the corresponding logic edges' delays in the timing graph.
+     * @return The logic delay in ps: zero, since this graph is not timing driven.
+     */
+    protected float getLutLogicDelay(TimingGraph timingGraph, Connection connection, RouteNode sinkRnode,
+                                     boolean updateTimingGraph) {
+        return 0;
+    }
+
+    /**
+     * Sets, for each of the connection's targets, its LUT logic delay in excess of that of the
+     * fastest target: nothing to do, since this graph is not timing driven.
+     * @param state State from the connection that is being routed, with its targets marked.
+     * @param timingManager The timing manager (null if not timing driven).
+     */
+    protected void setTargetExcessLogicDelays(RWRoute.ConnectionState state, TimingManager timingManager) {
+    }
+
+    /**
+     * Gets the given target's LUT logic delay in excess of that of the connection's fastest target.
+     * @param state State from the connection that is being routed.
+     * @param target One of the connection's targets.
+     * @return The excess logic delay in ps: zero, since this graph is not timing driven.
+     */
+    protected float getTargetExcessLogicDelay(RWRoute.ConnectionState state, RouteNode target) {
+        return 0;
+    }
+
+    /**
+     * Checks if routing a connection may terminate early on pushing the given (uncongested) target.
+     * @param state State from the connection that is being routed.
+     * @param target The target being pushed.
+     * @return True, since this graph is not timing driven.
+     */
+    protected boolean isEarlyTerminable(RWRoute.ConnectionState state, RouteNode target) {
+        return true;
     }
 
     /**
