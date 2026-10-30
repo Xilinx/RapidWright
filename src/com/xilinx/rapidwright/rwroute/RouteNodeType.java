@@ -78,8 +78,8 @@ public enum RouteNodeType {
 
     NON_LOCAL,
     /**
-     * Non-local nodes that serve both sides (halves) of the INT tile that they end at: UltraScale longs and those
-     * INT_NODE_QUAD_LONG_* that drive quads on both sides, and Versal longs. Rather than being placed at either side,
+     * Non-local nodes that serve both sides (halves) of the INT tile that they end at: UltraScale longs and the
+     * INT_NODE_QUAD_LONG_* / QLND* that drive them, and Versal longs. Rather than being placed at either side,
      * these are considered to be on the same side as the node that the path arrived at them from (see
      * RWRoute.evaluateCostAndPush()), so that entering them neither gains nor loses distance to the sink in X.
      */

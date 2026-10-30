@@ -38,7 +38,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountedCompleter;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReferenceArray;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -158,10 +157,67 @@ public class RouteNodeGraph {
      * half of an interconnect tile; all other nodes are considered to end on its west half. This includes
      * local nodes serving the east side, interconnect wires (e.g. singles and doubles) arriving at the east side,
      * CTRL_E* pins, and INT_NODE_GLOBAL_* nodes driving INODEs on the east side (UltraScale/UltraScale+), as
-     * well as CTRL_L_B* pins in CLE_BC_CORE/SLL tiles, the CTRL pins of INTF_* tiles serving the east side, and site
-     * pins (NODE_PINFEED) in CLE_W_CORE tiles (Versal).
+     * well as CTRL_L_B* pins in CLE_BC_CORE/SLL tiles (Versal). Nodes of the tiles beside one side of their INT tile
+     * (e.g. CLE outputs) are placed by tile type instead (see {@link #SITE_TILE_TYPE_ON_EAST_SIDE}).
      */
     protected final Map<TileTypeEnum, BitSet> eastSideWires;
+
+    /**
+     * Side of their INT tile (true for east) that tiles of these types are beside, and so that the nodes in them that
+     * RWRoute routes from (CLE outputs, and the INT_INTERFACE_* / INT_INTF_* / INTF_* / BLI_CLE_* nodes that all other
+     * site outputs are projected onto; see RouterHelper.projectOutputPinToINTNode()) enter that INT tile on, and drive
+     * nodes on (other than UltraScale INT_NODE_QUAD_LONG_* / QLND*, which serve both sides): as found for every such
+     * node on xcku040, xcvu3p, xcvu9p, xcu50 and xczu7ev, and in samples of each type on xcku115, xcvu440, xcvu095,
+     * xcvu13p, xczu9eg, xcu250, xcvu37p, xcvc1902 and xcv80. Neither the suffix of a type's name (CLEM_R and CLE_M_R
+     * are beside the west side) nor, on Versal, the LOGIC_OUTS_[EW]* wire in the node (most CLE_W_CORE outputs on
+     * xcv80 contain a LOGIC_OUTS_W*) always says which. Every node of these types is placed on that side (see
+     * isEastSideWire()).
+     */
+    protected static final Map<TileTypeEnum, Boolean> SITE_TILE_TYPE_ON_EAST_SIDE = new EnumMap<>(TileTypeEnum.class);
+    static {
+        for (TileTypeEnum tte : EnumSet.of(
+                // UltraScale and UltraScale+
+                TileTypeEnum.CLEL_R,
+                // UltraScale+
+                TileTypeEnum.INT_INTF_R, TileTypeEnum.INT_INTF_R_PCIE4, TileTypeEnum.INT_INTF_R_TERM_GT,
+                TileTypeEnum.INT_INTF_RIGHT_TERM_IO,
+                // UltraScale
+                TileTypeEnum.INT_INTERFACE_R, TileTypeEnum.INT_INTERFACE_PCIE_R, TileTypeEnum.INT_INTERFACE_GT_R,
+                // Versal
+                TileTypeEnum.CLE_W_CORE, TileTypeEnum.BLI_CLE_BOT_CORE, TileTypeEnum.BLI_CLE_TOP_CORE,
+                TileTypeEnum.INTF_LOCF_TR_TILE, TileTypeEnum.INTF_LOCF_BR_TILE,
+                TileTypeEnum.INTF_ROCF_TR_TILE, TileTypeEnum.INTF_ROCF_BR_TILE,
+                TileTypeEnum.INTF_GT_TR_TILE, TileTypeEnum.INTF_GT_BR_TILE,
+                TileTypeEnum.INTF_HB_LOCF_TR_TILE, TileTypeEnum.INTF_HB_LOCF_BR_TILE,
+                TileTypeEnum.INTF_HB_ROCF_TR_TILE, TileTypeEnum.INTF_HB_ROCF_BR_TILE,
+                TileTypeEnum.INTF_HDIO_LOCF_TR_TILE, TileTypeEnum.INTF_HDIO_ROCF_TR_TILE)) {
+            SITE_TILE_TYPE_ON_EAST_SIDE.put(tte, true);
+        }
+        for (TileTypeEnum tte : EnumSet.of(
+                // UltraScale and UltraScale+
+                TileTypeEnum.CLEL_L,
+                // UltraScale+
+                TileTypeEnum.CLEM, TileTypeEnum.CLEM_R,
+                TileTypeEnum.INT_INTF_L, TileTypeEnum.INT_INTF_L_CMT, TileTypeEnum.INT_INTF_L_IO,
+                TileTypeEnum.INT_INTF_L_PCIE4, TileTypeEnum.INT_INTF_L_TERM_GT,
+                TileTypeEnum.INT_INTF_LEFT_TERM_IO_FT, TileTypeEnum.INT_INTF_LEFT_TERM_PSS,
+                // UltraScale
+                TileTypeEnum.CLE_M, TileTypeEnum.CLE_M_R,
+                TileTypeEnum.INT_INTERFACE_L, TileTypeEnum.INT_INTERFACE_PCIE_L,
+                TileTypeEnum.INT_INT_INTERFACE_XIPHY_FT, TileTypeEnum.INT_INT_INTERFACE_GT_LEFT_FT,
+                // Versal
+                TileTypeEnum.CLE_E_CORE, TileTypeEnum.BLI_CLE_BOT_CORE_MY, TileTypeEnum.BLI_CLE_TOP_CORE_MY,
+                TileTypeEnum.INTF_LOCF_TL_TILE, TileTypeEnum.INTF_LOCF_BL_TILE,
+                TileTypeEnum.INTF_ROCF_TL_TILE, TileTypeEnum.INTF_ROCF_BL_TILE,
+                TileTypeEnum.INTF_GT_TL_TILE, TileTypeEnum.INTF_GT_BL_TILE,
+                TileTypeEnum.INTF_HB_LOCF_TL_TILE, TileTypeEnum.INTF_HB_LOCF_BL_TILE,
+                TileTypeEnum.INTF_HB_ROCF_TL_TILE, TileTypeEnum.INTF_HB_ROCF_BL_TILE,
+                TileTypeEnum.INTF_HDIO_LOCF_TL_TILE, TileTypeEnum.INTF_HDIO_ROCF_TL_TILE,
+                TileTypeEnum.INTF_CFRM_TL_TILE, TileTypeEnum.INTF_CFRM_BL_TILE,
+                TileTypeEnum.INTF_PSS_TL_TILE, TileTypeEnum.INTF_PSS_BL_TILE)) {
+            SITE_TILE_TYPE_ON_EAST_SIDE.put(tte, false);
+        }
+    }
 
     /** BitSet indicating (for UltraScale/UltraScale+ only) the wire indices of CTRL_* pins in INT tiles */
     protected final BitSet ultraScalesCtrlWires;
@@ -169,7 +225,7 @@ public class RouteNodeGraph {
     /**
      * Map indicating the wire indices (of the base wire of a node) corresponding to non-local nodes that serve both
      * sides of the INT tile that they end at, and so are given the {@link RouteNodeType#NON_LOCAL_INHERIT_PREV_SIDE}
-     * type: UltraScale longs and those INT_NODE_QUAD_LONG_* / QLND* that drive quads on both sides, and Versal longs.
+     * type: UltraScale longs and INT_NODE_QUAD_LONG_* / QLND* (which drive a long), and Versal longs.
      */
     protected final Map<TileTypeEnum, BitSet> inheritPrevSideWires;
 
@@ -427,30 +483,15 @@ public class RouteNodeGraph {
                                     // Not a LOCAL node, but sided (in the sense of its half-tile X coordinate)
                                     setSideFromDownhill(baseNode, sideFromName);
                                 } else {
-                                    // INT_NODE_QUAD_LONG_* / QLND* each drive two quads and a long (with no side): sided
-                                    // only when both quads are on the same side (32 of 128 per INT tile on xcku040),
-                                    // otherwise left on the west side
-                                    Boolean east = null;
-                                    boolean bothSides = false;
-                                    for (Node downhill : baseNode.getAllDownhillNodes()) {
-                                        IntentCode ic = downhill.getIntentCode();
-                                        if (ic != IntentCode.NODE_HQUAD && ic != IntentCode.NODE_VQUAD) {
-                                            continue;
-                                        }
-                                        Matcher m = indexNamedPattern.matcher(downhill.getWireName());
-                                        if (!m.matches()) {
-                                            continue;
-                                        }
-                                        boolean downhillEast = isEastSideByIndexName(false, m);
-                                        bothSides |= (east != null && east != downhillEast);
-                                        east = downhillEast;
-                                    }
-                                    if (bothSides) {
-                                        inheritPrevSideWires.computeIfAbsent(baseTile.getTileTypeEnum(), k -> new BitSet())
-                                                .set(baseNode.getWireIndex());
-                                    } else if (east != null && east) {
-                                        setEastSide(baseNode);
-                                    }
+                                    // INT_NODE_QUAD_LONG_* / QLND* each drive two quads and a long (with no side), and
+                                    // so serve both sides even when both quads are on the same side (32 of 128 per INT
+                                    // tile on xcku040): the long that they drive inherits their side, and the quads
+                                    // land where their own names say
+                                    assert(baseNode.getAllDownhillNodes().stream().anyMatch((downhill) ->
+                                            downhill.getIntentCode() == IntentCode.NODE_HLONG ||
+                                            downhill.getIntentCode() == IntentCode.NODE_VLONG));
+                                    inheritPrevSideWires.computeIfAbsent(baseTile.getTileTypeEnum(), k -> new BitSet())
+                                            .set(baseNode.getWireIndex());
                                 }
                                 continue;
                             }
@@ -559,95 +600,35 @@ public class RouteNodeGraph {
                 }
             }
 
-            // Site pins (NODE_PINFEED; in the routing graph only as the CLE_SLICE[LM]_TOP_*_LAG_*_PIN downhill of an SLL
-            // output, since all others are projected onto their INT tile) and CLE outputs (NODE_CLE_OUTPUT: the
-            // [A-H]Q*_PIN, [A-H]Q*, [A-H]_O_PIN and [A-H]_O that those pins and the CLE's sources drive, which drive
-            // nodes on that same side of the INT tile) are on the side of the INT tile that their CLE core is beside:
-            // CLE_W_CORE_X<n> is beside the east side of INT_X<n>, and CLE_E_CORE_X<n> beside the west side (where they
-            // would otherwise be placed)
-            Tile cleWCoreTile = device.getArbitraryTileOfType(TileTypeEnum.CLE_W_CORE);
-            if (cleWCoreTile != null) {
-                BitSet eastWires = eastSideWires.computeIfAbsent(TileTypeEnum.CLE_W_CORE, k -> new BitSet());
-                for (int wireIndex = 0; wireIndex < cleWCoreTile.getWireCount(); wireIndex++) {
-                    IntentCode ic = cleWCoreTile.getWireIntentCode(wireIndex);
-                    if (ic == IntentCode.NODE_PINFEED || ic == IntentCode.NODE_CLE_OUTPUT) {
-                        eastWires.set(wireIndex);
+            // INTF_* tiles serve only one side of their INT tile (see SITE_TILE_TYPE_ON_EAST_SIDE), and their BNODEs and
+            // CNODEs are sided local wires. Unlike those in CLE_BC_CORE tiles, CNODEs in INTF_* tiles (on xcv80, at
+            // least) do not drive any INODEs, only CTRL pins
+            for (TileTypeEnum tte : SITE_TILE_TYPE_ON_EAST_SIDE.keySet()) {
+                Tile intfTile = device.getArbitraryTileOfType(tte);
+                if (intfTile == null) continue;
+                for (int wireIndex = 0; wireIndex < intfTile.getWireCount(); wireIndex++) {
+                    IntentCode baseIntentCode = intfTile.getWireIntentCode(wireIndex);
+                    if (baseIntentCode != IntentCode.NODE_INTF_BNODE && baseIntentCode != IntentCode.NODE_INTF_CNODE) {
+                        continue;
+                    }
+                    sidedLocalWires.computeIfAbsent(tte, k -> new BitSet()).set(wireIndex);
+                    if (baseIntentCode != IntentCode.NODE_INTF_CNODE) {
+                        continue;
+                    }
+                    Node baseNode = Node.getNode(intfTile, wireIndex);
+                    assert(baseNode.getTile() == intfTile);
+                    boolean ctrlOnly = true;
+                    for (Node downhill : baseNode.getAllDownhillNodes()) {
+                        if (downhill.getIntentCode() != IntentCode.NODE_INTF_CTRL) {
+                            ctrlOnly = false;
+                            break;
+                        }
+                    }
+                    if (ctrlOnly) {
+                        versalIntfCtrlOnlyWires.computeIfAbsent(tte, k -> new BitSet()).set(wireIndex);
                     }
                 }
             }
-
-            // With NODE_CLE_[BC]NODEs being handled as part of the INT tile above, compute east/west wires
-            // in INTF_* tiles here; INTF_* tiles serve only one side of their INT tile, including their CTRL pins
-            // (which, like those in CLE_BC_CORE tiles, are not considered to be sided local wires)
-            BiConsumer<List<TileTypeEnum>, Boolean> lambda = (types, east) -> {
-                for (TileTypeEnum tte : types) {
-                    Tile intfTile = device.getArbitraryTileOfType(tte);
-                    if (intfTile == null) continue;
-                    BitSet sidedWires = sidedLocalWires.computeIfAbsent(tte, k -> new BitSet());
-                    BitSet eastWires = eastSideWires.computeIfAbsent(tte, k -> new BitSet());
-                    for (int wireIndex = 0; wireIndex < intfTile.getWireCount(); wireIndex++) {
-                        IntentCode baseIntentCode = intfTile.getWireIntentCode(wireIndex);
-                        if (baseIntentCode == IntentCode.NODE_INTF_CTRL) {
-                            if (east) {
-                                eastWires.set(wireIndex);
-                            }
-                            continue;
-                        }
-                        if (baseIntentCode != IntentCode.NODE_INTF_BNODE && baseIntentCode != IntentCode.NODE_INTF_CNODE) {
-                            continue;
-                        }
-                        Node baseNode = Node.getNode(intfTile, wireIndex);
-                        assert(baseNode.getTile() == intfTile);
-
-                        sidedWires.set(wireIndex);
-                        if (east) {
-                            eastWires.set(wireIndex);
-                        }
-
-                        if (baseIntentCode == IntentCode.NODE_INTF_CNODE) {
-                            // Unlike those in CLE_BC_CORE tiles, CNODEs in INTF_* tiles (on xcv80, at least) do not
-                            // drive any INODEs, only CTRL pins
-                            boolean ctrlOnly = true;
-                            for (Node downhill : baseNode.getAllDownhillNodes()) {
-                                if (downhill.getIntentCode() != IntentCode.NODE_INTF_CTRL) {
-                                    ctrlOnly = false;
-                                    break;
-                                }
-                            }
-                            if (ctrlOnly) {
-                                versalIntfCtrlOnlyWires.computeIfAbsent(tte, k -> new BitSet()).set(wireIndex);
-                            }
-                        }
-                    }
-                }
-            };
-
-            lambda.accept(Arrays.asList(
-                    TileTypeEnum.INTF_LOCF_TR_TILE,
-                    TileTypeEnum.INTF_LOCF_BR_TILE,
-                    TileTypeEnum.INTF_ROCF_TR_TILE,
-                    TileTypeEnum.INTF_ROCF_BR_TILE,
-                    TileTypeEnum.INTF_GT_TR_TILE,
-                    TileTypeEnum.INTF_GT_BR_TILE,
-                    TileTypeEnum.INTF_HB_LOCF_TR_TILE,
-                    TileTypeEnum.INTF_HB_LOCF_BR_TILE,
-                    TileTypeEnum.INTF_HB_ROCF_TR_TILE,
-                    TileTypeEnum.INTF_HB_ROCF_BR_TILE), true /* east */);
-            lambda.accept(Arrays.asList(
-                    TileTypeEnum.INTF_LOCF_TL_TILE,
-                    TileTypeEnum.INTF_LOCF_BL_TILE,
-                    TileTypeEnum.INTF_ROCF_TL_TILE,
-                    TileTypeEnum.INTF_ROCF_BL_TILE,
-                    TileTypeEnum.INTF_CFRM_TL_TILE,
-                    TileTypeEnum.INTF_CFRM_BL_TILE,
-                    TileTypeEnum.INTF_GT_TL_TILE,
-                    TileTypeEnum.INTF_GT_BL_TILE,
-                    TileTypeEnum.INTF_HB_LOCF_TL_TILE,
-                    TileTypeEnum.INTF_HB_LOCF_BL_TILE,
-                    TileTypeEnum.INTF_HB_ROCF_TL_TILE,
-                    TileTypeEnum.INTF_HB_ROCF_BL_TILE,
-                    TileTypeEnum.INTF_PSS_BL_TILE,
-                    TileTypeEnum.INTF_PSS_TL_TILE), false /* west */);
         }
 
         if (lutRoutethru) {
@@ -1093,12 +1074,17 @@ public class RouteNodeGraph {
 
     /**
      * Checks if a node ends on the east side of an interconnect tile (otherwise, it is considered to end on the
-     * west side).
+     * west side): every node of a tile type beside the east side of its INT tile (see
+     * {@link #SITE_TILE_TYPE_ON_EAST_SIDE}), or one given by {@link #eastSideWires}.
      * @param tileTypeEnum Tile type of the node's base wire.
      * @param wireIndex Wire index of the node's base wire.
      * @return True if so.
      */
     public boolean isEastSideWire(TileTypeEnum tileTypeEnum, int wireIndex) {
+        Boolean siteTileOnEastSide = SITE_TILE_TYPE_ON_EAST_SIDE.get(tileTypeEnum);
+        if (siteTileOnEastSide != null) {
+            return siteTileOnEastSide;
+        }
         BitSet eastSideWires = this.eastSideWires.get(tileTypeEnum);
         return eastSideWires != null && eastSideWires.get(wireIndex);
     }
