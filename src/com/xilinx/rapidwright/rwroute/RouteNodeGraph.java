@@ -560,14 +560,17 @@ public class RouteNodeGraph {
             }
 
             // Site pins (NODE_PINFEED; in the routing graph only as the CLE_SLICE[LM]_TOP_*_LAG_*_PIN downhill of an SLL
-            // output, since all others are projected onto their INT tile) are on the side of the INT tile that their
-            // CLE core is beside: CLE_W_CORE_X<n> is beside the east side of INT_X<n>, and CLE_E_CORE_X<n> beside the
-            // west side (where they would otherwise be placed)
+            // output, since all others are projected onto their INT tile) and CLE outputs (NODE_CLE_OUTPUT: the
+            // [A-H]Q*_PIN, [A-H]Q*, [A-H]_O_PIN and [A-H]_O that those pins and the CLE's sources drive, which drive
+            // nodes on that same side of the INT tile) are on the side of the INT tile that their CLE core is beside:
+            // CLE_W_CORE_X<n> is beside the east side of INT_X<n>, and CLE_E_CORE_X<n> beside the west side (where they
+            // would otherwise be placed)
             Tile cleWCoreTile = device.getArbitraryTileOfType(TileTypeEnum.CLE_W_CORE);
             if (cleWCoreTile != null) {
                 BitSet eastWires = eastSideWires.computeIfAbsent(TileTypeEnum.CLE_W_CORE, k -> new BitSet());
                 for (int wireIndex = 0; wireIndex < cleWCoreTile.getWireCount(); wireIndex++) {
-                    if (cleWCoreTile.getWireIntentCode(wireIndex) == IntentCode.NODE_PINFEED) {
+                    IntentCode ic = cleWCoreTile.getWireIntentCode(wireIndex);
+                    if (ic == IntentCode.NODE_PINFEED || ic == IntentCode.NODE_CLE_OUTPUT) {
                         eastWires.set(wireIndex);
                     }
                 }
