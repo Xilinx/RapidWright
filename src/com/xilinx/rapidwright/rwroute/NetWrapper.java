@@ -67,8 +67,10 @@ public class NetWrapper{
         int ySum = 0;
         int count = 0;
         boolean sourceRnodeAdded = false;
+        boolean crossSLR = false;
         for (Connection connection : connections) {
             if (connection.isDirect()) continue;
+            crossSLR |= connection.isCrossSLR();
             if (!sourceRnodeAdded) {
                 short x = connection.getSourceRnode().getEndTileXCoordinate();
                 short y = connection.getSourceRnode().getEndTileYCoordinate();
@@ -76,16 +78,6 @@ public class NetWrapper{
                 yMin = Integer.min(yMin, y);
                 xMax = Integer.max(xMax, x);
                 yMax = Integer.max(yMax, y);
-
-                if (connection.isCrossSLR() && routingGraph.nextCrossingHalfColumn != null) {
-                    // For SLR-crossing connections, ensure it contains at least one column from which super long
-                    // lines can cross SLRs (Laguna on UltraScale/UltraScale+, SLL on Versal)
-                    int nextColumn = routingGraph.getNextCrossingColumn(xMin);
-                    int prevColumn = routingGraph.getPrevCrossingColumn(xMax);
-                    xMin = (short) Math.min(xMin, prevColumn);
-                    xMax = (short) Math.max(xMax, nextColumn);
-                }
-
                 xSum += x;
                 ySum += y;
                 sourceRnodeAdded = true;
@@ -100,6 +92,21 @@ public class NetWrapper{
             xSum += x;
             ySum += y;
             count++;
+        }
+
+        if (crossSLR) {
+            // As for each connection's bounding box (see Connection.computeConnectionBoundingBox()): for nets with an
+            // SLR-crossing connection, ensure it contains at least one column from which super long lines can cross
+            // SLRs (Laguna on UltraScale/UltraScale+, SLL on Versal), and is at least as high as a super long line
+            int nextColumn = routingGraph.getNextCrossingColumn(xMin);
+            int prevColumn = routingGraph.getPrevCrossingColumn(xMax);
+            if (nextColumn != Integer.MAX_VALUE) {
+                xMax = Math.max(xMax, nextColumn);
+            }
+            if (prevColumn != Integer.MIN_VALUE) {
+                xMin = Math.min(xMin, prevColumn);
+            }
+            yMax = Math.max(yMax, yMin + routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
         }
 
         doubleHpwl = (short) ((xMax - xMin + 1 + yMax - yMin + 1) * 2);

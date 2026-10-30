@@ -414,7 +414,7 @@ public class TestRWRoute {
             // One SLR crossing
             // (Too) close
             "xcv80,SLICE_X54Y331,SLICE_X54Y332,200",            // Source adjacent to crossing SLL (east)
-            "xcv80,SLICE_X53Y332,SLICE_X53Y331,200",            // Source adjacent to crossing SLL (west)
+            "xcv80,SLICE_X53Y332,SLICE_X53Y331,100",            // Source adjacent to crossing SLL (west)
             "xcv80,SLICE_X51Y331,SLICE_X51Y332,300",            // Close to crossing SLL
             // Perfect
             "xcv80,SLICE_X54Y331,SLICE_X54Y406,100",            // Source adjacent to crossing SLL (east, north)
@@ -432,11 +432,11 @@ public class TestRWRoute {
             Device.AWS_F1 + ",SLICE_X0Y299,SLICE_X0Y300,100",    // Far from Laguna column
             Device.AWS_F1 + ",SLICE_X0Y300,SLICE_X0Y299,100",
             Device.AWS_F1 + ",SLICE_X54Y299,SLICE_X56Y300,200",  // Slight closer to one Laguna column that is further from sink
-            Device.AWS_F1 + ",SLICE_X54Y300,SLICE_X56Y299,300",
+            Device.AWS_F1 + ",SLICE_X54Y300,SLICE_X56Y299,200",
             Device.AWS_F1 + ",SLICE_X50Y299,SLICE_X65Y300,100",
             Device.AWS_F1 + ",SLICE_X50Y300,SLICE_X65Y299,100",
-            Device.AWS_F1 + ",SLICE_X55Y299,SLICE_X55Y300,200",  // Equidistant from two Laguna columns
-            Device.AWS_F1 + ",SLICE_X55Y300,SLICE_X55Y299,200",
+            Device.AWS_F1 + ",SLICE_X55Y299,SLICE_X55Y300,100",  // Equidistant from two Laguna columns
+            Device.AWS_F1 + ",SLICE_X55Y300,SLICE_X55Y299,100",
             // Perfect
             Device.AWS_F1 + ",SLICE_X9Y241,SLICE_X9Y300,200",
             Device.AWS_F1 + ",SLICE_X9Y300,SLICE_X9Y241,200",
