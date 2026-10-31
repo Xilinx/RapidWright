@@ -1810,8 +1810,8 @@ public class RouteNodeGraph {
         // INODEs and PINBOUNCEs leading to one and a BNODE in an SLL tile, which can end on the other side of that tile
         // to what drives it, and which, being on the sending side of a chain, is not restricted to the side of the sink
         // by (c); and an UltraScale/UltraScale+ TXOUT, in the Laguna tile in the same row as the IMUX that drives it, and
-        // so leading in the same direction). Outside the sink's SLR, these are the only local nodes that such a
-        // connection can use on Versal (see below)
+        // so leading in the same direction). Outside the sink's SLR, these (and the other BNODEs of their SLL tiles;
+        // see (b2)) are the only local nodes that such a connection can use on Versal (see below)
         Tile childTile = childRnode.getTile();
         RouteNode sinkRnode = connection.getSinkRnode();
         int childX = childRnode.getEndTileXCoordinate();
@@ -1836,6 +1836,21 @@ public class RouteNodeGraph {
                 // e.g. one Y +/- 1 from the sink)
                 return false;
             }
+        } else if (isVersal && type == RouteNodeType.LOCAL && childTileType == TileTypeEnum.SLL &&
+                childRnode.getIntentCode() == IntentCode.NODE_CLE_BNODE &&
+                connection.isCrossSLR() && childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
+            // (b2) as (b), on Versal, for any other BNODE in an SLL tile whose BNODEs lead to an SLL crossing SLRs in
+            // the direction that we want: such a BNODE drives the INODEs on the side of the INT tile beside that SLL
+            // tile (at which it ends), and so can still reach one of those (through INODE -> PINBOUNCE -> BNODE, in
+            // the same row), whatever the side of the sink (e.g. a CLE output -> SLL_X16Y410/BNODE_OUTS_E3 -> INODE ->
+            // BOUNCE_W17 -> SLL_X16Y410/BNODE_OUTS_E1 -> SLL input on xcv80). Being LOCAL rather than
+            // LOCAL_LEADING_TO_SLL, it gets no crossing discount itself (see RWRoute.evaluateCostAndPush()). All
+            // other BNODEs outside the sink's SLR are rejected below (being outside the sink's row)
+            if (getWireIndicesLeadingToSLL(childTile)[1].isEmpty()) {
+                return false;
+            }
+            return isNorthboundSLLRow(childTile.getTileYCoordinate()) ? connection.isCrossSLRnorth()
+                                                                      : connection.isCrossSLRsouth();
         }
 
         // (c) on the same side (half) as the sink
@@ -1934,8 +1949,8 @@ public class RouteNodeGraph {
 
             // In an SLR other than the sink's, a connection that crosses SLRs may only use the local nodes of the sending
             // chain INODE -> PINBOUNCE -> BNODE -> NODE_SLL_INPUT of an SLL that crosses SLRs (of type
-            // LOCAL_LEADING_TO_SLL), which (b) above handled: all others are rejected below (being outside the sink's
-            // tile and row)
+            // LOCAL_LEADING_TO_SLL), which (b) above handled, and the other BNODEs of the SLL tiles of those chains,
+            // which (b2) above handled: all others are rejected below (being outside the sink's tile and row)
             IntentCode childIntentCode = childRnode.getIntentCode();
             switch (childIntentCode) {
                 case NODE_INODE:

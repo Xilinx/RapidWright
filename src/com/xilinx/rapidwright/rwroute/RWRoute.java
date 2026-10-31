@@ -1959,9 +1959,11 @@ public class RWRoute {
                                 // ... or unless it's a Versal SLL input, or a node leading to one that crosses SLRs
                                 // (e.g. a BNODE in an SLL tile, which can end on the other side of the SLL tile to what
                                 // drives it, and like such an SLL input is accessible from either side; see
-                                // RouteNodeGraph.isAccessible())
+                                // RouteNodeGraph.isAccessible()), or any other BNODE in an SLL tile (which is likewise)
                                 childRNode.getIntentCode() == IntentCode.NODE_SLL_INPUT ||
-                                (routingGraph.isVersal && childType.isLocalLeadingToSLL()));
+                                (routingGraph.isVersal && (childType.isLocalLeadingToSLL() ||
+                                        (childRNode.getIntentCode() == IntentCode.NODE_CLE_BNODE &&
+                                         childRNode.getTile().getTileTypeEnum() == TileTypeEnum.SLL))));
                         break;
                     case NON_LOCAL_LEADING_TO_SLL: // UltraScale/UltraScale+ only
                     case NON_LOCAL:

@@ -419,7 +419,7 @@ public class TestRWRoute {
             // Perfect
             "xcv80,SLICE_X54Y331,SLICE_X54Y406,100",            // Source adjacent to crossing SLL (east, north)
             "xcv80,SLICE_X53Y331,SLICE_X53Y406,200",            // Source adjacent to crossing SLL (west, north)
-            "xcv80,SLICE_X54Y406,SLICE_X54Y331,200",            // Sink adjacent to crossing SLL (east, south)
+            "xcv80,SLICE_X54Y406,SLICE_X54Y331,100",            // Sink adjacent to crossing SLL (east, south)
             "xcv80,SLICE_X53Y406,SLICE_X53Y331,100",            // Sink adjacent to crossing SLL (west, south)
             "xcv80,SLICE_X51Y331,SLICE_X51Y406,200",            // Source close to crossing SLL
             "xcv80,SLICE_X0Y331,SLICE_X49Y406,400",             // Source far from crossing SLL
