@@ -77,6 +77,7 @@ import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.util.IntHashSet;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.ReportRouteStatus;
 
@@ -309,6 +310,12 @@ final class RouteStatusNetlist {
         }
     }
 
+    /** Spreads the bits of a hash code (for the open addressing tables of segments and cells) */
+    private static int spread(int h) {
+        h *= 0x9E3779B9;
+        return h ^ (h >>> 16);
+    }
+
     /**
      * @param namesOfInterest Hash codes of names (e.g. of physical nets) to be looked up with
      * {@link #getSegment(String)}, or null.
@@ -354,7 +361,7 @@ final class RouteStatusNetlist {
         int capacity = Integer.highestOneBit(Math.max(4, segs.size() * 2) - 1) << 1;
         Segment[] table = new Segment[capacity];
         for (Segment seg : segs) {
-            int i = IntHashSet.spread(seg.hash) & (capacity - 1);
+            int i = spread(seg.hash) & (capacity - 1);
             while (table[i] != null) {
                 i = (i + 1) & (capacity - 1);
             }
@@ -369,7 +376,7 @@ final class RouteStatusNetlist {
         int h = name.hashCode();
         int mask = segmentTable.length - 1;
         Segment seg;
-        for (int i = IntHashSet.spread(h) & mask; (seg = segmentTable[i]) != null; i = (i + 1) & mask) {
+        for (int i = spread(h) & mask; (seg = segmentTable[i]) != null; i = (i + 1) & mask) {
             if (seg.hash != h) {
                 continue;
             }
@@ -526,7 +533,7 @@ final class RouteStatusNetlist {
             mask = capacity - 1;
             for (Cell cell : all) {
                 int h = cell.getName().hashCode();
-                int i = IntHashSet.spread(h) & mask;
+                int i = spread(h) & mask;
                 while (cells[i] != null) {
                     i = (i + 1) & mask;
                 }
@@ -538,7 +545,7 @@ final class RouteStatusNetlist {
         /** Gets the cell named prefix + name, given the hash code of the prefix. */
         Cell get(String prefix, int prefixHash, String name) {
             int h = prefixHash * pow31(name.length()) + name.hashCode();
-            for (int i = IntHashSet.spread(h) & mask; cells[i] != null; i = (i + 1) & mask) {
+            for (int i = spread(h) & mask; cells[i] != null; i = (i + 1) & mask) {
                 if (hashes[i] != h) {
                     continue;
                 }

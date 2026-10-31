@@ -78,6 +78,7 @@ import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.util.IntHashSet;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.ReportRouteStatus;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult.NetRouteStatus;

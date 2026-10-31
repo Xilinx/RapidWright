@@ -42,6 +42,7 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.util.LongToIndexMap;
 
 /**
  * The routing tree of a net as a graph of node keys, examined to find which sink pins are
@@ -63,7 +64,7 @@ final class RouteGraph {
     /** The start and end nodes of the routethru PIPs, or null if none */
     List<Node> routethruNodes;
     /** Index of each node key in {@link #nodes} */
-    LongIndex index;
+    LongToIndexMap index;
     /**
      * Per node: whether a PIP leads from it in the direction it is used (not just backwards through a
      * bidirectional PIP)
@@ -110,7 +111,7 @@ final class RouteGraph {
 
     RouteGraph(Net net) {
         Edges edges = readEdges(net.getPIPs());
-        index = new LongIndex(2 * edges.count);
+        index = new LongToIndexMap(2 * edges.count);
         int[] startIdx = new int[edges.count];
         int[] endIdx = new int[edges.count];
         // Routing is mostly stored in order, each PIP starting where the previous one ends
