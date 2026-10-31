@@ -907,6 +907,33 @@ public class RouteNodeGraph {
     }
 
     /**
+     * Gets the (Versal) SLL tile beside one side (half) of an INT tile, in the same row: the reverse of
+     * {@link RouteNodeInfo#getWestIntTileXCoordinate(Tile)}.
+     * @param intTile INT tile in question.
+     * @param eastSide True for the SLL tile to its east, else to its west.
+     * @return That SLL tile, or null if there is another INT tile (or none) first.
+     */
+    private static Tile getSllTileBeside(Tile intTile, boolean eastSide) {
+        // On xcv80, for example, SLL_X114Y461 is 3 columns to the east of INT_X113Y461, and 2 to the west of
+        // INT_X114Y461
+        final int maxColumns = 8;
+        for (int dx = 1; dx <= maxColumns; dx++) {
+            Tile tile = intTile.getTileNeighbor(eastSide ? dx : -dx, 0);
+            if (tile == null) {
+                break;
+            }
+            TileTypeEnum tileTypeEnum = tile.getTileTypeEnum();
+            if (tileTypeEnum == TileTypeEnum.SLL) {
+                return tile;
+            }
+            if (tileTypeEnum == TileTypeEnum.INT) {
+                break;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Checks whether nodes leading to a super long line (see {@link RouteNodeType#LOCAL_LEADING_TO_SLL}) in the given row lead
      * to one crossing into the SLR to the north (else south): such nodes are only found in the band of rows next to an
      * SLR boundary, so those in the upper half of their SLR lead north, and those in the lower half south.
@@ -1802,9 +1829,18 @@ public class RouteNodeGraph {
                 // (b) above)
                 if (childIntentCode == IntentCode.NODE_INODE) {
                     // Only INODEs on a half column beside an SLL column whose SLLs cross SLRs (see
-                    // nextCrossingHalfColumn), whose bounces can drive that column's BNODEs
+                    // nextCrossingHalfColumn), whose bounces can drive the BNODEs of the SLL tile beside them in the
+                    // same row, and only if that SLL tile has BNODEs that lead to an SLL crossing SLRs (of type
+                    // LOCAL_LEADING_TO_SLL) and, as (b) requires of those, in the direction that we want
                     int halfX = childRnode.getEndHalfTileXCoordinate();
-                    return nextCrossingHalfColumn[halfX] == halfX;
+                    if (nextCrossingHalfColumn[halfX] != halfX) {
+                        return false;
+                    }
+                    if (isNorthboundSLLRow(childTile.getTileYCoordinate()) ? !connection.isCrossSLRnorth() : !connection.isCrossSLRsouth()) {
+                        return false;
+                    }
+                    Tile sllTile = getSllTileBeside(childTile, childRnode.isOnEastSide());
+                    return sllTile != null && !getWireIndicesLeadingToSLL(sllTile)[1].isEmpty();
                 }
                 if (childIntentCode == IntentCode.NODE_CLE_BNODE && childTile.getTileTypeEnum() == TileTypeEnum.SLL) {
                     // Only BNODEs in an SLL tile with BNODEs that lead to an SLL crossing SLRs (of type
