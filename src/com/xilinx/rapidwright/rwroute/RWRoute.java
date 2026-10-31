@@ -2232,10 +2232,15 @@ public class RWRoute {
             if (RouteNode.isSingleDoubleQuadLong(childRnode.getIntentCode())) {
                 newTotalPathCost += state.rnodeCostWeight * RouteNode.DEPTH_FIRST_BIAS;
             } else if (deltaSLR == 0 && deltaHalfX == 0 && deltaY == 0 && !childRnode.isINode() && !childRnode.isTarget()) {
-                // At the sink's half tile, where the estimate is zero, a node other than an INODE (e.g. an SDQ node or
-                // a bounce) must still take an INODE if only INODEs drive the sink: charge it uncongested. (Singles,
-                // doubles, quads and longs already carry DEPTH_FIRST_BIAS, which is more.)
+                // At the sink's half tile, where the estimate is zero, a node other than an INODE (e.g. a bounce or GNODE)
+                // must still take an INODE if only INODEs drive the sink: charge it uncongested. A non-local one (e.g.
+                // an SDQ node, which drives only singles, doubles, quads and longs) must take one of those first:
+                // charge that too, at its base cost. (Singles, doubles, quads and longs already carry
+                // DEPTH_FIRST_BIAS, which is more than an INODE.)
                 newTotalPathCost += state.sinkINodeCost;
+                if (state.sinkINodeCost > 0 && !childRnode.getType().isAnyLocal()) {
+                    newTotalPathCost += state.rnodeCostWeight * RouteNode.LOCAL_BASE_COST;
+                }
             }
         } else if (isDiscountedSendingChainNode(rnode, connection)) {
             // Following a discounted node along its sending chain: inherit its lower bound, less the tie-break, so that
