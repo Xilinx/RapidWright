@@ -45,6 +45,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -60,6 +61,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import com.xilinx.rapidwright.design.Cell;
+import com.xilinx.rapidwright.design.CellPinStaticDefaults;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.PartitionPin;
@@ -307,6 +309,136 @@ final class RouteStatusNetlist {
         /** Checks whether this is the segment naming the given flat net. */
         boolean names(FlatNet flat) {
             return flat.net == net && flat.prefix.equals(prefix);
+        }
+    }
+
+    /**
+     * An instance of a macro primitive with unconnected input ports, whose defaults are GND or VCC:
+     * Vivado ties such ports to them when it expands the macro, which makes them logical nets (e.g. in
+     * a netlist extracted or edited in RapidWright). The unconnected input pins of other primitives are
+     * left unconnected.
+     */
+    static class TiedMacro {
+        /** The full name of the instance */
+        final String name;
+        /** The number of its unconnected input ports tied to GND, and to VCC */
+        final int[] ties;
+
+        TiedMacro(String name, int[] ties) {
+            this.name = name;
+            this.ties = ties;
+        }
+    }
+
+    private final Queue<TiedMacro> tiedMacros = new ConcurrentLinkedQueue<>();
+
+    /** Gets the instances of macros whose unconnected input ports Vivado ties to GND or VCC. */
+    Collection<TiedMacro> getTiedMacros() {
+        return tiedMacros;
+    }
+
+    /** Per primitive (or macro) cell: per port slot, the constant an unconnected input pin is tied to, if any */
+    private final Map<EDIFCell, NetType[]> inputTies = new ConcurrentHashMap<>();
+
+    /**
+     * Counts the unconnected input ports of an instance of a macro that default to GND, and to VCC.
+     * @return The counts, or null if there are none.
+     */
+    int[] countUnconnectedTies(EDIFCellInst inst) {
+        EDIFCell type = inst.getCellType();
+        Map<EDIFPort, Integer> offsets = getPortOffsets(type);
+        int numSlots = offsets.get(null);
+        if (inst.getPortInsts().size() >= numSlots) {
+            // (every pin is connected)
+            return null;
+        }
+        NetType[] ties = getInputTies(type);
+        boolean[] connected = new boolean[numSlots];
+        for (EDIFPortInst pi : inst.getPortInsts()) {
+            Integer offset = offsets.get(pi.getPort());
+            if (offset != null) {
+                connected[offset + Math.max(0, pi.getIndex())] = true;
+            }
+        }
+        int[] counts = new int[2];
+        for (int slot = 0; slot < numSlots; slot++) {
+            if (!connected[slot] && ties[slot] != null) {
+                counts[ties[slot] == NetType.GND ? 0 : 1]++;
+            }
+        }
+        return (counts[0] > 0 || counts[1] > 0) ? counts : null;
+    }
+
+    /**
+     * Gets, per port slot of a primitive (or macro) cell, the constant its input pin defaults to (see
+     * {@link CellPinStaticDefaults}), or null. The ports of a macro default to the inputs they lead to
+     * inside it.
+     */
+    private NetType[] getInputTies(EDIFCell type) {
+        NetType[] ties = inputTies.get(type);
+        if (ties != null) {
+            return ties;
+        }
+        Map<EDIFPort, Integer> offsets = getPortOffsets(type);
+        ties = new NetType[offsets.get(null)];
+        Unisim unisim = getUnisim(type.getName());
+        Map<String, EDIFNet> internalNets = type.isLeafCellOrBlackBox() ? null : getInternalNets(type);
+        for (EDIFPort port : type.getPorts()) {
+            if (!port.isInput()) {
+                continue;
+            }
+            int offset = offsets.get(port);
+            for (int i = 0; i < Math.max(1, port.getWidth()); i++) {
+                String pin = port.isBus() ? port.getPortInstNameFromPort(i) : port.getName();
+                NetType tie = (unisim == null) ? null : CellPinStaticDefaults.getCellPinDefault(design.getSeries(), unisim, pin);
+                if (tie == null && internalNets != null) {
+                    tie = getInternalTie(internalNets.get(pin));
+                }
+                ties[offset + i] = (tie == NetType.GND || tie == NetType.VCC) ? tie : null;
+            }
+        }
+        inputTies.put(type, ties);
+        return ties;
+    }
+
+    /** Gets the nets inside a cell that connect to its ports, by port instance name. */
+    private static Map<String, EDIFNet> getInternalNets(EDIFCell cell) {
+        Map<String, EDIFNet> nets = new HashMap<>();
+        for (EDIFNet net : cell.getNets()) {
+            for (EDIFPortInst pi : net.getPortInsts()) {
+                if (pi.getCellInst() == null) {
+                    nets.put(pi.getName(), net);
+                }
+            }
+        }
+        return nets;
+    }
+
+    /** Gets the constant that the first input pin with one on a net (inside a macro) defaults to. */
+    private NetType getInternalTie(EDIFNet net) {
+        if (net == null) {
+            return null;
+        }
+        for (EDIFPortInst pi : net.getPortInsts()) {
+            EDIFCellInst child = pi.getCellInst();
+            if (child == null || !pi.isInput()) {
+                continue;
+            }
+            Integer offset = getPortOffsets(child.getCellType()).get(pi.getPort());
+            NetType tie = (offset == null) ? null
+                    : getInputTies(child.getCellType())[offset + Math.max(0, pi.getIndex())];
+            if (tie != null) {
+                return tie;
+            }
+        }
+        return null;
+    }
+
+    private static Unisim getUnisim(String name) {
+        try {
+            return Unisim.valueOf(name);
+        } catch (IllegalArgumentException e) {
+            return null;
         }
     }
 
@@ -647,6 +779,9 @@ final class RouteStatusNetlist {
                         }
                     } else {
                         childBindings[c] = new FlatNet[getCellInfo(eci.getCellType()).numSlots];
+                        if (info.childTies[c] != null) {
+                            tiedMacros.add(new TiedMacro(prefix + eci.getName(), info.childTies[c]));
+                        }
                     }
                 }
             });

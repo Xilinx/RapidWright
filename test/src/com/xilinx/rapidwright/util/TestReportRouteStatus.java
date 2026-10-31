@@ -926,6 +926,36 @@ public class TestReportRouteStatus {
         }
     }
 
+    /**
+     * Vivado ties the unconnected input ports of a macro primitive (here a DSP58, unplaced) to their
+     * default constants when it expands it, which makes GND and VCC logical nets (with no placed
+     * pins, as the macro). It leaves the unconnected pins of other primitives (here a flip-flop's)
+     * unconnected. (Vivado 2026.1's counts)
+     */
+    @ParameterizedTest(name = "DSP58 {0}, FDRE {1}")
+    @CsvSource({"true, false, 1316", "false, true, 0", "true, true, 1316"})
+    public void testReportRouteStatusUnconnectedMacroPorts(boolean dsp, boolean ff, int logicalNets) {
+        Design design = new Design("macro_tie", "xcvp1202-vsva2785-2MHP-e-S");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = netlist.getTopCell();
+        if (dsp) {
+            top.createChildCellInst("dsp", netlist.getHDIPrimitive(Unisim.DSP58));
+            netlist.expandMacroUnisims(design.getSeries());
+        }
+        if (ff) {
+            top.createChildCellInst("ff", netlist.getHDIPrimitive(Unisim.FDRE));
+        }
+        ReportRouteStatusResult rrs = ReportRouteStatus.reportRouteStatus(design, true);
+        Assertions.assertEquals(logicalNets, rrs.logicalNets);
+        // (GND and VCC included)
+        Assertions.assertEquals(logicalNets, rrs.netsWithNoPlacedPins);
+        Assertions.assertEquals(0, rrs.netsNotNeedingRouting);
+        Assertions.assertEquals(0, rrs.routableNets);
+        if (dsp) {
+            assertNetStatuses(rrs, new String[]{"GLOBAL_LOGIC0=UNPLACED_ALL", "GLOBAL_LOGIC1=UNPLACED_ALL"});
+        }
+    }
+
     private static void connectClockEnableReset(Design design, Cell ff, Net clk) {
         ECOTools.connectNet(design, ff, "C", clk);
         ECOTools.connectNet(design, ff, "CE", design.getVccNet());
