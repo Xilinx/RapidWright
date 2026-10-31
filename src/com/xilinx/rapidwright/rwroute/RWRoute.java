@@ -2264,15 +2264,16 @@ public class RWRoute {
             // cost, and it is no longer the estimate that takes the node to the crossing column but the chain, so
             // estimate from where its super long line lands: on UltraScale/UltraScale+, the west half of the same INT
             // tile column (see RouteNodeGraph.populateLagunaLookups()); on Versal, either side of the same SLL tile
-            // column, whichever is nearer to the sink (as for an SLL itself, above). (Not divided by the sharing
-            // factor.)
+            // column, whichever is nearer to the sink (as for an SLL itself, above). Both are divided by the sharing
+            // factor, as for any other node, so that a chain that this net already uses (whose nodes, super long line
+            // included, its path cost will charge divided by theirs) is not overestimated
             int landHalfX = sendingHalfX;
             if (routingGraph.isVersal) {
                 landHalfX = Math.max(landHalfX, Math.min(landHalfX + 1, sinkHalfX));
             }
-            newTotalPathCost = newPartialPathCost + getSendingChainCost(state, childRnode, sendingHalfX);
+            newTotalPathCost = newPartialPathCost + getSendingChainCost(state, childRnode, sendingHalfX) / sharingFactor;
             newTotalPathCost = addEstimate(state, newTotalPathCost, getDeltaHalfX(sinkRnode, landHalfX, sinkHalfX),
-                    deltaY + (deltaSLR - 1) * sllLength, 1);
+                    deltaY + (deltaSLR - 1) * sllLength, sharingFactor);
         }
         // A discounted node's lower bound is lower than if it were charged as not being on a chain (at the span
         // estimate), which it must be for the discount to be one
