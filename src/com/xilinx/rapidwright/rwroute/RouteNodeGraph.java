@@ -1701,16 +1701,8 @@ public class RouteNodeGraph {
             }
         }
 
-        Tile sinkTile = sinkRnode.getTile();
-        if (!isVersal && childTile != sinkTile &&
-                (childX != sinkRnode.getBeginTileXCoordinate() ||
-                 Math.abs(childRnode.getEndTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) > 1)) {
-            // Outside the sink tile, only (e) below can accept an UltraScale/UltraScale+ local node: reject all others
-            // (most of those reaching here) before the checks of (c)
-            return false;
-        }
-
         // (c) on the same side (half) as the sink
+        Tile sinkTile = sinkRnode.getTile();
         RouteNodeType sinkType = sinkRnode.getType();
         switch (sinkType) {
             case LOCAL:
@@ -1868,8 +1860,9 @@ public class RouteNodeGraph {
             throw new RuntimeException("ERROR: Unhandled IntentCode: " + childIntentCode);
         }
 
-        // (e) when in same X as the sink tile, but Y +/- 1 (as checked before (c) above)
-        return true;
+        // (e) when in same X as the sink tile, but Y +/- 1
+        return childX == sinkRnode.getBeginTileXCoordinate() &&
+               Math.abs(childRnode.getEndTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) <= 1;
     }
 
     protected boolean allowRoutethru(RouteNode head, Node tail) {
