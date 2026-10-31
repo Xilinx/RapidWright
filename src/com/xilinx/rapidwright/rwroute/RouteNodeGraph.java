@@ -1678,30 +1678,39 @@ public class RouteNodeGraph {
         Tile childTile = childRnode.getTile();
         RouteNode sinkRnode = connection.getSinkRnode();
         int childX = childRnode.getEndTileXCoordinate();
-        if (connection.isCrossSLR() && type.isLocalLeadingToSLL() &&
-                childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
-            assert(isVersal ? (childRnode.getIntentCode() == IntentCode.NODE_SLL_INPUT ||
-                               childRnode.getIntentCode() == IntentCode.NODE_CLE_BNODE)
-                            : wireIndicesLeadingToSLL.get(childTile) != null);
-            assert(childTile != sinkRnode.getTile());
-            if (isNorthboundSLLRow(childTile.getTileYCoordinate()) ? !connection.isCrossSLRnorth() : !connection.isCrossSLRsouth()) {
-                // Does not lead to an SLL in the direction that we want
+        if (type.isLocalLeadingToSLL()) {
+            if (connection.isCrossSLR() && childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
+                assert(isVersal ? (childRnode.getIntentCode() == IntentCode.NODE_SLL_INPUT ||
+                                   childRnode.getIntentCode() == IntentCode.NODE_CLE_BNODE)
+                                : wireIndicesLeadingToSLL.get(childTile) != null);
+                assert(childTile != sinkRnode.getTile());
+                if (isNorthboundSLLRow(childTile.getTileYCoordinate()) ? !connection.isCrossSLRnorth() : !connection.isCrossSLRsouth()) {
+                    // Does not lead to an SLL in the direction that we want
+                    return false;
+                }
+                assert(getNextCrossingColumn(childX) == childX);
+                return true;
+            }
+
+            if (!isVersal && Utils.isLaguna(childTileType)) {
+                // An UltraScale/UltraScale+ TXOUT (LAG_MUX_ATOM_*_TXOUT, always of this type) that (b) did not
+                // accept: its super long line leaves this SLR, which a connection that does not need to cross SLRs
+                // from here never wants, whatever its side (it is driven by an IMUX that (c) to (e) below may accept,
+                // e.g. one Y +/- 1 from the sink)
                 return false;
             }
-            assert(getNextCrossingColumn(childX) == childX);
-            return true;
         }
 
-        if (!isVersal && Utils.isLaguna(childTileType)) {
-            // An UltraScale/UltraScale+ TXOUT (LAG_MUX_ATOM_*_TXOUT) that (b) did not accept: its super long line
-            // leaves this SLR, which a connection that does not need to cross SLRs from here never wants, whatever its
-            // side (it is driven by an IMUX that (c) to (e) below may accept, e.g. one Y +/- 1 from the sink)
-            assert(type.isLocalLeadingToSLL());
+        Tile sinkTile = sinkRnode.getTile();
+        if (!isVersal && childTile != sinkTile &&
+                (childX != sinkRnode.getBeginTileXCoordinate() ||
+                 Math.abs(childRnode.getEndTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) > 1)) {
+            // Outside the sink tile, only (e) below can accept an UltraScale/UltraScale+ local node: reject all others
+            // (most of those reaching here) before the checks of (c)
             return false;
         }
 
         // (c) on the same side (half) as the sink
-        Tile sinkTile = sinkRnode.getTile();
         RouteNodeType sinkType = sinkRnode.getType();
         switch (sinkType) {
             case LOCAL:
@@ -1795,28 +1804,27 @@ public class RouteNodeGraph {
             assert(sinkRnode.getIntentCode() == IntentCode.NODE_IMUX || sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
 
             IntentCode childIntentCode = childRnode.getIntentCode();
+            if (connection.isCrossSLR() && childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
+                // In an SLR other than the sink's, allow the local nodes needed for PINBOUNCE -> BNODE ->
+                // NODE_SLL_INPUT (those that lead to an SLL crossing SLRs, of type LOCAL_LEADING_TO_SLL, were handled by
+                // (b) above)
+                if (childIntentCode == IntentCode.NODE_INODE) {
+                    // Only INODEs on a half column beside an SLL column whose SLLs cross SLRs (see
+                    // nextCrossingHalfColumn), whose bounces can drive that column's BNODEs
+                    int halfX = childRnode.getEndHalfTileXCoordinate();
+                    return nextCrossingHalfColumn[halfX] == halfX;
+                }
+                if (childIntentCode == IntentCode.NODE_CLE_BNODE && childTile.getTileTypeEnum() == TileTypeEnum.SLL) {
+                    // TODO: Only allow those that lead to a SLR crossing
+                    return true;
+                }
+            }
+
             switch (childIntentCode) {
                 case NODE_INODE:
-                    if (connection.isCrossSLR() &&
-                            childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
-                        // Allow INODEs needed for PINBOUNCE -> BNODE -> NODE_SLL_INPUT: only those on a half column
-                        // beside an SLL column whose SLLs cross SLRs (see nextCrossingHalfColumn), whose bounces can
-                        // drive that column's BNODEs
-                        int halfX = childRnode.getEndHalfTileXCoordinate();
-                        return nextCrossingHalfColumn[halfX] == halfX;
-                    }
                     // Block access to all INODEs outside the sink tile, since NODE_INODE -> NODE_IMUX -> NODE_PINFEED (or NODE_INODE -> NODE_PINBOUNCE)
-                    assert(childTile != sinkTile);
                     return false;
                 case NODE_CLE_BNODE:
-                    if (connection.isCrossSLR() &&
-                            childTile.getTileTypeEnum() == TileTypeEnum.SLL &&
-                            childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
-                        // Allow CLE BNODEs since these are used to reach NODE_SLL_INPUT nodes (those that lead to an
-                        // SLL crossing SLRs, of type LOCAL_LEADING_TO_SLL, were handled by (b) above)
-                        // TODO: Only allow those that lead to a SLR crossing
-                        return true;
-                    }
                 case NODE_INTF_BNODE:
                 case NODE_CLE_CNODE:
                 case NODE_INTF_CNODE:
@@ -1833,21 +1841,20 @@ public class RouteNodeGraph {
                     assert(connection.isCrossSLR() &&
                             childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this));
                     return true;
-                case NODE_IMUX:
-                    // IMUXes that are not our target EXCLUSIVE_SINK will have been isExcluded() from the graph unless
-                    // LUT routethrus are enabled (which would have already returned true above)
-                    break;
                 case NODE_PINFEED:
                     if (connection.isCrossSLR()) {
                         // Allow NODE_SLL_OUTPUT -> NODE_PINFEED
                         return parentRnode.getIntentCode() == IntentCode.NODE_SLL_OUTPUT;
                     }
                     // Expected to be projected away
-                    break;
+                    throw new RuntimeException("ERROR: Unexpected NODE_PINFEED: " + childRnode);
+                case NODE_IMUX:
+                    // IMUXes that are not our target EXCLUSIVE_SINK will have been isExcluded() from the graph unless
+                    // LUT routethrus are enabled (which would have already returned true above)
                 case NODE_CLE_CTRL:
                 case NODE_INTF_CTRL:
                     // CTRL pins that are not our target EXCLUSIVE_SINK will have been isExcluded() from the graph
-                    break;
+                    throw new RuntimeException("ERROR: Unexpected " + childIntentCode + ": " + childRnode);
                 case NODE_SLL_INPUT:
                     // SLL inputs leading to an SLL that crosses SLRs were handled by (b) above; others (whose SLL
                     // does not leave their tile, stays within their SLR, or is horizontal) are only explored if
@@ -1859,9 +1866,8 @@ public class RouteNodeGraph {
             throw new RuntimeException("ERROR: Unhandled IntentCode: " + childIntentCode);
         }
 
-        // (e) when in same X as the sink tile, but Y +/- 1
-        return childX == sinkRnode.getBeginTileXCoordinate() &&
-               Math.abs(childRnode.getEndTileYCoordinate() - sinkRnode.getBeginTileYCoordinate()) <= 1;
+        // (e) when in same X as the sink tile, but Y +/- 1 (as checked before (c) above)
+        return true;
     }
 
     protected boolean allowRoutethru(RouteNode head, Node tail) {
