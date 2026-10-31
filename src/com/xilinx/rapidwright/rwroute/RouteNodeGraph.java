@@ -1807,8 +1807,14 @@ public class RouteNodeGraph {
                     return nextCrossingHalfColumn[halfX] == halfX;
                 }
                 if (childIntentCode == IntentCode.NODE_CLE_BNODE && childTile.getTileTypeEnum() == TileTypeEnum.SLL) {
-                    // TODO: Only allow those that lead to a SLR crossing
-                    return true;
+                    // Only BNODEs in an SLL tile with BNODEs that lead to an SLL crossing SLRs (of type
+                    // LOCAL_LEADING_TO_SLL), which these reach through INODE -> PINBOUNCE in the same row (BNODEs in
+                    // other SLL tiles cannot lead to an SLR crossing), and, as (b) requires of those, only if those lead
+                    // in the direction that we want
+                    if (getWireIndicesLeadingToSLL(childTile)[1].isEmpty()) {
+                        return false;
+                    }
+                    return isNorthboundSLLRow(childTile.getTileYCoordinate()) ? connection.isCrossSLRnorth() : connection.isCrossSLRsouth();
                 }
             }
 

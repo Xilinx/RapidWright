@@ -414,7 +414,7 @@ public class TestRWRoute {
             // One SLR crossing
             // (Too) close
             "xcv80,SLICE_X54Y331,SLICE_X54Y332,200",            // Source adjacent to crossing SLL (east)
-            "xcv80,SLICE_X53Y332,SLICE_X53Y331,100",            // Source adjacent to crossing SLL (west)
+            "xcv80,SLICE_X53Y332,SLICE_X53Y331,200",            // Source adjacent to crossing SLL (west)
             "xcv80,SLICE_X51Y331,SLICE_X51Y332,300",            // Close to crossing SLL
             // Perfect
             "xcv80,SLICE_X54Y331,SLICE_X54Y406,100",            // Source adjacent to crossing SLL (east, north)
