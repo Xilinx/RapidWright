@@ -190,9 +190,9 @@ public class RWRoute {
     protected int maxDetourToSnapBackToPrevLagunaColumn = 4;
 
     /**
-     * The number of local nodes in the sending chain of a super long line after its first node (see
-     * getSendingChainCost()): INODE, IMUX, LAG_MUX_ATOM_*_TXOUT on UltraScale/UltraScale+ (after an SDQ node and its
-     * intra-tile single); the SLL input on Versal (after a BNODE in an SLL tile).
+     * The number of local nodes in the sending chain of a super long line (see getSendingChainCost()): INODE, IMUX,
+     * LAG_MUX_ATOM_*_TXOUT on UltraScale/UltraScale+ (after an SDQ node and its intra-tile single); INODE, PINBOUNCE,
+     * BNODE in an SLL tile, SLL input on Versal.
      */
     private final int sllSendingChainLocals;
     /**
@@ -206,7 +206,7 @@ public class RWRoute {
         this.design = design;
         this.config = config;
         sllReceivingChainNodes = (design.getSeries() == Series.Versal) ? 4 : 3;
-        sllSendingChainLocals = (design.getSeries() == Series.Versal) ? 1 : 3;
+        sllSendingChainLocals = (design.getSeries() == Series.Versal) ? 4 : 3;
         connectionsRouted = new AtomicInteger();
         connectionsRoutedThisIteration = new AtomicInteger();
         nodesPushed = new AtomicLong();
@@ -1956,9 +1956,10 @@ public class RWRoute {
                                 (childType.isSidedLocal() && rnode.isOnEastSide() == childRNode.isOnEastSide()) ||
                                 // ... unless it's an exclusive sink using a LOCAL_RESERVED node
                                 (childType == RouteNodeType.LOCAL_RESERVED && connection.getSinkRnode().getType().isExclusiveSinkCtrlOrSllInput()) ||
-                                // ... or unless it's a Versal SLL input, or a BNODE in an SLL tile leading to one that
-                                // crosses SLRs (which can end on the other side of the SLL tile to what drives it, and
-                                // like such an SLL input is accessible from either side; see RouteNodeGraph.isAccessible())
+                                // ... or unless it's a Versal SLL input, or a node leading to one that crosses SLRs
+                                // (e.g. a BNODE in an SLL tile, which can end on the other side of the SLL tile to what
+                                // drives it, and like such an SLL input is accessible from either side; see
+                                // RouteNodeGraph.isAccessible())
                                 childRNode.getIntentCode() == IntentCode.NODE_SLL_INPUT ||
                                 (routingGraph.isVersal && childType.isLocalLeadingToSLL()));
                         break;
@@ -2144,19 +2145,24 @@ public class RWRoute {
         int deltaSLR = 0;
         int sendingHalfX = -1;
         if (connection.isCrossSLR()) {
+            deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
+            // A node leading to a super long line in the other direction is only accessible as a LOCAL node near the
+            // sink (see RouteNodeGraph.isAccessible()): Y +/- 1 from it, or (on Versal) in its SLR, e.g. an INODE in an
+            // INT tile beside a CTRL sink
             assert(!childRnode.getType().isLocalLeadingToSLL() ||
                     (routingGraph.isNorthboundSLLRow(childRnode.getTile().getTileYCoordinate())
                             ? connection.isCrossSLRnorth() : connection.isCrossSLRsouth()) ||
-                    (deltaX == 0 && deltaY <= 1));
+                    (deltaX == 0 && deltaY <= 1) ||
+                    (routingGraph.isVersal && deltaSLR == 0));
 
-            deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
             if (deltaSLR != 0) {
                 if (isDiscountedSendingChainNode(childRnode, connection)) {
                     // Where the super long line is taken from: on UltraScale/UltraScale+, the west half of the node's
                     // INT tile column (see RouteNodeGraph.populateLagunaLookups()); on Versal, the east half of the INT
                     // tile to the west of its SLL tile column, where an SLL input ends (see RouteNodeInfo.get()) and
                     // next to which a BNODE in an SLL tile ends (on either side, at the INT tile whose INODEs it also
-                    // drives)
+                    // drives), as do the INODEs and PINBOUNCEs that lead to it (on the side of their INT tile that the
+                    // SLL tile is beside)
                     sendingHalfX = getLowerOfTwoHalves(childRnode.getEndHalfTileXCoordinate());
                     assert(!routingGraph.isVersal || childRnode.getIntentCode() != IntentCode.NODE_CLE_BNODE ||
                             (sendingHalfX == 2 * RouteNodeInfo.getWestIntTileXCoordinate(childRnode.getTile()) + 1 &&
@@ -2242,10 +2248,14 @@ public class RWRoute {
                     newTotalPathCost += state.rnodeCostWeight * RouteNode.LOCAL_BASE_COST;
                 }
             }
-        } else if (isDiscountedSendingChainNode(rnode, connection)) {
+        } else if (isDiscountedSendingChainNode(rnode, connection) &&
+                (!routingGraph.isVersal ||
+                 getSendingChainLocalsCharged(childRnode) < getSendingChainLocalsCharged(rnode))) {
             // Following a discounted node along its sending chain: inherit its lower bound, less the tie-break, so that
             // the lower bound falls slightly along the chain and it is followed depth-first. (The whole sending chain
-            // was charged at its uncongested cost on entering it, which this node's path cost claws back.)
+            // was charged at its uncongested cost on entering it, which this node's path cost claws back.) Not when
+            // going back to the start of a chain: on Versal, from a BNODE in an SLL tile to an INODE that it drives,
+            // which enters that INODE's chain afresh (below)
             newTotalPathCost = rnode.getLowerBoundTotalPathCost() - state.rnodeCostWeight * RouteNode.SLL_CHAIN_TIE_BREAK;
         } else {
             // Entering a sending chain, with the discount: the chain and its super long line are charged at their true
@@ -2370,11 +2380,12 @@ public class RWRoute {
      * the whole sending chain from its first node, the super long line itself and its whole receiving chain, at their
      * true (uncongested) cost (see getUncongestedNodeCost()), with their bias cost taken at the sending node for the
      * sending chain, and where the super long line lands for it and its receiving chain. The sending chain is: on
-     * UltraScale/UltraScale+, SDQ node, intra-tile single, INODE, IMUX, LAG_MUX_ATOM_*_TXOUT; on Versal, BNODE in an
-     * SLL tile, SLL input. Its local nodes are charged whichever node it was entered at (so that one entered further
-     * along is charged for those that it skips), and its intra-tile single only when it is entered at an SDQ node;
-     * each also with {@link RouteNode#SLL_CHAIN_TIE_BREAK}, which the nodes after the entry take off as they inherit
-     * its lower bound. The receiving chain is: on UltraScale/UltraScale+, LAG_LAGUNA_SITE_*_RXD*, RXD*, then an SDQ
+     * UltraScale/UltraScale+, SDQ node, intra-tile single, INODE, IMUX, LAG_MUX_ATOM_*_TXOUT; on Versal, INODE,
+     * PINBOUNCE, BNODE in an SLL tile, SLL input. On UltraScale/UltraScale+, its local nodes are charged whichever node
+     * it was entered at (so that one entered further along is charged for those that it skips), and its intra-tile
+     * single only when it is entered at an SDQ node; on Versal, only those after the node it was entered at (see
+     * getSendingChainLocalsCharged()). Each is also charged {@link RouteNode#SLL_CHAIN_TIE_BREAK}, which the nodes
+     * after the entry take off as they inherit its lower bound. The receiving chain is: on UltraScale/UltraScale+, LAG_LAGUNA_SITE_*_RXD*, RXD*, then an SDQ
      * node (the landing node); on Versal, LAG_OUT*, a CLE LAG_*_PIN, an [A-H]Q*_PIN, then an [A-H]Q* (the landing
      * node), unless the sink could be on it (a CLE LAG_*_PIN, of intent NODE_PINFEED), when it is not charged.
      * From the super long line onwards, nodes are priced as any other: as the lower bound of the entry (and so of its
@@ -2396,7 +2407,8 @@ public class RWRoute {
         final boolean north = routingGraph.isNorthboundSLLRow(y);
         final int landY = north ? y + sllLength : y - sllLength;
         assert(routingGraph.intYToSLRIndex[landY] == routingGraph.intYToSLRIndex[y] + (north ? 1 : -1));
-        float cost = sllSendingChainLocals * (getUncongestedNodeCost(state, RouteNode.LOCAL_BASE_COST, x, y) + tieBreak);
+        float cost = getSendingChainLocalsCharged(childRnode) *
+                (getUncongestedNodeCost(state, RouteNode.LOCAL_BASE_COST, x, y) + tieBreak);
         cost += singles * (getUncongestedNodeCost(state, RouteNode.LOCAL_BASE_COST, x, y) +
                 state.rnodeWLWeight * 0.5f + tieBreak);
         // The super long line itself (as RouteNode.setBaseCost() and the wirelength cost in evaluateCostAndPush())
@@ -2407,6 +2419,32 @@ public class RWRoute {
             cost += sllReceivingChainNodes * getUncongestedNodeCost(state, RouteNode.LOCAL_BASE_COST, x, landY);
         }
         return cost;
+    }
+
+    /**
+     * Gets the number of local nodes of a sending chain that getSendingChainCost() charges on entering it at the given
+     * node: on UltraScale/UltraScale+, all of them ({@link #sllSendingChainLocals}), whichever node it is entered at; on
+     * Versal, those after the given node in INODE -&gt; PINBOUNCE -&gt; BNODE in an SLL tile -&gt; SLL input, which a node
+     * further along the chain than its parent also gives (see evaluateCostAndPush()).
+     * @param rnode Node of the sending chain in question.
+     * @return That number.
+     */
+    private int getSendingChainLocalsCharged(RouteNode rnode) {
+        if (!routingGraph.isVersal) {
+            return sllSendingChainLocals;
+        }
+        switch (rnode.getIntentCode()) {
+            case NODE_INODE:
+                return sllSendingChainLocals - 1;
+            case NODE_PINBOUNCE:
+                return sllSendingChainLocals - 2;
+            case NODE_CLE_BNODE:
+                return sllSendingChainLocals - 3;
+            case NODE_SLL_INPUT:
+                return sllSendingChainLocals - 4;
+            default:
+                throw new RuntimeException("ERROR: Unexpected sending chain node: " + rnode);
+        }
     }
 
     /**

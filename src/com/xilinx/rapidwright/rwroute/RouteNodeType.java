@@ -59,9 +59,10 @@ public enum RouteNodeType {
      * the TXOUTs (LAG_MUX_ATOM_*_TXOUT) in it that drive such a SUPER_LONG_LINE, considered to be on the west side of
      * the INT tile of their IMUX (see RouteNodeGraph.populateLagunaLookups(); other TXOUTs, whose SUPER_LONG_LINE stays
      * within its SLR, are of type {@link #NON_LOCAL}); on Versal, SLL inputs (NODE_SLL_INPUT) that drive such a
-     * SUPER_LONG_LINE, and the BNODEs in SLL tiles (NODE_CLE_BNODE) that drive those SLL inputs, which also drive the
-     * INODEs on one side of the INT tile at which they end (other SLL inputs and BNODEs are of type {@link #LOCAL};
-     * see RouteNodeGraph.wireIndicesLeadingToSLL). Such nodes are only found in the band of rows next
+     * SUPER_LONG_LINE, the BNODEs in SLL tiles (NODE_CLE_BNODE) that drive those SLL inputs, which also drive the
+     * INODEs on one side of the INT tile at which they end, and the PINBOUNCEs and INODEs in INT tiles that lead to
+     * those BNODEs (INODE -&gt; PINBOUNCE -&gt; BNODE, in the same row; other SLL inputs, BNODEs, PINBOUNCEs and INODEs
+     * are of type {@link #LOCAL}; see RouteNodeGraph.wireIndicesLeadingToSLL). Such nodes are only found in the band of rows next
      * to an SLR boundary, which gives the direction they cross in (see RouteNodeGraph.isNorthboundSLLRow()); they are
      * only accessible to connections that must cross in that direction (see RouteNodeGraph.isAccessible()), and are
      * otherwise treated as {@link #LOCAL} nodes (other than those TXOUTs, which are never accessible otherwise), other

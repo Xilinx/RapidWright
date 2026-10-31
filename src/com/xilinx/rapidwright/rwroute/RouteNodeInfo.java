@@ -393,6 +393,12 @@ public class RouteNodeInfo {
                     // up in RouteNodeGraph.wireIndicesLeadingToSLL): still on the side of the INODEs that it drives
                     return RouteNodeType.LOCAL_LEADING_TO_SLL;
                 }
+                if (routingGraph.isVersal && (ic == IntentCode.NODE_INODE || ic == IntentCode.NODE_PINBOUNCE) &&
+                        routingGraph.isINodeOrBounceLeadingToSLL(node)) {
+                    // A Versal PINBOUNCE that drives such a BNODE, or an INODE that drives such a PINBOUNCE (as looked
+                    // up in RouteNodeGraph.wireIndicesLeadingToSLL): still on its side
+                    return RouteNodeType.LOCAL_LEADING_TO_SLL;
+                }
                 return RouteNodeType.LOCAL;
 
             case NODE_SINGLE:

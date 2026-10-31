@@ -122,11 +122,13 @@ public class RouteNodeGraph {
      * {@link #populateLagunaLookups}): [0] IMUX and INODE wires in an INT tile, or TXOUT (LAG_MUX_ATOM_*_TXOUT) wires
      * in a Laguna tile (LOCAL_LEADING_TO_SLL), [1] INT_INT and SDQNODE wires in an INT tile
      * (NON_LOCAL_LEADING_TO_SLL).</li>
-     * <li>Versal (SLL tiles, each computed when first needed; see {@link #getWireIndicesLeadingToSLL(Tile)}):
-     * [0] SLL inputs whose SLL crosses SLRs, [1] BNODEs that drive such an SLL input (both LOCAL_LEADING_TO_SLL).</li>
+     * <li>Versal (SLL and INT tiles, each computed when first needed; see {@link #getWireIndicesLeadingToSLL(Tile)}):
+     * in an SLL tile, [0] SLL inputs whose SLL crosses SLRs, [1] BNODEs that drive such an SLL input; in an INT tile,
+     * [0] PINBOUNCEs that drive such a BNODE (in the SLL tile beside their side of the INT tile, in the same row) and
+     * the INODEs that drive such a PINBOUNCE, [1] nothing (all LOCAL_LEADING_TO_SLL).</li>
      * </ul>
-     * Keyed by INT and Laguna tiles on UltraScale/UltraScale+ and by SLL tiles on Versal, so users that are specific
-     * to one series check the series rather than whether this is null.
+     * Keyed by INT and Laguna tiles on UltraScale/UltraScale+ and by SLL and INT tiles on Versal, so users that are
+     * specific to one series check the series rather than whether this is null.
      */
     protected final Map<Tile, BitSet[]> wireIndicesLeadingToSLL;
 
@@ -680,7 +682,7 @@ public class RouteNodeGraph {
                 for (boolean crossing : crossingHalfColumns) {
                     anyCrossing |= crossing;
                 }
-                // Filled in for each SLL tile when first needed (see getWireIndicesLeadingToSLL())
+                // Filled in for each SLL and INT tile when first needed (see getWireIndicesLeadingToSLL())
                 wireIndicesLeadingToSLL = anyCrossing ? new ConcurrentHashMap<>() : null;
             } else {
                 wireIndicesLeadingToSLL = null;
@@ -804,12 +806,12 @@ public class RouteNodeGraph {
         return false;
     }
 
-    /** A (Versal) SLL tile's entry in {@link #wireIndicesLeadingToSLL} when it has none (never modified) */
+    /** A (Versal) SLL or INT tile's entry in {@link #wireIndicesLeadingToSLL} when it has none (never modified) */
     private static final BitSet[] NO_WIRE_INDICES_LEADING_TO_SLL = {new BitSet(), new BitSet()};
 
     /**
-     * Gets a tile's entry in {@link #wireIndicesLeadingToSLL}, which must not be null. On Versal, an SLL tile's entry
-     * is computed when first needed (see {@link #computeSllLookup(Tile)}).
+     * Gets a tile's entry in {@link #wireIndicesLeadingToSLL}, which must not be null. On Versal, an SLL or INT tile's
+     * entry is computed when first needed (see {@link #computeSllLookup(Tile)} and {@link #computeIntLookup(Tile)}).
      * @param tile Tile in question.
      * @return Its two BitSets, or null if it has none (on UltraScale/UltraScale+).
      */
@@ -817,16 +819,84 @@ public class RouteNodeGraph {
         if (!isVersal) {
             return wireIndicesLeadingToSLL.get(tile);
         }
-        assert(tile.getTileTypeEnum() == TileTypeEnum.SLL);
+        TileTypeEnum tileTypeEnum = tile.getTileTypeEnum();
+        assert(tileTypeEnum == TileTypeEnum.SLL || tileTypeEnum == TileTypeEnum.INT);
         // SLL inputs whose SLL crosses SLRs are only found within one SLL length of the SLR boundary that they
-        // cross, and so in the half of their SLR nearer to it (see isNorthboundSLLRow())
+        // cross, and so in the half of their SLR nearer to it (see isNorthboundSLLRow()); as are the nodes in INT tiles
+        // that lead to them, which are in the same row
         int y = tile.getTileYCoordinate();
         int slr = intYToSLRIndex[y];
         if (isNorthboundSLLRow(y) ? (slr == slrLastIntY.length - 1 || y <= slrLastIntY[slr] - SUPER_LONG_LINE_LENGTH_IN_TILES)
                                   : (slr == 0 || y >= slrFirstIntY[slr] + SUPER_LONG_LINE_LENGTH_IN_TILES)) {
             return NO_WIRE_INDICES_LEADING_TO_SLL;
         }
-        return wireIndicesLeadingToSLL.computeIfAbsent(tile, this::computeSllLookup);
+        if (tileTypeEnum == TileTypeEnum.SLL) {
+            return wireIndicesLeadingToSLL.computeIfAbsent(tile, this::computeSllLookup);
+        }
+        // Only an INT tile with a half on a half column beside an SLL column whose SLLs cross SLRs (see
+        // nextCrossingHalfColumn) has a PINBOUNCE that can drive a BNODE leading to one
+        int x = tile.getTileXCoordinate();
+        if (nextCrossingHalfColumn[2 * x] > 2 * x + 1) {
+            return NO_WIRE_INDICES_LEADING_TO_SLL;
+        }
+        BitSet[] bs = wireIndicesLeadingToSLL.get(tile);
+        if (bs == null) {
+            // Not computeIfAbsent(), whose mapping function must not itself update the map (as computeIntLookup()
+            // does, for the SLL tiles beside this one); another thread may compute the same entry meanwhile
+            bs = computeIntLookup(tile);
+            BitSet[] prev = wireIndicesLeadingToSLL.putIfAbsent(tile, bs);
+            if (prev != null) {
+                bs = prev;
+            }
+        }
+        return bs;
+    }
+
+    /**
+     * Computes a (Versal) INT tile's entry in {@link #wireIndicesLeadingToSLL}: the wire indices of its PINBOUNCEs that
+     * drive a BNODE leading to an SLL crossing SLRs (see {@link #computeSllLookup(Tile)}), and of its INODEs that drive
+     * such a PINBOUNCE: the sending chain INODE -&gt; PINBOUNCE -&gt; BNODE -&gt; SLL input, whose PINBOUNCE drives the
+     * BNODEs of the SLL tile beside its side of its INT tile, in the same row (e.g. INT_X95Y620/INT_NODE_IMUX_ATOM_117_INT_OUT0
+     * -&gt; INT_X95Y620/BOUNCE_W28 -&gt; SLL_X95Y620/BNODE_OUTS_E26 -&gt; SLL_X95Y620/LAG_CASCOUT_TXI1 on xcv80). Found by
+     * walking uphill from those BNODEs.
+     * @param intTile INT tile in question.
+     * @return Its two BitSets.
+     */
+    private BitSet[] computeIntLookup(Tile intTile) {
+        BitSet[] bs = null;
+        for (int side = 0; side < 2; side++) {
+            boolean eastSide = (side == 1);
+            Tile sllTile = getSllTileBeside(intTile, eastSide);
+            if (sllTile == null) {
+                continue;
+            }
+            BitSet bnodes = getWireIndicesLeadingToSLL(sllTile)[1];
+            for (int wireIndex = bnodes.nextSetBit(0); wireIndex >= 0; wireIndex = bnodes.nextSetBit(wireIndex + 1)) {
+                Node bnode = Node.getNode(sllTile, wireIndex);
+                for (Node bounce : bnode.getAllUphillNodes()) {
+                    if (bounce.getTile() != intTile || bounce.getIntentCode() != IntentCode.NODE_PINBOUNCE) {
+                        // e.g. a PINBOUNCE of the INT tile on the other side of the SLL tile
+                        continue;
+                    }
+                    assert(isEastSideWire(TileTypeEnum.INT, bounce.getWireIndex()) == eastSide);
+                    if (bs == null) {
+                        bs = new BitSet[]{new BitSet(), new BitSet()};
+                    }
+                    if (bs[0].get(bounce.getWireIndex())) {
+                        continue;
+                    }
+                    bs[0].set(bounce.getWireIndex());
+                    for (Node inode : bounce.getAllUphillNodes()) {
+                        if (inode.getIntentCode() != IntentCode.NODE_INODE) {
+                            continue;
+                        }
+                        assert(inode.getTile() == intTile);
+                        bs[0].set(inode.getWireIndex());
+                    }
+                }
+            }
+        }
+        return (bs != null) ? bs : NO_WIRE_INDICES_LEADING_TO_SLL;
     }
 
     /**
@@ -904,6 +974,44 @@ public class RouteNodeGraph {
             }
         }
         return leads;
+    }
+
+    /**
+     * Checks whether a (Versal) node is a PINBOUNCE in an INT tile that drives a BNODE leading to an SLL crossing into
+     * another SLR (see {@link #isBNodeLeadingToSLL(Node)}), or an INODE that drives such a PINBOUNCE (see
+     * {@link #wireIndicesLeadingToSLL}), and so is of type {@link RouteNodeType#LOCAL_LEADING_TO_SLL} (see
+     * RouteNodeInfo.getType()).
+     * @param node NODE_INODE or NODE_PINBOUNCE node in question.
+     * @return True if so.
+     */
+    boolean isINodeOrBounceLeadingToSLL(Node node) {
+        assert(isVersal && (node.getIntentCode() == IntentCode.NODE_INODE || node.getIntentCode() == IntentCode.NODE_PINBOUNCE));
+        if (wireIndicesLeadingToSLL == null || node.getTile().getTileTypeEnum() != TileTypeEnum.INT) {
+            return false;
+        }
+        BitSet bs = getWireIndicesLeadingToSLL(node.getTile())[0];
+        boolean leads = bs.get(node.getWireIndex());
+        // Only walk (as a check) where this tile has any such node
+        assert(bs.isEmpty() || leads == isINodeOrBounceLeadingToSLLByWalk(node));
+        return leads;
+    }
+
+    /**
+     * Checks {@link #isINodeOrBounceLeadingToSLL(Node)} by walking the node's downhill nodes, without creating any
+     * {@link RouteNode}, for use in assertions.
+     */
+    private boolean isINodeOrBounceLeadingToSLLByWalk(Node node) {
+        for (Node downhill : node.getAllDownhillNodes()) {
+            IntentCode ic = downhill.getIntentCode();
+            if (node.getIntentCode() == IntentCode.NODE_INODE) {
+                if (ic == IntentCode.NODE_PINBOUNCE && isINodeOrBounceLeadingToSLLByWalk(downhill)) {
+                    return true;
+                }
+            } else if (ic == IntentCode.NODE_CLE_BNODE && isBNodeLeadingToSLL(downhill)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -1693,22 +1801,24 @@ public class RouteNodeGraph {
         if (lutRoutethru && (isVersal || !type.isLocalLeadingToSLL())) {
             // (a) considering LUT routethrus, other than (on UltraScale/UltraScale+ only) through local nodes leading to
             // an SLL, which can only lead into (or, for TXOUTs, are in) a Laguna tile and never to a LUT input. (On
-            // Versal, where LUT routethrus are not yet supported, these include BNODEs in SLL tiles, which also drive
-            // INODEs.)
+            // Versal, where LUT routethrus are not yet supported, these include INODEs, PINBOUNCEs and BNODEs in SLL
+            // tiles, which also drive IMUXes, other BNODEs or INODEs.)
             return true;
         }
 
-        // (b) needs to cross an SLR and this is a local node leading to an SLL that crosses SLRs (including a Versal BNODE
-        // in an SLL tile, which can end on the other side of that tile to what drives it, and which, being on the
-        // sending side of a chain, is not restricted to the side of the sink by (c); and an UltraScale/UltraScale+ TXOUT,
-        // in the Laguna tile in the same row as the IMUX that drives it, and so leading in the same direction)
+        // (b) needs to cross an SLR and this is a local node leading to an SLL that crosses SLRs (including, on Versal, the
+        // INODEs and PINBOUNCEs leading to one and a BNODE in an SLL tile, which can end on the other side of that tile
+        // to what drives it, and which, being on the sending side of a chain, is not restricted to the side of the sink
+        // by (c); and an UltraScale/UltraScale+ TXOUT, in the Laguna tile in the same row as the IMUX that drives it, and
+        // so leading in the same direction). Outside the sink's SLR, these are the only local nodes that such a
+        // connection can use on Versal (see below)
         Tile childTile = childRnode.getTile();
         RouteNode sinkRnode = connection.getSinkRnode();
         int childX = childRnode.getEndTileXCoordinate();
         if (type.isLocalLeadingToSLL()) {
             if (connection.isCrossSLR() && childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
-                assert(isVersal ? (childRnode.getIntentCode() == IntentCode.NODE_SLL_INPUT ||
-                                   childRnode.getIntentCode() == IntentCode.NODE_CLE_BNODE)
+                assert(isVersal ? EnumSet.of(IntentCode.NODE_INODE, IntentCode.NODE_PINBOUNCE, IntentCode.NODE_CLE_BNODE,
+                                             IntentCode.NODE_SLL_INPUT).contains(childRnode.getIntentCode())
                                 : wireIndicesLeadingToSLL.get(childTile) != null);
                 assert(childTile != sinkRnode.getTile());
                 if (isNorthboundSLLRow(childTile.getTileYCoordinate()) ? !connection.isCrossSLRnorth() : !connection.isCrossSLRsouth()) {
@@ -1822,41 +1932,15 @@ public class RouteNodeGraph {
             assert(!sinkType.isExclusiveSinkCtrlOrSllInput());
             assert(sinkRnode.getIntentCode() == IntentCode.NODE_IMUX || sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
 
+            // In an SLR other than the sink's, a connection that crosses SLRs may only use the local nodes of the sending
+            // chain INODE -> PINBOUNCE -> BNODE -> NODE_SLL_INPUT of an SLL that crosses SLRs (of type
+            // LOCAL_LEADING_TO_SLL), which (b) above handled: all others are rejected below (being outside the sink's
+            // tile and row)
             IntentCode childIntentCode = childRnode.getIntentCode();
-            if (connection.isCrossSLR() && childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this)) {
-                // In an SLR other than the sink's, allow the local nodes needed for PINBOUNCE -> BNODE ->
-                // NODE_SLL_INPUT (those that lead to an SLL crossing SLRs, of type LOCAL_LEADING_TO_SLL, were handled by
-                // (b) above)
-                if (childIntentCode == IntentCode.NODE_INODE) {
-                    // Only INODEs on a half column beside an SLL column whose SLLs cross SLRs (see
-                    // nextCrossingHalfColumn), whose bounces can drive the BNODEs of the SLL tile beside them in the
-                    // same row, and only if that SLL tile has BNODEs that lead to an SLL crossing SLRs (of type
-                    // LOCAL_LEADING_TO_SLL) and, as (b) requires of those, in the direction that we want
-                    int halfX = childRnode.getEndHalfTileXCoordinate();
-                    if (nextCrossingHalfColumn[halfX] != halfX) {
-                        return false;
-                    }
-                    if (isNorthboundSLLRow(childTile.getTileYCoordinate()) ? !connection.isCrossSLRnorth() : !connection.isCrossSLRsouth()) {
-                        return false;
-                    }
-                    Tile sllTile = getSllTileBeside(childTile, childRnode.isOnEastSide());
-                    return sllTile != null && !getWireIndicesLeadingToSLL(sllTile)[1].isEmpty();
-                }
-                if (childIntentCode == IntentCode.NODE_CLE_BNODE && childTile.getTileTypeEnum() == TileTypeEnum.SLL) {
-                    // Only BNODEs in an SLL tile with BNODEs that lead to an SLL crossing SLRs (of type
-                    // LOCAL_LEADING_TO_SLL), which these reach through INODE -> PINBOUNCE in the same row (BNODEs in
-                    // other SLL tiles cannot lead to an SLR crossing), and, as (b) requires of those, only if those lead
-                    // in the direction that we want
-                    if (getWireIndicesLeadingToSLL(childTile)[1].isEmpty()) {
-                        return false;
-                    }
-                    return isNorthboundSLLRow(childTile.getTileYCoordinate()) ? connection.isCrossSLRnorth() : connection.isCrossSLRsouth();
-                }
-            }
-
             switch (childIntentCode) {
                 case NODE_INODE:
                     // Block access to all INODEs outside the sink tile, since NODE_INODE -> NODE_IMUX -> NODE_PINFEED (or NODE_INODE -> NODE_PINBOUNCE)
+                    // (other than those that (b) accepted)
                     return false;
                 case NODE_CLE_BNODE:
                 case NODE_INTF_BNODE:
@@ -1873,10 +1957,12 @@ public class RouteNodeGraph {
                     return true;
                 case NODE_PINBOUNCE:
                     // PINBOUNCEs are only accessible through an INODE, so arriving here means that this must be a
-                    // Versal inter-SLR connection
+                    // Versal inter-SLR connection, at an INODE leading to an SLL crossing SLRs; but this PINBOUNCE
+                    // does not lead to one (those that do were handled by (b) above)
                     assert(connection.isCrossSLR() &&
                             childRnode.getSLRIndex(this) != sinkRnode.getSLRIndex(this));
-                    return true;
+                    assert(!type.isLocalLeadingToSLL());
+                    return false;
                 case NODE_PINFEED:
                     if (connection.isCrossSLR()) {
                         // Allow NODE_SLL_OUTPUT -> NODE_PINFEED
