@@ -33,6 +33,7 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
 import com.xilinx.rapidwright.util.Utils;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -139,6 +140,9 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      * It is often the case that multiple connections of the user are using a same rnode.
      * We count the number of connections from the net.
      * The number is used for the sharing mechanism of RWRoute.
+     * To save memory and pointer chasing, this is null when no net uses this rnode, an immutable
+     * {@link Collections#singletonMap(Object, Object)} when exactly one net does, and an {@link IdentityHashMap}
+     * only while two or more nets share (overuse) it.
      */
     private Map<NetWrapper, Integer> usersConnectionCounts;
 
@@ -616,7 +620,7 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      * It is often the case that multiple connections of a net are using a same rnode.
      * So we count connections of each user to facilitate the sharing mechanism of RWRoute.
      * @return A map between users, i.e., {@link NetWrapper} instances representing by {@link Net} instances,
-     *  and numbers of connections from different users.
+     *  and numbers of connections from different users; null if there are no users. Not to be modified.
      */
     public Map<NetWrapper, Integer> getUsersConnectionCounts() {
         return usersConnectionCounts;
@@ -630,10 +634,23 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      * @param user The user net in question.
      */
     public void incrementUser(NetWrapper user) {
-        if (usersConnectionCounts == null) {
-            usersConnectionCounts = new IdentityHashMap<>();
+        Map<NetWrapper, Integer> users = usersConnectionCounts;
+        if (users == null) {
+            usersConnectionCounts = Collections.singletonMap(user, 1);
+        } else if (users instanceof IdentityHashMap) {
+            users.merge(user, 1, Integer::sum);
+        } else {
+            // Exactly one user so far
+            Integer count = users.get(user);
+            if (count != null) {
+                usersConnectionCounts = Collections.singletonMap(user, count + 1);
+            } else {
+                Map<NetWrapper, Integer> shared = new IdentityHashMap<>(2);
+                shared.putAll(users);
+                shared.put(user, 1);
+                usersConnectionCounts = shared;
+            }
         }
-        usersConnectionCounts.merge(user, 1, Integer::sum);
     }
 
     /**
@@ -655,7 +672,22 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      * @param user The user to be decremented from the user map.
      */
     public void decrementUser(NetWrapper user) {
-        usersConnectionCounts.compute(user, (k,v) -> (v == 1) ? null : v - 1);
+        Map<NetWrapper, Integer> users = usersConnectionCounts;
+        // Unboxing throws a NullPointerException if user does not use this rnode
+        int count = users.get(user);
+        if (users instanceof IdentityHashMap) {
+            if (count > 1) {
+                users.put(user, count - 1);
+            } else {
+                users.remove(user);
+                if (users.size() == 1) {
+                    Map.Entry<NetWrapper, Integer> e = users.entrySet().iterator().next();
+                    usersConnectionCounts = Collections.singletonMap(e.getKey(), e.getValue());
+                }
+            }
+        } else {
+            usersConnectionCounts = (count > 1) ? Collections.singletonMap(user, count - 1) : null;
+        }
     }
 
     /**
