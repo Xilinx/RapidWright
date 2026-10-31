@@ -65,6 +65,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
@@ -78,6 +79,8 @@ import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.util.IntHashSet;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.ReportRouteStatus;
@@ -131,6 +134,12 @@ public final class RouteStatusEngine {
 
     /** Per static net: whether the netlist uses it, and its flat nets */
     private final boolean[] hasLogicalStatic = new boolean[2];
+
+    /**
+     * Whether GND (VCC) is the default of an unconnected input port of a macro, which Vivado ties to
+     * it (see {@link RouteStatusNetlist.TiedMacro})
+     */
+    private final boolean[] tiedUnconnectedInputs = new boolean[2];
 
     private final List<List<FlatNet>> staticFlats = Arrays.asList(new ArrayList<>(), new ArrayList<>());
 
@@ -280,6 +289,7 @@ public final class RouteStatusEngine {
             listEntries[l] = listed;
             listSizes[l] = size;
         });
+        addTiedMacros(flatNetlist);
         for (FlatNet flat : statics) {
             int t = flat.staticType == NetType.GND ? 0 : 1;
             hasLogicalStatic[t] = true;
@@ -308,6 +318,36 @@ public final class RouteStatusEngine {
      * a constant (its expansion of the macro includes the constant source), also where the net
      * reaches no pin outside LUT6_2 macros (its own site routing then does not matter).
      */
+    /**
+     * Counts the unconnected input ports of macros that Vivado ties to GND (VCC) as loads of it, and
+     * as unplaced loads if none of the macro's cells is placed.
+     */
+    private void addTiedMacros(RouteStatusNetlist flatNetlist) {
+        EDIFNetlist netlist = design.getNetlist();
+        for (RouteStatusNetlist.TiedMacro macro : flatNetlist.getTiedMacros()) {
+            boolean placed = false;
+            EDIFHierCellInst inst = netlist.getHierCellInstFromName(macro.name);
+            if (inst != null) {
+                for (EDIFHierCellInst leaf : netlist.getAllLeafDescendants(inst)) {
+                    Cell cell = design.getCell(leaf.getFullHierarchicalInstName());
+                    if (cell != null && cell.isPlaced()) {
+                        placed = true;
+                        break;
+                    }
+                }
+            }
+            for (int t = 0; t < 2; t++) {
+                if (macro.ties[t] > 0) {
+                    tiedUnconnectedInputs[t] = true;
+                    staticLoads[t] += macro.ties[t];
+                    if (!placed) {
+                        staticUnplacedLoads[t] += macro.ties[t];
+                    }
+                }
+            }
+        }
+    }
+
     private static boolean isTiedInsideMacro(FlatNet flat) {
         boolean macroLoads = flat.insideMacro || (flat.leafLoads > 0 && flat.macroLeafLoads == flat.leafLoads
                 && flat.leafInouts == 0 && flat.blackBoxDrivers == 0);
@@ -398,7 +438,8 @@ public final class RouteStatusEngine {
 
     /**
      * Adds GND and VCC as entries. Vivado represents all GND (VCC) nets as a single net. It is listed
-     * if it is used physically or logically, but only counted in the summary if it is used logically.
+     * if it is used physically or logically, but only counted in the summary if it is used logically,
+     * including by the unconnected input ports of macros that Vivado ties to it.
      * (A netlist with nets but without any primitive also lists GND, as internally routed.)
      */
     private void addStaticEntries() {
@@ -406,7 +447,8 @@ public final class RouteStatusEngine {
         for (NetType type : new NetType[]{NetType.GND, NetType.VCC}) {
             String name = (type == NetType.GND) ? Net.GND_NET : Net.VCC_NET;
             Net net = design.getNet(name);
-            boolean hasLogical = hasLogicalStatic[type == NetType.GND ? 0 : 1];
+            int t = (type == NetType.GND) ? 0 : 1;
+            boolean hasLogical = hasLogicalStatic[t] || tiedUnconnectedInputs[t];
             boolean hasPhysical = net != null && (net.hasPIPs() || !net.getSiteInsts().isEmpty());
             if (!hasLogical && !hasPhysical && !(type == NetType.GND && placeholderGnd)) {
                 continue;
@@ -414,7 +456,7 @@ public final class RouteStatusEngine {
             if (!hasLogical) {
                 uncounted.add(entries.size());
             }
-            staticEntry[type == NetType.GND ? 0 : 1] = entries.size();
+            staticEntry[t] = entries.size();
             entries.add(null, net, name);
         }
     }

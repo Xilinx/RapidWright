@@ -100,6 +100,11 @@ final class CellInfo {
     final boolean[] childIsWeakDriver;
     /** Per child: whether it is a black box (a leaf cell that is not a primitive) */
     final boolean[] childIsBlackBox;
+    /**
+     * Per child that is a macro: the numbers of its unconnected input ports that Vivado ties to GND,
+     * and to VCC (or null if none, see {@link RouteStatusNetlist.TiedMacro})
+     */
+    final int[][] childTies;
 
     /** Per port slot: whether a net inside connects to it, and whether that net connects to nothing else */
     final boolean[] ownConnected;
@@ -132,6 +137,7 @@ final class CellInfo {
         childPortOnly = new boolean[children.length][];
         childIsWeakDriver = new boolean[children.length];
         childIsBlackBox = new boolean[children.length];
+        childTies = new int[children.length][];
         Map<EDIFCellInst, Integer> childIndex = initChildren(netlist);
         nets = toArray(cell.getNets(), new EDIFNet[0], parallel);
         nameHashes = new int[nets.length];
@@ -165,6 +171,9 @@ final class CellInfo {
             childIsWeakDriver[i] = childIsLeaf[i] && (typeName.equals("PULLUP") || typeName.equals("PULLDOWN")
                     || typeName.equals("KEEPER"));
             childIsBlackBox[i] = childIsLeaf[i] && !isPrimitive(type);
+            if (!childIsLeaf[i] && isMacro(type)) {
+                childTies[i] = netlist.countUnconnectedTies(children[i]);
+            }
             if (!childIsLeaf[i]) {
                 childOffsets[i] = netlist.getPortOffsets(type);
                 CellInfo childInfo = netlist.getCellInfo(type);
@@ -173,6 +182,11 @@ final class CellInfo {
             }
         }
         return childIndex;
+    }
+
+    /** Checks whether a cell is an expanded macro primitive (in the primitives library, with contents). */
+    private static boolean isMacro(EDIFCell type) {
+        return type.getLibrary() != null && type.getLibrary().isHDIPrimitivesLibrary();
     }
 
     /** Tallies the port instances of the nets, each chunk of nets into its own arrays (in parallel). */
