@@ -1828,12 +1828,14 @@ public class RouteNodeGraph {
                 case NODE_INTF_BNODE:
                 case NODE_CLE_CNODE:
                 case NODE_INTF_CNODE:
+                    // Only allow [BC]NODEs in the sink's row within one half tile of the sink. Each is placed at the
+                    // half of the INT tile whose INODEs it drives (see RouteNodeInfo.get()), so with (c) this admits
+                    // only those driving the INODEs of the sink tile's half
                     if (childTile.getTileYCoordinate() != sinkTile.getTileYCoordinate() ||
-                        childRnode.getEndTileXCoordinate() != sinkTile.getTileXCoordinate()) {
+                        Math.abs(childRnode.getEndHalfTileXCoordinate() - sinkRnode.getEndHalfTileXCoordinate()) > 1) {
                         assert(parentRnode.getIntentCode() != IntentCode.NODE_INODE);
                         return false;
                     }
-                    // Only allow [BC]NODEs that reach into the sink tile
                     return true;
                 case NODE_PINBOUNCE:
                     // PINBOUNCEs are only accessible through an INODE, so arriving here means that this must be a

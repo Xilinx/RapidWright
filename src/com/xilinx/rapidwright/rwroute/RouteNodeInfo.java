@@ -218,6 +218,9 @@ public class RouteNodeInfo {
         short endTileYCoordinate = (short) endTile.getTileYCoordinate();
         // Nodes in LAGUNA tiles must have no X distance
         assert(baseTileType != TileTypeEnum.LAG_LAG || baseTile.getTileXCoordinate() == endTileXCoordinate - 1);
+        // Versal [BC]NODEs drive the INODEs of only the INT tile half that they are placed at, in their own row (see
+        // RouteNodeGraph.isAccessible())
+        assert(routingGraph == null || !isBCNode(baseIntentCode) || drivesINodesOnlyAt(node, endTile, endsOnEastSide, routingGraph));
 
         short halfTileWirelength = getNominalHalfTileWirelength(baseIntentCode, node.getWireName(), baseTileType);
 
@@ -232,6 +235,31 @@ public class RouteNodeInfo {
      */
     public static boolean isOnBothSides(IntentCode ic) {
         return ic == IntentCode.NODE_SLL_INPUT || ic == IntentCode.NODE_SLL_OUTPUT || ic == IntentCode.NODE_SLL_DATA;
+    }
+
+    private static boolean isBCNode(IntentCode ic) {
+        return ic == IntentCode.NODE_CLE_BNODE || ic == IntentCode.NODE_CLE_CNODE ||
+               ic == IntentCode.NODE_INTF_BNODE || ic == IntentCode.NODE_INTF_CNODE;
+    }
+
+    /**
+     * Checks (for assertions) that a node is in the same row as its end tile, and that all the INODEs it drives are
+     * in that end tile, on the given side.
+     */
+    private static boolean drivesINodesOnlyAt(Node node, Tile endTile, boolean east, RouteNodeGraph routingGraph) {
+        if (endTile.getTileYCoordinate() != node.getTile().getTileYCoordinate()) {
+            return false;
+        }
+        for (Node downhill : node.getAllDownhillNodes()) {
+            if (downhill.getIntentCode() != IntentCode.NODE_INODE) {
+                continue;
+            }
+            if (downhill.getTile() != endTile ||
+                    routingGraph.isEastSideWire(endTile.getTileTypeEnum(), downhill.getWireIndex()) != east) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
