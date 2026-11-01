@@ -478,6 +478,26 @@ public class TestRWRoute {
             "xcku115,SLICE_X20Y359,SLICE_X20Y240,200",
             "xcku115,SLICE_X18Y240,SLICE_X18Y359,100",
             "xcku115,SLICE_X18Y359,SLICE_X18Y240,100",
+
+            // Riding: one SLR crossing, far, with a source in the crossing rows from which the on-ramp is not typed, so
+            // that the search rides vertical wires towards the sink before stepping onto it
+            // US+: on the west half of the INT tile on the other side (west) of a Laguna column (INT_X4: EE2_W doubles
+            // into INT_X5), and one INT tile further west (INT_X3)
+            Device.AWS_F1 + ",SLICE_X6Y240,SLICE_X6Y359,300",
+            Device.AWS_F1 + ",SLICE_X6Y359,SLICE_X6Y240,200",
+            Device.AWS_F1 + ",SLICE_X5Y240,SLICE_X5Y359,300",
+            // US: on the west half of the INT tile on the other side (west) of a Laguna column (INT_X12)
+            "xcku115,SLICE_X17Y240,SLICE_X17Y359,200",
+            "xcku115,SLICE_X17Y359,SLICE_X17Y240,200",
+            // Versal: in the crossing band (INT Y262-Y335 northbound, Y337-Y410 southbound) on or beside a crossing half
+            "xcv80,SLICE_X54Y257,SLICE_X54Y402,300",            // On a crossing half (INT_X17 west)
+            "xcv80,SLICE_X56Y257,SLICE_X56Y402,100",            // Beside a crossing half (INT_X17 east)
+            "xcv80,SLICE_X54Y402,SLICE_X54Y257,100",
+            "xcv80,SLICE_X56Y402,SLICE_X56Y257,100",
+            "xcv80,SLICE_X58Y257,SLICE_X58Y402,500",            // Between crossing halves (INT_X18 west)
+            "xcv80,SLICE_X56Y290,SLICE_X56Y440,300",            // Mid-band
+            "xcv80,SLICE_X54Y150,SLICE_X54Y480,100",            // Below the crossing band
+            "xcv80,SLICE_X120Y150,SLICE_X20Y800,200",           // Two crossings, up and left
     })
     public void testSLRCrossingNonTimingDriven(String deviceName, String srcSiteName, String dstSiteName, long nodesPoppedLimit) {
         testSingleConnectionHelper(deviceName, srcSiteName, "AQ", dstSiteName, "A1", nodesPoppedLimit);
