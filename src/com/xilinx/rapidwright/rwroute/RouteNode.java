@@ -33,7 +33,6 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
 import com.xilinx.rapidwright.util.Utils;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -135,16 +134,19 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     /** A variable that stores the parent of a rnode during expansion to facilitate tracing back */
     private RouteNode prev;
     /**
-     * A map that records users of a rnode based on all routed connections.
+     * The users of a rnode based on all routed connections.
      * Each user is a {@link NetWrapper} instance that corresponds to a {@link Net} instance.
      * It is often the case that multiple connections of the user are using a same rnode.
      * We count the number of connections from the net.
      * The number is used for the sharing mechanism of RWRoute.
-     * To save memory and pointer chasing, this is null when no net uses this rnode, an immutable
-     * {@link Collections#singletonMap(Object, Object)} when exactly one net does, and an {@link IdentityHashMap}
-     * only while two or more nets share (overuse) it.
+     * Since nearly every used rnode has a single user, the first user and its count are held inline
+     * ({@link #firstUser}, {@link #firstUserCount}), and only any others in {@link #otherUsersConnectionCounts}
+     * (null unless there are two or more users; a user is in only one of the two); the number of users is derived
+     * from them (see {@link #uniqueUserCount()}). {@link #firstUser} may be null while two or more other users remain.
      */
-    private Map<NetWrapper, Integer> usersConnectionCounts;
+    private NetWrapper firstUser;
+    private int firstUserCount;
+    private Map<NetWrapper, Integer> otherUsersConnectionCounts;
 
     /** Flag to enable really comprehensive (but performance-impacting) assertions */
     protected final static boolean enableComprehensiveAssertions = false;
@@ -159,7 +161,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         children = null;
         setBaseCost();
         historicalCongestionCost = initialHistoricalCongestionCost;
-        usersConnectionCounts = null;
         visited = 0;
         assert(prev == null);
         assert(!isTarget);
@@ -619,75 +620,90 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      * Each user is a {@link NetWrapper} instance representing a {@link Net} instance.
      * It is often the case that multiple connections of a net are using a same rnode.
      * So we count connections of each user to facilitate the sharing mechanism of RWRoute.
-     * @return A map between users, i.e., {@link NetWrapper} instances representing by {@link Net} instances,
-     *  and numbers of connections from different users; null if there are no users. Not to be modified.
+     * @return A new map between users, i.e., {@link NetWrapper} instances representing by {@link Net} instances,
+     *  and numbers of connections from different users; null if there are no users.
      */
     public Map<NetWrapper, Integer> getUsersConnectionCounts() {
+        if (firstUser == null && otherUsersConnectionCounts == null) {
+            return null;
+        }
+        Map<NetWrapper, Integer> usersConnectionCounts = new IdentityHashMap<>();
+        if (firstUser != null) {
+            usersConnectionCounts.put(firstUser, firstUserCount);
+        }
+        if (otherUsersConnectionCounts != null) {
+            usersConnectionCounts.putAll(otherUsersConnectionCounts);
+        }
         return usersConnectionCounts;
     }
 
     /**
-     * Adds an user {@link NetWrapper} instance to the user map, of which a key is a {@link NetWrapper} instance and
-     * the value is the number of connections that are using a rnode.
-     * If the user is already stored in the map, increment the connection count of the user by 1. Otherwise, put the user
-     * into the map and initialize the connection count as 1.
+     * Adds an user {@link NetWrapper} instance to the users of this rnode, with the number of connections that are
+     * using this rnode.
+     * If the user is already a user, increment the connection count of the user by 1. Otherwise, add the user
+     * and initialize the connection count as 1.
      * @param user The user net in question.
      */
     public void incrementUser(NetWrapper user) {
-        Map<NetWrapper, Integer> users = usersConnectionCounts;
-        if (users == null) {
-            usersConnectionCounts = Collections.singletonMap(user, 1);
-        } else if (users instanceof IdentityHashMap) {
-            users.merge(user, 1, Integer::sum);
+        assert(user != null);
+        if (firstUser == user) {
+            firstUserCount++;
         } else {
-            // Exactly one user so far
-            Integer count = users.get(user);
+            Integer count = (otherUsersConnectionCounts != null) ? otherUsersConnectionCounts.get(user) : null;
             if (count != null) {
-                usersConnectionCounts = Collections.singletonMap(user, count + 1);
+                otherUsersConnectionCounts.put(user, count + 1);
+            } else if (firstUser == null) {
+                firstUser = user;
+                firstUserCount = 1;
             } else {
-                Map<NetWrapper, Integer> shared = new IdentityHashMap<>(2);
-                shared.putAll(users);
-                shared.put(user, 1);
-                usersConnectionCounts = shared;
+                if (otherUsersConnectionCounts == null) {
+                    otherUsersConnectionCounts = new IdentityHashMap<>(2);
+                }
+                otherUsersConnectionCounts.put(user, 1);
             }
         }
+        assert(otherUsersConnectionCounts == null || uniqueUserCount() >= 2);
     }
 
     /**
      * Gets the number of unique users.
-     * @return The number of unique {@link NetWrapper} instances in the user map, i.e, the key set size of the user map.
+     * @return The number of unique {@link NetWrapper} instances using this rnode.
      */
     public int uniqueUserCount() {
-        if (usersConnectionCounts == null) {
-            return 0;
-        }
-        return usersConnectionCounts.size();
+        return ((firstUser != null) ? 1 : 0) +
+                ((otherUsersConnectionCounts != null) ? otherUsersConnectionCounts.size() : 0);
     }
 
     /**
      * Decrements the connection count of a user that is represented by a
      * {@link NetWrapper} instance corresponding to a {@link Net} instance.
-     * If there is only one connection of the user that is using a RouteNode instance, remove the user from the map.
+     * If there is only one connection of the user that is using a RouteNode instance, remove the user.
      * Otherwise, decrement the connection count by 1.
-     * @param user The user to be decremented from the user map.
+     * @param user The user to be decremented.
      */
     public void decrementUser(NetWrapper user) {
-        Map<NetWrapper, Integer> users = usersConnectionCounts;
-        // Unboxing throws a NullPointerException if user does not use this rnode
-        int count = users.get(user);
-        if (users instanceof IdentityHashMap) {
-            if (count > 1) {
-                users.put(user, count - 1);
-            } else {
-                users.remove(user);
-                if (users.size() == 1) {
-                    Map.Entry<NetWrapper, Integer> e = users.entrySet().iterator().next();
-                    usersConnectionCounts = Collections.singletonMap(e.getKey(), e.getValue());
-                }
+        boolean removed;
+        if (firstUser == user) {
+            removed = (--firstUserCount == 0);
+            if (removed) {
+                // (Any other users stay where they are, rather than one being moved here, which would need the map to
+                // be iterated: firstUser is then null while other users remain, until another user is added)
+                firstUser = null;
             }
         } else {
-            usersConnectionCounts = (count > 1) ? Collections.singletonMap(user, count - 1) : null;
+            removed = (otherUsersConnectionCounts.compute(user, (k,v) -> (v == 1) ? null : v - 1) == null);
         }
+        if (removed && otherUsersConnectionCounts != null && uniqueUserCount() <= 1) {
+            // Keep the map only while there are two or more users, so that looking up a user of a node that is not
+            // overused never needs it: move any one user left in it to firstUser
+            if (firstUser == null && !otherUsersConnectionCounts.isEmpty()) {
+                Map.Entry<NetWrapper, Integer> e = otherUsersConnectionCounts.entrySet().iterator().next();
+                firstUser = e.getKey();
+                firstUserCount = e.getValue();
+            }
+            otherUsersConnectionCounts = null;
+        }
+        assert(otherUsersConnectionCounts == null || uniqueUserCount() >= 2);
     }
 
     /**
@@ -696,10 +712,13 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
      * @return The total number of connections of the user.
      */
     public int countConnectionsOfUser(NetWrapper user) {
-        if (usersConnectionCounts == null) {
+        if (firstUser == user) {
+            return firstUserCount;
+        }
+        if (otherUsersConnectionCounts == null) {
             return 0;
         }
-        return usersConnectionCounts.getOrDefault(user, 0);
+        return otherUsersConnectionCounts.getOrDefault(user, 0);
     }
 
     /**
