@@ -407,7 +407,10 @@ public class RouteNodeInfo {
                     BitSet[] bs2 = routingGraph.wireIndicesLeadingToSLL.get(node.getTile());
                     if (bs2 != null && bs2[1].get(node.getWireIndex())) {
                         assert(node.getWireName().matches("INT_INT_SDQ_\\d+_INT_OUT[01]|WW1_E_7_FT0") ||    // UltraScale+
-                               node.getWireName().matches("INT_INT_SINGLE_\\d+_INT_OUT|EE1_W_0_FTS"));      // UltraScale
+                               node.getWireName().matches("INT_INT_SINGLE_\\d+_INT_OUT|EE1_W_0_FTS") ||     // UltraScale
+                               // Both: from the INT tile on the other side of the Laguna column (see
+                               // RouteNodeGraph.populateNeighbourLagunaLookups())
+                               node.getWireName().matches("EE1_E_BEG\\d+"));
                         return RouteNodeType.NON_LOCAL_LEADING_TO_SLL;
                     }
                 }

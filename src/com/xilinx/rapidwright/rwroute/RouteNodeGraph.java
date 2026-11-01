@@ -120,7 +120,8 @@ public class RouteNodeGraph {
      * <ul>
      * <li>UltraScale/UltraScale+ (Laguna-adjacent INT tiles and their Laguna tiles; see
      * {@link #populateLagunaLookups}): [0] IMUX and INODE wires in an INT tile, or TXOUT (LAG_MUX_ATOM_*_TXOUT) wires
-     * in a Laguna tile (LOCAL_LEADING_TO_SLL), [1] INT_INT and SDQNODE wires in an INT tile
+     * in a Laguna tile (LOCAL_LEADING_TO_SLL), [1] INT_INT and SDQNODE wires in an INT tile, and in the INT tile on
+     * the other side of the Laguna column, horizontal singles into it and the SDQNODE wires that drive those
      * (NON_LOCAL_LEADING_TO_SLL).</li>
      * <li>Versal (SLL and INT tiles, each computed when first needed; see {@link #getWireIndicesLeadingToSLL(Tile)}):
      * in an SLL tile, [0] SLL inputs whose SLL crosses SLRs, [1] BNODEs that drive such an SLL input; in an INT tile,
@@ -1159,6 +1160,7 @@ public class RouteNodeGraph {
 
                                 for (Node intInt : inode.getAllUphillNodes()) {
                                     if (intInt.getTile() != inode.getTile()) {
+                                        populateNeighbourLagunaLookups(intInt, inode.getTile());
                                         continue;
                                     }
                                     if (intInt.getIntentCode() != IntentCode.NODE_SINGLE) {
@@ -1189,6 +1191,45 @@ public class RouteNodeGraph {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * For the INT tile on the other side of the Laguna column (the west neighbour of an INT tile with a Laguna column),
+     * which has no TXOUTs of its own: records a horizontal single from it (in the same row) that drives an INODE leading
+     * to that Laguna, and the SDQ nodes that drive such a single and end in that tile, keyed by that tile, as
+     * NON_LOCAL_LEADING_TO_SLL. Otherwise, a connection there would see the crossing discount only on reaching the
+     * INODE, and would first ride away on vertical wires (each lowering its lower bound more than the step across).
+     * (Not its SDQNODE_*_FT* that end in the row above or below, which are one node further from the Laguna.)
+     * @param single Node driving an INODE that leads to a Laguna, in another tile.
+     * @param inodeTile The INT tile of that INODE.
+     */
+    private void populateNeighbourLagunaLookups(Node single, Tile inodeTile) {
+        Tile singleTile = single.getTile();
+        if (single.getIntentCode() != IntentCode.NODE_SINGLE ||
+                singleTile.getTileTypeEnum() != inodeTile.getTileTypeEnum() ||
+                singleTile.getTileYCoordinate() != inodeTile.getTileYCoordinate() ||
+                singleTile.getTileXCoordinate() != inodeTile.getTileXCoordinate() - 1) {
+            return;
+        }
+        BitSet[] bs = wireIndicesLeadingToSLL.computeIfAbsent(singleTile, k -> new BitSet[]{new BitSet(), new BitSet()});
+        bs[1].set(single.getWireIndex());
+        for (Node sdq : single.getAllUphillNodes()) {
+            if (sdq.isTiedToVcc() || sdq.getTile() != singleTile || sdq.getIntentCode() != IntentCode.NODE_LOCAL) {
+                continue;
+            }
+            // Its end tile: the first INT tile among its other wires, if any
+            boolean endsInSingleTile = true;
+            Wire[] wires = sdq.getAllWiresInNode();
+            for (int i = 1; i < wires.length; i++) {
+                if (wires[i].getTile().getTileTypeEnum() == singleTile.getTileTypeEnum()) {
+                    endsInSingleTile = wires[i].getTile() == singleTile;
+                    break;
+                }
+            }
+            if (endsInSingleTile) {
+                bs[1].set(sdq.getWireIndex());
             }
         }
     }

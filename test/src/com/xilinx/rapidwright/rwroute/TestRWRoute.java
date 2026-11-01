@@ -432,7 +432,7 @@ public class TestRWRoute {
             Device.AWS_F1 + ",SLICE_X0Y299,SLICE_X0Y300,100",    // Far from Laguna column
             Device.AWS_F1 + ",SLICE_X0Y300,SLICE_X0Y299,100",
             Device.AWS_F1 + ",SLICE_X54Y299,SLICE_X56Y300,200",  // Slight closer to one Laguna column that is further from sink
-            Device.AWS_F1 + ",SLICE_X54Y300,SLICE_X56Y299,200",
+            Device.AWS_F1 + ",SLICE_X54Y300,SLICE_X56Y299,100",
             Device.AWS_F1 + ",SLICE_X50Y299,SLICE_X65Y300,100",
             Device.AWS_F1 + ",SLICE_X50Y300,SLICE_X65Y299,100",
             Device.AWS_F1 + ",SLICE_X55Y299,SLICE_X55Y300,100",  // Equidistant from two Laguna columns
@@ -462,8 +462,22 @@ public class TestRWRoute {
             Device.AWS_F1 + ",SLICE_X78Y60,SLICE_X78Y839,200",   // Straight up: on Laguna column (same side as Laguna)
             Device.AWS_F1 + ",SLICE_X0Y0,SLICE_X0Y899,300",      // Straight up: far from Laguna column
             Device.AWS_F1 + ",SLICE_X168Y0,SLICE_X168Y899,200",  // Straight up: far from Laguna column
-            Device.AWS_F1 + ",SLICE_X9Y0,SLICE_X162Y899,400",    // Up and right
+            Device.AWS_F1 + ",SLICE_X9Y0,SLICE_X162Y899,200",    // Up and right
             Device.AWS_F1 + ",SLICE_X168Y162,SLICE_X9Y899,200",  // Up and left
+
+            // One SLR crossing, far: source in a Laguna row, on the east half of the INT tile on the other side (west) of
+            // a Laguna column (INT_X4, beside LAG_LAG_X4, which INT_X5 drives; cf. SLICE_X9Y240/SLICE_X9Y359 above, on
+            // the east half of INT_X5)
+            Device.AWS_F1 + ",SLICE_X7Y240,SLICE_X7Y359,200",
+            Device.AWS_F1 + ",SLICE_X7Y359,SLICE_X7Y240,200",
+
+            // US
+            // One SLR crossing, far: source in a Laguna row, on the east half of the INT tile with a Laguna column
+            // (INT_X13, which drives LAGUNA_TILE_X13) and of the INT tile on the other side (west) of it (INT_X12)
+            "xcku115,SLICE_X20Y240,SLICE_X20Y359,100",
+            "xcku115,SLICE_X20Y359,SLICE_X20Y240,200",
+            "xcku115,SLICE_X18Y240,SLICE_X18Y359,100",
+            "xcku115,SLICE_X18Y359,SLICE_X18Y240,100",
     })
     public void testSLRCrossingNonTimingDriven(String deviceName, String srcSiteName, String dstSiteName, long nodesPoppedLimit) {
         testSingleConnectionHelper(deviceName, srcSiteName, "AQ", dstSiteName, "A1", nodesPoppedLimit);

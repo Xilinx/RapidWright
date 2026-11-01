@@ -2166,6 +2166,13 @@ public class RWRoute {
                     // drives), as do the INODEs and PINBOUNCEs that lead to it (on the side of their INT tile that the
                     // SLL tile is beside)
                     sendingHalfX = getLowerOfTwoHalves(childRnode.getEndHalfTileXCoordinate());
+                    if (!routingGraph.isVersal && routingGraph.nextCrossingHalfColumn[sendingHalfX] != sendingHalfX) {
+                        // An SDQ node of the INT tile on the other side of the Laguna column, from whose single into
+                        // the next INT tile its super long line is taken (see
+                        // RouteNodeGraph.populateNeighbourLagunaLookups())
+                        assert(routingGraph.nextCrossingHalfColumn[sendingHalfX] == sendingHalfX + 2);
+                        sendingHalfX += 2;
+                    }
                     assert(!routingGraph.isVersal || childRnode.getIntentCode() != IntentCode.NODE_CLE_BNODE ||
                             (sendingHalfX == 2 * RouteNodeInfo.getWestIntTileXCoordinate(childRnode.getTile()) + 1 &&
                              childY == childRnode.getTile().getTileYCoordinate()));
@@ -2383,7 +2390,8 @@ public class RWRoute {
      * the whole sending chain from its first node, the super long line itself and its whole receiving chain, at their
      * true (uncongested) cost (see getUncongestedNodeCost()), with their bias cost taken at the sending node for the
      * sending chain, and where the super long line lands for it and its receiving chain. The sending chain is: on
-     * UltraScale/UltraScale+, SDQ node, intra-tile single, INODE, IMUX, LAG_MUX_ATOM_*_TXOUT; on Versal, INODE,
+     * UltraScale/UltraScale+, SDQ node, intra-tile single, INODE, IMUX, LAG_MUX_ATOM_*_TXOUT (or SDQ node, horizontal
+     * single, from the INT tile on the other side of the Laguna column, then the same); on Versal, INODE,
      * PINBOUNCE, BNODE in an SLL tile, SLL input. On UltraScale/UltraScale+, its local nodes are charged whichever node
      * it was entered at (so that one entered further along is charged for those that it skips), and its intra-tile
      * single only when it is entered at an SDQ node; on Versal, only those after the node it was entered at (see
