@@ -2085,7 +2085,14 @@ public class RWRoute {
                                        RouteNode childRnode) {
         final Connection connection = state.connection;
         final int countSourceUses = childRnode.countConnectionsOfUser(connection.getNetWrapper());
-        final float sharingFactor = 1 + state.shareWeight * countSourceUses;
+        // An exclusive sink is counted as used by its net from the start (see createNetWrapperAndConnections()), so that
+        // other nets see it as occupied, and its connection's route is never counted on it again: for that connection,
+        // that is not a use by another of its net's connections, so it is not discounted for sharing (though, in
+        // getNodeCost(), it still does not count towards the occupancy that this net is charged for)
+        final int countSharingUses = (childRnode == connection.getSinkRnode() && childRnode.getType().isAnyExclusiveSink())
+                ? countSourceUses - 1 : countSourceUses;
+        assert(countSharingUses >= 0);
+        final float sharingFactor = 1 + state.shareWeight * countSharingUses;
         // Set the prev pointer, as RouteNode.getEndTileYCoordinate() and
         // RouteNode.getSLRIndex() require this
         childRnode.setPrev(rnode);
