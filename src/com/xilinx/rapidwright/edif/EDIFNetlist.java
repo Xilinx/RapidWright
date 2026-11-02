@@ -1090,6 +1090,9 @@ public class EDIFNetlist extends EDIFName {
         if (out instanceof ParallelDCPOutput) {
             try (ParallelDCPOutput dcpOut = (ParallelDCPOutput) out) {
                 dcpOut.writePieces(exportEDIFPieces(dcpOut, stable));
+            } catch (UncheckedIOException e) {
+                // From the pieces' writers, which cannot throw an IOException themselves
+                throw e.getCause();
             }
             return;
         }
@@ -1171,6 +1174,26 @@ public class EDIFNetlist extends EDIFName {
                                                              List<EDIFLibrary> librariesToWrite,
                                                              EDIFWriteLegalNameCache<?> cache) {
         final List<Future<ParallelDCPInput>> pieces = new ArrayList<>();
+        try {
+            submitExportChunks(dcpOut, librariesToWrite, cache, pieces);
+        } catch (Throwable e) {
+            // As ParallelismTools.joinOrdered() does once a task has thrown: those not yet started are never run, and
+            // those running run to the end, but their pieces are discarded (as is each piece's temporary file, if any,
+            // once writing the DCP has failed)
+            for (Future<ParallelDCPInput> piece : pieces) {
+                piece.cancel(false);
+            }
+            throw e;
+        }
+        return pieces;
+    }
+
+    /**
+     * As {@link #submitExportChunks(ParallelDCPOutput, List, EDIFWriteLegalNameCache)}, adding the pieces to the given
+     * list as each is submitted, so that those submitted can be cancelled if a later one cannot be.
+     */
+    private void submitExportChunks(ParallelDCPOutput dcpOut, List<EDIFLibrary> librariesToWrite,
+                                    EDIFWriteLegalNameCache<?> cache, List<Future<ParallelDCPInput>> pieces) {
         for (EDIFLibrary lib : librariesToWrite) {
             // Split each library's cells into chunks of consecutive cells, each the most estimated to make up at most
             // PARALLEL_EXPORT_CHUNK_BYTES (ending a chunk before the cell that would take it beyond that), but at least
@@ -1203,7 +1226,6 @@ public class EDIFNetlist extends EDIFName {
                 })));
             } while (from < cells.size());
         }
-        return pieces;
     }
 
     /**
