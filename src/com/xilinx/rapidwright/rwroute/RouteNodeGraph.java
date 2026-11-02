@@ -1782,6 +1782,8 @@ public class RouteNodeGraph {
 
     public boolean isAccessible(RouteNode childRnode, RouteNode parentRnode, Connection connection) {
         assert(!childRnode.isTarget());
+        assert(parentRnode != null || (childRnode.getType().isAnyLocal() &&
+                (!isVersal || childRnode.getIntentCode() != IntentCode.NODE_PINFEED)));
 
         // Only consider LOCAL nodes when:
         RouteNodeType type = childRnode.getType();
@@ -1834,7 +1836,7 @@ public class RouteNodeGraph {
                                         TileTypeEnum.INTF_LOCF_TL_TILE, TileTypeEnum.INTF_LOCF_BL_TILE, TileTypeEnum.INTF_ROCF_TL_TILE, TileTypeEnum.INTF_ROCF_BL_TILE,
                                       TileTypeEnum.CLE_BC_CORE, TileTypeEnum.SLL)
                        .contains(childTileType)) ||
-                (isVersal && Utils.isCLB(childTileType) && parentRnode.getIntentCode() == IntentCode.NODE_SLL_OUTPUT && childRnode.getIntentCode() == IntentCode.NODE_PINFEED) ||
+                (isVersal && Utils.isCLB(childTileType) && parentRnode != null && parentRnode.getIntentCode() == IntentCode.NODE_SLL_OUTPUT && childRnode.getIntentCode() == IntentCode.NODE_PINFEED) ||
                 // Allow NODE_PINFEEDs in RCLK tiles that are preserved (belonging to a partially routed net)
                 (Utils.isClocking(childTileType) && childRnode.getIntentCode() == IntentCode.NODE_PINFEED && isPreserved(childRnode))
         );
@@ -2007,7 +2009,7 @@ public class RouteNodeGraph {
                     // only those driving the INODEs of the sink tile's half
                     if (childTile.getTileYCoordinate() != sinkTile.getTileYCoordinate() ||
                         Math.abs(childRnode.getEndHalfTileXCoordinate() - sinkRnode.getEndHalfTileXCoordinate()) > 1) {
-                        assert(parentRnode.getIntentCode() != IntentCode.NODE_INODE);
+                        assert(parentRnode == null || parentRnode.getIntentCode() != IntentCode.NODE_INODE);
                         return false;
                     }
                     return true;

@@ -1706,6 +1706,30 @@ public class RWRoute {
          */
         protected float sinkINodeCost;
 
+        /**
+         * Whether the drivers of this connection's sinks are marked as targets (see setFinishCosts()): if so, the
+         * search ends when a target is popped (a driver finishing at its cheapest own sink), else when a target is
+         * pushed (unless this net would overuse it)
+         */
+        protected boolean driversMarked;
+        /**
+         * Least of what a driver adds for a sink pushed from it (see getSinkFinishCost()), over the connection's sinks;
+         * only computed (else zero) for a connection with alternate sinks
+         */
+        protected float minSinkCost;
+        /**
+         * Congestion excess of the cheapest driver of the sinks (marked or not), charged to every node other than a
+         * target: max(0, d - u), d being that driver's exact push cost and u sinkINodeCost if that is non-zero, else
+         * the uncongested cost (getUncongestedNodeCost()) of that driver
+         */
+        protected float drvExcess;
+        /**
+         * What is charged to a node, other than a wire, an INODE or a target, at the sink's half tile (see
+         * evaluateCostAndPush()): sinkINodeCost; on a marked connection, the exact push cost of the cheapest driver
+         * (d), which replaces both sinkINodeCost and the excess there
+         */
+        protected float sinkHalfTileCost;
+
         protected ConnectionState() {
             this.queue = new PriorityQueue<>();
             this.targets = new ArrayList<>();
@@ -1742,6 +1766,11 @@ public class RWRoute {
         while ((rnode = queue.poll()) != null) {
             state.nodesPopped++;
             if (rnode.isTarget()) {
+                if (state.driversMarked && !isValidSink(connection, rnode)) {
+                    // A driver of the sinks (see setFinishCosts()), whose lower bound included the exact cost of its
+                    // cheapest own sink: finish at its cheapest own sink not yet pushed (see finishAtSinkDriver())
+                    rnode = finishAtSinkDriver(state, rnode);
+                }
                 break;
             }
             exploreAndExpand(state, rnode);
@@ -1775,6 +1804,130 @@ public class RWRoute {
             target.clearTarget();
         }
         targets.clear();
+    }
+
+    /**
+     * Finishes the route of a connection at a marked driver of its sinks that has been popped: pushes and pops the
+     * cheapest of its own sinks that this search has not yet pushed (see getCheapestTargetChild()). The driver's lower
+     * bound included the exact cost of its cheapest own sink, less that of the connection's cheapest sink (see
+     * getDriverFinishCost()), whether pushed or not; so if that sink was pushed since (with alternate sinks, from an
+     * unmarked driver), the sink finished at can cost more than the driver's lower bound assumed. (With LUT pin
+     * swapping, this was seen only 14 times in about 980,000 finishes on optical-flow, and never on bnn, each time
+     * finishing at a sink of exactly the same cost.)
+     * @param state State from the connection that is being routed.
+     * @param driver The driver that has been popped.
+     * @return That sink, popped, or null if none (with the queue emptied, as for a search that fails).
+     */
+    private RouteNode finishAtSinkDriver(ConnectionState state, RouteNode driver) {
+        PriorityQueue<RouteNode> queue = state.queue;
+        nodesPushed.addAndGet(queue.size());
+        queue.clear();
+        RouteNode sinkRnode = getCheapestTargetChild(state, driver);
+        assert(sinkRnode != null);
+        if (sinkRnode == null) {
+            return null;
+        }
+        evaluateCostAndPush(state, driver, config.isTimingDriven() && DelayEstimatorBase.isLong(driver), sinkRnode);
+        RouteNode popped = queue.poll();
+        assert(popped == sinkRnode);
+        state.nodesPopped++;
+        return popped;
+    }
+
+    /**
+     * Gets the cheapest (see getSinkFinishCost()) of a connection's sinks (the sink or alternate sinks) that a marked
+     * driver of them drives, that this search has not yet pushed.
+     * @param state State from the connection that is being routed.
+     * @param driver The driver in question.
+     * @return That sink, or null if none.
+     */
+    private RouteNode getCheapestTargetChild(ConnectionState state, RouteNode driver) {
+        final Connection connection = state.connection;
+        final int sequence = state.sequence;
+        if (!connection.hasAltSinks()) {
+            final RouteNode sinkRnode = connection.getSinkRnode();
+            assert(driver.children == null || Arrays.asList(driver.children).contains(sinkRnode));
+            return sinkRnode.isVisited(sequence) ? null : sinkRnode;
+        }
+        RouteNode cheapest = null;
+        float cheapestCost = Float.MAX_VALUE;
+        for (RouteNode child : driver.getChildren(routingGraph)) {
+            if (!child.isTarget() || child.isVisited(sequence) || !isValidSink(connection, child)) {
+                continue;
+            }
+            float cost = getSinkFinishCost(state, child);
+            if (cost < cheapestCost) {
+                cheapest = child;
+                cheapestCost = cost;
+            }
+        }
+        return cheapest;
+    }
+
+    /**
+     * Gets what is added to the path cost of a marked driver of a connection's sinks to give its lower bound, as it is
+     * pushed: the least, over the sinks (the sink or alternate sinks) among its own children, of what
+     * evaluateCostAndPush() would add to its path cost to give that sink's lower bound (see getSinkFinishCost()), less
+     * the least of that over all the connection's sinks (ConnectionState.minSinkCost). For a connection without
+     * alternate sinks, that is exactly zero.
+     * @param state State from the connection that is being routed.
+     * @param driver The driver being pushed.
+     * @return That cost.
+     */
+    private float getDriverFinishCost(ConnectionState state, RouteNode driver) {
+        final Connection connection = state.connection;
+        if (!connection.hasAltSinks()) {
+            return 0;
+        }
+        float cheapestCost = Float.MAX_VALUE;
+        for (RouteNode child : driver.getChildren(routingGraph)) {
+            if (!child.isTarget() || !isValidSink(connection, child)) {
+                continue;
+            }
+            cheapestCost = Math.min(cheapestCost, getSinkFinishCost(state, child));
+        }
+        assert(cheapestCost < Float.MAX_VALUE);
+        if (cheapestCost == Float.MAX_VALUE) {
+            cheapestCost = state.minSinkCost;
+        }
+        return cheapestCost - state.minSinkCost;
+    }
+
+    /**
+     * Gets the number of uses of a node by the connection's net that evaluateCostAndPush() discounts it for sharing:
+     * all of them, other than for the connection's own exclusive sink, which is counted as used by its net from the
+     * start.
+     * @param state State from the connection that is being routed.
+     * @param rnode The node in question.
+     * @param countSourceUses Its number of uses by the connection's net.
+     * @return That number.
+     */
+    private static int getCountSharingUses(ConnectionState state, RouteNode rnode, int countSourceUses) {
+        return (rnode == state.connection.getSinkRnode() && rnode.getType().isAnyExclusiveSink())
+                ? countSourceUses - 1 : countSourceUses;
+    }
+
+    /**
+     * Gets what evaluateCostAndPush() adds to the path cost of a marked driver to give the lower bound of one of the
+     * connection's sinks (the sink or an alternate sink) pushed from it: its push cost (see getPushCost()) and the
+     * estimate that evaluateCostAndPush() gives it, which is zero unless it ends elsewhere than it begins (e.g. an
+     * UltraScale+ PINBOUNCE feedthrough, BOUNCE_*_FT[01], which ends in the next row, so is charged one row).
+     * @param state State from the connection that is being routed.
+     * @param sink The sink in question.
+     * @return That cost.
+     */
+    private float getSinkFinishCost(ConnectionState state, RouteNode sink) {
+        final Connection connection = state.connection;
+        final RouteNode sinkRnode = connection.getSinkRnode();
+        final int countSourceUses = sink.countConnectionsOfUser(connection.getNetWrapper());
+        final float sharingFactor = 1 + state.shareWeight * getCountSharingUses(state, sink, countSourceUses);
+        // As evaluateCostAndPush() for a node that is not of type NON_LOCAL_INHERIT_PREV_SIDE
+        assert(sink.getType() != RouteNodeType.NON_LOCAL_INHERIT_PREV_SIDE);
+        final int deltaHalfX = getDeltaHalfX(sinkRnode, getNearerEndHalfTileXCoordinate(connection, sink),
+                sinkRnode.getEndHalfTileXCoordinate());
+        final int deltaY = Math.abs(sink.getEndTileYCoordinate() - sinkRnode.getBeginTileYCoordinate());
+        assert(!connection.isCrossSLR() || sinkRnode.getSLRIndex(routingGraph) == sink.getSLRIndex(routingGraph));
+        return addEstimate(state, getPushCost(state, sink), deltaHalfX, deltaY, sharingFactor);
     }
 
     protected void enlargeBoundingBox(Connection connection) {
@@ -1900,8 +2053,8 @@ public class RWRoute {
             if (childRNode.isVisited(sequence)) {
                 // Node must be in queue already
 
-                // Targets that are visited more than once must be overused
-                assert(!childRNode.isTarget() || childRNode.willOverUse(netWrapper));
+                // Targets that are visited more than once must be overused (unless marked drivers of the sinks)
+                assert(!childRNode.isTarget() || state.driversMarked || childRNode.willOverUse(netWrapper));
 
                 // Note: it is possible this is a cheaper path to childRNode; however, because the
                 // PriorityQueue class does not support (efficiently) reducing the cost of nodes
@@ -1924,11 +2077,12 @@ public class RWRoute {
                     assert(!childRNode.willOverUse(netWrapper));
                     assert(childRNode.countConnectionsOfUser(netWrapper) == 1 ||
                            childRNode.getIntentCode() == IntentCode.NODE_PINBOUNCE);
-                    state.earlyTermination = true;
+                    // If the drivers are marked, the search ends only when a target is popped
+                    state.earlyTermination = !state.driversMarked;
                 } else {
                     // Target is not an exclusive sink, only early terminate if this net will not
                     // (further) overuse this node
-                    state.earlyTermination = !childRNode.willOverUse(netWrapper);
+                    state.earlyTermination = !state.driversMarked && !childRNode.willOverUse(netWrapper);
                 }
 
                 if (state.earlyTermination) {
@@ -2089,8 +2243,7 @@ public class RWRoute {
         // other nets see it as occupied, and its connection's route is never counted on it again: for that connection,
         // that is not a use by another of its net's connections, so it is not discounted for sharing (though, in
         // getNodeCost(), it still does not count towards the occupancy that this net is charged for)
-        final int countSharingUses = (childRnode == connection.getSinkRnode() && childRnode.getType().isAnyExclusiveSink())
-                ? countSourceUses - 1 : countSourceUses;
+        final int countSharingUses = getCountSharingUses(state, childRnode, countSourceUses);
         assert(countSharingUses >= 0);
         final float sharingFactor = 1 + state.shareWeight * countSharingUses;
         // Set the prev pointer, as RouteNode.getEndTileYCoordinate() and
@@ -2102,6 +2255,16 @@ public class RWRoute {
         newPartialPathCost += state.rnodeWLWeight * 0.5f * childRnode.getHalfTileWirelength() / sharingFactor;
         if (config.isTimingDriven()) {
             newPartialPathCost += state.dlyWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode, longParent));
+        }
+
+        if (state.driversMarked && childRnode.isTarget() && !rnode.isTarget() && !isValidSink(connection, childRnode)) {
+            // A marked driver of the sinks (see setFinishCosts()): its lower bound is that which its cheapest own sink
+            // would be given on being pushed from it, less that of the connection's cheapest sink (the same for every
+            // driver, so only shifting the drivers relative to all other nodes, whose lower bounds charge no sink; see
+            // getDriverFinishCost()), which is exact unless that sink is pushed by another driver before this one is
+            // popped (see finishAtSinkDriver())
+            push(state, childRnode, newPartialPathCost, newPartialPathCost + getDriverFinishCost(state, childRnode));
+            return;
         }
 
         int childX = childRnode.getEndTileXCoordinate();
@@ -2127,23 +2290,7 @@ public class RWRoute {
             childRnode.setInheritedSide(rnode);
             childHalfX = childRnode.getEndHalfTileXCoordinate();
         } else {
-            // Nodes that serve two adjacent halves for this connection are considered to be on whichever is nearer to
-            // the sink:
-            // - INT_NODE_GLOBAL_* (UltraScale/UltraScale+), the [BC]NODEs reserved for CTRL pins and SLL inputs in
-            //   Versal CLE_BC_CORE/INTF_*/SLL tiles, at the tile of a CTRL pin or SLL input sink, which they serve on
-            //   either side (so that is the sink's half);
-            // - Versal SLL inputs, outputs and data (super long lines) of a connection that crosses SLRs, between the
-            //   east side of one INT tile and the west side of the next
-            final boolean servesTwoHalves =
-                    ((childType == RouteNodeType.LOCAL_SIDE_DEPENDS_ON_SINK || childType == RouteNodeType.LOCAL_RESERVED) &&
-                     sinkRnode.getType().isExclusiveSinkCtrlOrSllInput() && childRnode.getTile() == sinkRnode.getTile()) ||
-                    (connection.isCrossSLR() && routingGraph.isOnBothSides(childRnode));
-            if (servesTwoHalves) {
-                final int lowerHalfX = getLowerOfTwoHalves(childHalfX);
-                final int nearerHalfX = Math.max(lowerHalfX, Math.min(lowerHalfX + 1, sinkHalfX));
-                assert(childRnode.getTile() != sinkRnode.getTile() || nearerHalfX == sinkHalfX);
-                childHalfX = nearerHalfX;
-            }
+            childHalfX = getNearerEndHalfTileXCoordinate(connection, childRnode);
         }
         int deltaHalfX = getDeltaHalfX(sinkRnode, childHalfX, sinkHalfX);
         int deltaY = Math.abs(childY - sinkY);
@@ -2247,10 +2394,18 @@ public class RWRoute {
         // Each super long line still to be taken (other than the one whose discounted sending chain this node is on) is
         // charged at its span, at the estimate's rate per row
         final int sllLength = routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
+        // If the drivers of the sinks are marked (see setFinishCosts()), a node other than a target is charged the
+        // congestion excess of the cheapest driver (marked drivers are priced above); a sink nothing.
+        // Note: an unmarked driver (one of an alternate-sink connection, see setFinishCosts()) is charged it too, even
+        // though its own cost is already in its path cost, so that its lower bound can be higher than it need be. Not
+        // charging it would need those drivers to be told apart here, on every push; with LUT pin swapping, the excess
+        // was found to be non-zero on none of their pushes on one benchmark and 0.5% on another, with no difference in
+        // wirelength, so that is not done
+        final float finishCost = (state.driversMarked && !childRnode.isTarget()) ? state.drvExcess : 0;
         float newTotalPathCost;
         if (sendingHalfX < 0) {
             newTotalPathCost = addEstimate(state, newPartialPathCost, deltaHalfX, deltaY + deltaSLR * sllLength,
-                    sharingFactor);
+                    sharingFactor) + finishCost;
             if (RouteNode.isSingleDoubleQuadLong(childRnode.getIntentCode())) {
                 newTotalPathCost += state.rnodeCostWeight * RouteNode.DEPTH_FIRST_BIAS;
             } else if (deltaSLR == 0 && deltaHalfX == 0 && deltaY == 0 && !childRnode.isINode() && !childRnode.isTarget()) {
@@ -2259,7 +2414,11 @@ public class RWRoute {
                 // an SDQ node, which drives only singles, doubles, quads and longs) must take one of those first:
                 // charge that too, at its base cost. (Singles, doubles, quads and longs already carry
                 // DEPTH_FIRST_BIAS, which is more than an INODE.)
-                newTotalPathCost += state.sinkINodeCost;
+                // On a marked connection, the exact cost of the cheapest driver instead, without the excess
+                newTotalPathCost += state.sinkHalfTileCost;
+                if (state.driversMarked) {
+                    newTotalPathCost -= finishCost;
+                }
                 if (state.sinkINodeCost > 0 && !childRnode.getType().isAnyLocal()) {
                     newTotalPathCost += state.rnodeCostWeight * RouteNode.LOCAL_BASE_COST;
                 }
@@ -2287,14 +2446,21 @@ public class RWRoute {
             }
             newTotalPathCost = newPartialPathCost + getSendingChainCost(state, childRnode, sendingHalfX) / sharingFactor;
             newTotalPathCost = addEstimate(state, newTotalPathCost, getDeltaHalfX(sinkRnode, landHalfX, sinkHalfX),
-                    deltaY + (deltaSLR - 1) * sllLength, sharingFactor);
+                    deltaY + (deltaSLR - 1) * sllLength, sharingFactor) + finishCost;
         }
         // A discounted node's lower bound is lower than if it were charged as not being on a chain (at the span
         // estimate), which it must be for the discount to be one
         assert(sendingHalfX < 0 ||
                newTotalPathCost <= addEstimate(state, newPartialPathCost, deltaHalfX, deltaY + deltaSLR * sllLength,
                     sharingFactor) + (RouteNode.isSingleDoubleQuadLong(childRnode.getIntentCode()) ?
-                    state.rnodeCostWeight * RouteNode.DEPTH_FIRST_BIAS : 0));
+                    state.rnodeCostWeight * RouteNode.DEPTH_FIRST_BIAS : 0) + finishCost);
+
+        if (state.driversMarked && childRnode.isTarget() && !rnode.isTarget()) {
+            // A sink pushed from an unmarked driver (see setFinishCosts()): shifted as the marked drivers are (see
+            // getDriverFinishCost())
+            assert(isValidSink(connection, childRnode));
+            newTotalPathCost -= state.minSinkCost;
+        }
 
         push(state, childRnode, newPartialPathCost, newTotalPathCost);
     }
@@ -2333,6 +2499,37 @@ public class RWRoute {
      */
     private int getLowerOfTwoHalves(int halfX) {
         return routingGraph.isVersal ? ((halfX - 1) & ~1) + 1 : halfX & ~1;
+    }
+
+    /**
+     * Gets the half tile that a node, other than one of type NON_LOCAL_INHERIT_PREV_SIDE, is considered to end at for
+     * a connection: where it ends, unless it serves two adjacent halves for this connection, in which case whichever
+     * of them is nearer to the sink. Those are:
+     * - INT_NODE_GLOBAL_* (UltraScale/UltraScale+), the [BC]NODEs reserved for CTRL pins and SLL inputs in Versal
+     *   CLE_BC_CORE, INTF_* and SLL tiles, at the tile of a CTRL pin or SLL input sink, which they serve on either side
+     *   (so that is the sink's half);
+     * - Versal SLL inputs, outputs and data (super long lines) of a connection that crosses SLRs, between the east side
+     *   of one INT tile and the west side of the next.
+     * @param connection The connection being routed.
+     * @param rnode The node in question.
+     * @return Half-tile X coordinate of that half.
+     */
+    private int getNearerEndHalfTileXCoordinate(Connection connection, RouteNode rnode) {
+        final RouteNode sinkRnode = connection.getSinkRnode();
+        final RouteNodeType type = rnode.getType();
+        final int halfX = rnode.getEndHalfTileXCoordinate();
+        final boolean servesTwoHalves =
+                ((type == RouteNodeType.LOCAL_SIDE_DEPENDS_ON_SINK || type == RouteNodeType.LOCAL_RESERVED) &&
+                 sinkRnode.getType().isExclusiveSinkCtrlOrSllInput() && rnode.getTile() == sinkRnode.getTile()) ||
+                (connection.isCrossSLR() && routingGraph.isOnBothSides(rnode));
+        if (!servesTwoHalves) {
+            return halfX;
+        }
+        final int sinkHalfX = sinkRnode.getEndHalfTileXCoordinate();
+        final int lowerHalfX = getLowerOfTwoHalves(halfX);
+        final int nearerHalfX = Math.max(lowerHalfX, Math.min(lowerHalfX + 1, sinkHalfX));
+        assert(rnode.getTile() != sinkRnode.getTile() || nearerHalfX == sinkHalfX);
+        return nearerHalfX;
     }
 
     /**
@@ -2534,6 +2731,9 @@ public class RWRoute {
         // Sets the sink rnode(s) of the connection as the target(s)
         connection.setAllTargets(state);
 
+        // Marks the drivers of the sinks, if possible, and prices them
+        setFinishCosts(state);
+
         // Adds the source rnode to the queue
         RouteNode sourceRnode = connection.getSourceRnode();
         float newPartialPathCost = 0;
@@ -2541,6 +2741,258 @@ public class RWRoute {
         push(state, sourceRnode, newPartialPathCost, newTotalPathCost);
 
         assert(routingGraph.isAllowedTile(connection.getSinkRnode()));
+    }
+
+    /**
+     * Finds the drivers (direct uphill nodes) of a connection's sinks (its sink and any alternate sinks) that it could
+     * push (see isPushableSinkDriver()) and, if they are all INODEs, GNODEs, BNODEs or CNODEs (see isMarkableDriver()),
+     * marks them as targets (so that the search ends when one is popped; see routeIndirectConnection()) and prices them
+     * (see ConnectionState). A driver that has no rnode yet is created if its intent code could be such a node
+     * (NODE_LOCAL, NODE_INODE or a Versal [BC]NODE); any other means that the drivers are not marked, and the search
+     * ends when a sink is pushed, as without them. (A Versal NODE_SLL_OUTPUT driving an NODE_SLL_INPUT sink is ignored,
+     * that arc being excluded from the routing graph.)
+     * On a connection with alternate sinks (LUT pin swapping), a driver all of whose sinks this net would overuse is
+     * left unmarked, so that the search can pass through it (e.g. onto a bounce, then another INODE and a sink that is
+     * free) rather than end there; it is still a driver for the cheapest driver cost, and the sinks that it pushes end
+     * the search when popped.
+     * @param state State from the connection that is being routed.
+     */
+    private void setFinishCosts(ConnectionState state) {
+        final Connection connection = state.connection;
+        final RouteNode sinkRnode = connection.getSinkRnode();
+        final List<RouteNode> altSinkRnodes = connection.getAltSinkRnodes();
+        final boolean hasAltSinks = connection.hasAltSinks();
+        final List<RouteNode> targets = state.targets;
+        final int firstDriver = targets.size();
+        // The connection's cheapest sink is only needed with alternate sinks (see getDriverFinishCost())
+        float minSinkCost = hasAltSinks ? Float.MAX_VALUE : 0;
+        float minUnmarkedDriverCost = Float.MAX_VALUE;
+        RouteNode minUnmarkedDriver = null;
+        boolean markable = true;
+        for (int i = -1; i < altSinkRnodes.size() && markable; i++) {
+            final RouteNode target = (i < 0) ? sinkRnode : altSinkRnodes.get(i);
+            if (hasAltSinks) {
+                minSinkCost = Math.min(minSinkCost, getSinkFinishCost(state, target));
+            }
+            for (Node uphill : target.getAllUphillNodes()) {
+                if (uphill.isTiedToVcc()) {
+                    // Driven by VCC only, so never reached from this connection's source
+                    continue;
+                }
+                if (routingGraph.isVersal && uphill.getIntentCode() == IntentCode.NODE_SLL_OUTPUT &&
+                        target.getIntentCode() == IntentCode.NODE_SLL_INPUT) {
+                    // The arc NODE_SLL_OUTPUT -> NODE_SLL_INPUT is excluded from the routing graph (see
+                    // RouteNodeGraph.isExcluded()), so never taken
+                    continue;
+                }
+                RouteNode driver = routingGraph.getNode(uphill);
+                if (driver == null) {
+                    if (!isMarkableDriverIntentCode(uphill.getIntentCode()) ||
+                            RouteNodeGraph.isExcludedTile(uphill) || !routingGraph.isAllowedTile(uphill)) {
+                        markable = false;
+                        break;
+                    }
+                    driver = routingGraph.getOrCreate(uphill);
+                }
+                if (driver.isTarget()) {
+                    // Already marked (driving more than one of the sinks), or a sink itself (never pushed as a driver)
+                    continue;
+                }
+                if (!isPushableSinkDriver(driver, target, connection)) {
+                    continue;
+                }
+                if (!isMarkableDriver(driver)) {
+                    markable = false;
+                    break;
+                }
+                if (hasAltSinks && !hasFreeSinkChild(driver, connection)) {
+                    // Left unmarked, so that it can be passed through
+                    float cost = getPushCost(state, driver);
+                    if (cost < minUnmarkedDriverCost) {
+                        minUnmarkedDriverCost = cost;
+                        minUnmarkedDriver = driver;
+                    }
+                    continue;
+                }
+                driver.markTarget(state);
+            }
+        }
+        float minDriverCost = Float.MAX_VALUE;
+        RouteNode minDriver = null;
+        if (markable) {
+            for (int i = firstDriver; i < targets.size(); i++) {
+                RouteNode driver = targets.get(i);
+                float cost = getPushCost(state, driver);
+                if (cost < minDriverCost) {
+                    minDriverCost = cost;
+                    minDriver = driver;
+                }
+            }
+            if (minDriver == null) {
+                // No driver was marked
+                markable = false;
+            } else if (minUnmarkedDriverCost < minDriverCost) {
+                minDriverCost = minUnmarkedDriverCost;
+                minDriver = minUnmarkedDriver;
+            }
+        }
+        if (!markable) {
+            // Unmark any drivers marked so far
+            for (int i = targets.size() - 1; i >= firstDriver; i--) {
+                targets.get(i).clearTarget();
+                targets.remove(i);
+            }
+        }
+        state.driversMarked = markable;
+        if (markable) {
+            state.minSinkCost = minSinkCost;
+            final float uncongested = state.sinkINodeCost > 0 ? state.sinkINodeCost :
+                    getUncongestedNodeCost(state, minDriver.getBaseCost(), minDriver.getEndTileXCoordinate(),
+                            minDriver.getEndTileYCoordinate());
+            state.drvExcess = Math.max(0, minDriverCost - uncongested);
+            state.sinkHalfTileCost = minDriverCost;
+        } else {
+            state.minSinkCost = 0;
+            state.drvExcess = 0;
+            state.sinkHalfTileCost = state.sinkINodeCost;
+        }
+    }
+
+    /**
+     * Checks if a driver drives one of a connection's sinks (the sink or an alternate sink) that its net would not
+     * overuse.
+     * @param driver The driver in question.
+     * @param connection The connection being routed.
+     * @return True if so.
+     */
+    private boolean hasFreeSinkChild(RouteNode driver, Connection connection) {
+        final NetWrapper netWrapper = connection.getNetWrapper();
+        for (RouteNode child : driver.getChildren(routingGraph)) {
+            if (isValidSink(connection, child) && !child.willOverUse(netWrapper)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Checks if a node with no rnode yet could be a driver that may be marked (see isMarkableDriver()).
+     * @param ic Its intent code.
+     * @return True if so.
+     */
+    private static boolean isMarkableDriverIntentCode(IntentCode ic) {
+        switch (ic) {
+            case NODE_LOCAL:
+            case NODE_INODE:
+            case NODE_CLE_BNODE:
+            case NODE_CLE_CNODE:
+            case NODE_INTF_BNODE:
+            case NODE_INTF_CNODE:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Checks if a driver of a connection's sink may be marked as a target: an INODE, a GNODE (UltraScale/
+     * UltraScale+ INT_NODE_GLOBAL_*), or a Versal BNODE or CNODE.
+     * @param driver The driver in question.
+     * @return True if so.
+     */
+    private static boolean isMarkableDriver(RouteNode driver) {
+        if (driver.isINode() || isGNode(driver)) {
+            return true;
+        }
+        switch (driver.getIntentCode()) {
+            case NODE_CLE_BNODE:
+            case NODE_CLE_CNODE:
+            case NODE_INTF_BNODE:
+            case NODE_INTF_CNODE:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Checks if a driver of one of a connection's targets could be pushed while routing it, with that target as one
+     * of its children: by those checks that RouteNode.getChildren() and exploreAndExpand() make on a node that is not
+     * a target that do not depend on its parent.
+     * @param driver The driver in question.
+     * @param target The target.
+     * @param connection The connection being routed.
+     * @return False if it could not.
+     */
+    private boolean isPushableSinkDriver(RouteNode driver, RouteNode target, Connection connection) {
+        Net preservedNet = routingGraph.getPreservedNet(driver);
+        if ((preservedNet != null && preservedNet != connection.getNet()) || !routingGraph.isAllowedTile(driver) ||
+                driver.isTarget() || !isAccessible(driver, connection) || routingGraph.isExcluded(driver, target)) {
+            return false;
+        }
+        switch (driver.getType()) {
+            case LOCAL:
+            case LOCAL_SIDE_DEPENDS_ON_SINK:
+            case LOCAL_RESERVED:
+            case LOCAL_LEADING_TO_SLL:
+                // Whether a Versal PINFEED is accessible depends on its parent (see RouteNodeGraph.isAccessible())
+                return (routingGraph.isVersal && driver.getIntentCode() == IntentCode.NODE_PINFEED) ||
+                        routingGraph.isAccessible(driver, null, connection);
+            case NON_LOCAL_LEADING_TO_SLL:
+            case NON_LOCAL:
+            case NON_LOCAL_INHERIT_PREV_SIDE:
+                // Otherwise, whether accessible depends on its parent
+                return config.isUseUTurnNodes() || driver.getDelay() <= 10000;
+            case EXCLUSIVE_SINK:
+            case EXCLUSIVE_SINK_CTRL:
+            case EXCLUSIVE_SINK_SLL_INPUT:
+            case EXCLUSIVE_SINK_NON_LOCAL:
+                return isAccessibleSink(driver, connection);
+            case SUPER_LONG_LINE:
+                return true;
+            default:
+                // Never pushed as a child: an EXCLUSIVE_SOURCE (which exploreAndExpand() rejects) or INACCESSIBLE
+                return false;
+        }
+    }
+
+    /**
+     * Checks if a node is a GNODE: on UltraScale/UltraScale+, an INT_NODE_GLOBAL_* (see
+     * RouteNodeType.LOCAL_SIDE_DEPENDS_ON_SINK).
+     * @param rnode The node in question.
+     * @return True if so.
+     */
+    private static boolean isGNode(RouteNode rnode) {
+        boolean gnode = rnode.getIntentCode() == IntentCode.NODE_LOCAL &&
+                rnode.getType() == RouteNodeType.LOCAL_SIDE_DEPENDS_ON_SINK;
+        assert(!gnode || rnode.getWireName().startsWith("INT_NODE_GLOBAL_"));
+        return gnode;
+    }
+
+    /**
+     * Gets the cost that evaluateCostAndPush() adds to the path cost of a node on pushing it: exactly (with the same
+     * sharing factor, see getCountSharingUses()), other than the extra delay of a long after a long (never a sink or a
+     * driver of one), which is left out, and the bias cost of a super long line, which depends on the way it is taken
+     * (see RouteNode.getEndTileYCoordinate()), for which the most it could be is taken off.
+     * @param state State from the connection that is being routed.
+     * @param rnode The node in question.
+     * @return That cost, or a lower bound on it.
+     */
+    private float getPushCost(ConnectionState state, RouteNode rnode) {
+        final Connection connection = state.connection;
+        final int countSourceUses = rnode.countConnectionsOfUser(connection.getNetWrapper());
+        final float sharingFactor = 1 + state.shareWeight * getCountSharingUses(state, rnode, countSourceUses);
+        float nodeCost = getNodeCost(rnode, connection, countSourceUses, sharingFactor);
+        if (rnode.getType() == RouteNodeType.SUPER_LONG_LINE) {
+            // getNodeCost() adds a bias cost of at most half of the rest
+            nodeCost /= 1.5f;
+        }
+        float cost = state.rnodeCostWeight * nodeCost;
+        cost += state.rnodeWLWeight * 0.5f * rnode.getHalfTileWirelength() / sharingFactor;
+        if (config.isTimingDriven()) {
+            cost += state.dlyWeight * rnode.getDelay();
+        }
+        return cost;
     }
 
     /**
