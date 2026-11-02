@@ -65,11 +65,14 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.zip.CRC32;
+import java.util.zip.CheckedInputStream;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.InflaterInputStream;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 
@@ -1997,12 +2000,18 @@ public class FileTools {
                     File currFile = new File(destFilePath);
                     String parentName = currFile.getParentFile().getAbsolutePath();
                     makeDirs(parentName);
-                    try (InputStream zin = zip.getInputStream(e);
+                    try (CheckedInputStream zin = new CheckedInputStream(zip.getInputStream(e), new CRC32());
                         FileOutputStream fos = new FileOutputStream(destFilePath);
                         BufferedOutputStream bos = new BufferedOutputStream(fos)) {
                         int read;
                         while ( (read = zin.read(buffer)) != -1) {
                             bos.write(buffer,0,read);
+                        }
+                        // Unlike a ZipInputStream, a ZipFile does not check an entry's CRC
+                        if (e.getCrc() != -1 && zin.getChecksum().getValue() != e.getCrc()) {
+                            throw new ZipException("invalid entry CRC for " + e.getName() + " (expected 0x"
+                                    + Long.toHexString(e.getCrc()) + " but got 0x"
+                                    + Long.toHexString(zin.getChecksum().getValue()) + ")");
                         }
                     }
                 }
