@@ -133,37 +133,94 @@ public class RouteNodeGraph {
      */
     protected final Map<Tile, BitSet[]> wireIndicesLeadingToSLL;
 
-    /** Map indicating (for UltraScale/UltraScale+ only) the wire indices corresponding to the [A-H]MUX output
-     * to be blocked during LUT routethrus
+    /**
+     * What RWRoute knows about the wires of one tile type, indexed by (base) wire index, as all tiles of a type share
+     * their wires: held together (see {@link #tileTypeInfos}) so that one lookup by tile type serves every property,
+     * rather than one map per property. Each BitSet is null where no wire of the type has that property.
      */
-    protected final Map<TileTypeEnum, BitSet> ultraScalesMuxWiresToBlockWhenLutRoutethru;
+    protected static final class TileTypeInfo {
+        /**
+         * (UltraScale/UltraScale+ INT only, whose entry always has it) The subset of NODE_LOCAL wires that RWRoute
+         * should assign a LOCAL_* type, e.g. excluding INT_NODE_SDQ_*.
+         */
+        BitSet localWires;
+
+        /**
+         * Local nodes that serve only one side (half) of interconnect tiles (that side being given by
+         * {@link #eastSideWires}).
+         */
+        BitSet sidedLocalWires;
+
+        /**
+         * Nodes (by their base wire) that end on the east half of an interconnect tile; all other nodes are
+         * considered to end on its west half. This includes local nodes serving the east side, interconnect wires
+         * (e.g. singles and doubles) arriving at the east side, CTRL_E* pins, and INT_NODE_GLOBAL_* nodes driving
+         * INODEs on the east side (UltraScale/UltraScale+), as well as CTRL_L_B* pins in CLE_BC_CORE/SLL tiles
+         * (Versal). Nodes of the tiles beside one side of their INT tile (e.g. CLE outputs) are placed by tile type
+         * instead (see {@link RouteNodeGraph#SITE_TILE_TYPE_ON_EAST_SIDE}).
+         */
+        BitSet eastSideWires;
+
+        /**
+         * Non-local nodes (by their base wire) that serve both sides of the INT tile that they end at, and so are given
+         * the {@link RouteNodeType#NON_LOCAL_INHERIT_PREV_SIDE} type: UltraScale longs and INT_NODE_QUAD_LONG_* /
+         * QLND* (which drive a long), and Versal longs.
+         */
+        BitSet inheritPrevSideWires;
+
+        /**
+         * (Versal only) INTF_* tile CNODEs that only drive that tile's CTRL pins (and thus are only of use to reach
+         * those pins).
+         */
+        BitSet intfCtrlOnlyWires;
+
+        /**
+         * (UltraScale/UltraScale+ CLB tiles only, with LUT routethrus) The [A-H]MUX outputs to be blocked during LUT
+         * routethrus.
+         */
+        BitSet muxWiresToBlockWhenLutRoutethru;
+
+        /** (UltraScale/UltraScale+ INT only, whose entry always has it) CTRL_* pins. */
+        BitSet ctrlWires;
+
+        /**
+         * Sets a bit in a BitSet, creating it if null.
+         * @param bs The BitSet, or null.
+         * @param wireIndex The bit to set.
+         * @return The BitSet.
+         */
+        static BitSet set(BitSet bs, int wireIndex) {
+            if (bs == null) {
+                bs = new BitSet();
+            }
+            bs.set(wireIndex);
+            return bs;
+        }
+
+        /**
+         * Gets a bit of a BitSet that may be null.
+         * @param bs The BitSet, or null.
+         * @param wireIndex The bit to get.
+         * @return False if bs is null, else the bit.
+         */
+        static boolean get(BitSet bs, int wireIndex) {
+            return bs != null && bs.get(wireIndex);
+        }
+    }
+
+    /**
+     * What RWRoute knows about the wires of each tile type that has any wire with one of the properties of
+     * {@link TileTypeInfo}; a tile type with none has no entry (see {@link #getTileTypeInfo(TileTypeEnum)}). Entries
+     * are created (see {@link #getOrCreateTileTypeInfo(TileTypeEnum)}) only during construction, which is
+     * single-threaded, and the map is never modified after that, so it may be read by several threads at once.
+     */
+    protected final Map<TileTypeEnum, TileTypeInfo> tileTypeInfos = new EnumMap<>(TileTypeEnum.class);
 
     /** Flag for whether LUT routethrus are to be considered */
     protected final boolean lutRoutethru;
 
     /** Flag for whether LUT pin swapping is to be considered */
     protected final boolean lutPinSwapping;
-
-    /** Map indicating (for UltraScale/UltraScale+ only) the subset wire indices of a NODE_LOCAL that are
-     *  what RWRoute should assign a LOCAL_* type, e.g. excluding INT_NODE_SDQ_*
-     */
-    protected final Map<TileTypeEnum, BitSet> ultraScalesLocalWires;
-
-    /**
-     * Map indicating the wire indices corresponding to local nodes that serve only one side (half) of
-     * interconnect tiles (that side being given by {@link #eastSideWires})
-     */
-    protected final Map<TileTypeEnum, BitSet> sidedLocalWires;
-
-    /**
-     * Map indicating the wire indices (of the base wire of a node) corresponding to nodes that end on the east
-     * half of an interconnect tile; all other nodes are considered to end on its west half. This includes
-     * local nodes serving the east side, interconnect wires (e.g. singles and doubles) arriving at the east side,
-     * CTRL_E* pins, and INT_NODE_GLOBAL_* nodes driving INODEs on the east side (UltraScale/UltraScale+), as
-     * well as CTRL_L_B* pins in CLE_BC_CORE/SLL tiles (Versal). Nodes of the tiles beside one side of their INT tile
-     * (e.g. CLE outputs) are placed by tile type instead (see {@link #SITE_TILE_TYPE_ON_EAST_SIDE}).
-     */
-    protected final Map<TileTypeEnum, BitSet> eastSideWires;
 
     /**
      * Side of their INT tile (true for east) that tiles of these types are beside, and so that the nodes in them that
@@ -221,22 +278,6 @@ public class RouteNodeGraph {
             SITE_TILE_TYPE_ON_EAST_SIDE.put(tte, false);
         }
     }
-
-    /** BitSet indicating (for UltraScale/UltraScale+ only) the wire indices of CTRL_* pins in INT tiles */
-    protected final BitSet ultraScalesCtrlWires;
-
-    /**
-     * Map indicating the wire indices (of the base wire of a node) corresponding to non-local nodes that serve both
-     * sides of the INT tile that they end at, and so are given the {@link RouteNodeType#NON_LOCAL_INHERIT_PREV_SIDE}
-     * type: UltraScale longs and INT_NODE_QUAD_LONG_* / QLND* (which drive a long), and Versal longs.
-     */
-    protected final Map<TileTypeEnum, BitSet> inheritPrevSideWires;
-
-    /**
-     * Map indicating (for Versal only) the wire indices of INTF_* tile CNODEs that only drive that tile's CTRL pins
-     * (and thus are only of use to reach those pins)
-     */
-    protected final Map<TileTypeEnum, BitSet> versalIntfCtrlOnlyWires;
 
     /** Flag for whether design targets the Versal series */
     protected final boolean isVersal;
@@ -317,11 +358,6 @@ public class RouteNodeGraph {
             Matcher m = sideNamedPattern.matcher(downhill.getWireName());
             return m.matches() ? m.group("eastwest").equals("E") : null;
         };
-        sidedLocalWires = new EnumMap<>(TileTypeEnum.class);
-        eastSideWires = new EnumMap<>(TileTypeEnum.class);
-        ultraScalesCtrlWires = isVersal ? null : new BitSet();
-        inheritPrevSideWires = new EnumMap<>(TileTypeEnum.class);
-        versalIntfCtrlOnlyWires = isVersal ? new EnumMap<>(TileTypeEnum.class) : null;
         BitSet localWires = new BitSet();
         List<Tile> intTilesToExamine = null;
         if (isUltraScale || isUltraScalePlus) {
@@ -334,8 +370,9 @@ public class RouteNodeGraph {
                     IntentCode.NODE_PINBOUNCE,
                     IntentCode.NODE_LOCAL);
 
-            ultraScalesLocalWires = new EnumMap<>(TileTypeEnum.class);
-            ultraScalesLocalWires.put(tile.getTileTypeEnum(), localWires);
+            TileTypeInfo intInfo = getOrCreateTileTypeInfo(tile.getTileTypeEnum());
+            intInfo.localWires = localWires;
+            intInfo.ctrlWires = new BitSet();
 
             eastWestPattern = Pattern.compile("(((BOUNCE|BYPASS|IMUX|INODE(_[12])?)_(?<eastwest>[EW]))|INT_NODE_IMUX_(?<inode>\\d+)_).*");
 
@@ -372,8 +409,6 @@ public class RouteNodeGraph {
                     IntentCode.NODE_CLE_BNODE,
                     IntentCode.NODE_CLE_CNODE);
 
-            ultraScalesLocalWires = null;
-
             eastWestPattern = Pattern.compile("(((BOUNCE|IMUX_B|[BC]NODE_OUTS)_(?<eastwest>[EW]))|INT_NODE_IMUX_ATOM_(?<inode>\\d+)_).*");
 
             // Longs have no side in their name
@@ -405,8 +440,8 @@ public class RouteNodeGraph {
                                       baseIntentCode == IntentCode.NODE_VLONG7 || baseIntentCode == IntentCode.NODE_VLONG12))) {
                     // UltraScale longs only drive INT_NODE_QUAD_LONG_* / QLND*, which mostly drive quads on both sides
                     // (on xcku040); Versal longs drive INT_NODE_SDQ_ATOM_* on both sides (on xcvc1902)
-                    inheritPrevSideWires.computeIfAbsent(baseNode.getTile().getTileTypeEnum(), k -> new BitSet())
-                            .set(baseNode.getWireIndex());
+                    TileTypeInfo info = getOrCreateTileTypeInfo(baseNode.getTile().getTileTypeEnum());
+                    info.inheritPrevSideWires = TileTypeInfo.set(info.inheritPrevSideWires, baseNode.getWireIndex());
                 }
                 if ((isUltraScalePlus && (baseIntentCode == IntentCode.NODE_HLONG || baseIntentCode == IntentCode.NODE_VLONG)) ||
                         (isUltraScale && (baseIntentCode == IntentCode.NODE_HQUAD || baseIntentCode == IntentCode.NODE_VQUAD))) {
@@ -493,8 +528,9 @@ public class RouteNodeGraph {
                                     assert(baseNode.getAllDownhillNodes().stream().anyMatch((downhill) ->
                                             downhill.getIntentCode() == IntentCode.NODE_HLONG ||
                                             downhill.getIntentCode() == IntentCode.NODE_VLONG));
-                                    inheritPrevSideWires.computeIfAbsent(baseTile.getTileTypeEnum(), k -> new BitSet())
-                                            .set(baseNode.getWireIndex());
+                                    TileTypeInfo info = getOrCreateTileTypeInfo(baseTile.getTileTypeEnum());
+                                    info.inheritPrevSideWires = TileTypeInfo.set(info.inheritPrevSideWires,
+                                            baseNode.getWireIndex());
                                 }
                                 continue;
                             }
@@ -530,7 +566,8 @@ public class RouteNodeGraph {
                             east = false;
                         }
                     }
-                    sidedLocalWires.computeIfAbsent(baseTileType, k -> new BitSet()).set(baseNode.getWireIndex());
+                    TileTypeInfo info = getOrCreateTileTypeInfo(baseTileType);
+                    info.sidedLocalWires = TileTypeInfo.set(info.sidedLocalWires, baseNode.getWireIndex());
                     if (east) {
                         setEastSide(baseNode);
                     }
@@ -540,7 +577,7 @@ public class RouteNodeGraph {
                     // INT_NODE_GLOBAL_* which can serve both sides)
                     if (baseWireName.startsWith("CTRL_")) {
                         assert(baseNode.getTile().getTileTypeEnum() == TileTypeEnum.INT);
-                        ultraScalesCtrlWires.set(baseNode.getWireIndex());
+                        getTileTypeInfo(TileTypeEnum.INT).ctrlWires.set(baseNode.getWireIndex());
                     }
                     if (baseWireName.startsWith("CTRL_E")) {
                         setEastSide(baseNode);
@@ -598,7 +635,8 @@ public class RouteNodeGraph {
                     String wireName = tile.getWireName(wireIndex);
                     assert(wireName.matches("CTRL_[LR]_B\\d+"));
                     if (wireName.startsWith("CTRL_L")) {
-                        eastSideWires.computeIfAbsent(tte, k -> new BitSet()).set(wireIndex);
+                        TileTypeInfo info = getOrCreateTileTypeInfo(tte);
+                        info.eastSideWires = TileTypeInfo.set(info.eastSideWires, wireIndex);
                     }
                 }
             }
@@ -614,7 +652,8 @@ public class RouteNodeGraph {
                     if (baseIntentCode != IntentCode.NODE_INTF_BNODE && baseIntentCode != IntentCode.NODE_INTF_CNODE) {
                         continue;
                     }
-                    sidedLocalWires.computeIfAbsent(tte, k -> new BitSet()).set(wireIndex);
+                    TileTypeInfo info = getOrCreateTileTypeInfo(tte);
+                    info.sidedLocalWires = TileTypeInfo.set(info.sidedLocalWires, wireIndex);
                     if (baseIntentCode != IntentCode.NODE_INTF_CNODE) {
                         continue;
                     }
@@ -628,7 +667,7 @@ public class RouteNodeGraph {
                         }
                     }
                     if (ctrlOnly) {
-                        versalIntfCtrlOnlyWires.computeIfAbsent(tte, k -> new BitSet()).set(wireIndex);
+                        info.intfCtrlOnlyWires = TileTypeInfo.set(info.intfCtrlOnlyWires, wireIndex);
                     }
                 }
             }
@@ -637,7 +676,6 @@ public class RouteNodeGraph {
         if (lutRoutethru) {
             assert(isUltraScalePlus || isUltraScale);
 
-            ultraScalesMuxWiresToBlockWhenLutRoutethru = new EnumMap<>(TileTypeEnum.class);
             for (TileTypeEnum tileTypeEnum : Utils.getCLBTileTypes()) {
                 Tile clbTile = device.getArbitraryTileOfType(tileTypeEnum);
                 if (clbTile == null) {
@@ -655,10 +693,8 @@ public class RouteNodeGraph {
                 if (localWires.isEmpty()) {
                     continue;
                 }
-                ultraScalesMuxWiresToBlockWhenLutRoutethru.put(tileTypeEnum, localWires);
+                getOrCreateTileTypeInfo(tileTypeEnum).muxWiresToBlockWhenLutRoutethru = localWires;
             }
-        } else {
-            ultraScalesMuxWiresToBlockWhenLutRoutethru = null;
         }
 
         boolean[] crossingHalfColumns = null;
@@ -1238,20 +1274,53 @@ public class RouteNodeGraph {
     }
 
     /**
+     * Gets what RWRoute knows about the wires of a tile type.
+     * @param tileTypeEnum The tile type.
+     * @return Its entry in {@link #tileTypeInfos}, or null if it has none (no wire of the type has any of the
+     * properties of {@link TileTypeInfo}).
+     */
+    protected TileTypeInfo getTileTypeInfo(TileTypeEnum tileTypeEnum) {
+        return tileTypeInfos.get(tileTypeEnum);
+    }
+
+    /**
+     * Gets the entry of a tile type in {@link #tileTypeInfos}, creating it if it has none: only to be called during
+     * construction (see {@link #tileTypeInfos}), to give a wire of the type one of the properties of
+     * {@link TileTypeInfo}.
+     * @param tileTypeEnum The tile type.
+     * @return Its entry.
+     */
+    private TileTypeInfo getOrCreateTileTypeInfo(TileTypeEnum tileTypeEnum) {
+        return tileTypeInfos.computeIfAbsent(tileTypeEnum, k -> new TileTypeInfo());
+    }
+
+    /**
+     * Checks if a wire is in one of the wire sets of {@link TileTypeInfo}.
+     * @param tileTypeEnum Tile type of the wire.
+     * @param wireIndex The (base) wire index.
+     * @param wires Gives that set from the entry of the tile type in {@link #tileTypeInfos} (null if no wire of the
+     * type is in it).
+     * @return False if the tile type has no entry, or the wire is not in the set.
+     */
+    private boolean isWireIn(TileTypeEnum tileTypeEnum, int wireIndex, Function<TileTypeInfo, BitSet> wires) {
+        final TileTypeInfo info = getTileTypeInfo(tileTypeEnum);
+        return info != null && TileTypeInfo.get(wires.apply(info), wireIndex);
+    }
+
+    /**
      * Checks if a local node serves only one side (half) of its interconnect tile.
      * @param tileTypeEnum Tile type of the node's base wire.
      * @param wireIndex Wire index of the node's base wire.
      * @return True if so.
      */
     public boolean isSidedLocalWire(TileTypeEnum tileTypeEnum, int wireIndex) {
-        BitSet sidedLocalWires = this.sidedLocalWires.get(tileTypeEnum);
-        return sidedLocalWires != null && sidedLocalWires.get(wireIndex);
+        return isWireIn(tileTypeEnum, wireIndex, info -> info.sidedLocalWires);
     }
 
     /**
      * Checks if a node ends on the east side of an interconnect tile (otherwise, it is considered to end on the
      * west side): every node of a tile type beside the east side of its INT tile (see
-     * {@link #SITE_TILE_TYPE_ON_EAST_SIDE}), or one given by {@link #eastSideWires}.
+     * {@link #SITE_TILE_TYPE_ON_EAST_SIDE}), or one given by {@link TileTypeInfo#eastSideWires}.
      * @param tileTypeEnum Tile type of the node's base wire.
      * @param wireIndex Wire index of the node's base wire.
      * @return True if so.
@@ -1261,19 +1330,18 @@ public class RouteNodeGraph {
         if (siteTileOnEastSide != null) {
             return siteTileOnEastSide;
         }
-        BitSet eastSideWires = this.eastSideWires.get(tileTypeEnum);
-        return eastSideWires != null && eastSideWires.get(wireIndex);
+        return isWireIn(tileTypeEnum, wireIndex, info -> info.eastSideWires);
     }
 
     /**
-     * Checks if a node is to be a {@link RouteNodeType#NON_LOCAL_INHERIT_PREV_SIDE} node (see {@link #inheritPrevSideWires}).
+     * Checks if a node is to be a {@link RouteNodeType#NON_LOCAL_INHERIT_PREV_SIDE} node (see
+     * {@link TileTypeInfo#inheritPrevSideWires}).
      * @param tileTypeEnum Tile type of the node's base wire.
      * @param wireIndex Wire index of the node's base wire.
      * @return True if so.
      */
     public boolean isInheritPrevSideWire(TileTypeEnum tileTypeEnum, int wireIndex) {
-        BitSet inheritPrevSideWires = this.inheritPrevSideWires.get(tileTypeEnum);
-        return inheritPrevSideWires != null && inheritPrevSideWires.get(wireIndex);
+        return isWireIn(tileTypeEnum, wireIndex, info -> info.inheritPrevSideWires);
     }
 
     /**
@@ -1318,11 +1386,12 @@ public class RouteNodeGraph {
     }
 
     /**
-     * Places a (base) node on the east side (half) of an INT tile (see {@link #eastSideWires}).
+     * Places a (base) node on the east side (half) of an INT tile (see {@link TileTypeInfo#eastSideWires}).
      * @param baseNode Base node in question.
      */
     private void setEastSide(Node baseNode) {
-        eastSideWires.computeIfAbsent(baseNode.getTile().getTileTypeEnum(), k -> new BitSet()).set(baseNode.getWireIndex());
+        TileTypeInfo info = getOrCreateTileTypeInfo(baseNode.getTile().getTileTypeEnum());
+        info.eastSideWires = TileTypeInfo.set(info.eastSideWires, baseNode.getWireIndex());
     }
 
     /**
@@ -1354,7 +1423,8 @@ public class RouteNodeGraph {
             }
             return RouteNodeType.EXCLUSIVE_SINK;
         }
-        if (sinkRnode.getTile().getTileTypeEnum() == TileTypeEnum.INT && ultraScalesCtrlWires.get(sinkRnode.getWireIndex())) {
+        if (sinkRnode.getTile().getTileTypeEnum() == TileTypeEnum.INT &&
+                getTileTypeInfo(TileTypeEnum.INT).ctrlWires.get(sinkRnode.getWireIndex())) {
             return RouteNodeType.EXCLUSIVE_SINK_CTRL;
         }
         return RouteNodeType.EXCLUSIVE_SINK;
@@ -1591,8 +1661,7 @@ public class RouteNodeGraph {
             }
 
             if (ic == IntentCode.NODE_INTF_CNODE) {
-                BitSet ctrlOnlyWires = versalIntfCtrlOnlyWires.get(child.getTile().getTileTypeEnum());
-                if (ctrlOnlyWires != null && ctrlOnlyWires.get(child.getWireIndex())) {
+                if (isWireIn(child.getTile().getTileTypeEnum(), child.getWireIndex(), info -> info.intfCtrlOnlyWires)) {
                     // Likewise for CNODEs that only drive CTRL pins, unless already in the routing graph (as a
                     // LOCAL_RESERVED node uphill of a CTRL sink)
                     return childRnode == null;
@@ -2085,8 +2154,8 @@ public class RouteNodeGraph {
         }
         assert(PIP.getArbitraryPIP(head, tail).isRouteThru());
 
-        BitSet bs = ultraScalesMuxWiresToBlockWhenLutRoutethru.get(tail.getTile().getTileTypeEnum());
-        if (bs != null && bs.get(tail.getWireIndex())) {
+        if (isWireIn(tail.getTile().getTileTypeEnum(), tail.getWireIndex(),
+                info -> info.muxWiresToBlockWhenLutRoutethru)) {
             // Disallow * -> [A-H]MUX routethrus since Vivado does not support the LUT
             // being fractured to support more than one routethru net
             return false;

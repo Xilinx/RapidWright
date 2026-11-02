@@ -172,7 +172,8 @@ public class RouteNodeInfo {
         TileTypeEnum endTileType;
         if (baseIntentCode == IntentCode.NODE_CLE_CTRL) {
             // Versal CTRL_[LR]_B* pins (in CLE_BC_CORE or SLL tiles) end at the CLE core tile that they serve, which
-            // has the same X coordinate as the INT tile that it is beside (see RouteNodeGraph.eastSideWires)
+            // has the same X coordinate as the INT tile that it is beside (see
+            // RouteNodeGraph.TileTypeInfo.eastSideWires)
             assert(baseTileType == TileTypeEnum.CLE_BC_CORE || baseTileType == TileTypeEnum.SLL);
             endTileType = null;
         } else if (baseIntentCode == IntentCode.NODE_CLE_BNODE || baseIntentCode == IntentCode.NODE_CLE_CNODE ||
@@ -323,7 +324,7 @@ public class RouteNodeInfo {
                     BitSet[] bs2 = routingGraph.wireIndicesLeadingToSLL.get(node.getTile());
                     if (bs2 != null) {
                         if (bs2[0].get(node.getWireIndex())) {
-                            BitSet bs = routingGraph.ultraScalesLocalWires.get(tileTypeEnum);
+                            BitSet bs = routingGraph.getTileTypeInfo(tileTypeEnum).localWires;
                             assert(bs.get(node.getWireIndex()));
                             assert(routingGraph.isSidedLocalWire(tileTypeEnum, node.getWireIndex()));
 
@@ -336,7 +337,7 @@ public class RouteNodeInfo {
                     }
                 }
 
-                BitSet bs = routingGraph.ultraScalesLocalWires.get(tileTypeEnum);
+                BitSet bs = routingGraph.getTileTypeInfo(tileTypeEnum).localWires;
                 if (!bs.get(node.getWireIndex())) {
                     break;
                 }
@@ -364,7 +365,8 @@ public class RouteNodeInfo {
                         // as a route-thru from Vivado's high fanout net optimization
                         Utils.isClocking(tileTypeEnum)) {
                     // Not restricted to any specific side (see RouteNodeGraph.isAccessible()), though Versal ones
-                    // are placed on the side of the INT tile that their CLE core is beside (see RouteNodeGraph.eastSideWires)
+                    // are placed on the side of the INT tile that their CLE core is beside (see
+                    // RouteNodeGraph.TileTypeInfo.eastSideWires)
                     return RouteNodeType.LOCAL;
                 }
 
@@ -419,7 +421,8 @@ public class RouteNodeInfo {
             // Versal only
             case NODE_CLE_CTRL:     // CLE_BC_CORE*.CTRL_[LR]_B*
             case NODE_INTF_CTRL:    // INTF_[LR]OCF_[TB][LR]_TILE.INTF_IRI*
-                // On one side of an INT tile (see RouteNodeGraph.eastSideWires), though reachable from both sides.
+                // On one side of an INT tile (see RouteNodeGraph.TileTypeInfo.eastSideWires), though reachable from
+                // both sides.
                 // LOCAL rather than RouteNodeType.EXCLUSIVE_SINK_CTRL, since this is the type that the node is
                 // created with: only once it is found to be the single sink of a connection does RWRoute make it an
                 // exclusive sink (see RouteNodeGraph.getExclusiveSinkType()), as for all other sinks
