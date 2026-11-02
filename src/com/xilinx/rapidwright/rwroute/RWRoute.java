@@ -1773,19 +1773,12 @@ public class RWRoute {
 
         /**
          * What SDQ lookahead (see getSdqLookaheadFloor()) needs of this connection, set by prepareSdqLookahead(): the
-         * scale of the bias cost (1 / (connections * double HPWL) of the net, or 0 if either is 0) and the net's
-         * centre; half the wirelength weight; the sink's half-tile X, Y and SLR (-1 if the connection does not cross
-         * SLRs); whether the sink is a Versal SLL input (see getDeltaHalfX()); and whether RWRoute.sdqLookaheadOrders
-         * applies to it
+         * sink's half-tile X, Y and SLR (-1 if the connection does not cross SLRs); and whether
+         * RWRoute.sdqLookaheadOrders applies to it
          */
-        protected float laBiasScale;
-        protected float laXCenter;
-        protected float laYCenter;
-        protected float laHalfWlWeight;
         protected int laSinkHalfX;
         protected int laSinkY;
         protected int laSinkSLR;
-        protected boolean laSinkSllInput;
         protected boolean laOrdered;
 
         protected ConnectionState() {
@@ -2550,27 +2543,21 @@ public class RWRoute {
 
     /**
      * Sets up SDQ lookahead (see getSdqLookaheadFloor()) for a connection about to be routed, once its weights are
-     * set: what its floors need of it (see ConnectionState.laBiasScale and those after it).
+     * set: what its floors need of it (see ConnectionState.laSinkHalfX and those after it).
      * @param state State from the connection that is about to be routed.
      */
     private void prepareSdqLookahead(ConnectionState state) {
         final Connection connection = state.connection;
-        final NetWrapper net = connection.getNetWrapper();
         final RouteNode sinkRnode = connection.getSinkRnode();
-        final int connections = net.getConnections().size();
-        state.laBiasScale = (net.getDoubleHpwl() > 0 && connections > 0) ? 1f / connections / net.getDoubleHpwl() : 0;
-        state.laXCenter = net.getXCenter();
-        state.laYCenter = net.getYCenter();
-        state.laHalfWlWeight = state.rnodeWLWeight * 0.5f;
         state.laSinkHalfX = sinkRnode.getEndHalfTileXCoordinate();
         state.laSinkY = sinkRnode.getBeginTileYCoordinate();
         state.laSinkSLR = connection.isCrossSLR() ? sinkRnode.getSLRIndex(routingGraph) : -1;
-        state.laSinkSllInput = sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK_SLL_INPUT;
         // The order of sdqLookaheadOrders holds only for the weights that it was built for (criticality 0, the
         // connection weight being 1), and for a distance that is symmetric (not to a Versal SLL input sink); and not
-        // where getSdqLookaheadChildBound() would divide by zero for the bias cost
-        state.laOrdered = sdqLookaheadOrders != null && state.rnodeCostWeight == 1 && !state.laSinkSllInput &&
-                state.laBiasScale > 0;
+        // where getSdqLookaheadChildBound() would divide by zero for the bias cost (see getBiasCost())
+        state.laOrdered = sdqLookaheadOrders != null && state.rnodeCostWeight == 1 &&
+                sinkRnode.getType() != RouteNodeType.EXCLUSIVE_SINK_SLL_INPUT &&
+                connection.getNetWrapper().getDoubleHpwl() > 0;
     }
 
     /**
@@ -2805,13 +2792,8 @@ public class RWRoute {
     /**
      * Gets the floor of a child wire of an SDQ node that the net does not use (so that the net cannot use the child
      * wire through it, and its sharing factor is 1): the least that the lower bound that evaluateCostAndPush() gives
-     * it can be, whether or not it exists yet as an rnode, from its entry in RouteNodeGraph.sdqLookahead alone. That
-     * is the SDQ node's path cost plus the child wire's node cost (at least its base cost, its historical and present
-     * congestion costs being at least 1 when uncongested, plus the bias cost where it ends, no more than half of
-     * that), its wirelength cost and, if timing-driven, its delay cost (taken as at least 0); plus the estimate from
-     * where it ends; plus finishCost (see getSdqLookaheadChildFinishCost()) and DEPTH_FIRST_BIAS. A target child wire
-     * is priced as any other. When not timing-driven, it is computed by getSdqLookaheadChildBound(), whose arithmetic
-     * follows evaluateCostAndPush()'s.
+     * it can be, whether or not it exists yet as an rnode, from its entry in RouteNodeGraph.sdqLookahead alone (see
+     * getSdqLookaheadChildBound()). A target child wire is priced as any other.
      * @param state State from the connection that is being routed.
      * @param entry The SDQ node's entry in RouteNodeGraph.sdqLookahead.
      * @param i Index in that entry of the child wire's fields.
@@ -2835,35 +2817,21 @@ public class RWRoute {
         if (isSdqLookaheadChildOutside(state, endHalfX, endY)) {
             return Float.POSITIVE_INFINITY;
         }
-        final int halfTileWirelength = entry[i + RouteNodeGraph.SDQ_LOOKAHEAD_WIRELENGTH];
-        final float childBaseCost = Float.intBitsToFloat(entry[i + RouteNodeGraph.SDQ_LOOKAHEAD_BASE_COST]);
-        if (!config.isTimingDriven()) {
-            return getSdqLookaheadChildBound(state, upstreamPathCost, endHalfX, endY, halfTileWirelength,
-                    childBaseCost);
-        }
-        final int endX = endHalfX >> 1;
-        final int sinkHalfX = state.laSinkHalfX;
-        // As getDeltaHalfX()
-        final int deltaHalfX = !state.laSinkSllInput ? Math.abs(endHalfX - sinkHalfX) :
-                (endHalfX <= sinkHalfX) ? sinkHalfX - endHalfX : Math.max(0, endHalfX - sinkHalfX - 1);
-        final int deltaY = Math.abs(endY - state.laSinkY);
-        final float biasCost = childBaseCost * state.laBiasScale *
-                (Math.abs(endX - state.laXCenter) + Math.abs(endY - state.laYCenter));
-        float floor = upstreamPathCost +
-                state.rnodeCostWeight * (childBaseCost + Math.min(biasCost, childBaseCost / 2)) +
-                (state.laHalfWlWeight * halfTileWirelength + state.estWlWeight * (0.5f * deltaHalfX + deltaY));
-        // As addEstimate()
-        floor += state.estDlyWeight * (deltaHalfX * 0.14f + deltaY * 0.13f);
-        floor += getSdqLookaheadChildFinishCost(state);
-        floor += state.rnodeCostWeight * RouteNode.DEPTH_FIRST_BIAS;
-        return floor;
+        return getSdqLookaheadChildBound(state, upstreamPathCost, endHalfX, endY,
+                entry[i + RouteNodeGraph.SDQ_LOOKAHEAD_WIRELENGTH],
+                Float.intBitsToFloat(entry[i + RouteNodeGraph.SDQ_LOOKAHEAD_BASE_COST]));
     }
 
     /**
-     * Gets the lower bound that evaluateCostAndPush() would give a child wire of an SDQ node that is uncongested and
-     * not used by the net (sharing factor 1), when not timing-driven, from its entry in RouteNodeGraph.sdqLookahead,
-     * with the same arithmetic, so that the floor of an SDQ node is no more than the lower bound of such a child wire
-     * (rounding included).
+     * Gets the least lower bound that evaluateCostAndPush() can give a child wire of an SDQ node that is not used by
+     * the net (sharing factor 1), from its entry in RouteNodeGraph.sdqLookahead, with the same arithmetic, so that the
+     * floor of an SDQ node is no more than the lower bound of such a child wire (rounding included). That is the SDQ
+     * node's path cost plus the child wire's node cost as getNodeCost() gives it (its historical and present
+     * congestion costs, and the multiplier of an overused node, taken at their least, 1), its wirelength cost and, if
+     * timing-driven, its delay cost, taken as 0 (it is at least 0, and each term is added to the path cost in turn,
+     * so that leaving one out cannot raise the sum, rounding included); plus the estimate from where it ends (see
+     * addEstimate(), which includes the delay estimate if timing-driven); plus finishCost (see
+     * getSdqLookaheadChildFinishCost()) and DEPTH_FIRST_BIAS. Used both when timing-driven and when not.
      * @param state State from the connection that is being routed.
      * @param upstreamPathCost The SDQ node's path cost.
      * @param endHalfX Half-tile X coordinate of where the child wire ends.
@@ -2874,19 +2842,17 @@ public class RWRoute {
      */
     private float getSdqLookaheadChildBound(ConnectionState state, float upstreamPathCost, int endHalfX, int endY,
                                             int halfTileWirelength, float baseCost) {
-        assert(!config.isTimingDriven());
         final Connection connection = state.connection;
         final float sharingFactor = 1;
         float partialPathCost = upstreamPathCost;
         // As getNodeCost() for a node with no users and historical congestion cost
         // RouteNode.initialHistoricalCongestionCost
-        final NetWrapper net = connection.getNetWrapper();
         final float presentCongestionCost = routingGraph.getPresentCongestionCost(0);
-        float distToCenter = Math.abs((endHalfX >> 1) - net.getXCenter()) + Math.abs(endY - net.getYCenter());
-        float biasCost = baseCost / net.getConnections().size() * distToCenter / net.getDoubleHpwl();
+        float biasCost = getBiasCost(connection.getNetWrapper(), baseCost, endHalfX >> 1, endY);
         float nodeCost = baseCost * RouteNode.initialHistoricalCongestionCost * presentCongestionCost / sharingFactor;
         partialPathCost += state.rnodeCostWeight * (nodeCost + Math.min(biasCost, nodeCost / 2));
         partialPathCost += state.rnodeWLWeight * 0.5f * halfTileWirelength / sharingFactor;
+        // (Here evaluateCostAndPush() adds the delay cost if timing-driven, taken as 0)
         final RouteNode sinkRnode = connection.getSinkRnode();
         final int deltaHalfX = getDeltaHalfX(sinkRnode, endHalfX, sinkRnode.getEndHalfTileXCoordinate());
         final int deltaY = Math.abs(endY - sinkRnode.getBeginTileYCoordinate());
@@ -3014,10 +2980,24 @@ public class RWRoute {
      * @return That cost, including the bias cost and the connection's cost weight.
      */
     private static float getUncongestedNodeCost(ConnectionState state, float baseCost, int x, int y) {
-        NetWrapper net = state.connection.getNetWrapper();
-        float distToCenter = Math.abs(x - net.getXCenter()) + Math.abs(y - net.getYCenter());
-        float biasCost = baseCost / net.getConnections().size() * distToCenter / net.getDoubleHpwl();
+        float biasCost = getBiasCost(state.connection.getNetWrapper(), baseCost, x, y);
         return state.rnodeCostWeight * (baseCost + Math.min(biasCost, baseCost / 2));
+    }
+
+    /**
+     * Gets the bias cost of a node (see getNodeCost()), which grows with its distance from the centre of the net: one
+     * computation for every caller, so that the lower bounds that use it (getUncongestedNodeCost(),
+     * getSdqLookaheadChildBound()) charge bit for bit the bias cost that getNodeCost() charges a node of the same base
+     * cost ending at the same tile.
+     * @param net The net being routed.
+     * @param baseCost Base cost of the node.
+     * @param x INT tile X coordinate of where the node ends.
+     * @param y INT tile Y coordinate of where the node ends.
+     * @return That bias cost, before it is capped at half of the node's congestion cost.
+     */
+    private static float getBiasCost(NetWrapper net, float baseCost, int x, int y) {
+        float distToCenter = Math.abs(x - net.getXCenter()) + Math.abs(y - net.getYCenter());
+        return baseCost / net.getConnections().size() * distToCenter / net.getDoubleHpwl();
     }
 
     /**
@@ -3119,10 +3099,9 @@ public class RWRoute {
 
         float baseCost = rnode.getBaseCost();
         NetWrapper net = connection.getNetWrapper();
-        float distToCenter = Math.abs(rnode.getEndTileXCoordinate() - net.getXCenter()) + Math.abs(rnode.getEndTileYCoordinate() - net.getYCenter());
         // CRoute paper states that the bias factor cannot be more than half of the wire cost
         // (it may exceed this here because we may not be using the minimum-sized bounding box)
-        float biasCost = baseCost / net.getConnections().size() * distToCenter / net.getDoubleHpwl();
+        float biasCost = getBiasCost(net, baseCost, rnode.getEndTileXCoordinate(), rnode.getEndTileYCoordinate());
         float nodeCost = baseCost * rnode.getHistoricalCongestionCost() * presentCongestionCost / sharingFactor;
         if (rnode.isOverUsed()) {
             // Relative sharing: on an overused node, the congestion cost is scaled by (1 + shareWeight * connections
