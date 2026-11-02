@@ -718,7 +718,11 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
         if (otherUsersConnectionCounts == null) {
             return 0;
         }
-        return otherUsersConnectionCounts.getOrDefault(user, 0);
+        // Not getOrDefault(user, 0), whose boxing of the default (Integer.valueOf(0)), inlined late by C2, leaves this
+        // line's debug info on much of the code of the callers that it is inlined into, so that profilers attribute
+        // their samples here
+        Integer count = otherUsersConnectionCounts.get(user);
+        return (count != null) ? count : 0;
     }
 
     /**
