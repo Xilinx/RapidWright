@@ -1695,14 +1695,16 @@ public class TimingModel {
     /**
      * Gets the BEL pins that a placed cell's outputs leave its BEL from: those its output ports are
      * mapped to, or, for a routethru cell (which has no EDIFCellInst, e.g. a flip-flop that the
-     * output of a CARRY8 passes through onto its Q site pin), every output pin of its BEL.
+     * output of a CARRY8 passes through onto its Q site pin), the output pins of its BEL that it is
+     * mapped to.
      * @param c Placed cell in question.
      * @return Those BEL pins.
      */
     private static List<BELPin> getOutputBELPins(Cell c) {
         List<BELPin> pins = new ArrayList<>();
         if (c.getEDIFCellInst() == null) {
-            for (BELPin p : c.getBEL().getPins()) {
+            for (String physicalPinName : c.getPinMappingsP2L().keySet()) {
+                BELPin p = c.getBEL().getPin(physicalPinName);
                 if (p.isOutput()) {
                     pins.add(p);
                 }
