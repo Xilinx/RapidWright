@@ -778,6 +778,14 @@ public class ParallelismTools {
      * @return The number of items in each chunk (the last may have fewer), at least minChunkSize, and at least 1.
      */
     public static int chunkSize(int size, int minChunkSize) {
+        return (int) chunkSize((long) size, minChunkSize);
+    }
+
+    /**
+     * As {@link #chunkSize(int, int)}, for a number of items that may not fit in an int (such as the indices between
+     * two ints).
+     */
+    private static long chunkSize(long size, int minChunkSize) {
         return Math.max(Math.max(1, minChunkSize), getParallel() ? size / (4 * maxParallelism()) : size);
     }
 
@@ -806,13 +814,15 @@ public class ParallelismTools {
      *         (inclusive) to to (exclusive); none if end is not after start.
      */
     public static Stream<int[]> chunkRanges(int start, int end, int minChunkSize) {
-        // When parallel processing is disabled, chunkSize() is at least size, so there is a single chunk, if any
-        final int size = end - start;
-        final int chunkSize = chunkSize(size, minChunkSize);
-        // Without adding chunkSize to an index, which could overflow if minChunkSize is large
-        final int chunks = size > 0 ? (size - 1) / chunkSize + 1 : 0;
-        return IntStream.range(0, chunks).mapToObj(i -> new int[]{start + i * chunkSize,
-                (int) Math.min(start + (long) (i + 1) * chunkSize, end)});
+        // When parallel processing is disabled, chunkSize() is at least size, so there is a single chunk, if any. As
+        // longs, as the indices between two ints may be more than an int can count, and adding chunkSize to an index
+        // could overflow if minChunkSize is large
+        final long size = (long) end - start;
+        final long chunkSize = chunkSize(size, minChunkSize);
+        // At most about four per thread (or one), so it fits in an int
+        final int chunks = size > 0 ? (int) ((size - 1) / chunkSize + 1) : 0;
+        return IntStream.range(0, chunks).mapToObj(i -> new int[]{(int) (start + i * chunkSize),
+                (int) Math.min(start + (i + 1) * chunkSize, end)});
     }
 
     /**

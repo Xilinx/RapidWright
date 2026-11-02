@@ -46,6 +46,8 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.function.Executable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 // A hang (e.g. a task that is never run) fails the test rather than stalling the build
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
@@ -399,6 +401,31 @@ public class TestParallelismTools {
             Assertions.assertEquals(1, single.size());
             Assertions.assertArrayEquals(new int[]{5, 15}, single.get(0));
             Assertions.assertEquals(0, ParallelismTools.chunkRanges(5, 5, 25).count());
+        } finally {
+            ParallelismTools.setParallel(wasParallel);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testChunkRangesBeyondIntRange(boolean parallel) {
+        boolean wasParallel = ParallelismTools.getParallel();
+        try {
+            ParallelismTools.setParallel(parallel);
+            // More indices than an int can count: every index once, in order, without overflowing
+            List<int[]> chunks = ParallelismTools.chunkRanges(-1, Integer.MAX_VALUE).collect(Collectors.toList());
+            Assertions.assertFalse(chunks.isEmpty());
+            long next = -1;
+            for (int[] chunk : chunks) {
+                Assertions.assertEquals(next, chunk[0]);
+                Assertions.assertTrue(chunk[1] > chunk[0]);
+                next = chunk[1];
+            }
+            Assertions.assertEquals(Integer.MAX_VALUE, next);
+
+            // A reversed range whose difference wraps around as an int: no chunks
+            Assertions.assertEquals(0, ParallelismTools.chunkRanges(Integer.MAX_VALUE, -2).count());
+            Assertions.assertEquals(0, ParallelismTools.chunkRanges(Integer.MAX_VALUE, Integer.MIN_VALUE).count());
         } finally {
             ParallelismTools.setParallel(wasParallel);
         }
