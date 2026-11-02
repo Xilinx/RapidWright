@@ -2310,7 +2310,8 @@ public class RWRoute {
         childRnode.setPrev(rnode);
 
         float newPartialPathCost = rnode.getUpstreamPathCost();
-        newPartialPathCost += state.rnodeCostWeight * getNodeCost(childRnode, connection, countSourceUses, sharingFactor);
+        newPartialPathCost += state.rnodeCostWeight * getNodeCost(childRnode, connection, countSourceUses, sharingFactor,
+                state.shareWeight);
         newPartialPathCost += state.rnodeWLWeight * 0.5f * childRnode.getHalfTileWirelength() / sharingFactor;
         if (config.isTimingDriven()) {
             newPartialPathCost += state.dlyWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode, longParent));
@@ -3100,9 +3101,11 @@ public class RWRoute {
      * @param countSameSourceUsers The number of connections from the same net that are using rnode.
      * Note: a net is represented by its source {@link SitePinInst} Object.
      * @param sharingFactor The sharing factor.
+     * @param shareWeight The connection's share weight (see ConnectionState.shareWeight).
      * @return The sum of the congestion cost and the bias cost of rnode.
      */
-    private float getNodeCost(RouteNode rnode, Connection connection, int countSameSourceUsers, float sharingFactor) {
+    private float getNodeCost(RouteNode rnode, Connection connection, int countSameSourceUsers, float sharingFactor,
+                              float shareWeight) {
         boolean hasSameSourceUsers = (countSameSourceUsers != 0);
         float presentCongestionCost;
 
@@ -3121,6 +3124,16 @@ public class RWRoute {
         // (it may exceed this here because we may not be using the minimum-sized bounding box)
         float biasCost = baseCost / net.getConnections().size() * distToCenter / net.getDoubleHpwl();
         float nodeCost = baseCost * rnode.getHistoricalCongestionCost() * presentCongestionCost / sharingFactor;
+        if (rnode.isOverUsed()) {
+            // Relative sharing: on an overused node, the congestion cost is scaled by (1 + shareWeight * connections
+            // of other nets on it) / sharingFactor rather than only divided by the sharing factor, so that two nets
+            // that each route many connections through it no longer each see it as that many times cheaper than any
+            // alternative (and wait for each other to leave), and a net with few connections on it pays for the many
+            // of the others. The multiplier is at least 1, so the cost is never below that without it (which lower
+            // bounds rely on). The bias cost below is still capped at half of this cost; the wirelength cost (in the
+            // callers) is unchanged.
+            nodeCost *= 1 + shareWeight * rnode.countConnectionsOfOtherUsers(net, countSameSourceUsers);
+        }
         return nodeCost + Math.min(biasCost, nodeCost / 2);
     }
 
@@ -3478,7 +3491,7 @@ public class RWRoute {
         final Connection connection = state.connection;
         final int countSourceUses = rnode.countConnectionsOfUser(connection.getNetWrapper());
         final float sharingFactor = 1 + state.shareWeight * getCountSharingUses(state, rnode, countSourceUses);
-        float nodeCost = getNodeCost(rnode, connection, countSourceUses, sharingFactor);
+        float nodeCost = getNodeCost(rnode, connection, countSourceUses, sharingFactor, state.shareWeight);
         if (rnode.getType() == RouteNodeType.SUPER_LONG_LINE) {
             // getNodeCost() adds a bias cost of at most half of the rest
             nodeCost /= 1.5f;

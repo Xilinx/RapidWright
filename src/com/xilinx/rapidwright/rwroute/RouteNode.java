@@ -726,6 +726,23 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     }
 
     /**
+     * Counts the connections of all users other than one that are using this rnode.
+     * @param user The user to leave out.
+     * @param countOfUser Its number of connections using this rnode (see {@link #countConnectionsOfUser(NetWrapper)}).
+     * @return The sum of the other users' connection counts.
+     */
+    public int countConnectionsOfOtherUsers(NetWrapper user, int countOfUser) {
+        assert(countOfUser == countConnectionsOfUser(user));
+        int total = (firstUser != null) ? firstUserCount : 0;
+        if (otherUsersConnectionCounts != null) {
+            for (int count : otherUsersConnectionCounts.values()) {
+                total += count;
+            }
+        }
+        return total - countOfUser;
+    }
+
+    /**
      * Gets the number of users.
      * @return The number of users.
      */
