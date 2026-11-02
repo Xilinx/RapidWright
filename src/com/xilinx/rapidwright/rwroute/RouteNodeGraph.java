@@ -1323,10 +1323,7 @@ public class RouteNodeGraph {
         // SLL inputs whose SLL crosses SLRs are only found within one SLL length of the SLR boundary that they
         // cross, and so in the half of their SLR nearer to it (see isNorthboundSLLRow()); as are the nodes in INT tiles
         // that lead to them, which are in the same row
-        int y = tile.getTileYCoordinate();
-        int slr = intYToSLRIndex[y];
-        if (isNorthboundSLLRow(y) ? (slr == slrLastIntY.length - 1 || y <= slrLastIntY[slr] - SUPER_LONG_LINE_LENGTH_IN_TILES)
-                                  : (slr == 0 || y >= slrFirstIntY[slr] + SUPER_LONG_LINE_LENGTH_IN_TILES)) {
+        if (!isSendingSLLRow(tile.getTileYCoordinate())) {
             return NO_WIRE_INDICES_LEADING_TO_SLL;
         }
         if (tileTypeEnum == TileTypeEnum.SLL) {
@@ -1553,6 +1550,47 @@ public class RouteNodeGraph {
     }
 
     /**
+     * Checks whether super long lines crossing into another SLR can be taken from the given row: whether it is within
+     * one super long line's length of the boundary of its SLR that it is nearer to (see isNorthboundSLLRow()), other
+     * than the top and bottom edges of the device. (On UltraScale/UltraScale+, the Laguna tiles whose super long lines
+     * cross SLRs are in the clock region next to that boundary, as tall as a super long line is long; see
+     * populateLagunaLookups().)
+     * @param y INT tile Y coordinate.
+     * @return True if so.
+     */
+    public boolean isSendingSLLRow(int y) {
+        int slr = intYToSLRIndex[y];
+        return isNorthboundSLLRow(y) ? (slr < slrLastIntY.length - 1 && y > slrLastIntY[slr] - SUPER_LONG_LINE_LENGTH_IN_TILES)
+                                     : (slr > 0 && y < slrFirstIntY[slr] + SUPER_LONG_LINE_LENGTH_IN_TILES);
+    }
+
+    /**
+     * Gets the row from which the super long line that a node on the sending side of a chain leads to is taken (that
+     * of the IMUX and Laguna tile of its chain on UltraScale/UltraScale+, or of its SLL tile on Versal):
+     * <ul>
+     * <li>for an UltraScale/UltraScale+ SDQ node or single (NON_LOCAL_LEADING_TO_SLL), the row of its base tile, by
+     * which it is keyed (see populateLagunaLookups()), even if it is a feedthrough that ends in the next row (e.g.
+     * WW1_E_7_FT0 on UltraScale+, SDND[NS]W_E_15_FTN on UltraScale);</li>
+     * <li>otherwise, the row where the node ends (that of the IMUXes driven by an UltraScale+ feedthrough INODE from
+     * the next row), unless super long lines crossing SLRs cannot be taken from there (see isSendingSLLRow()), when it
+     * is the row of its base tile: an UltraScale feedthrough INODE (INODE_[12]_[EW]_*_FT[NS], which drives the IMUXes
+     * of both its rows) in the row farthest from the SLR boundary from which they can be taken (e.g.
+     * INT_X45Y359/INODE_2_W_28_FTN and INT_X37Y240/INODE_2_W_1_FTS on xcku115).</li>
+     * </ul>
+     * @param rnode A node of type LOCAL_LEADING_TO_SLL or NON_LOCAL_LEADING_TO_SLL.
+     * @return INT tile Y coordinate of that row.
+     */
+    public int getSendingSLLRow(RouteNode rnode) {
+        assert(rnode.getType().isLeadingToSLL());
+        int y = rnode.getEndTileYCoordinate();
+        if (rnode.getType() == RouteNodeType.NON_LOCAL_LEADING_TO_SLL || !isSendingSLLRow(y)) {
+            y = rnode.getBeginTileYCoordinate();
+        }
+        assert(isSendingSLLRow(y));
+        return y;
+    }
+
+    /**
      * Gets the X coordinate of the next (at or above the given one) INT tile column from which super long lines can
      * cross into another SLR (see {@link #nextCrossingHalfColumn}).
      * @param x INT tile X coordinate.
@@ -1649,11 +1687,18 @@ public class RouteNodeGraph {
                                     continue;
                                 }
                                 assert(inode.getIntentCode() == IntentCode.NODE_LOCAL);
-                                bs[0].set(inode.getWireIndex());
 
-                                if (inode.getTile() != imux.getTile()) {
+                                if (inode.getTile() != imuxTile) {
+                                    // A feedthrough INODE from the INT tile above or below (INODE_[EW]_*_FT[01] on
+                                    // UltraScale+, INODE_[12]_[EW]_*_FT[NS] on UltraScale): keyed by its own (base)
+                                    // tile, by which RouteNodeInfo.getType() looks it up. (In the IMUX's tile, its wire
+                                    // index is the feedthrough of the same name from there into the row after it, e.g.
+                                    // INT_X5Y359/INODE_W_54_FT0, which ends in INT_X5Y360, on xcvu9p)
+                                    wireIndicesLeadingToSLL.computeIfAbsent(inode.getTile(), k -> new BitSet[]{new BitSet(), new BitSet()})[0]
+                                            .set(inode.getWireIndex());
                                     continue;
                                 }
+                                bs[0].set(inode.getWireIndex());
                                 assert(!enableComprehensiveAssertions || inodePattern.matcher(inode.getWireName()).matches());
 
                                 for (Node intInt : inode.getAllUphillNodes()) {

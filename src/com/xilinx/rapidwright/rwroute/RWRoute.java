@@ -2359,6 +2359,8 @@ public class RWRoute {
         // half-tile X coordinate of the column from which that is taken (else -1)
         int deltaSLR = 0;
         int sendingHalfX = -1;
+        // If so, the row from which that super long line is taken (see RouteNodeGraph.getSendingSLLRow())
+        int sendingY = -1;
         if (connection.isCrossSLR()) {
             deltaSLR = Math.abs(sinkRnode.getSLRIndex(routingGraph) - childRnode.getSLRIndex(routingGraph));
             // A node leading to a super long line in the other direction is only accessible as a LOCAL node near the
@@ -2389,6 +2391,7 @@ public class RWRoute {
                     assert(!routingGraph.isVersal || childRnode.getIntentCode() != IntentCode.NODE_CLE_BNODE ||
                             (sendingHalfX == 2 * RouteNodeInfo.getWestIntTileXCoordinate(childRnode.getTile()) + 1 &&
                              childY == childRnode.getTile().getTileYCoordinate()));
+                    sendingY = routingGraph.getSendingSLLRow(childRnode);
                 }
                 // The rows that wires other than super long lines must still cover: those on this side of the super
                 // long lines, and from where the last lands to the sink (when the sink is less than their length away
@@ -2521,9 +2524,11 @@ public class RWRoute {
             if (routingGraph.isVersal) {
                 landHalfX = Math.max(landHalfX, Math.min(landHalfX + 1, sinkHalfX));
             }
-            newTotalPathCost = newPartialPathCost + getSendingChainCost(state, childRnode, sendingHalfX) / sharingFactor;
+            // The rows from where it lands to the sink, as for deltaY above but from the row that it is taken from
+            final int landDeltaY = Math.abs(Math.abs(sendingY - sinkY) - deltaSLR * sllLength);
+            newTotalPathCost = newPartialPathCost + getSendingChainCost(state, childRnode, sendingHalfX, sendingY) / sharingFactor;
             newTotalPathCost = addEstimate(state, newTotalPathCost, getDeltaHalfX(sinkRnode, landHalfX, sinkHalfX),
-                    deltaY + (deltaSLR - 1) * sllLength, sharingFactor) + finishCost;
+                    landDeltaY + (deltaSLR - 1) * sllLength, sharingFactor) + finishCost;
         }
         // A discounted node's lower bound is lower than if it were charged as not being on a chain (at the span
         // estimate), which it must be for the discount to be one
@@ -3035,14 +3040,14 @@ public class RWRoute {
      * @param state State from the connection that is being routed.
      * @param childRnode The node entering the chain.
      * @param sendingHalfX Half-tile X coordinate of the column from which the super long line is taken.
+     * @param y Y coordinate of the row from which it is taken (see RouteNodeGraph.getSendingSLLRow()).
      * @return That cost.
      */
-    private float getSendingChainCost(ConnectionState state, RouteNode childRnode, int sendingHalfX) {
+    private float getSendingChainCost(ConnectionState state, RouteNode childRnode, int sendingHalfX, int y) {
         final float tieBreak = state.rnodeCostWeight * RouteNode.SLL_CHAIN_TIE_BREAK;
         final int singles = (childRnode.getType() == RouteNodeType.NON_LOCAL_LEADING_TO_SLL &&
                 childRnode.getIntentCode() != IntentCode.NODE_SINGLE) ? 1 : 0;
         final int x = sendingHalfX >> 1;
-        final int y = childRnode.getEndTileYCoordinate();
         final int sllLength = routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES;
         // The super long line lands in the same column, a whole length to the north or south, in the next SLR
         final boolean north = routingGraph.isNorthboundSLLRow(y);
