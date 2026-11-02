@@ -1729,6 +1729,12 @@ public class RWRoute {
          * (d), which replaces both sinkINodeCost and the excess there
          */
         protected float sinkHalfTileCost;
+        /**
+         * Cheapest (by its exact push cost) of the drivers of the sinks that setFinishCosts() has so far left
+         * unmarked to be passed through (see markSinkDriver()), and that cost; only meaningful within setFinishCosts()
+         */
+        protected RouteNode minUnmarkedDriver;
+        protected float minUnmarkedDriverCost;
 
         protected ConnectionState() {
             this.queue = new PriorityQueue<>();
@@ -2755,6 +2761,10 @@ public class RWRoute {
      * left unmarked, so that the search can pass through it (e.g. onto a bounce, then another INODE and a sink that is
      * free) rather than end there; it is still a driver for the cheapest driver cost, and the sinks that it pushes end
      * the search when popped.
+     * Where the routing graph gives a sink's drivers from its tables (see RouteNodeGraph.getSinkDriverWires(), for
+     * most sinks), they are found there (see markSinkDriversFromTable()), with no lookup in the device other than to
+     * create a driver that has no rnode yet; otherwise from the device (see markSinkDriversFromDevice()). Either way,
+     * the same drivers are considered in the same order (see markSinkDriver()).
      * @param state State from the connection that is being routed.
      */
     private void setFinishCosts(ConnectionState state) {
@@ -2766,57 +2776,23 @@ public class RWRoute {
         final int firstDriver = targets.size();
         // The connection's cheapest sink is only needed with alternate sinks (see getDriverFinishCost())
         float minSinkCost = hasAltSinks ? Float.MAX_VALUE : 0;
-        float minUnmarkedDriverCost = Float.MAX_VALUE;
-        RouteNode minUnmarkedDriver = null;
+        state.minUnmarkedDriverCost = Float.MAX_VALUE;
+        state.minUnmarkedDriver = null;
         boolean markable = true;
         for (int i = -1; i < altSinkRnodes.size() && markable; i++) {
             final RouteNode target = (i < 0) ? sinkRnode : altSinkRnodes.get(i);
             if (hasAltSinks) {
                 minSinkCost = Math.min(minSinkCost, getSinkFinishCost(state, target));
             }
-            for (Node uphill : target.getAllUphillNodes()) {
-                if (uphill.isTiedToVcc()) {
-                    // Driven by VCC only, so never reached from this connection's source
-                    continue;
-                }
-                if (routingGraph.isVersal && uphill.getIntentCode() == IntentCode.NODE_SLL_OUTPUT &&
-                        target.getIntentCode() == IntentCode.NODE_SLL_INPUT) {
-                    // The arc NODE_SLL_OUTPUT -> NODE_SLL_INPUT is excluded from the routing graph (see
-                    // RouteNodeGraph.isExcluded()), so never taken
-                    continue;
-                }
-                RouteNode driver = routingGraph.getNode(uphill);
-                if (driver == null) {
-                    if (!isMarkableDriverIntentCode(uphill.getIntentCode()) ||
-                            RouteNodeGraph.isExcludedTile(uphill) || !routingGraph.isAllowedTile(uphill)) {
-                        markable = false;
-                        break;
-                    }
-                    driver = routingGraph.getOrCreate(uphill);
-                }
-                if (driver.isTarget()) {
-                    // Already marked (driving more than one of the sinks), or a sink itself (never pushed as a driver)
-                    continue;
-                }
-                if (!isPushableSinkDriver(driver, target, connection)) {
-                    continue;
-                }
-                if (!isMarkableDriver(driver)) {
-                    markable = false;
-                    break;
-                }
-                if (hasAltSinks && !hasFreeSinkChild(driver, connection)) {
-                    // Left unmarked, so that it can be passed through
-                    float cost = getPushCost(state, driver);
-                    if (cost < minUnmarkedDriverCost) {
-                        minUnmarkedDriverCost = cost;
-                        minUnmarkedDriver = driver;
-                    }
-                    continue;
-                }
-                driver.markTarget(state);
+            final int[] driverWires = routingGraph.getSinkDriverWires(target);
+            if (driverWires != null) {
+                markSinkDriversFromTable(state, target, driverWires);
+            } else {
+                markable = markSinkDriversFromDevice(state, target);
             }
         }
+        final float minUnmarkedDriverCost = state.minUnmarkedDriverCost;
+        final RouteNode minUnmarkedDriver = state.minUnmarkedDriver;
         float minDriverCost = Float.MAX_VALUE;
         RouteNode minDriver = null;
         if (markable) {
@@ -2856,6 +2832,101 @@ public class RWRoute {
             state.drvExcess = 0;
             state.sinkHalfTileCost = state.sinkINodeCost;
         }
+    }
+
+    /**
+     * Considers (see markSinkDriver()) the drivers of one of a connection's sinks as given by the routing graph's
+     * tables (see RouteNodeGraph.getSinkDriverWires()): all INODEs, GNODEs, BNODEs or CNODEs, in tiles that are not
+     * excluded, in the order that Node.getAllUphillNodes() gives them, so the same drivers in the same order as
+     * markSinkDriversFromDevice() would consider (each of which may be marked), but found without asking the device;
+     * any that has no rnode yet is created, as there.
+     * @param state State from the connection that is being routed.
+     * @param target The sink.
+     * @param driverWires Base wire indices of its drivers.
+     */
+    private void markSinkDriversFromTable(ConnectionState state, RouteNode target, int[] driverWires) {
+        final Tile sinkTile = target.getTile();
+        final int[] driverRowOffsets = routingGraph.getSinkDriverRowOffsets(target);
+        for (int i = 0; i < driverWires.length; i++) {
+            final int rowOffset = (driverRowOffsets == null) ? 0 : driverRowOffsets[i];
+            final RouteNode driver = routingGraph.getOrCreateSinkDriver(sinkTile, rowOffset, driverWires[i]);
+            final boolean markable = markSinkDriver(state, driver, target, true);
+            assert(markable);
+        }
+    }
+
+    /**
+     * Considers (see markSinkDriver()) the drivers of one of a connection's sinks as found from the device: its
+     * uphill nodes, other than those tied to VCC and, for a Versal NODE_SLL_INPUT, its NODE_SLL_OUTPUTs (that arc
+     * being excluded from the routing graph). A driver that has no rnode yet is created if its intent code could be
+     * that of a driver that may be marked (see isMarkableDriverIntentCode()) and it is in a tile that is allowed.
+     * @param state State from the connection that is being routed.
+     * @param target The sink.
+     * @return False if a driver cannot be created, or is pushable but may not be marked, so that none may be marked.
+     */
+    private boolean markSinkDriversFromDevice(ConnectionState state, RouteNode target) {
+        for (Node uphill : target.getAllUphillNodes()) {
+            if (uphill.isTiedToVcc()) {
+                // Driven by VCC only, so never reached from this connection's source
+                continue;
+            }
+            if (routingGraph.isVersal && uphill.getIntentCode() == IntentCode.NODE_SLL_OUTPUT &&
+                    target.getIntentCode() == IntentCode.NODE_SLL_INPUT) {
+                // The arc NODE_SLL_OUTPUT -> NODE_SLL_INPUT is excluded from the routing graph (see
+                // RouteNodeGraph.isExcluded()), so never taken
+                continue;
+            }
+            RouteNode driver = routingGraph.getNode(uphill);
+            if (driver == null) {
+                if (!isMarkableDriverIntentCode(uphill.getIntentCode()) ||
+                        RouteNodeGraph.isExcludedTile(uphill) || !routingGraph.isAllowedTile(uphill)) {
+                    return false;
+                }
+                driver = routingGraph.getOrCreate(uphill);
+            }
+            if (!markSinkDriver(state, driver, target, false)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Considers one driver of one of a connection's sinks for setFinishCosts(): one that is already a target, or that
+     * could not be pushed with the sink as its child (see isPushableSinkDriver()), is passed over; otherwise it is
+     * marked as a target, unless (on a connection with alternate sinks) all of its sinks would be overused by this
+     * net, in which case it is left unmarked so that it can be passed through, and counted towards
+     * {@link ConnectionState#minUnmarkedDriver}.
+     * @param state State from the connection that is being routed.
+     * @param driver The driver.
+     * @param target The sink.
+     * @param knownMarkable True if the driver is known to be one that may be marked (see isMarkableDriver()).
+     * @return False if the driver is pushable but may not be marked, so that no driver of the sinks may be marked.
+     */
+    private boolean markSinkDriver(ConnectionState state, RouteNode driver, RouteNode target, boolean knownMarkable) {
+        if (driver.isTarget()) {
+            // Already marked (driving more than one of the sinks), or a sink itself (never pushed as a driver)
+            return true;
+        }
+        final Connection connection = state.connection;
+        if (!isPushableSinkDriver(driver, target, connection)) {
+            return true;
+        }
+        assert(!knownMarkable || isMarkableDriver(driver));
+        if (!knownMarkable && !isMarkableDriver(driver)) {
+            return false;
+        }
+        if (connection.hasAltSinks() && !hasFreeSinkChild(driver, connection)) {
+            // Left unmarked, so that it can be passed through
+            float cost = getPushCost(state, driver);
+            if (cost < state.minUnmarkedDriverCost) {
+                state.minUnmarkedDriverCost = cost;
+                state.minUnmarkedDriver = driver;
+            }
+            return true;
+        }
+        driver.markTarget(state);
+        return true;
     }
 
     /**

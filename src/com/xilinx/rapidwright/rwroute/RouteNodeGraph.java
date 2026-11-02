@@ -78,6 +78,13 @@ public class RouteNodeGraph {
     private final AtomicInteger nodesMapSize;
 
     /**
+     * Number of columns of tiles in the device: the unique addresses (indices into {@link #nodesMap}) of two tiles in
+     * the same column differ by this times the number of rows between them (as checked by
+     * {@link #buildSinkDriverTables(Device)} for each sink driver in another tile)
+     */
+    private final int deviceColumns;
+
+    /**
      * A map of preserved nodes to their nets
      */
     private final AtomicReferenceArray<Net[]> preservedMap;
@@ -182,6 +189,57 @@ public class RouteNodeGraph {
 
         /** (UltraScale/UltraScale+ INT only, whose entry always has it) CTRL_* pins. */
         BitSet ctrlWires;
+
+        /**
+         * Sink wires (see {@link RouteNodeGraph#SINK_INTENT_CODES}) all of whose drivers are given by
+         * {@link #sinkDriverWires} (see {@link RouteNodeGraph#buildSinkDriverTables(Device)}): those whose drivers
+         * (direct uphill nodes, other than those tied to VCC and, for a Versal NODE_SLL_INPUT, its NODE_SLL_OUTPUTs,
+         * which RWRoute.setFinishCosts() ignores) are all INODEs, GNODEs, BNODEs or CNODEs, which it may mark.
+         */
+        BitSet markableSinkWires;
+
+        /**
+         * Indexed by sink wire (in {@link #markableSinkWires}, else null): the base wire indices of its drivers, in the
+         * order that Node.getAllUphillNodes() gives them (less repeats), so that RWRoute.setFinishCosts() can find
+         * their rnodes without asking the device.
+         */
+        int[][] sinkDriverWires;
+
+        /**
+         * Indexed by sink wire (in {@link #markableSinkWires}): how many device rows below (positive) or above
+         * (negative) the sink's tile, in the same column, the tile of each of its drivers is; null where they are all
+         * in the sink's tile. Holds only for a sink in one of {@link #cleanRows}.
+         */
+        int[][] sinkDriverRowOffsets;
+
+        /**
+         * Device rows in which every tile of this type has a tile of this type directly above and below it; null
+         * unless some sink wire of this type has a driver in another tile (UltraScale/UltraScale+ INT, whose
+         * feedthrough INODEs drive sinks in the INT tile above or below). Only in these rows do all sinks of a wire
+         * have the same drivers relative to their tile (as found for every sink of xcvu9p, xcku115, xcvu3p, xcku040,
+         * xcvu440 and xczu7ev): beside a row of another type (an RCLK row between clock regions, or INT_TERM rows at
+         * an SLR boundary or the edge of the device), a feedthrough driver is two rows away, or is replaced by one in
+         * the sink's own tile (as seen on xcvu9p and xcku115).
+         */
+        BitSet cleanRows;
+
+        /**
+         * Gets the drivers of a sink of this tile type, if given by {@link #sinkDriverWires}.
+         * @param sinkWire The sink's (base) wire index.
+         * @param sinkRow The device row of the sink's tile.
+         * @param otherTilesAllowed False if drivers in another tile may not be given (see
+         * {@link RouteNodeGraph#getSinkDriverWires(RouteNode)}).
+         * @return Base wire indices of its drivers, or null if they are not given.
+         */
+        int[] getSinkDriverWires(int sinkWire, int sinkRow, boolean otherTilesAllowed) {
+            if (!get(markableSinkWires, sinkWire)) {
+                return null;
+            }
+            if (sinkDriverRowOffsets[sinkWire] != null && (!otherTilesAllowed || !cleanRows.get(sinkRow))) {
+                return null;
+            }
+            return sinkDriverWires[sinkWire];
+        }
 
         /**
          * Sets a bit in a BitSet, creating it if null.
@@ -765,6 +823,265 @@ public class RouteNodeGraph {
         } else {
             allowedTiles = null;
         }
+
+        deviceColumns = device.getColumns();
+        buildSinkDriverTables(device);
+    }
+
+    /**
+     * Intent codes of the sinks whose drivers RWRoute.setFinishCosts() may mark (and so that the tables of
+     * {@link #buildSinkDriverTables(Device)} cover): those of the nodes that RouterHelper.projectInputPinToINTNode()
+     * gives as sinks, other than the few (e.g. UltraScale NODE_SINGLE wires) whose drivers are never all markable
+     */
+    private static final Set<IntentCode> SINK_INTENT_CODES = EnumSet.of(
+            IntentCode.NODE_PINFEED,    // UltraScale/UltraScale+ IMUX_* and CTRL_*
+            IntentCode.NODE_PINBOUNCE,  // BOUNCE_* and BYPASS_*
+            IntentCode.NODE_IMUX,       // Versal IMUX_B_*
+            IntentCode.NODE_CLE_CTRL,   // Versal CTRL_[LR]_B*
+            IntentCode.NODE_INTF_CTRL,  // Versal INTF_IRI*
+            IntentCode.NODE_SLL_INPUT); // Versal
+
+    /**
+     * Checks if a driver of a sink could be marked by RWRoute.setFinishCosts() once it has an rnode of the type that
+     * it is created with (see RWRoute.isMarkableDriver() and RouteNodeInfo.getType()): a Versal INODE, BNODE or CNODE,
+     * or an UltraScale/UltraScale+ NODE_LOCAL that is given a LOCAL_* type (an INODE or a GNODE), in a tile whose type
+     * is not excluded (as setFinishCosts() requires of a driver that it creates).
+     * @param driver The driver in question.
+     * @return True if so.
+     */
+    private boolean isMarkableSinkDriver(Node driver) {
+        if (isExcludedTile(driver)) {
+            return false;
+        }
+        switch (driver.getIntentCode()) {
+            case NODE_INODE:
+            case NODE_CLE_BNODE:
+            case NODE_CLE_CNODE:
+            case NODE_INTF_BNODE:
+            case NODE_INTF_CNODE:
+                return true;
+            case NODE_LOCAL:
+                return isWireIn(driver.getTile().getTileTypeEnum(), driver.getWireIndex(), info -> info.localWires);
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Builds the tables of sink drivers ({@link TileTypeInfo#markableSinkWires} and those that it refers to) of each
+     * tile type that a sink with markable drivers may be in (those not excluded, see {@link #allowedTileEnums}), so
+     * that RWRoute.setFinishCosts() need not ask the device for the drivers of each connection's sinks each time it
+     * is routed. All tiles of a type have the same drivers for each sink wire, relative to their tile (as found for
+     * every sink of xcvu9p, xcku115, xcvu3p, xcku040, xcvu440, xczu7ev, xcv80 and xcvc1902), except beside a row of
+     * another type where a driver is in another tile (see {@link TileTypeInfo#cleanRows}): so each type's tables are
+     * built from one of its tiles in a clean row (see {@link #findSinkDriverTableTile(Tile[][], TileTypeEnum)}), not
+     * from Device.getArbitraryTileOfType(), which gives a tile at the edge of the device (whose tables would differ
+     * from those of most of its tiles on xcvu9p and xcku115).
+     * A driver in another tile is allowed only in the same column, at a unique address that differs by a whole number
+     * of rows (see {@link #deviceColumns}); any other makes its sink wire unmarkable. A type with no markable sink
+     * wire is given no tables, and so no entry in {@link #tileTypeInfos} if it has none already.
+     * @param device The device.
+     */
+    private void buildSinkDriverTables(Device device) {
+        final Tile[][] tiles = device.getTiles();
+        for (TileTypeEnum tte : allowedTileEnums) {
+            if (device.getArbitraryTileOfType(tte) == null) {
+                continue;
+            }
+            final Tile tableTile = findSinkDriverTableTile(tiles, tte);
+            // Its entry, once it is found to have a markable sink wire
+            TileTypeInfo info = null;
+            final int wireCount = tableTile.getWireCount();
+            boolean anyRowOffsets = false;
+            for (int wireIndex = 0; wireIndex < wireCount; wireIndex++) {
+                final IntentCode sinkIntentCode = tableTile.getWireIntentCode(wireIndex);
+                if (!SINK_INTENT_CODES.contains(sinkIntentCode)) {
+                    continue;
+                }
+                final Node sink = Node.getNode(tableTile, wireIndex);
+                if (sink == null || sink.getTile() != tableTile || sink.getWireIndex() != wireIndex) {
+                    // Not a base wire
+                    continue;
+                }
+                assert(sink.getIntentCode() == sinkIntentCode);
+                final List<Node> uphills = sink.getAllUphillNodes();
+                int[] driverWires = new int[uphills.size()];
+                int[] driverRowOffsets = new int[uphills.size()];
+                int numDrivers = 0;
+                boolean markable = true;
+                for (Node uphill : uphills) {
+                    if (uphill.isTiedToVcc()) {
+                        continue;
+                    }
+                    if (isVersal && uphill.getIntentCode() == IntentCode.NODE_SLL_OUTPUT &&
+                            sinkIntentCode == IntentCode.NODE_SLL_INPUT) {
+                        // Excluded from the routing graph (see isExcluded())
+                        continue;
+                    }
+                    final Tile tile = uphill.getTile();
+                    final int rowOffset = tile.getRow() - tableTile.getRow();
+                    if (!isMarkableSinkDriver(uphill) || tile.getColumn() != tableTile.getColumn() ||
+                            tile.getUniqueAddress() - tableTile.getUniqueAddress() != rowOffset * deviceColumns) {
+                        markable = false;
+                        break;
+                    }
+                    final int driverWire = uphill.getWireIndex();
+                    boolean repeat = false;
+                    for (int i = 0; i < numDrivers && !repeat; i++) {
+                        repeat = driverWires[i] == driverWire && driverRowOffsets[i] == rowOffset;
+                    }
+                    if (repeat) {
+                        // setFinishCosts() changes nothing on meeting a driver again (it is then a target, not
+                        // pushable, or no cheaper than itself)
+                        continue;
+                    }
+                    driverWires[numDrivers] = driverWire;
+                    driverRowOffsets[numDrivers] = rowOffset;
+                    numDrivers++;
+                }
+                if (!markable || numDrivers == 0) {
+                    continue;
+                }
+                if (info == null) {
+                    info = getOrCreateTileTypeInfo(tte);
+                    assert(info.markableSinkWires == null);
+                    info.markableSinkWires = new BitSet();
+                    info.sinkDriverWires = new int[wireCount][];
+                    info.sinkDriverRowOffsets = new int[wireCount][];
+                }
+                info.markableSinkWires.set(wireIndex);
+                info.sinkDriverWires[wireIndex] = Arrays.copyOf(driverWires, numDrivers);
+                for (int i = 0; i < numDrivers; i++) {
+                    if (driverRowOffsets[i] != 0) {
+                        info.sinkDriverRowOffsets[wireIndex] = Arrays.copyOf(driverRowOffsets, numDrivers);
+                        anyRowOffsets = true;
+                        break;
+                    }
+                }
+            }
+            if (anyRowOffsets) {
+                info.cleanRows = new BitSet();
+                for (int row = 0; row < tiles.length; row++) {
+                    if (isCleanRow(tiles, row, tte)) {
+                        info.cleanRows.set(row);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Checks if a device row is clean for a tile type (see {@link TileTypeInfo#cleanRows}).
+     * @param tiles The device's tiles, by row and column.
+     * @param row The row.
+     * @param tte The tile type.
+     * @return True if the row has a tile of the type, and every one has a tile of the type directly above and below.
+     */
+    private static boolean isCleanRow(Tile[][] tiles, int row, TileTypeEnum tte) {
+        if (row == 0 || row == tiles.length - 1) {
+            return false;
+        }
+        boolean any = false;
+        for (int col = 0; col < tiles[row].length; col++) {
+            if (tiles[row][col].getTileTypeEnum() != tte) {
+                continue;
+            }
+            if (tiles[row - 1][col].getTileTypeEnum() != tte || tiles[row + 1][col].getTileTypeEnum() != tte) {
+                return false;
+            }
+            any = true;
+        }
+        return any;
+    }
+
+    /**
+     * Finds the tile that a tile type's sink driver tables are built from (see buildSinkDriverTables()): the first of
+     * the type in a clean row, scanning the rows from the middle of the device outwards (only as far as the first
+     * such row, usually the middle one), each from its first column; or, if no row is clean (on a type with no sink
+     * drivers in another tile, which then needs none), the first of the type in that order.
+     * @param tiles The device's tiles, by row and column.
+     * @param tte The tile type, which must be in the device.
+     * @return That tile.
+     */
+    private static Tile findSinkDriverTableTile(Tile[][] tiles, TileTypeEnum tte) {
+        final int rows = tiles.length;
+        Tile first = null;
+        for (int d = 0; d < rows; d++) {
+            for (int sign = 1; sign >= -1; sign -= 2) {
+                final int row = rows / 2 + sign * d;
+                if (row < 0 || row >= rows || (d == 0 && sign < 0)) {
+                    continue;
+                }
+                for (Tile tile : tiles[row]) {
+                    if (tile.getTileTypeEnum() != tte) {
+                        continue;
+                    }
+                    if (isCleanRow(tiles, row, tte)) {
+                        return tile;
+                    }
+                    if (first == null) {
+                        first = tile;
+                    }
+                    break;
+                }
+            }
+        }
+        assert(first != null);
+        return first;
+    }
+
+    /**
+     * Gets the drivers of a sink from the tables built by buildSinkDriverTables(), where they give them: if its
+     * drivers are all INODEs, GNODEs, BNODEs or CNODEs and, where any is in another tile, the sink is in a clean row
+     * (see {@link TileTypeInfo#cleanRows}) and there is no PBlock (as RWRoute.setFinishCosts() treats a driver outside
+     * the PBlock differently depending on whether it has an rnode yet).
+     * @param sinkRnode The sink.
+     * @return Base wire indices of its drivers (with their tiles given by
+     * {@link #getSinkDriverRowOffsets(RouteNode)}), in the order that Node.getAllUphillNodes() gives them (less
+     * repeats), or null if not given (as for every sink of a tile type with no entry in {@link #tileTypeInfos}).
+     */
+    public int[] getSinkDriverWires(RouteNode sinkRnode) {
+        final Tile tile = sinkRnode.getTile();
+        final TileTypeInfo info = getTileTypeInfo(tile.getTileTypeEnum());
+        if (info == null) {
+            return null;
+        }
+        return info.getSinkDriverWires(sinkRnode.getWireIndex(), tile.getRow(), allowedTiles == null);
+    }
+
+    /**
+     * Gets the offsets of the tiles of a sink's drivers (see {@link TileTypeInfo#sinkDriverRowOffsets}), for a sink
+     * whose drivers are given by {@link #getSinkDriverWires(RouteNode)}.
+     * @param sinkRnode The sink.
+     * @return Their offsets in device rows, or null if they are all in the sink's tile.
+     */
+    public int[] getSinkDriverRowOffsets(RouteNode sinkRnode) {
+        return getTileTypeInfo(sinkRnode.getTile().getTileTypeEnum()).sinkDriverRowOffsets[sinkRnode.getWireIndex()];
+    }
+
+    /**
+     * Gets the rnode of a sink's driver given by {@link #getSinkDriverWires(RouteNode)}, creating it if it has none
+     * yet, as RWRoute.setFinishCosts() does for a driver found from the device. Drivers are created only then, not
+     * with their sink: an rnode makes its node unavailable to the clock and static net routers (see
+     * RWRoute.getGlobalRoutingNodeStatus()), which run after the sinks are created and before signal routing.
+     * @param sinkTile The sink's tile.
+     * @param rowOffset The offset of the driver's tile, in device rows (see {@link TileTypeInfo#sinkDriverRowOffsets}).
+     * @param wireIndex The driver's base wire index.
+     * @return Its rnode.
+     */
+    public RouteNode getOrCreateSinkDriver(Tile sinkTile, int rowOffset, int wireIndex) {
+        final RouteNode[] rnodes = nodesMap[sinkTile.getUniqueAddress() + rowOffset * deviceColumns];
+        if (rnodes != null && wireIndex < rnodes.length) {
+            final RouteNode rnode = rnodes[wireIndex];
+            if (rnode != null) {
+                return rnode;
+            }
+        }
+        final Tile tile = (rowOffset == 0) ? sinkTile
+                : design.getDevice().getTile(sinkTile.getRow() + rowOffset, sinkTile.getColumn());
+        final Node node = Node.getNode(tile, wireIndex);
+        assert(node.getTile() == tile && node.getWireIndex() == wireIndex);
+        return getOrCreate(node);
     }
 
     /**
