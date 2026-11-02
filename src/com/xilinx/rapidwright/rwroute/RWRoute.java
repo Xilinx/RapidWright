@@ -164,6 +164,40 @@ public class RWRoute {
     private final AtomicLong nodesPushed;
     private final AtomicLong nodesPopped;
 
+    /**
+     * Relative margin by which the partial price of the next child wire in order (see
+     * getSdqLookaheadOrderedFloor()) must reach the floor so far for the search for a lower one to stop: that price
+     * is not computed with the same arithmetic as the exact one, and so may exceed it by rounding
+     */
+    private static final float SDQ_LOOKAHEAD_ORDER_MARGIN = 1e-5f;
+    /**
+     * Ints at the start of an array of {@link #sdqLookaheadOrders}: the number of child wires n; the least half-tile
+     * X offset of where they end, and the width of the range of those offsets; the same for their Y offsets (rows)
+     */
+    private static final int SDQ_LOOKAHEAD_ORDER_HEADER = 5;
+    /** Ints per child wire in an array of {@link #sdqLookaheadOrders} */
+    private static final int SDQ_LOOKAHEAD_ORDER_FIELDS = 4;
+    /** Most child wires of an SDQ node that can be ordered (4 bits each, in an int) in {@link #sdqLookaheadOrders} */
+    private static final int SDQ_LOOKAHEAD_ORDER_MAX_CHILDREN = 8;
+    /**
+     * For SDQ lookahead in non-timing-driven routing (else null; see getSdqLookaheadOrderedFloor()), so that the floor
+     * of an SDQ node need not price every child wire: indexed by twice the base wire index of an SDQ node in
+     * RouteNodeGraph.sdqLookahead plus its side bit (the low bit of its half-tile X), null if it has more than
+     * {@link #SDQ_LOOKAHEAD_ORDER_MAX_CHILDREN} child wires, else an array of:
+     * <ul>
+     * <li>the header (see {@link #SDQ_LOOKAHEAD_ORDER_HEADER});</li>
+     * <li>{@link #SDQ_LOOKAHEAD_ORDER_FIELDS} ints per child wire: the half-tile X and Y offsets of where it ends,
+     * from twice the SDQ node's tile X and its tile Y (its side, if inherited, being the SDQ node's); its partial
+     * price (its node cost, without the bias cost, and wirelength cost, as float bits) for a connection of
+     * criticality 0; and its index in the SDQ node's entry in RouteNodeGraph.sdqLookahead;</li>
+     * <li>per sink offset (in half tiles and rows from twice the SDQ node's tile X and its tile Y), row-major, over the
+     * range of the offsets of where the child wires end (beyond which their order does not change), the child wires in
+     * increasing order of their partial price plus the estimate (ties in listed order), 4 bits each, first in the low
+     * bits.</li>
+     * </ul>
+     */
+    private int[][] sdqLookaheadOrders;
+
     /** The maximum criticality constraint of connection */
     private static final float MAX_CRITICALITY = 0.99f;
     /** The minimum criticality of connections that should be re-routed, updated after each iteration */
@@ -809,6 +843,7 @@ public class RWRoute {
         wlWeight = config.getWirelengthWeight();
         oneMinusTimingWeight = 1 - timingWeight;
         oneMinusWlWeight = 1 - wlWeight;
+        buildSdqLookaheadOrders();
         printIterationHeader(config.isTimingDriven());
 
         // On Versal only, reserve all uphills of NODE_(CLE|INTF)_CTRL sinks since
@@ -1736,6 +1771,23 @@ public class RWRoute {
         protected RouteNode minUnmarkedDriver;
         protected float minUnmarkedDriverCost;
 
+        /**
+         * What SDQ lookahead (see getSdqLookaheadFloor()) needs of this connection, set by prepareSdqLookahead(): the
+         * scale of the bias cost (1 / (connections * double HPWL) of the net, or 0 if either is 0) and the net's
+         * centre; half the wirelength weight; the sink's half-tile X, Y and SLR (-1 if the connection does not cross
+         * SLRs); whether the sink is a Versal SLL input (see getDeltaHalfX()); and whether RWRoute.sdqLookaheadOrders
+         * applies to it
+         */
+        protected float laBiasScale;
+        protected float laXCenter;
+        protected float laYCenter;
+        protected float laHalfWlWeight;
+        protected int laSinkHalfX;
+        protected int laSinkY;
+        protected int laSinkSLR;
+        protected boolean laSinkSllInput;
+        protected boolean laOrdered;
+
         protected ConnectionState() {
             this.queue = new PriorityQueue<>();
             this.targets = new ArrayList<>();
@@ -1766,6 +1818,7 @@ public class RWRoute {
         PriorityQueue<RouteNode> queue = state.queue;
         assert(queue.isEmpty());
 
+        prepareSdqLookahead(state);
         prepareRouteConnection(state);
 
         RouteNode rnode;
@@ -2429,6 +2482,24 @@ public class RWRoute {
                     newTotalPathCost += state.rnodeCostWeight * RouteNode.LOCAL_BASE_COST;
                 }
             }
+            if (deltaSLR == 0 && countSourceUses == 0 && !childRnode.isTarget()) {
+                final int[] entry = routingGraph.getSdqLookahead(childRnode);
+                if (entry != null) {
+                    // An SDQ node that the net does not use: keyed by the floor of what its child wires' lower bounds
+                    // can be (see getSdqLookaheadFloor()) in place of its own lower bound above, since every route
+                    // through it takes one of them. Each of those includes finishCost and DEPTH_FIRST_BIAS, as the
+                    // child wire's own lower bound will on being pushed, so that the floor already includes finishCost
+                    // (and none of the sink's half-tile charges above, which no child wire bears). One that the net
+                    // already uses keeps its own lower bound: its child wires may be shared, by an unknown number of
+                    // the net's connections, and so cost less than the table can tell
+                    final float floor = getSdqLookaheadFloor(state, childRnode, entry, newPartialPathCost);
+                    // (Every term that a floor adds to the path cost is at least 0)
+                    assert(floor >= newPartialPathCost);
+                    if (floor < Float.POSITIVE_INFINITY) {
+                        newTotalPathCost = floor;
+                    }
+                }
+            }
         } else if (isDiscountedSendingChainNode(rnode, connection) &&
                 (!routingGraph.isVersal ||
                  getSendingChainLocalsCharged(childRnode) < getSendingChainLocalsCharged(rnode))) {
@@ -2469,6 +2540,355 @@ public class RWRoute {
         }
 
         push(state, childRnode, newPartialPathCost, newTotalPathCost);
+    }
+
+    /**
+     * Sets up SDQ lookahead (see getSdqLookaheadFloor()) for a connection about to be routed, once its weights are
+     * set: what its floors need of it (see ConnectionState.laBiasScale and those after it).
+     * @param state State from the connection that is about to be routed.
+     */
+    private void prepareSdqLookahead(ConnectionState state) {
+        final Connection connection = state.connection;
+        final NetWrapper net = connection.getNetWrapper();
+        final RouteNode sinkRnode = connection.getSinkRnode();
+        final int connections = net.getConnections().size();
+        state.laBiasScale = (net.getDoubleHpwl() > 0 && connections > 0) ? 1f / connections / net.getDoubleHpwl() : 0;
+        state.laXCenter = net.getXCenter();
+        state.laYCenter = net.getYCenter();
+        state.laHalfWlWeight = state.rnodeWLWeight * 0.5f;
+        state.laSinkHalfX = sinkRnode.getEndHalfTileXCoordinate();
+        state.laSinkY = sinkRnode.getBeginTileYCoordinate();
+        state.laSinkSLR = connection.isCrossSLR() ? sinkRnode.getSLRIndex(routingGraph) : -1;
+        state.laSinkSllInput = sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK_SLL_INPUT;
+        // The order of sdqLookaheadOrders holds only for the weights that it was built for (criticality 0, the
+        // connection weight being 1), and for a distance that is symmetric (not to a Versal SLL input sink); and not
+        // where getSdqLookaheadChildBound() would divide by zero for the bias cost
+        state.laOrdered = sdqLookaheadOrders != null && state.rnodeCostWeight == 1 && !state.laSinkSllInput &&
+                state.laBiasScale > 0;
+    }
+
+    /**
+     * Builds {@link #sdqLookaheadOrders} from RouteNodeGraph.sdqLookahead, for the weights of a connection of
+     * criticality 0 (see routeIndirectConnection()), unless timing-driven (when a connection's weights depend on its
+     * criticality).
+     */
+    private void buildSdqLookaheadOrders() {
+        final int[][] table = routingGraph.sdqLookahead;
+        if (table == null || config.isTimingDriven()) {
+            return;
+        }
+        final int fields = RouteNodeGraph.SDQ_LOOKAHEAD_FIELDS;
+        // A connection of criticality 0's rnodeWLWeight and estWlWeight (its rnodeCostWeight being 1)
+        final float rnodeWLWeight = oneMinusWlWeight;
+        final float estWlWeight = wlWeight;
+        int[][] orders = new int[2 * table.length][];
+        for (int w = 0; w < table.length; w++) {
+            final int[] entry = table[w];
+            if (entry == null) {
+                continue;
+            }
+            final int n = entry.length / fields;
+            if (n > SDQ_LOOKAHEAD_ORDER_MAX_CHILDREN) {
+                continue;
+            }
+            for (int side = 0; side < 2; side++) {
+                int[] rx = new int[n];
+                int[] ry = new int[n];
+                float[] k = new float[n];
+                int minRx = Integer.MAX_VALUE;
+                int maxRx = Integer.MIN_VALUE;
+                int minRy = Integer.MAX_VALUE;
+                int maxRy = Integer.MIN_VALUE;
+                for (int c = 0, i = 0; c < n; c++, i += fields) {
+                    // Where it ends, as getSdqLookaheadChildFloor() takes it
+                    rx[c] = (entry[i + RouteNodeGraph.SDQ_LOOKAHEAD_INHERIT_SIDE] != 0)
+                            ? ((entry[i + RouteNodeGraph.SDQ_LOOKAHEAD_END_HALF_X] & ~1) | side)
+                            : entry[i + RouteNodeGraph.SDQ_LOOKAHEAD_END_HALF_X];
+                    ry[c] = entry[i + RouteNodeGraph.SDQ_LOOKAHEAD_END_Y];
+                    // As getSdqLookaheadChildBound(), less the bias cost (as its capacity is 1, an unused node's
+                    // present congestion cost is always RouteNode.initialPresentCongestionCost)
+                    final float nodeCost = Float.intBitsToFloat(entry[i + RouteNodeGraph.SDQ_LOOKAHEAD_BASE_COST]) *
+                            RouteNode.initialHistoricalCongestionCost * RouteNode.initialPresentCongestionCost;
+                    k[c] = nodeCost + rnodeWLWeight * 0.5f * entry[i + RouteNodeGraph.SDQ_LOOKAHEAD_WIRELENGTH];
+                    minRx = Math.min(minRx, rx[c]);
+                    maxRx = Math.max(maxRx, rx[c]);
+                    minRy = Math.min(minRy, ry[c]);
+                    maxRy = Math.max(maxRy, ry[c]);
+                }
+                final int width = maxRx - minRx + 1;
+                final int height = maxRy - minRy + 1;
+                final int cells = SDQ_LOOKAHEAD_ORDER_HEADER + SDQ_LOOKAHEAD_ORDER_FIELDS * n;
+                int[] data = new int[cells + width * height];
+                data[0] = n;
+                data[1] = minRx;
+                data[2] = width;
+                data[3] = minRy;
+                data[4] = height;
+                for (int c = 0; c < n; c++) {
+                    final int d = SDQ_LOOKAHEAD_ORDER_HEADER + SDQ_LOOKAHEAD_ORDER_FIELDS * c;
+                    data[d] = rx[c];
+                    data[d + 1] = ry[c];
+                    data[d + 2] = Float.floatToIntBits(k[c]);
+                    data[d + 3] = c * fields;
+                }
+                float[] t = new float[n];
+                int[] order = new int[n];
+                for (int v = minRy; v <= maxRy; v++) {
+                    for (int u = minRx; u <= maxRx; u++) {
+                        // Insertion sort by partial price plus the estimate (ties in listed order)
+                        for (int c = 0; c < n; c++) {
+                            final float price = k[c] + estWlWeight * (0.5f * Math.abs(rx[c] - u) +
+                                    Math.abs(ry[c] - v));
+                            int j = c;
+                            while (j > 0 && t[j - 1] > price) {
+                                t[j] = t[j - 1];
+                                order[j] = order[j - 1];
+                                j--;
+                            }
+                            t[j] = price;
+                            order[j] = c;
+                        }
+                        int cell = 0;
+                        for (int j = 0; j < n; j++) {
+                            cell |= order[j] << (4 * j);
+                        }
+                        data[cells + (v - minRy) * width + (u - minRx)] = cell;
+                    }
+                }
+                orders[2 * w + side] = data;
+            }
+        }
+        sdqLookaheadOrders = orders;
+    }
+
+    /**
+     * Gets what every child wire of an SDQ node is charged on being pushed, other than its path cost, its estimate and
+     * DEPTH_FIRST_BIAS: finishCost (see evaluateCostAndPush()). A child wire of an SDQ node is never a target on a
+     * connection whose drivers are marked (only INODEs, GNODEs, BNODEs and CNODEs are), so it is always charged
+     * finishCost there, and is never shifted by minSinkCost as a sink pushed from an unmarked driver is.
+     * @param state State from the connection that is being routed.
+     * @return That cost.
+     */
+    private static float getSdqLookaheadChildFinishCost(ConnectionState state) {
+        return state.driversMarked ? state.drvExcess : 0;
+    }
+
+    /**
+     * Gets the floor of an SDQ node as getSdqLookaheadFloorOfEach() would, from
+     * {@link #sdqLookaheadOrders}: the child wires are visited in increasing order of their partial price plus the
+     * estimate (which leave out the bias cost, finishCost and DEPTH_FIRST_BIAS, all at least 0, and so are no more than
+     * their exact prices), each visited priced exactly (see getSdqLookaheadChildBound()), until that order's price
+     * cannot lower the floor so far: usually after the first, rather than pricing all of them.
+     * @param state State from the connection that is being routed (for which ConnectionState.laOrdered holds).
+     * @param sdqRnode The SDQ node being pushed.
+     * @param entry Its entry in RouteNodeGraph.sdqLookahead.
+     * @param data Its array of {@link #sdqLookaheadOrders}.
+     * @param upstreamPathCost Its path cost.
+     * @return That floor, or positive infinity if every child wire is skipped.
+     */
+    private float getSdqLookaheadOrderedFloor(ConnectionState state, RouteNode sdqRnode, int[] entry, int[] data,
+                                              float upstreamPathCost) {
+        assert(state.laOrdered);
+        final Tile tile = sdqRnode.getTile();
+        final int x2 = 2 * tile.getTileXCoordinate();
+        final int y = tile.getTileYCoordinate();
+        final int u = state.laSinkHalfX - x2;
+        final int v = state.laSinkY - y;
+        final int n = data[0];
+        assert(n <= SDQ_LOOKAHEAD_ORDER_MAX_CHILDREN && n * RouteNodeGraph.SDQ_LOOKAHEAD_FIELDS == entry.length);
+        final int width = data[2];
+        final int height = data[4];
+        // Beyond the range of where the child wires end, their order no longer changes
+        int cu = u - data[1];
+        cu = (cu < 0) ? 0 : (cu >= width ? width - 1 : cu);
+        int cv = v - data[3];
+        cv = (cv < 0) ? 0 : (cv >= height ? height - 1 : cv);
+        int cell = data[SDQ_LOOKAHEAD_ORDER_HEADER + SDQ_LOOKAHEAD_ORDER_FIELDS * n + cv * width + cu];
+        final float estWlWeight = state.estWlWeight;
+        float floor = Float.POSITIVE_INFINITY;
+        for (int k = 0; k < n; k++, cell >>>= 4) {
+            final int c = SDQ_LOOKAHEAD_ORDER_HEADER + SDQ_LOOKAHEAD_ORDER_FIELDS * (cell & 15);
+            final int rx = data[c];
+            final int ry = data[c + 1];
+            final int deltaHalfX = Math.abs(rx - u);
+            final int deltaY = Math.abs(ry - v);
+            final float bound = upstreamPathCost + (Float.intBitsToFloat(data[c + 2]) +
+                    estWlWeight * (0.5f * deltaHalfX + deltaY));
+            if (bound - SDQ_LOOKAHEAD_ORDER_MARGIN * bound >= floor) {
+                break;
+            }
+            final int endHalfX = x2 + rx;
+            final int endY = y + ry;
+            if (isSdqLookaheadChildOutside(state, endHalfX, endY)) {
+                continue;
+            }
+            final int i = data[c + 3];
+            final float price = getSdqLookaheadChildBound(state, upstreamPathCost, endHalfX, endY,
+                    entry[i + RouteNodeGraph.SDQ_LOOKAHEAD_WIRELENGTH],
+                    Float.intBitsToFloat(entry[i + RouteNodeGraph.SDQ_LOOKAHEAD_BASE_COST]));
+            floor = Math.min(floor, price);
+        }
+        return floor;
+    }
+
+    /**
+     * Checks if a child wire of an SDQ node is skipped by SDQ lookahead, as the search could not take it: where it ends
+     * is outside the device, the sink's SLR (for a connection that crosses SLRs, of which none is left to cross) or
+     * the connection's bounding box.
+     * @param state State from the connection that is being routed.
+     * @param endHalfX Half-tile X coordinate of where the child wire ends.
+     * @param endY Y coordinate of the INT tile where it ends.
+     * @return True if so.
+     */
+    private boolean isSdqLookaheadChildOutside(ConnectionState state, int endHalfX, int endY) {
+        final Connection connection = state.connection;
+        final int endX = endHalfX >> 1;
+        return endY < 0 || endY >= routingGraph.intYToSLRIndex.length ||
+                (state.laSinkSLR >= 0 && routingGraph.intYToSLRIndex[endY] != state.laSinkSLR) ||
+                (config.isUseBoundingBox() && !(endX > connection.getXMinBB() && endX < connection.getXMaxBB() &&
+                        endY > connection.getYMinBB() && endY < connection.getYMaxBB()));
+    }
+
+    /**
+     * SDQ lookahead: gets the floor of an SDQ node (one listed in RouteNodeGraph.sdqLookahead) that the net does not
+     * use, being pushed by a connection with no SLR left to cross, which evaluateCostAndPush() keys it by in place of
+     * its own lower bound (but not its path cost). An SDQ node drives only singles, doubles, quads and longs, each
+     * charged its base cost, wirelength and DEPTH_FIRST_BIAS on being pushed, which its own lower bound does not
+     * foresee, so that the search would otherwise pop many SDQ nodes that lead nowhere cheap. The floor is the least
+     * that the lower bound that evaluateCostAndPush() gives any of its child wires can be, from the table alone (see
+     * getSdqLookaheadChildFloor()). When popped, the SDQ node is expanded as any other node.
+     * @param state State from the connection that is being routed.
+     * @param sdqRnode The SDQ node being pushed (its prev pointer and, if needed, inherited side already set).
+     * @param entry Its entry in RouteNodeGraph.sdqLookahead.
+     * @param upstreamPathCost Its path cost.
+     * @return That floor, or positive infinity if every child wire is skipped (when it keeps its own lower bound).
+     */
+    private float getSdqLookaheadFloor(ConnectionState state, RouteNode sdqRnode, int[] entry, float upstreamPathCost) {
+        if (state.laOrdered) {
+            final int[] data = sdqLookaheadOrders[2 * sdqRnode.getWireIndex() +
+                    (sdqRnode.getEndHalfTileXCoordinate() & 1)];
+            if (data != null) {
+                return getSdqLookaheadOrderedFloor(state, sdqRnode, entry, data, upstreamPathCost);
+            }
+        }
+        return getSdqLookaheadFloorOfEach(state, sdqRnode, entry, upstreamPathCost);
+    }
+
+    /**
+     * Gets the floor of an SDQ node that the net does not use (see getSdqLookaheadFloor()) by pricing each of its child
+     * wires (see getSdqLookaheadChildFloor()).
+     * @param state State from the connection that is being routed.
+     * @param sdqRnode The SDQ node being pushed (its prev pointer and, if needed, inherited side already set).
+     * @param entry Its entry in RouteNodeGraph.sdqLookahead.
+     * @param upstreamPathCost Its path cost.
+     * @return That floor, or positive infinity if every child wire is skipped (when it keeps its own lower bound).
+     */
+    private float getSdqLookaheadFloorOfEach(ConnectionState state, RouteNode sdqRnode, int[] entry,
+                                             float upstreamPathCost) {
+        final Tile tile = sdqRnode.getTile();
+        final int x = tile.getTileXCoordinate();
+        final int y = tile.getTileYCoordinate();
+        final int sideBit = sdqRnode.getEndHalfTileXCoordinate() & 1;
+        float floor = Float.POSITIVE_INFINITY;
+        for (int i = 0; i < entry.length; i += RouteNodeGraph.SDQ_LOOKAHEAD_FIELDS) {
+            floor = Math.min(floor, getSdqLookaheadChildFloor(state, entry, i, x, y, sideBit, upstreamPathCost));
+        }
+        return floor;
+    }
+
+    /**
+     * Gets the floor of a child wire of an SDQ node that the net does not use (so that the net cannot use the child
+     * wire through it, and its sharing factor is 1): the least that the lower bound that evaluateCostAndPush() gives
+     * it can be, whether or not it exists yet as an rnode, from its entry in RouteNodeGraph.sdqLookahead alone. That
+     * is the SDQ node's path cost plus the child wire's node cost (at least its base cost, its historical and present
+     * congestion costs being at least 1 when uncongested, plus the bias cost where it ends, no more than half of
+     * that), its wirelength cost and, if timing-driven, its delay cost (taken as at least 0); plus the estimate from
+     * where it ends; plus finishCost (see getSdqLookaheadChildFinishCost()) and DEPTH_FIRST_BIAS. A target child wire
+     * is priced as any other. When not timing-driven, it is computed by getSdqLookaheadChildBound(), whose arithmetic
+     * follows evaluateCostAndPush()'s.
+     * @param state State from the connection that is being routed.
+     * @param entry The SDQ node's entry in RouteNodeGraph.sdqLookahead.
+     * @param i Index in that entry of the child wire's fields.
+     * @param x The SDQ node's INT tile X coordinate.
+     * @param y The SDQ node's INT tile Y coordinate.
+     * @param sideBit The low bit of the SDQ node's half-tile X coordinate (its side, which a child wire of type
+     * NON_LOCAL_INHERIT_PREV_SIDE takes).
+     * @param upstreamPathCost The SDQ node's path cost.
+     * @return That floor, or positive infinity if it is skipped (see isSdqLookaheadChildOutside()).
+     */
+    private float getSdqLookaheadChildFloor(ConnectionState state, int[] entry, int i, int x, int y, int sideBit,
+                                            float upstreamPathCost) {
+        // Where it ends, as evaluateCostAndPush() takes it: on the SDQ node's side if it inherits it, else (as
+        // getNearerEndHalfTileXCoordinate() gives for a single, double, quad or long, which is never a LOCAL node nor
+        // a Versal SLL input, output or data) where it ends
+        int endHalfX = 2 * x + entry[i + RouteNodeGraph.SDQ_LOOKAHEAD_END_HALF_X];
+        if (entry[i + RouteNodeGraph.SDQ_LOOKAHEAD_INHERIT_SIDE] != 0) {
+            endHalfX = (endHalfX & ~1) | sideBit;
+        }
+        final int endY = y + entry[i + RouteNodeGraph.SDQ_LOOKAHEAD_END_Y];
+        if (isSdqLookaheadChildOutside(state, endHalfX, endY)) {
+            return Float.POSITIVE_INFINITY;
+        }
+        final int halfTileWirelength = entry[i + RouteNodeGraph.SDQ_LOOKAHEAD_WIRELENGTH];
+        final float childBaseCost = Float.intBitsToFloat(entry[i + RouteNodeGraph.SDQ_LOOKAHEAD_BASE_COST]);
+        if (!config.isTimingDriven()) {
+            return getSdqLookaheadChildBound(state, upstreamPathCost, endHalfX, endY, halfTileWirelength,
+                    childBaseCost);
+        }
+        final int endX = endHalfX >> 1;
+        final int sinkHalfX = state.laSinkHalfX;
+        // As getDeltaHalfX()
+        final int deltaHalfX = !state.laSinkSllInput ? Math.abs(endHalfX - sinkHalfX) :
+                (endHalfX <= sinkHalfX) ? sinkHalfX - endHalfX : Math.max(0, endHalfX - sinkHalfX - 1);
+        final int deltaY = Math.abs(endY - state.laSinkY);
+        final float biasCost = childBaseCost * state.laBiasScale *
+                (Math.abs(endX - state.laXCenter) + Math.abs(endY - state.laYCenter));
+        float floor = upstreamPathCost +
+                state.rnodeCostWeight * (childBaseCost + Math.min(biasCost, childBaseCost / 2)) +
+                (state.laHalfWlWeight * halfTileWirelength + state.estWlWeight * (0.5f * deltaHalfX + deltaY));
+        // As addEstimate()
+        floor += state.estDlyWeight * (deltaHalfX * 0.14f + deltaY * 0.13f);
+        floor += getSdqLookaheadChildFinishCost(state);
+        floor += state.rnodeCostWeight * RouteNode.DEPTH_FIRST_BIAS;
+        return floor;
+    }
+
+    /**
+     * Gets the lower bound that evaluateCostAndPush() would give a child wire of an SDQ node that is uncongested and
+     * not used by the net (sharing factor 1), when not timing-driven, from its entry in RouteNodeGraph.sdqLookahead,
+     * with the same arithmetic, so that the floor of an SDQ node is no more than the lower bound of such a child wire
+     * (rounding included).
+     * @param state State from the connection that is being routed.
+     * @param upstreamPathCost The SDQ node's path cost.
+     * @param endHalfX Half-tile X coordinate of where the child wire ends.
+     * @param endY Y coordinate of the INT tile where it ends.
+     * @param halfTileWirelength Its wirelength, in half tiles.
+     * @param baseCost Its base cost.
+     * @return That lower bound.
+     */
+    private float getSdqLookaheadChildBound(ConnectionState state, float upstreamPathCost, int endHalfX, int endY,
+                                            int halfTileWirelength, float baseCost) {
+        assert(!config.isTimingDriven());
+        final Connection connection = state.connection;
+        final float sharingFactor = 1;
+        float partialPathCost = upstreamPathCost;
+        // As getNodeCost() for a node with no users and historical congestion cost
+        // RouteNode.initialHistoricalCongestionCost
+        final NetWrapper net = connection.getNetWrapper();
+        final float presentCongestionCost = routingGraph.getPresentCongestionCost(0);
+        float distToCenter = Math.abs((endHalfX >> 1) - net.getXCenter()) + Math.abs(endY - net.getYCenter());
+        float biasCost = baseCost / net.getConnections().size() * distToCenter / net.getDoubleHpwl();
+        float nodeCost = baseCost * RouteNode.initialHistoricalCongestionCost * presentCongestionCost / sharingFactor;
+        partialPathCost += state.rnodeCostWeight * (nodeCost + Math.min(biasCost, nodeCost / 2));
+        partialPathCost += state.rnodeWLWeight * 0.5f * halfTileWirelength / sharingFactor;
+        final RouteNode sinkRnode = connection.getSinkRnode();
+        final int deltaHalfX = getDeltaHalfX(sinkRnode, endHalfX, sinkRnode.getEndHalfTileXCoordinate());
+        final int deltaY = Math.abs(endY - sinkRnode.getBeginTileYCoordinate());
+        // As evaluateCostAndPush() for a single, double, quad or long in the sink's SLR, not on a sending chain
+        float lowerBound = addEstimate(state, partialPathCost, deltaHalfX, deltaY, sharingFactor) +
+                getSdqLookaheadChildFinishCost(state);
+        lowerBound += state.rnodeCostWeight * RouteNode.DEPTH_FIRST_BIAS;
+        return lowerBound;
     }
 
     /**

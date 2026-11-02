@@ -353,6 +353,35 @@ public class RouteNodeGraph {
 
     protected final Set<Tile> allowedTiles;
 
+    /**
+     * The SDQ nodes of an INT tile and their child wires, for RWRoute's SDQ lookahead (see
+     * RWRoute.getSdqLookaheadFloor()), which keys an SDQ node by the least lower bound that one of its child wires
+     * could have. Indexed by the base wire index of a node in an INT tile: null unless that node is an SDQ node (one
+     * whose children are all singles, doubles, quads or longs: INT_NODE_SDQ_* on UltraScale+, NODE_SDQNODEs on
+     * Versal), else its child wires, {@link #SDQ_LOOKAHEAD_FIELDS} ints each (see SDQ_LOOKAHEAD_*), less those that go
+     * nowhere or that RWRoute never enters. Measured from one interior INT tile (see
+     * {@link #buildSdqLookahead(Tile[][])}) and taken to hold for every INT tile, so that a child wire need not exist
+     * (as an rnode) to be priced; null if no INT tile was found to measure. Kept in its own field rather than in the
+     * INT entry of {@link #tileTypeInfos}, as it is read on every push of a node in an INT tile.
+     */
+    protected final int[][] sdqLookahead;
+    /**
+     * Fields of a child wire in {@link #sdqLookahead}: the offset in INT tile X and Y of the tile of its base wire, and
+     * that base wire's index (which identify it, so that tables measured from different tiles can be compared); its
+     * nominal wirelength in half tiles; the offset in half tiles and rows of where it ends (relative to twice the SDQ
+     * node's tile X, and its tile Y); 1 if it is of type {@link RouteNodeType#NON_LOCAL_INHERIT_PREV_SIDE} (it then
+     * ends on the side of its parent), else 0; and its base cost (as float bits).
+     */
+    public static final int SDQ_LOOKAHEAD_TILE_X = 0;
+    public static final int SDQ_LOOKAHEAD_TILE_Y = 1;
+    public static final int SDQ_LOOKAHEAD_WIRE = 2;
+    public static final int SDQ_LOOKAHEAD_WIRELENGTH = 3;
+    public static final int SDQ_LOOKAHEAD_END_HALF_X = 4;
+    public static final int SDQ_LOOKAHEAD_END_Y = 5;
+    public static final int SDQ_LOOKAHEAD_INHERIT_SIDE = 6;
+    public static final int SDQ_LOOKAHEAD_BASE_COST = 7;
+    public static final int SDQ_LOOKAHEAD_FIELDS = 8;
+
     /** Flag to enable really comprehensive (but performance-impacting) assertions */
     protected final static boolean enableComprehensiveAssertions = false;
 
@@ -826,6 +855,122 @@ public class RouteNodeGraph {
 
         deviceColumns = device.getColumns();
         buildSinkDriverTables(device);
+
+        sdqLookahead = buildSdqLookahead(intTiles);
+    }
+
+    /**
+     * Builds {@link #sdqLookahead} from one interior INT tile, whose child wires are not cut short by the edge of the
+     * device or an SLR boundary: of up to seven candidates, the first INT tile at or after 1/8, 2/8, ..., 7/8 of the
+     * width of the middle row of SLR 0, the table that most of them share (the first such, on a tie), so that one
+     * beside an unusual column is outvoted.
+     * @param intTiles INT tiles of the device, as given by Device.getTilesByRootName("INT").
+     * @return The table, or null if no candidate was found.
+     */
+    private int[][] buildSdqLookahead(Tile[][] intTiles) {
+        final int midY = (slrFirstIntY[0] + slrLastIntY[0]) / 2;
+        final Tile[] row = intTiles[midY];
+        final int candidates = 7;
+        List<int[][]> tables = new ArrayList<>();
+        int bestCount = 0;
+        int bestIndex = -1;
+        for (int k = 1; k <= candidates; k++) {
+            Tile tile = null;
+            for (int x = k * row.length / (candidates + 1); x < row.length && tile == null; x++) {
+                if (row[x] != null && row[x].getTileTypeEnum() == TileTypeEnum.INT) {
+                    tile = row[x];
+                }
+            }
+            if (tile == null || tile.getTileXCoordinate() >= row.length || row[tile.getTileXCoordinate()] != tile ||
+                    tile.getTileYCoordinate() != midY) {
+                // None, or not indexed by its own INT tile coordinates
+                continue;
+            }
+            int[][] table = measureSdqLookahead(tile);
+            int count = 1;
+            for (int[][] other : tables) {
+                if (Arrays.deepEquals(table, other)) {
+                    count++;
+                }
+            }
+            tables.add(table);
+            if (count > bestCount) {
+                bestCount = count;
+                bestIndex = tables.size() - 1;
+            }
+        }
+        return (bestIndex < 0) ? null : tables.get(bestIndex);
+    }
+
+    /**
+     * Measures the SDQ nodes of one INT tile and their child wires (see {@link #sdqLookahead}).
+     * @param tile The INT tile.
+     * @return Its table.
+     */
+    private int[][] measureSdqLookahead(Tile tile) {
+        int[][] table = new int[tile.getWireCount()][];
+        final int x2 = 2 * tile.getTileXCoordinate();
+        final int y = tile.getTileYCoordinate();
+        for (int wireIndex = 0; wireIndex < tile.getWireCount(); wireIndex++) {
+            Node node = Node.getNode(tile, wireIndex);
+            if (node == null || !node.getTile().equals(tile) || node.getWireIndex() != wireIndex ||
+                    RouteNode.isSingleDoubleQuadLong(node.getIntentCode())) {
+                // Not a base wire, or a wire itself
+                continue;
+            }
+            List<Node> downhill = node.getAllDownhillNodes();
+            if (downhill.isEmpty()) {
+                continue;
+            }
+            int[] entry = new int[SDQ_LOOKAHEAD_FIELDS * downhill.size()];
+            int n = 0;
+            boolean onlyWires = true;
+            for (Node child : downhill) {
+                if (!RouteNode.isSingleDoubleQuadLong(child.getIntentCode())) {
+                    onlyWires = false;
+                    break;
+                }
+                Tile childTile = child.getTile();
+                if (childTile.getTileTypeEnum() != TileTypeEnum.INT || child.getAllDownhillPIPs().isEmpty()) {
+                    // A dead end (e.g. a Versal double with only one wire)
+                    continue;
+                }
+                // A throwaway RouteNode (not in nodesMap), for its base cost, end and type as RWRoute sees them
+                RouteNode rnode = new RouteNode(this, child, null);
+                if (rnode.getType() == RouteNodeType.INACCESSIBLE) {
+                    continue;
+                }
+                assert(n % SDQ_LOOKAHEAD_FIELDS == 0);
+                entry[n + SDQ_LOOKAHEAD_TILE_X] = childTile.getTileXCoordinate() - tile.getTileXCoordinate();
+                entry[n + SDQ_LOOKAHEAD_TILE_Y] = childTile.getTileYCoordinate() - y;
+                entry[n + SDQ_LOOKAHEAD_WIRE] = child.getWireIndex();
+                entry[n + SDQ_LOOKAHEAD_WIRELENGTH] = rnode.getHalfTileWirelength();
+                entry[n + SDQ_LOOKAHEAD_END_HALF_X] = rnode.getEndHalfTileXCoordinate() - x2;
+                entry[n + SDQ_LOOKAHEAD_END_Y] = rnode.getEndTileYCoordinate() - y;
+                entry[n + SDQ_LOOKAHEAD_INHERIT_SIDE] =
+                        (rnode.getType() == RouteNodeType.NON_LOCAL_INHERIT_PREV_SIDE) ? 1 : 0;
+                entry[n + SDQ_LOOKAHEAD_BASE_COST] = Float.floatToIntBits(rnode.getBaseCost());
+                n += SDQ_LOOKAHEAD_FIELDS;
+            }
+            if (onlyWires && n > 0) {
+                table[wireIndex] = Arrays.copyOf(entry, n);
+            }
+        }
+        return table;
+    }
+
+    /**
+     * Gets the child wires of an SDQ node, as listed in {@link #sdqLookahead}.
+     * @param rnode The node in question.
+     * @return Its entry, or null if it is not an SDQ node of an INT tile (or there is no table).
+     */
+    public int[] getSdqLookahead(RouteNode rnode) {
+        final int[][] table = sdqLookahead;
+        if (table == null || rnode.getTile().getTileTypeEnum() != TileTypeEnum.INT) {
+            return null;
+        }
+        final int wireIndex = rnode.getWireIndex();
+        return wireIndex < table.length ? table[wireIndex] : null;
     }
 
     /**

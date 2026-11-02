@@ -413,7 +413,7 @@ public class TestRWRoute {
             // Versal
             // One SLR crossing
             // (Too) close
-            "xcv80,SLICE_X54Y331,SLICE_X54Y332,200",            // Source adjacent to crossing SLL (east)
+            "xcv80,SLICE_X54Y331,SLICE_X54Y332,100",            // Source adjacent to crossing SLL (east)
             "xcv80,SLICE_X53Y332,SLICE_X53Y331,100",            // Source adjacent to crossing SLL (west)
             "xcv80,SLICE_X51Y331,SLICE_X51Y332,100",            // Close to crossing SLL
             // Perfect
@@ -422,7 +422,7 @@ public class TestRWRoute {
             "xcv80,SLICE_X54Y406,SLICE_X54Y331,100",            // Sink adjacent to crossing SLL (east, south)
             "xcv80,SLICE_X53Y406,SLICE_X53Y331,100",            // Sink adjacent to crossing SLL (west, south)
             "xcv80,SLICE_X51Y331,SLICE_X51Y406,200",            // Source close to crossing SLL
-            "xcv80,SLICE_X0Y331,SLICE_X49Y406,400",             // Source far from crossing SLL
+            "xcv80,SLICE_X0Y331,SLICE_X49Y406,300",             // Source far from crossing SLL
 
             // US+
             // One SLR crossing
@@ -431,25 +431,25 @@ public class TestRWRoute {
             Device.AWS_F1 + ",SLICE_X9Y300,SLICE_X9Y299,100",
             Device.AWS_F1 + ",SLICE_X0Y299,SLICE_X0Y300,100",    // Far from Laguna column
             Device.AWS_F1 + ",SLICE_X0Y300,SLICE_X0Y299,100",
-            Device.AWS_F1 + ",SLICE_X54Y299,SLICE_X56Y300,200",  // Slight closer to one Laguna column that is further from sink
+            Device.AWS_F1 + ",SLICE_X54Y299,SLICE_X56Y300,100",  // Slight closer to one Laguna column that is further from sink
             Device.AWS_F1 + ",SLICE_X54Y300,SLICE_X56Y299,100",
             Device.AWS_F1 + ",SLICE_X50Y299,SLICE_X65Y300,100",
             Device.AWS_F1 + ",SLICE_X50Y300,SLICE_X65Y299,100",
             Device.AWS_F1 + ",SLICE_X55Y299,SLICE_X55Y300,100",  // Equidistant from two Laguna columns
             Device.AWS_F1 + ",SLICE_X55Y300,SLICE_X55Y299,100",
             // Perfect
-            Device.AWS_F1 + ",SLICE_X9Y241,SLICE_X9Y300,200",
-            Device.AWS_F1 + ",SLICE_X9Y300,SLICE_X9Y241,200",
+            Device.AWS_F1 + ",SLICE_X9Y241,SLICE_X9Y300,100",
+            Device.AWS_F1 + ",SLICE_X9Y300,SLICE_X9Y241,100",
             Device.AWS_F1 + ",SLICE_X9Y358,SLICE_X9Y299,200",
-            Device.AWS_F1 + ",SLICE_X9Y299,SLICE_X9Y358,200",
-            Device.AWS_F1 + ",SLICE_X53Y241,SLICE_X69Y300,400",
-            Device.AWS_F1 + ",SLICE_X53Y358,SLICE_X69Y299,200",
+            Device.AWS_F1 + ",SLICE_X9Y299,SLICE_X9Y358,100",
+            Device.AWS_F1 + ",SLICE_X53Y241,SLICE_X69Y300,300",
+            Device.AWS_F1 + ",SLICE_X53Y358,SLICE_X69Y299,100",
             // Far
             Device.AWS_F1 + ",SLICE_X9Y240,SLICE_X9Y359,100",    // On Laguna
             Device.AWS_F1 + ",SLICE_X9Y359,SLICE_X9Y240,100",
             Device.AWS_F1 + ",SLICE_X162Y240,SLICE_X162Y430,100",
 
-            Device.AWS_F1 + ",SLICE_X162Y430,SLICE_X162Y240,200",
+            Device.AWS_F1 + ",SLICE_X162Y430,SLICE_X162Y240,100",
             Device.AWS_F1 + ",SLICE_X0Y240,SLICE_X12Y430,100",   // Far from Laguna
             Device.AWS_F1 + ",SLICE_X0Y430,SLICE_X12Y240,200",
 
@@ -459,7 +459,7 @@ public class TestRWRoute {
 
             // Three SLR crossings
             Device.AWS_F1 + ",SLICE_X79Y0,SLICE_X79Y899,200",    // Straight up: on Laguna column (opposite side of Laguna)
-            Device.AWS_F1 + ",SLICE_X78Y60,SLICE_X78Y839,200",   // Straight up: on Laguna column (same side as Laguna)
+            Device.AWS_F1 + ",SLICE_X78Y60,SLICE_X78Y839,100",   // Straight up: on Laguna column (same side as Laguna)
             Device.AWS_F1 + ",SLICE_X0Y0,SLICE_X0Y899,300",      // Straight up: far from Laguna column
             Device.AWS_F1 + ",SLICE_X168Y0,SLICE_X168Y899,200",  // Straight up: far from Laguna column
             Device.AWS_F1 + ",SLICE_X9Y0,SLICE_X162Y899,200",    // Up and right
@@ -468,14 +468,14 @@ public class TestRWRoute {
             // One SLR crossing, far: source in a Laguna row, on the east half of the INT tile on the other side (west) of
             // a Laguna column (INT_X4, beside LAG_LAG_X4, which INT_X5 drives; cf. SLICE_X9Y240/SLICE_X9Y359 above, on
             // the east half of INT_X5)
-            Device.AWS_F1 + ",SLICE_X7Y240,SLICE_X7Y359,200",
-            Device.AWS_F1 + ",SLICE_X7Y359,SLICE_X7Y240,200",
+            Device.AWS_F1 + ",SLICE_X7Y240,SLICE_X7Y359,100",
+            Device.AWS_F1 + ",SLICE_X7Y359,SLICE_X7Y240,100",
 
             // US
             // One SLR crossing, far: source in a Laguna row, on the east half of the INT tile with a Laguna column
             // (INT_X13, which drives LAGUNA_TILE_X13) and of the INT tile on the other side (west) of it (INT_X12)
             "xcku115,SLICE_X20Y240,SLICE_X20Y359,100",
-            "xcku115,SLICE_X20Y359,SLICE_X20Y240,200",
+            "xcku115,SLICE_X20Y359,SLICE_X20Y240,100",
             "xcku115,SLICE_X18Y240,SLICE_X18Y359,100",
             "xcku115,SLICE_X18Y359,SLICE_X18Y240,100",
 
@@ -484,18 +484,18 @@ public class TestRWRoute {
             // US+: on the west half of the INT tile on the other side (west) of a Laguna column (INT_X4: EE2_W doubles
             // into INT_X5), and one INT tile further west (INT_X3)
             Device.AWS_F1 + ",SLICE_X6Y240,SLICE_X6Y359,300",
-            Device.AWS_F1 + ",SLICE_X6Y359,SLICE_X6Y240,200",
-            Device.AWS_F1 + ",SLICE_X5Y240,SLICE_X5Y359,300",
+            Device.AWS_F1 + ",SLICE_X6Y359,SLICE_X6Y240,100",
+            Device.AWS_F1 + ",SLICE_X5Y240,SLICE_X5Y359,200",
             // US: on the west half of the INT tile on the other side (west) of a Laguna column (INT_X12)
             "xcku115,SLICE_X17Y240,SLICE_X17Y359,200",
             "xcku115,SLICE_X17Y359,SLICE_X17Y240,200",
             // Versal: in the crossing band (INT Y262-Y335 northbound, Y337-Y410 southbound) on or beside a crossing half
-            "xcv80,SLICE_X54Y257,SLICE_X54Y402,300",            // On a crossing half (INT_X17 west)
+            "xcv80,SLICE_X54Y257,SLICE_X54Y402,200",            // On a crossing half (INT_X17 west)
             "xcv80,SLICE_X56Y257,SLICE_X56Y402,100",            // Beside a crossing half (INT_X17 east)
             "xcv80,SLICE_X54Y402,SLICE_X54Y257,100",
             "xcv80,SLICE_X56Y402,SLICE_X56Y257,100",
-            "xcv80,SLICE_X58Y257,SLICE_X58Y402,500",            // Between crossing halves (INT_X18 west)
-            "xcv80,SLICE_X56Y290,SLICE_X56Y440,300",            // Mid-band
+            "xcv80,SLICE_X58Y257,SLICE_X58Y402,300",            // Between crossing halves (INT_X18 west)
+            "xcv80,SLICE_X56Y290,SLICE_X56Y440,200",            // Mid-band
             "xcv80,SLICE_X54Y150,SLICE_X54Y480,100",            // Below the crossing band
             "xcv80,SLICE_X120Y150,SLICE_X20Y800,200",           // Two crossings, up and left
     })
