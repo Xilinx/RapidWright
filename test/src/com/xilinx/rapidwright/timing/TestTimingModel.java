@@ -21,9 +21,14 @@
 
 package com.xilinx.rapidwright.timing;
 
+import com.xilinx.rapidwright.design.Cell;
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Tile;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -49,5 +54,26 @@ public class TestTimingModel {
         // check tile consistent with what specify in the file
         Assertions.assertEquals(expectedCol,tile.getColumn());
         Assertions.assertEquals(expectedRow,tile.getRow());
+    }
+
+    @Test
+    public void testSourceIntraSiteDelayTermThroughRoutethru() {
+        Design design = new Design("test", "xcvu3p");
+        SiteInst si = design.createSiteInst("SLICE_X0Y0");
+        // A flip-flop used as a routethru (e.g. by the output of a CARRY8 leaving its site through AQ), as read from a
+        // DCP: a cell without an EDIFCellInst
+        Cell routethru = new Cell(si.getName() + "/AQ", si.getBEL("AFF"));
+        routethru.setType(Cell.FF_ROUTETHRU_TYPE);
+        routethru.setRoutethru(true);
+        routethru.addPinMapping("D", "D");
+        routethru.addPinMapping("Q", "Q");
+        si.addCell(routethru);
+        Assertions.assertNull(routethru.getEDIFCellInst());
+        SitePinInst aq = design.createNet("net").createPin("AQ", si);
+
+        TimingModel model = new TimingModel(design.getDevice());
+        model.build();
+        // A Q output is neither a MUX nor an _O output: no intra-site hop to describe
+        Assertions.assertNull(model.getSourceIntraSiteDelayTerm(aq));
     }
 }
