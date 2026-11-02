@@ -1646,10 +1646,7 @@ public class TimingModel {
                 if (c.getBEL() == null) continue;
                 sourceType = c.getBEL().getName();
                 if (sourceBELPin != null && sinkBELPin != null) continue;
-                for (EDIFPortInst epi : c.getEDIFCellInst().getPortInsts()) {
-                    if (!epi.isOutput()) continue;
-                    String epiToPhysicalPinName = c.getPhysicalPinMapping(epi.getName());
-                    BELPin p = c.getBEL().getPin(epiToPhysicalPinName);
+                for (BELPin p : getOutputBELPins(c)) {
                     if (!p.isOutput()) continue;
                     ArrayList<BELPin> connectedPins = p.getSiteConns();
                     for (BELPin connectedToP : connectedPins) {
@@ -1693,6 +1690,30 @@ public class TimingModel {
             return (short) INTRASITE_DELAY_LUT_OUTPUT_TO_O_SITEPIN;
         }
         return 0;
+    }
+
+    /**
+     * Gets the BEL pins that a placed cell's outputs leave its BEL from: those its output ports are
+     * mapped to, or, for a routethru cell (which has no EDIFCellInst, e.g. a flip-flop that the
+     * output of a CARRY8 passes through onto its Q site pin), every output pin of its BEL.
+     * @param c Placed cell in question.
+     * @return Those BEL pins.
+     */
+    private static List<BELPin> getOutputBELPins(Cell c) {
+        List<BELPin> pins = new ArrayList<>();
+        if (c.getEDIFCellInst() == null) {
+            for (BELPin p : c.getBEL().getPins()) {
+                if (p.isOutput()) {
+                    pins.add(p);
+                }
+            }
+            return pins;
+        }
+        for (EDIFPortInst epi : c.getEDIFCellInst().getPortInsts()) {
+            if (!epi.isOutput()) continue;
+            pins.add(c.getBEL().getPin(c.getPhysicalPinMapping(epi.getName())));
+        }
+        return pins;
     }
 
     /**
