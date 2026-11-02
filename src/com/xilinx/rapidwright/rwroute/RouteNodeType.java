@@ -74,6 +74,9 @@ public enum RouteNodeType {
      * UltraScale/UltraScale+: the SDQ nodes and intra-tile singles that drive their INODEs (see
      * RouteNodeGraph.populateLagunaLookups()). Treated as {@link #NON_LOCAL} nodes, other than for their lower bounds
      * (see RWRoute.evaluateCostAndPush()).
+     * Not used on Versal, where a sending chain starts at its INODE (see RouteNodeGraph.computeIntLookup()): typing
+     * the intra-tile singles and SDQ nodes that drive those INODEs as this too was tried, and experimental data did
+     * not support it.
      */
     NON_LOCAL_LEADING_TO_SLL,
 

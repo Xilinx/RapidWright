@@ -1354,7 +1354,9 @@ public class RouteNodeGraph {
      * such a PINBOUNCE: the sending chain INODE -&gt; PINBOUNCE -&gt; BNODE -&gt; SLL input, whose PINBOUNCE drives the
      * BNODEs of the SLL tile beside its side of its INT tile, in the same row (e.g. INT_X95Y620/INT_NODE_IMUX_ATOM_117_INT_OUT0
      * -&gt; INT_X95Y620/BOUNCE_W28 -&gt; SLL_X95Y620/BNODE_OUTS_E26 -&gt; SLL_X95Y620/LAG_CASCOUT_TXI1 on xcv80). Found by
-     * walking uphill from those BNODEs.
+     * walking uphill from those BNODEs. Unlike on UltraScale/UltraScale+, the intra-tile singles and SDQ nodes that
+     * drive those INODEs are not included, as experimental data did not support it (see
+     * RouteNodeType.NON_LOCAL_LEADING_TO_SLL).
      * @param intTile INT tile in question.
      * @return Its two BitSets.
      */
