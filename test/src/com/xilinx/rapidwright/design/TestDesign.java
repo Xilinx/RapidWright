@@ -38,7 +38,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -175,8 +174,6 @@ public class TestDesign {
 
     @Test
     @Timeout(value = 120, unit = TimeUnit.SECONDS)
-    @Disabled("A failed parallel DCP write leaves unwritten pieces open (and their temporary files on disk), which"
-            + " fails the open files check: https://github.com/Xilinx/RapidWright/issues/1471")
     public void checkDcpParallelEdifExportFailure(@TempDir Path tempDir) {
         EDIFNetlist netlist = EDIFTools.createNewNetlist("parallelEdifExportFailure");
         EDIFTools.ensureCorrectPartInEDIF(netlist, Device.AWS_F1);
