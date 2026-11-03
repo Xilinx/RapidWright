@@ -1728,7 +1728,10 @@ public class RWRoute {
         protected float estWlWeight;
         protected float dlyWeight;
         protected float estDlyWeight;
-        /** If timing driven: each target's LUT logic delay in excess of the fastest one's, as targets */
+        /**
+         * If timing driven: each target sink's LUT logic delay in excess of the fastest one's, indexed as the leading
+         * entries of targets (the connection's sinks that are targets; never a marked driver, see setFinishCosts())
+         */
         protected final float[] targetExcessLogicDelays = new float[LUTTools.MAX_LUT_SIZE];
 
         /** Number of nodes popped during the routing of this connection */
@@ -1746,12 +1749,13 @@ public class RWRoute {
         /**
          * Whether the drivers of this connection's sinks are marked as targets (see setFinishCosts()): if so, the
          * search ends when a target is popped (a driver finishing at its cheapest own sink), else when a target is
-         * pushed (unless this net would overuse it)
+         * pushed (unless, for a target that is not an exclusive sink, this net would overuse it or
+         * RouteNodeGraph.isEarlyTerminable() does not allow it)
          */
         protected boolean driversMarked;
         /**
-         * Least of what a driver adds for a sink pushed from it (see getSinkFinishCost()), over the connection's sinks;
-         * only computed (else zero) for a connection with alternate sinks
+         * Least of what a driver adds for a sink pushed from it (see getSinkFinishCost()), over the connection's sinks
+         * that are targets; only computed (else zero) for a connection with alternate sinks
          */
         protected float minSinkCost;
         /**
@@ -2316,16 +2320,17 @@ public class RWRoute {
         newPartialPathCost += state.rnodeCostWeight * getNodeCost(childRnode, connection, countSourceUses, sharingFactor,
                 state.shareWeight);
         newPartialPathCost += state.rnodeWLWeight * 0.5f * childRnode.getHalfTileWirelength() / sharingFactor;
+        // A target is one of the connection's sinks or a marked driver of them (see setFinishCosts())
+        final boolean childIsTargetSink = childRnode.isTarget() && isValidSink(connection, childRnode);
         if (config.isTimingDriven()) {
             newPartialPathCost += state.dlyWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode, longParent));
-            if (childRnode.isTarget() && isValidSink(connection, childRnode)) {
-                // With LUT pin swapping, each candidate LUT input pin has its own logic delay through the LUT (not a
-                // marked driver of the sinks, also a target; see setFinishCosts())
+            if (childIsTargetSink) {
+                // With LUT pin swapping, each candidate LUT input pin has its own logic delay through the LUT
                 newPartialPathCost += state.dlyWeight * routingGraph.getTargetExcessLogicDelay(state, childRnode);
             }
         }
 
-        if (state.driversMarked && childRnode.isTarget() && !rnode.isTarget() && !isValidSink(connection, childRnode)) {
+        if (state.driversMarked && childRnode.isTarget() && !rnode.isTarget() && !childIsTargetSink) {
             // A marked driver of the sinks (see setFinishCosts()): its lower bound is that which its cheapest own sink
             // would be given on being pushed from it, less that of the connection's cheapest sink (the same for every
             // driver, so only shifting the drivers relative to all other nodes, whose lower bounds charge no sink; see
@@ -3201,8 +3206,9 @@ public class RWRoute {
     }
 
     /**
-     * Finds the drivers (direct uphill nodes) of a connection's sinks (its sink and any alternate sinks) that it could
-     * push (see isPushableSinkDriver()) and, if they are all INODEs, GNODEs, BNODEs or CNODEs (see isMarkableDriver()),
+     * Finds the drivers (direct uphill nodes) of a connection's sinks that are targets (its sink and any alternate
+     * sinks, other than those that another connection of its net already uses; see Connection.setAllTargets()) that
+     * it could push (see isPushableSinkDriver()) and, if they are all INODEs, GNODEs, BNODEs or CNODEs (see isMarkableDriver()),
      * marks them as targets (so that the search ends when one is popped; see routeIndirectConnection()) and prices them
      * (see ConnectionState). A driver that has no rnode yet is created if its intent code could be such a node
      * (NODE_LOCAL, NODE_INODE or a Versal [BC]NODE); any other means that the drivers are not marked, and the search
@@ -3382,8 +3388,8 @@ public class RWRoute {
     }
 
     /**
-     * Checks if a driver drives one of a connection's sinks (the sink or an alternate sink) that its net would not
-     * overuse.
+     * Checks if a driver drives one of a connection's sinks (the sink or an alternate sink) that is a target (see
+     * Connection.setAllTargets()) and that its net would not overuse.
      * @param driver The driver in question.
      * @param connection The connection being routed.
      * @return True if so.

@@ -409,11 +409,9 @@ public class TestRWRoute {
     }
 
     /**
-     * A PartialRouter that records the cost of its (last) connection's route, as RWRoute's own path cost of its sink.
+     * A PartialRouter that records its (last) connection's route.
      */
     static class CostRecordingRouter extends PartialRouter {
-        float cost = Float.NaN;
-        boolean driversMarked;
         /** The route's nodes, from source to sink */
         final List<RouteNode> route = new ArrayList<>();
 
@@ -426,8 +424,6 @@ public class TestRWRoute {
         @Override
         protected void routeIndirectConnection(Connection connection) {
             super.routeIndirectConnection(connection);
-            cost = connection.getSinkRnode().getUpstreamPathCost();
-            driversMarked = getConnectionState().driversMarked;
             route.clear();
             route.addAll(connection.getRnodes());
             // Connection.getRnodes() is from sink to source
@@ -437,44 +433,25 @@ public class TestRWRoute {
 
     /**
      * Gets the cost of a route under the lower-bound model (see getLowerBound()): for every node after the source,
-     * its base cost ({@link RouteNode#LONG_BASE_COST} for a long, {@link RouteNode#BASE_COST_PER_TILE} per tile of a
-     * super long line, else {@link RouteNode#LOCAL_BASE_COST}) plus 0.1
-     * per half tile of its nominal wirelength (RouteNode.getHalfTileWirelength()). That is RWRoute's own cost of an
-     * uncongested, unshared, non-timing-driven connection at the default wirelength weight (0.8), less its bias cost.
+     * its base cost (RouteNode.getBaseCost()) plus 0.1 per half tile of its nominal wirelength
+     * (RouteNode.getHalfTileWirelength()). That is RWRoute's own cost of an uncongested, unshared, non-timing-driven
+     * connection at the default wirelength weight (0.8), less its bias cost.
      * @param route The route's nodes, from source to sink.
      * @return That cost.
      */
     static float getModelCost(List<RouteNode> route) {
         float cost = 0;
         for (RouteNode rnode : route.subList(1, route.size())) {
-            if (rnode.getType() == RouteNodeType.SUPER_LONG_LINE) {
-                // Charged per tile of its nominal length, as other wires are for their wirelength
-                cost += RouteNode.BASE_COST_PER_TILE * 0.5f * rnode.getHalfTileWirelength();
-                cost += 0.1f * rnode.getHalfTileWirelength();
-                continue;
-            }
-            switch (rnode.getIntentCode()) {
-                case NODE_VLONG:
-                case NODE_HLONG:
-                case NODE_VLONG7:
-                case NODE_VLONG12:
-                case NODE_HLONG6:
-                case NODE_HLONG10:
-                    cost += RouteNode.LONG_BASE_COST;
-                    break;
-                default:
-                    cost += RouteNode.LOCAL_BASE_COST;
-            }
-            cost += 0.1f * rnode.getHalfTileWirelength();
+            cost += rnode.getBaseCost() + 0.1f * rnode.getHalfTileWirelength();
         }
         return cost;
     }
 
     /**
      * Gets the least cost, under the model of getModelCost(), of a route between two INT tile half tiles made of the
-     * moves below, from the distance between them alone (and whether the source pin can launch a long itself): an
-     * intended lower bound on the cost of any real route between them, which it is wherever those moves cover every
-     * cheaper way to travel, as checked on the connections listed below, but not for every source and sink pin (see
+     * moves below (given whether the source pin can launch a long itself): within an SLR and away from the top and
+     * bottom of the device, it depends on the distance between them alone. It is an intended lower bound on the cost
+     * of any real route between them, which it is wherever those moves cover every cheaper way to travel, as checked on the connections listed below, but not for every source and sink pin (see
      * the known gaps below). The route is taken as a chain of moves on a regular grid of half tiles (horizontally) and
      * rows (vertically), then one of a few ways into the sink. A move is a wire in one of the four directions, at the
      * cost of the wire (base cost and nominal wirelength, as getModelCost()):
@@ -511,8 +488,8 @@ public class TestRWRoute {
      * xcvc1902, in every direction from LUT and flop outputs, nor for any of 3,600 on xcku115 from five LUT and flop
      * outputs (AQ, A_O, DQ2, EQ2, HQ) to 24 LUT inputs 1 to 17 rows away: it is known to be a lower bound for those
      * connections only. testCostWithinLowerBoundNonTimingDriven()'s rows are among those whose cheapest route attains
-     * it (but for three on xcku040; see there). It is loose where moves cannot follow each other as freely as here: which SDQ nodes and INODE feedthroughs a wire's end reaches depends
-     * on the member (BEG index) of its family, e.g. on xcku040 and xcku115 the INODE feedthroughs that NN2_[EW]_BEG7
+     * it (but for three on xcku040; see there). It is loose where moves cannot follow each other as freely as here:
+     * which SDQ nodes and INODE feedthroughs a wire's end reaches depends on the member (BEG index) of its family, e.g. on xcku040 and xcku115 the INODE feedthroughs that NN2_[EW]_BEG7
      * (3 rows) reaches lead back a row south, and those that NN2_[EW]_BEG6 reaches lead a row north.
      * <p>
      * It is not a lower bound for every source and sink pin. Known gaps, where a route can be cheaper (each also a
@@ -533,33 +510,22 @@ public class TestRWRoute {
      * xcvu9p's INT_X83Y450, only quad and long ends do); on UltraScale, SS12_BEG0 13 rows and EE1_E_BEG0, EE4_BEG0 and
      * EE12_BEG0 a row south, which the fabric has but RouteNodeInfo does not end them at. Not modelled or checked: INT
      * tiles next to a clock row, and longs near the edge of the device, which are shorter.
-     * @param series The device's series.
-     * @param deltaHalfX Horizontal distance, in half tiles, from source to sink.
-     * @param deltaY Vertical distance, in rows, from source to sink.
-     * @param sourceLaunchesLongs Whether the source pin drives longs directly (a Versal flop output).
-     * @return That least cost.
-     */
-    static float getLowerBound(Series series, int deltaHalfX, int deltaY, boolean sourceLaunchesLongs) {
-        return getLowerBound(series, null, 0, 0, deltaHalfX, deltaY, sourceLaunchesLongs);
-    }
-
-    /**
-     * Gets the same least cost as getLowerBound(Series, int, int, boolean), with the same caveats, but between absolute
-     * positions, and (given the routing graph) for a source and sink in different SLRs too. No wire then crosses an SLR boundary; the only way
-     * across is a crossing move (see {@link #getCrossingCosts}): from the INT tile half beside a column of super long
-     * lines that cross SLRs (RouteNodeGraph.nextCrossingHalfColumn), in a row from which they leave (the
+     * <p>
+     * For a source and sink in different SLRs, no wire crosses an SLR boundary; the only way across is a crossing move
+     * (see {@link #getCrossingCost}): from the INT tile half beside a column of super long lines that cross SLRs
+     * (RouteNodeGraph.nextCrossingHalfColumn), in a row from which they leave (the
      * {@link RouteNodeGraph#SUPER_LONG_LINE_LENGTH_IN_TILES} rows of an SLR next to its boundary), to the same half
      * that many rows away in the next SLR, at the cost of the whole chain: on UltraScale(+), an INODE, the IMUX into the
-     * Laguna tile, its TXOUT, the super long line and the receiving site's RXD and RXD; on Versal, a BNODE (from a CLE
-     * output; from anywhere else, an INODE, a bounce and a BNODE), the SLL input, the super long line, LAG_OUT and the
-     * CLE flop route-through it lands on (LAG pin, [A-H]Q2 pin and output). The landing is then a source of its own: an
-     * RXD drives SDQ nodes (and on UltraScale INODEs), as a LUT output does, and the Versal flop output launches longs.
+     * Laguna tile, its TXOUT, the super long line and the receiving site's RXD and RXD; on Versal, a BNODE (reached
+     * from a CLE output or a wire end; from anywhere else only after an INODE and a bounce too, which cost more), the
+     * SLL input, the super long line, LAG_OUT and the CLE flop route-through it lands on (LAG pin, [A-H]Q2 pin and
+     * output). The landing is then a source of its own: an RXD drives SDQ nodes (and on UltraScale INODEs), as a LUT output does, and the Versal flop output launches longs.
      * On UltraScale the crossing's INODE, as the sink's, cannot directly follow a vertical quad or long or a horizontal
      * long. An exact search found no cheaper route for the existing SLR-crossing tests' connections (and
      * testCostWithinLowerBoundNonTimingDriven()'s), all of whose cheapest routes cross this way, nor for 1,533 more on
      * xcku115.
      * @param series The device's series.
-     * @param graph The routing graph (for the SLRs and the crossing columns), or null for a single SLR.
+     * @param graph The routing graph (for the SLRs and the crossing columns).
      * @param srcHalfX Half-tile X coordinate of the source.
      * @param srcY INT tile Y coordinate of the source.
      * @param sinkHalfX Half-tile X coordinate of the sink.
@@ -672,9 +638,10 @@ public class TestRWRoute {
             }
         }
         // Crossings, if the source and sink are in different SLRs
-        final boolean crossing = graph != null && graph.intYToSLRIndex[srcY] != graph.intYToSLRIndex[sinkY];
+        final boolean crossing = graph.intYToSLRIndex[srcY] != graph.intYToSLRIndex[sinkY];
         final int sllLength = crossing ? graph.SUPER_LONG_LINE_LENGTH_IN_TILES : 0;
-        final int[] crossingCosts = crossing ? getCrossingCosts(series, sllLength) : null;
+        // {cost, plane of the landing}
+        final int[] crossingCost = crossing ? getCrossingCost(series, sllLength) : null;
         // Dijkstra over (half tile, row, at the end of a wire, at a CLE output), with a margin of the longest move
         // around the source and the sink (across the whole device if it must cross SLRs, for the crossing columns)
         final int margin = 18;
@@ -689,10 +656,8 @@ public class TestRWRoute {
             minY -= sllLength;
             maxY += sllLength;
         }
-        if (graph != null) {
-            minY = Math.max(minY, 0);
-            maxY = Math.min(maxY, graph.intYToSLRIndex.length - 1);
-        }
+        minY = Math.max(minY, 0);
+        maxY = Math.min(maxY, graph.intYToSLRIndex.length - 1);
         final int width = maxX - minX + 1;
         final int height = maxY - minY + 1;
         final int plane = width * height;
@@ -700,6 +665,24 @@ public class TestRWRoute {
         // an UltraScale or Versal crossing's landing)
         int[] dist = new int[4 * plane];
         Arrays.fill(dist, Integer.MAX_VALUE);
+        // What it costs to finish from each state, by a way into the sink (or -1 if none)
+        int[] endCost = new int[4 * plane];
+        Arrays.fill(endCost, -1);
+        for (int[] end : ends) {
+            int x = sinkHalfX - end[0];
+            int y = sinkY - end[1];
+            if (x < minX || x > maxX || y < minY || y > maxY ||
+                    graph.intYToSLRIndex[y] != graph.intYToSLRIndex[sinkY]) {
+                // Off the grid, or an INODE feedthrough across an SLR boundary
+                continue;
+            }
+            // (Not after an UltraScale quad or long, whose INODE needs another move)
+            for (int p = quadLongDrivesNoInode ? 1 : 0; p < 4; p++) {
+                int i = p * plane + (y - minY) * width + (x - minX);
+                endCost[i] = (endCost[i] == -1) ? end[2] : Math.min(endCost[i], end[2]);
+            }
+        }
+        int best = Integer.MAX_VALUE;
         PriorityQueue<int[]> queue = new PriorityQueue<>((a, b) -> Integer.compare(a[0], b[0]));
         int start = (2 + (sourceLaunchesLongs ? 1 : 0)) * plane + (srcY - minY) * width + (srcHalfX - minX);
         dist[start] = 0;
@@ -708,23 +691,28 @@ public class TestRWRoute {
             int[] e = queue.poll();
             int d = e[0];
             int i = e[1];
+            if (d >= best) {
+                // Every state left costs at least this much already, so none can finish more cheaply
+                break;
+            }
             if (d > dist[i]) {
                 continue;
             }
+            if (endCost[i] != -1) {
+                best = Math.min(best, d + endCost[i]);
+            }
             int p = i / plane;
             boolean wireEnd = (p & 1) == 1;
-            boolean cleOutput = p >= 2;
             int x = (i % plane) % width + minX;
             int y = (i % plane) / width + minY;
-            int slr = (graph == null) ? 0 : graph.intYToSLRIndex[y];
+            int slr = graph.intYToSLRIndex[y];
             for (int[] m : moves) {
                 if (m[3] == 1 && !wireEnd) {
                     continue;
                 }
                 int nx = x + m[0];
                 int ny = y + m[1];
-                if (nx < minX || nx > maxX || ny < minY || ny > maxY ||
-                        (graph != null && graph.intYToSLRIndex[ny] != slr)) {
+                if (nx < minX || nx > maxX || ny < minY || ny > maxY || graph.intYToSLRIndex[ny] != slr) {
                     // Off the grid, or a wire across an SLR boundary
                     continue;
                 }
@@ -746,29 +734,11 @@ public class TestRWRoute {
                         // Its INODE needs another move after an UltraScale quad or long
                         continue;
                     }
-                    int cost = crossingCosts[cleOutput ? 0 : 1];
-                    int ni = crossingCosts[2] * plane + (ny - minY) * width + (x - minX);
-                    if (d + cost < dist[ni]) {
-                        dist[ni] = d + cost;
+                    int ni = crossingCost[1] * plane + (ny - minY) * width + (x - minX);
+                    if (d + crossingCost[0] < dist[ni]) {
+                        dist[ni] = d + crossingCost[0];
                         queue.add(new int[] {dist[ni], ni});
                     }
-                }
-            }
-        }
-        int best = Integer.MAX_VALUE;
-        for (int[] end : ends) {
-            int x = sinkHalfX - end[0];
-            int y = sinkY - end[1];
-            if (x < minX || x > maxX || y < minY || y > maxY ||
-                    (graph != null && graph.intYToSLRIndex[y] != graph.intYToSLRIndex[sinkY])) {
-                // Off the grid, or an INODE feedthrough across an SLR boundary
-                continue;
-            }
-            // (Not after an UltraScale quad or long, whose INODE needs another move)
-            for (int p = quadLongDrivesNoInode ? 1 : 0; p < 4; p++) {
-                int d = dist[p * plane + (y - minY) * width + (x - minX)];
-                if (d != Integer.MAX_VALUE) {
-                    best = Math.min(best, d + end[2]);
                 }
             }
         }
@@ -776,28 +746,27 @@ public class TestRWRoute {
     }
 
     /**
-     * Gets the costs of crossing an SLR (see getLowerBound(Series, RouteNodeGraph, ...)), in tenths: a super long line
-     * of the given length costs {@link RouteNode#BASE_COST_PER_TILE} plus 0.2 of wirelength per tile.
+     * Gets the cost of crossing an SLR (see getLowerBound()), in tenths: a super long line of the given length costs
+     * {@link RouteNode#BASE_COST_PER_TILE} plus 0.2 of wirelength per tile.
      * @param series The device's series.
      * @param sllLength Length of a super long line, in rows.
-     * @return {cost from a CLE output, cost from anywhere else, plane of the landing (1 if at the end of a wire, plus 2
-     * if at a CLE output)}.
+     * @return {cost, plane of the landing (1 if at the end of a wire, plus 2 if at a CLE output)}.
      */
-    private static int[] getCrossingCosts(Series series, int sllLength) {
+    private static int[] getCrossingCost(Series series, int sllLength) {
         final int sll = 3 * sllLength;
         switch (series) {
             case UltraScale:
                 // INODE, IMUX, TXOUT; super long line; RXD site, RXD (which drives SDQ nodes and INODEs, as a LUT
                 // output does: e.g. LAGUNA_TILE_X13Y300/RXD19 drives INT_X13Y300/INT_NODE_IMUX_122_INT_OUT)
-                return new int[] {12 + sll + 8, 12 + sll + 8, 2};
+                return new int[] {12 + sll + 8, 2};
             case UltraScalePlus:
                 // INODE, IMUX, TXOUT; super long line; RXD site, RXD (which drives SDQ nodes, as a LUT output does)
-                return new int[] {12 + sll + 8, 12 + sll + 8, 0};
+                return new int[] {12 + sll + 8, 0};
             case Versal:
                 // BNODE (reached from a CLE output, or from a wire landing beside it; otherwise after an INODE and a
                 // bounce, which only cost more), SLL input; super long line; LAG_OUT, LAG pin, [A-H]Q2? pin and output
                 // (a flop output, which launches longs)
-                return new int[] {8 + sll + 16, 8 + sll + 16, 3};
+                return new int[] {8 + sll + 16, 3};
             default:
                 throw new RuntimeException("Unsupported series " + series);
         }
@@ -815,22 +784,19 @@ public class TestRWRoute {
     }
 
     /**
-     * Routes a single connection with CostRecordingRouter, from the A_O pin of a SLICE (or the pin given after a '.')
-     * to the A1 pin of a SLICE (or the pin given after a '.'), returning it
+     * Routes a single connection with CostRecordingRouter, between two pins of different SLICEs, each given as
+     * "SITE.PIN", returning it
      */
-    static CostRecordingRouter routeAndRecordCost(String partName, String srcSiteName, String dstSiteName) {
+    static CostRecordingRouter routeAndRecordCost(String partName, String srcSitePin, String dstSitePin) {
         Design design = new Design("top", partName);
         Net net = design.createNet("net");
-        String[] src = srcSiteName.split("\\.");
-        SiteInst srcSi = design.createSiteInst(src[0]);
-        net.createPin(src.length > 1 ? src[1] : "A_O", srcSi);
-        String[] dst = dstSiteName.split("\\.");
-        SiteInst dstSi = dst[0].equals(src[0]) ? srcSi : design.createSiteInst(dst[0]);
-        SitePinInst dstSpi = net.createPin(dst.length > 1 ? dst[1] : "A1", dstSi);
+        String[] src = srcSitePin.split("\\.");
+        net.createPin(src[1], design.createSiteInst(src[0]));
+        String[] dst = dstSitePin.split("\\.");
+        SitePinInst dstSpi = net.createPin(dst[1], design.createSiteInst(dst[0]));
         CostRecordingRouter router = new CostRecordingRouter(design, Collections.singletonList(dstSpi));
         RWRoute.routeDesign(router);
         Assertions.assertTrue(dstSpi.isRouted());
-        Assertions.assertFalse(Float.isNaN(router.cost));
         return router;
     }
 
@@ -843,8 +809,8 @@ public class TestRWRoute {
 
     /**
      * The cost (see getModelCost()) expected of RWRoute's route on those rows of
-     * testCostWithinLowerBoundNonTimingDriven() where it does not attain the lower bound, keyed by the row ("part,src,dst"); each entry gives RWRoute's route and the
-     * cheapest one (from an exact search under the same costs). They are of two kinds:
+     * testCostWithinLowerBoundNonTimingDriven() where it does not attain the lower bound, keyed by the row
+     * ("part,src,dst"); each entry gives RWRoute's route and the cheapest one (from an exact search under the same costs). They are of two kinds:
      * <ul>
      * <li>RWRoute misses: the cheapest route attains the bound, but RWRoute's costs more. In each, near the source
      * RWRoute takes a wire that looks as cheap or cheaper one wire ahead (it travels a row further, or lands on the
@@ -888,45 +854,31 @@ public class TestRWRoute {
     }
 
     /**
-     * Gets the horizontal (in half tiles) and vertical (in rows) distance between the source and sink of a route.
-     * @param route The route's nodes, from source to sink.
-     * @return {deltaHalfX, deltaY}.
-     */
-    static int[] getRouteDelta(List<RouteNode> route) {
-        RouteNode source = route.get(0);
-        RouteNode sink = route.get(route.size() - 1);
-        return new int[] {sink.getEndHalfTileXCoordinate() - source.getEndHalfTileXCoordinate(),
-                sink.getEndTileYCoordinate() - source.getEndTileYCoordinate()};
-    }
-
-    /**
      * Gets the lower bound (getLowerBound()) on the cost of a routed connection, between its source and sink.
      * @param router The router that routed it.
      * @param series The device's series.
-     * @param srcSiteName Its source, as given to routeAndRecordCost().
+     * @param srcSitePin Its source, as given to routeAndRecordCost().
      * @return The lower bound.
      */
-    static float getRouteLowerBound(CostRecordingRouter router, Series series, String srcSiteName) {
+    static float getRouteLowerBound(CostRecordingRouter router, Series series, String srcSitePin) {
         RouteNode source = router.route.get(0);
         RouteNode sink = router.route.get(router.route.size() - 1);
-        String[] src = srcSiteName.split("\\.");
         return getLowerBound(series, router.routingGraph, source.getEndHalfTileXCoordinate(),
                 source.getEndTileYCoordinate(), sink.getEndHalfTileXCoordinate(), sink.getEndTileYCoordinate(),
-                isLongLaunchingSource(series, src.length > 1 ? src[1] : "A_O"));
+                isLongLaunchingSource(series, srcSitePin.split("\\.")[1]));
     }
 
     /**
      * Tests that RWRoute finds a cheap route for a single uncongested connection: one whose cost, under the model of
      * getModelCost() (RWRoute's own costs without bias), is within {@link #LOWER_BOUND_LEEWAY} of a lower bound
-     * computed from the source-sink distance alone (getLowerBound()), or of its known excess over that bound
-     * ({@link #LOWER_BOUND_KNOWN_EXCESS}). The connections were chosen, with an exact search under the same model, as
-     * ones whose cheapest route attains that lower bound, so the bound is known to be achievable; except three on
-     * xcku040, whose rows give their cheapest cost too, where a later correction of getLowerBound()'s UltraScale
-     * moves lowered the bound below it. Which wires the route takes does not matter, so neither does how ties are
-     * broken.
+     * (getLowerBound()), or of its known excess over that bound ({@link #LOWER_BOUND_KNOWN_EXCESS}). The connections
+     * were chosen, with an exact search under the same model, as ones whose cheapest route attains that lower bound,
+     * so the bound is known to be achievable; except three on xcku040, where the bound is loose (see
+     * getLowerBound()), whose rows give their cheapest cost too. Which wires the route takes does not matter, so
+     * neither does how ties are broken.
      * @param partName Part.
-     * @param srcSiteName SLICE driving the connection from its A_O pin, or from the pin given after a '.'.
-     * @param dstSiteName SLICE whose A1 pin is the sink, or the pin given after a '.'.
+     * @param srcSitePin Source pin, as "SITE.PIN".
+     * @param dstSitePin Sink pin, as "SITE.PIN".
      */
     @ParameterizedTest
     @CsvSource({
@@ -1090,18 +1042,16 @@ public class TestRWRoute {
             "xcv80,SLICE_X53Y406.A_O,SLICE_X55Y331.A5",                    // 1,-75; bound 26.1
             "xcv80,SLICE_X53Y406.AQ,SLICE_X61Y331.A5",                     // 4,-75; bound 26.9
     })
-    public void testCostWithinLowerBoundNonTimingDriven(String partName, String srcSiteName, String dstSiteName) {
-        CostRecordingRouter rwroute = routeAndRecordCost(partName, srcSiteName, dstSiteName);
+    public void testCostWithinLowerBoundNonTimingDriven(String partName, String srcSitePin, String dstSitePin) {
+        CostRecordingRouter rwroute = routeAndRecordCost(partName, srcSitePin, dstSitePin);
         Series series = PartNameTools.getPart(partName).getSeries();
-        int[] delta = getRouteDelta(rwroute.route);
-        float lowerBound = getRouteLowerBound(rwroute, series, srcSiteName);
+        float lowerBound = getRouteLowerBound(rwroute, series, srcSitePin);
         float cost = getModelCost(rwroute.route);
-        float expected = LOWER_BOUND_KNOWN_EXCESS.getOrDefault(partName + "," + srcSiteName + "," + dstSiteName,
+        float expected = LOWER_BOUND_KNOWN_EXCESS.getOrDefault(partName + "," + srcSitePin + "," + dstSitePin,
                 lowerBound);
         String message = "cost " + cost + ", expected " + expected + ", lower bound " + lowerBound + ", ratio " +
                 cost / lowerBound;
-        System.out.printf("%s -> %s: delta %d,%d, cost %.4f, lower bound %.4f, ratio %.4f, expected %.4f%n",
-                srcSiteName, dstSiteName, delta[0], delta[1], cost, lowerBound, cost / lowerBound, expected);
+        System.out.println(srcSitePin + " -> " + dstSitePin + ": " + message);
         Assertions.assertTrue(cost >= lowerBound - 1e-4f, "below the lower bound: " + message);
         Assertions.assertTrue(cost <= expected * (1 + LOWER_BOUND_LEEWAY) + 1e-4f, "more than expected: " + message);
         Assertions.assertTrue(cost >= expected * (1 - LOWER_BOUND_LEEWAY) - 1e-4f,
