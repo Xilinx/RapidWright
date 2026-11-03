@@ -198,11 +198,14 @@ public class RWRoute {
         nodesPopped = new AtomicLong();
 
         if (design.getSeries() == Series.Versal) {
-            if (config.isLutPinSwapping()) {
-                throw new RuntimeException("ERROR: '--lutPinSwapping' not yet supported on Versal.");
-            }
             if (config.isLutRoutethru()) {
                 throw new RuntimeException("ERROR: '--lutRoutethru' not yet supported on Versal.");
+            }
+            if (config.isLutPinSwapping() &&
+                    Boolean.getBoolean("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates")) {
+                // assignNodesToConnections() would need to unproject a swapped sink's INT IMUX node to its site pin
+                throw new UnsupportedOperationException("ERROR: " +
+                        "'rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates' not yet supported on Versal.");
             }
         }
     }
@@ -684,45 +687,29 @@ public class RWRoute {
                     }
                 }
 
-                // Where appropriate, allow all 6 LUT pins to be swapped to begin with
+                // Where appropriate, allow this LUT input to be swapped onto some of its LUT's other input pins
                 char lutLetter = sink.getName().charAt(0);
-                int numberOfSwappablePins = (lutPinSwapping && sink.isLUTInputPin())
-                        ? LUTTools.MAX_LUT_SIZE : 0;
-                if (numberOfSwappablePins > 0) {
-                    for (Cell cell : DesignTools.getConnectedCells(sink)) {
-                        BEL bel = cell.getBEL();
-                        assert(bel.isLUT());
-                        String belName = bel.getName();
-                        String cellType = cell.getType();
-                        if (belName.charAt(0) != lutLetter) {
-                            assert(cellType.startsWith("RAM"));
-                            // This pin connects to other LUTs! (e.g. SLICEM.H[1-6] also serves
-                            // as the WA for A-G LUTs used as distributed RAM) -- do not allow any swapping
-                            // TODO: Relax this when https://github.com/Xilinx/RapidWright/issues/901 is fixed
-                            numberOfSwappablePins = 0;
-                            break;
-                        }
-                        if (bel.getName().startsWith("H") && cellType.startsWith("RAM")) {
-                            // Similarly, disallow swapping of any RAMs on the "H" BELs since their
-                            // "A" and "WA" inputs are shared and require extra care to keep in sync
-                            numberOfSwappablePins = 0;
-                            break;
-                        }
-                        if (cellType.startsWith("SRL")) {
-                            // SRL* cells cannot support any pin swaps
-                            numberOfSwappablePins = 0;
-                            break;
-                        }
-                        if (belName.charAt(1) == '5') {
-                            // Since a 5LUT cell exists, only allow bottom 5 pins to be swapped
-                            numberOfSwappablePins = 5;
-                        }
-                    }
-                }
-
+                int swappablePins = (lutPinSwapping && sink.isLUTInputPin()) ? getSwappableLutPins(sink) : 0;
                 Site site = sink.getSite();
-                for (int i = 1; i <= numberOfSwappablePins; i++) {
-                    Node node = site.getConnectedNode(lutLetter + Integer.toString(i));
+                for (int i = 1; i <= LUTTools.MAX_LUT_SIZE; i++) {
+                    if ((swappablePins & lutPinBit(i)) == 0) {
+                        continue;
+                    }
+                    String pinName = lutLetter + Integer.toString(i);
+                    Node node = site.getConnectedNode(pinName);
+                    if (routingGraph.isVersal) {
+                        SitePinInst otherSpi = sink.getSiteInst().getSitePinInst(pinName);
+                        if (otherSpi != null && otherSpi.getNet() != null && otherSpi.getNet().isStaticNet()) {
+                            // A pin tied to VCC/GND stays so. (On UltraScale/UltraScale+, static sink pins are
+                            // preserved before signal routing, which makes them unreachable; on Versal, that is
+                            // only their site pin node, and the static router would find the IMUX node (an alternate
+                            // sink rnode, if created here) unavailable)
+                            continue;
+                        }
+                        // Versal's LUT input site pins are in the CLE tile; project to the INT IMUX node that
+                        // drives each of them, as for the primary sink (see RouterHelper.projectInputPinToINTNode())
+                        node = getVersalLutInputIMUXNode(node);
+                    }
                     assert(node.getTile().getTileTypeEnum() == TileTypeEnum.INT);
                     if (node.equals(sinkINTNode)) {
                         continue;
@@ -767,6 +754,193 @@ public class RWRoute {
             }
         }
         return netWrapper;
+    }
+
+    /** All six input pins of a LUT, as a mask of {@link #lutPinBit(int)} bits */
+    private static final int LUT_PINS_A1_A6 = (1 << LUTTools.MAX_LUT_SIZE) - 1;
+    /** The bottom five input pins of a LUT */
+    private static final int LUT_PINS_A1_A5 = LUT_PINS_A1_A6 >> 1;
+    /** The bottom four input pins of a LUT */
+    private static final int LUT_PINS_A1_A4 = LUT_PINS_A1_A6 >> 2;
+    /** The top two input pins of a LUT */
+    private static final int LUT_PINS_A5_A6 = LUT_PINS_A1_A6 & ~LUT_PINS_A1_A4;
+
+    /**
+     * Gets the bit that stands for a LUT input pin in a mask of such pins.
+     * @param pin The pin's number (1 for [A-H]1, ..., 6 for [A-H]6).
+     * @return The bit.
+     */
+    private static int lutPinBit(int pin) {
+        return 1 << (pin - 1);
+    }
+
+    /**
+     * Gets a LUT cell (or routethru) that uses the given LUT BEL, i.e. that has pin mappings on it (a
+     * &lt;LOCKED&gt; placeholder has none).
+     * @param si The site instance.
+     * @param belName The name of the LUT BEL (e.g. "A5LUT").
+     * @return The cell, or null if the BEL is not used.
+     */
+    static Cell getUsedLutCell(SiteInst si, String belName) {
+        Cell cell = si.getCell(belName);
+        return (cell != null && !cell.getPinMappingsP2L().isEmpty()) ? cell : null;
+    }
+
+    /**
+     * Gets the pins of its LUT that a connection to the given LUT input site pin may be routed to, i.e.
+     * that its input may be swapped onto, as a mask of {@link #lutPinBit(int)} bits. This may include
+     * the sink pin itself; zero means no swapping.
+     * <p>
+     * On UltraScale/UltraScale+ all six pins are candidates, but if the 5LUT is also used only the
+     * bottom five (the only ones it has), and an input on A6 (which can then only be the 6LUT cell's
+     * own, as in a LUT6_2) must stay there.
+     * <p>
+     * On Versal each 5LUT has all six inputs and both LUTs of a lane also have a cascade input (BEL
+     * pin CASC, driven by the 6LUT of the lane below, or by CIN/LOOKAHEAD8 for lanes A/C/E/G). Vivado
+     * 2026.1 accepts (LOCK_PINS + place_cell, every assignment of the nets to A1-A6 tried):
+     * <ul>
+     * <li>a cell on the 5LUT, or on the 6LUT while the 5LUT is also used, may use at most one of
+     *     A5, A6 and CASC (its other inputs being on A1-A4), unless the two form a LUT6_2: a
+     *     6-input 6LUT cell (A6 being the select of its two halves, A5 or CASC the 5th input of
+     *     both) and a 5LUT cell that is its A6=0 half, using no input of its own;</li>
+     * <li>a lone 6LUT cell may use any pins, except A5 if it also uses CASC.</li>
+     * </ul>
+     * Moreover, with both LUTs used (and not a LUT6_2), Vivado puts the 6LUT cell's output on O5 (its
+     * upper half alone) rather than O6 (the whole LUT6, of which A6 is the select) whenever the lane
+     * uses A6, and its route_design rejects (Route 35-557) such a lane with that output on O6.
+     * <p>
+     * Since each connection is swapped on its own, the candidates kept here are those that stay legal
+     * whichever of them the lane's other connections end up on: with only the 5LUT used, or with both
+     * LUTs used (and not a LUT6_2) and the 6LUT cell's output on O5, an input on A1-A4 may only swap
+     * among A1-A4 and one on A5 or A6 only between A5 and A6; with the 6LUT cell's output on O6 instead,
+     * one on A5 must stay there. A swap applies to both cells alike (they share the site pins), so a
+     * LUT6_2's halves keep matching.
+     * @param sink The LUT input site pin.
+     * @return The pins that the sink's connection may be routed to.
+     */
+    protected int getSwappableLutPins(SitePinInst sink) {
+        char lutLetter = sink.getName().charAt(0);
+        int pin = sink.getName().charAt(1) - '0';
+        Set<Cell> connectedCells = DesignTools.getConnectedCells(sink);
+        if (routingGraph.isVersal && connectedCells.isEmpty()) {
+            return 0;
+        }
+        for (Cell cell : connectedCells) {
+            BEL bel = cell.getBEL();
+            if (!bel.isLUT()) {
+                // On Versal, a LUT input site pin also feeds an input register (IMR) that may be used as such,
+                // and A5-H5 also feed the LOOKAHEAD8 -- do not allow any swapping
+                assert(routingGraph.isVersal);
+                return 0;
+            }
+            String belName = bel.getName();
+            String cellType = cell.getType();
+            if (routingGraph.isVersal && !isVersalSwappableLutCell(cell)) {
+                return 0;
+            }
+            if (belName.charAt(0) != lutLetter) {
+                assert(cellType.startsWith("RAM"));
+                // This pin connects to other LUTs! (e.g. SLICEM.H[1-6] also serves
+                // as the WA for A-G LUTs used as distributed RAM) -- do not allow any swapping
+                // TODO: Relax this when https://github.com/Xilinx/RapidWright/issues/901 is fixed
+                return 0;
+            }
+            if (bel.getName().startsWith("H") && cellType.startsWith("RAM")) {
+                // Similarly, disallow swapping of any RAMs on the "H" BELs since their
+                // "A" and "WA" inputs are shared and require extra care to keep in sync
+                return 0;
+            }
+            if (cellType.startsWith("SRL")) {
+                // SRL* cells cannot support any pin swaps
+                return 0;
+            }
+        }
+
+        SiteInst si = sink.getSiteInst();
+        Cell lut5 = getUsedLutCell(si, lutLetter + "5LUT");
+        if (!routingGraph.isVersal) {
+            // On UltraScale/UltraScale+, with the 5LUT of this LUT also used (by a cell or routethru with pins; not a
+            // <LOCKED> placeholder, which has none), the inputs that it uses may only swap among the bottom 5 pins
+            // (the only ones that it has), so the 6th pin may only be used by an input of the 6LUT cell alone. An
+            // input on that pin must stay there: if it took one of the bottom 5 pins, nothing could take its own,
+            // leaving a connection without a free pin until congestion forced it back. And so no other input (even
+            // one used by the 6LUT cell alone) may take it
+            return (lut5 == null) ? LUT_PINS_A1_A6 : (pin == LUTTools.MAX_LUT_SIZE) ? 0 : LUT_PINS_A1_A5;
+        }
+
+        Cell lut6 = getUsedLutCell(si, lutLetter + "6LUT");
+        if ((lut6 != null && !isVersalSwappableLutCell(lut6)) || (lut5 != null && !isVersalSwappableLutCell(lut5))) {
+            return 0;
+        }
+        boolean lut6UsesCasc = lut6 != null && lut6.getLogicalPinMapping("CASC") != null;
+        if (lut5 == null) {
+            // Only the 6LUT is used: any pin, except A5 when CASC is used (as A5 and CASC are alternatives)
+            return !lut6UsesCasc ? LUT_PINS_A1_A6 : (pin == 5) ? 0 : (LUT_PINS_A1_A6 & ~lutPinBit(5));
+        }
+
+        if (lut6 != null && lut6.getLogicalPinMapping("A6") != null &&
+                (lut6.getLogicalPinMapping("A5") != null || lut6UsesCasc)) {
+            // A LUT6_2: the 6LUT cell uses A6 (selecting between the halves) as well as A5 or CASC -- the input
+            // on A6, which only the 6LUT cell uses, must stay there; the others may swap among A1-A5 (A1-A4
+            // with CASC, in which case A5 must stay unused)
+            if (pin == LUTTools.MAX_LUT_SIZE) {
+                return 0;
+            }
+            int pins = (lut6UsesCasc || lut5.getLogicalPinMapping("CASC") != null) ? LUT_PINS_A1_A4 : LUT_PINS_A1_A5;
+            return ((pins & lutPinBit(pin)) == 0) ? 0 : pins;
+        }
+
+        // Otherwise, each cell may use at most one of A5, A6 and CASC
+        if (pin <= 4) {
+            return LUT_PINS_A1_A4;
+        }
+        if (lut6 != null && lut6.getLogicalPinMapping("O5") == null) {
+            // The 6LUT cell's output is on O6 (A_O), which gives the whole LUT6: the lane may then not use A6
+            // (the select between its halves) for anything else, so an input on A5 must stay there. Vivado itself
+            // puts the 6LUT cell's output on O5 (its upper half alone) whenever such a lane uses A6, and its
+            // route_design fails to accept one that uses A6 with the output on O6
+            return 0;
+        }
+        return LUT_PINS_A5_A6;
+    }
+
+    /**
+     * Checks if a cell on a Versal LUT BEL may have its inputs swapped: only plain LUTs (LUT1-LUT6) and routethrus
+     * have been checked on Versal, not distributed RAMs, SRLs or LUTCY*s.
+     * @param cell The cell.
+     * @return True if so.
+     */
+    private static boolean isVersalSwappableLutCell(Cell cell) {
+        return cell.isRoutethru() || (LUTTools.isCellALUT(cell) && !cell.getType().startsWith("LUTCY"));
+    }
+
+    /**
+     * Gets the INT IMUX node that drives a Versal LUT input site pin's node (in the CLE tile).
+     * @param sitePinNode The site pin's node.
+     * @return The IMUX node.
+     */
+    private static Node getVersalLutInputIMUXNode(Node sitePinNode) {
+        List<Node> uphills = sitePinNode.getAllUphillNodes();
+        assert(uphills.size() == 1);
+        Node node = uphills.get(0);
+        assert(node.getIntentCode() == IntentCode.NODE_IMUX);
+        return node;
+    }
+
+    /**
+     * Gets the site pin that a LUT input sink rnode leads to: the rnode itself on UltraScale/UltraScale+,
+     * or the (CLE) site pin node that it drives on Versal.
+     * @param sinkRnode The sink rnode.
+     * @return The site pin.
+     */
+    SitePin getLutInputSitePin(RouteNode sinkRnode) {
+        SitePin sitePin = sinkRnode.getSitePin();
+        if (sitePin == null && routingGraph.isVersal) {
+            List<Node> downhills = sinkRnode.getAllDownhillNodes();
+            assert(downhills.size() == 1);
+            sitePin = downhills.get(0).getSitePin();
+        }
+        return sitePin;
     }
 
     /**
@@ -1071,7 +1245,7 @@ public class RWRoute {
                 }
                 connection.setSinkRnode(newSinkRnode);
 
-                SitePin newSitePin = newSinkRnode.getSitePin();
+                SitePin newSitePin = getLutInputSitePin(newSinkRnode);
                 String existing = pinSwaps.put(oldSinkSpi, newSitePin.getPinName());
                 assert(existing == null);
             }

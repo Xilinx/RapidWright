@@ -974,6 +974,13 @@ public class RouteNodeGraph {
     public boolean isAccessible(RouteNode childRnode, RouteNode parentRnode, Connection connection) {
         assert(!childRnode.isTarget());
 
+        if (isVersal && lutPinSwapping && childRnode.getIntentCode() == IntentCode.NODE_IMUX) {
+            // With LUT pin swapping, the graph also holds (as non-exclusive sinks) the IMUX nodes of other connections'
+            // candidate LUT input pins; one that is not a target of this connection leads nowhere it could use (an
+            // IMUX only drives its site pin)
+            return false;
+        }
+
         // Only consider LOCAL nodes when:
         RouteNodeType type = childRnode.getType();
         if (!type.isAnyLocal()) {

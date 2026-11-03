@@ -28,12 +28,17 @@ import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -60,9 +65,12 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.eco.ECOTools;
 import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.interchange.Interchange;
@@ -70,7 +78,9 @@ import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.CodeGenerator;
 import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
+import com.xilinx.rapidwright.util.Utils;
 import com.xilinx.rapidwright.util.VivadoTools;
 import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
@@ -727,6 +737,537 @@ public class TestRWRoute {
         Assertions.assertNotNull(i1);
         Assertions.assertNotEquals(i0, i1);
         Assertions.assertEquals(3, q.getPins().size());
+    }
+
+    /**
+     * Creates a design with one LUT lane for the LUT pin swapping tests: a cell on the 6LUT and/or a cell on the 5LUT
+     * of the given lane of a SLICE, each input driven by a flop (one per distinct net) in the SLICE below, and each
+     * LUT output captured by a flop (there, or the lane's own for a 5LUT cell, unless a LUT6_2 macro). Each cell is
+     * given as its type and equation, then the net and physical
+     * pin of each of its inputs (I0 first), e.g. "LUT3 O=I0&amp;I1&amp;I2 a@A1 b@A2 c@A5". Net "z" on pin CASC is
+     * driven by a LUT2 placed on the 6LUT of the lane below, whose O6 drives this lane's CASC inputs (Versal only).
+     * A type such as "LUT4/O5" puts the cell's output on that BEL pin (by default, O6 for the 6LUT, O5 for the 5LUT).
+     * With lut6_2 set, the two cells are instead the LUT6 and LUT5 of a LUT6_2 macro (whose INIT is that of the LUT6
+     * cell's equation), the LUT5 sharing the LUT6's I0-I4.
+     * @param partName Part to target.
+     * @param siteName SLICE for the lane.
+     * @param lane Lane letter.
+     * @param lut6Spec The 6LUT cell, or null for none.
+     * @param lut5Spec The 5LUT cell, or null for none.
+     * @param lut6_2 Make the two cells a LUT6_2 macro.
+     * @return The design, placed and with its sites routed.
+     */
+    public static Design createLutLaneDesign(String partName, String siteName, char lane, String lut6Spec,
+                                             String lut5Spec, boolean lut6_2) {
+        Design design = new Design("top", partName);
+        Device device = design.getDevice();
+        Site site = device.getSite(siteName);
+        Site ffSite = device.getSite(siteName.replaceFirst("Y\\d+$", "Y" + (site.getInstanceY() - 1)));
+        List<String> ffBELs = new ArrayList<>();
+        for (String suffix : new String[] {"FF", "FF2"}) {
+            for (char l : LUTTools.lutLetters) {
+                ffBELs.add(l + suffix);
+            }
+        }
+
+        String[] specs = {lut6Spec, lut5Spec};
+        if (lut6_2) {
+            // Connect the macro (I0-I5 shared as the LUT6 cell's are) and the flops in the logical netlist, expand the
+            // macro, then place its LUT6 and LUT5 and route the sites
+            EDIFNetlist netlist = design.getNetlist();
+            EDIFCellInst lut6_2Inst = Design.createUnisimInst(netlist.getTopCell(), "lut62", Unisim.LUT6_2);
+            lut6_2Inst.addProperty("INIT", LUTTools.getLUTInitFromEquation(lut6Spec.split(" ")[1], 6));
+            String[] tokens = lut6Spec.split(" ");
+            int ff = 0;
+            for (int i = 2; i < tokens.length; i++) {
+                String name = tokens[i].split("@")[0];
+                Cell ffCell = design.createAndPlaceCell("ff_" + name, Unisim.FDCE,
+                        ffSite.getName() + "/" + ffBELs.get(ff++));
+                EDIFNet net = design.createNet(name).getLogicalNet();
+                net.createPortInst("Q", ffCell);
+                net.createPortInst("I" + (i - 2), lut6_2Inst);
+            }
+            for (String name : new String[] {"o6", "o5"}) {
+                Cell ffCell = design.createAndPlaceCell("ff_" + name, Unisim.FDCE,
+                        ffSite.getName() + "/" + ffBELs.get(ff++));
+                EDIFNet net = design.createNet(name).getLogicalNet();
+                net.createPortInst(name.toUpperCase(), lut6_2Inst);
+                net.createPortInst("D", ffCell);
+            }
+            netlist.expandMacroUnisims(design.getSeries());
+            for (int c = 0; c < 2; c++) {
+                String name = "lut62/" + (c == 0 ? "LUT6" : "LUT5");
+                Cell cell = design.createCell(name, netlist.getHierCellInstFromName(name).getInst());
+                Assertions.assertTrue(design.placeCell(cell, site, site.getBEL(lane + (c == 0 ? "6LUT" : "5LUT"))));
+                setInputPinMappings(cell, specs[c]);
+            }
+            design.routeSites();
+            return design;
+        }
+
+        // Cells, with their pins mapped as given
+        Cell[] cells = new Cell[2];
+        for (int c = 0; c < 2; c++) {
+            if (specs[c] == null) {
+                continue;
+            }
+            String[] tokens = specs[c].split(" ");
+            String[] type = tokens[0].split("/");
+            cells[c] = design.createAndPlaceCell(c == 0 ? "lut6" : "lut5", Unisim.valueOf(type[0]),
+                    siteName + "/" + lane + (c == 0 ? "6LUT" : "5LUT"));
+            LUTTools.configureLUT(cells[c], tokens[1]);
+            setInputPinMappings(cells[c], specs[c]);
+            if (type.length > 1) {
+                // Output on the given BEL pin (e.g. O5 of the 6LUT: its upper half alone)
+                String outputPin = cells[c].getPhysicalPinMapping("O");
+                cells[c].removePinMapping(outputPin);
+                cells[c].addPinMapping(type[1], "O");
+            }
+        }
+
+        // Driver of any cascade input
+        Map<String, Cell> drivers = new HashMap<>();
+        int ff = 0;
+        if ((lut6Spec != null && lut6Spec.contains("@CASC")) || (lut5Spec != null && lut5Spec.contains("@CASC"))) {
+            Cell drv = design.createAndPlaceCell("drv", Unisim.LUT2, siteName + "/" + (char) (lane - 1) + "6LUT");
+            LUTTools.configureLUT(drv, "O=I0^I1");
+            for (int i = 0; i < 2; i++) {
+                Cell ffCell = design.createAndPlaceCell("ff_t" + i, Unisim.FDCE, ffSite.getName() + "/" + ffBELs.get(ff++));
+                Net t = design.createNet("t" + i);
+                ECOTools.connectNet(design, ffCell, "Q", t);
+                ECOTools.connectNet(design, drv, "I" + i, t);
+            }
+            drivers.put("z", drv);
+        }
+
+        // Nets, in order of first use, each connected to its driver then to every input that uses it (with the pins
+        // of both cells already mapped, connecting one cell's input first fails in ECOTools on Versal)
+        Map<String, List<Pair<Cell, String>>> netInputs = new LinkedHashMap<>();
+        for (int c = 0; c < 2; c++) {
+            if (specs[c] == null) {
+                continue;
+            }
+            String[] tokens = specs[c].split(" ");
+            for (int i = 2; i < tokens.length; i++) {
+                netInputs.computeIfAbsent(tokens[i].split("@")[0], (k) -> new ArrayList<>())
+                        .add(new Pair<>(cells[c], "I" + (i - 2)));
+            }
+        }
+        for (Map.Entry<String, List<Pair<Cell, String>>> e : netInputs.entrySet()) {
+            Net net = design.createNet(e.getKey());
+            Cell drv = drivers.get(e.getKey());
+            if (drv != null) {
+                ECOTools.connectNet(design, drv, "O", net);
+            } else {
+                Cell ffCell = design.createAndPlaceCell("ff_" + e.getKey(), Unisim.FDCE,
+                        ffSite.getName() + "/" + ffBELs.get(ff++));
+                ECOTools.connectNet(design, ffCell, "Q", net);
+            }
+            for (Pair<Cell, String> input : e.getValue()) {
+                ECOTools.connectNet(design, input.getFirst(), input.getSecond(), net);
+            }
+        }
+
+        // Outputs
+        for (int c = 0; c < 2; c++) {
+            if (cells[c] == null) {
+                continue;
+            }
+            String name = (c == 0) ? "o6" : "o5";
+            Net net = design.createNet(name);
+            ECOTools.connectNet(design, cells[c], "O", net);
+            // An output on O5 is captured by the lane's own flop (the 5LUT's O5 reaches xFF, the 6LUT's xFF2)
+            String ffLocation = !"O5".equals(cells[c].getPhysicalPinMapping("O"))
+                    ? (ffSite.getName() + "/" + ffBELs.get(ff++))
+                    : (siteName + "/" + lane + (c == 0 ? "FF2" : "FF"));
+            Cell ffCell = design.createAndPlaceCell("ff_" + name, Unisim.FDCE, ffLocation);
+            ECOTools.connectNet(design, ffCell, "D", net);
+        }
+        // ECOTools has routed the sites as needed (Design.routeSites() would tie A6 to VCC on Versal even where the
+        // 5LUT uses it)
+        return design;
+    }
+
+    /**
+     * Maps the inputs of a LUT cell (I0 first) to the physical pins given in its spec (see
+     * {@link #createLutLaneDesign(String, String, char, String, String, boolean)}), in place of its default mapping.
+     */
+    private static void setInputPinMappings(Cell cell, String spec) {
+        for (String physicalPin : new ArrayList<>(cell.getPinMappingsP2L().keySet())) {
+            if (physicalPin.matches("A[1-6]")) {
+                cell.removePinMapping(physicalPin);
+            }
+        }
+        String[] tokens = spec.split(" ");
+        for (int i = 2; i < tokens.length; i++) {
+            cell.addPinMapping(tokens[i].split("@")[1], "I" + (i - 2));
+        }
+    }
+
+    /**
+     * Routes a design with LUT pin swapping, recording which pins each LUT input connection may be routed to.
+     * @param design The design.
+     * @param timingDriven Route timing-driven.
+     * @param blockedPins LUT input site pins (e.g. "SLICE_X40Y61/A1") to make unreachable while routing, so that
+     *                    connections to them must be swapped onto another pin.
+     * @return Map from each LUT input sink pin (before swapping, e.g. "SLICE_X40Y61/A1") to the pins
+     *         (e.g. "A1") its connection may be routed to (itself included).
+     */
+    public static Map<String, Set<String>> routeLutPinSwapping(Design design, boolean timingDriven,
+                                                               String... blockedPins) {
+        Net blocker = null;
+        if (blockedPins.length > 0) {
+            // Preserve the INT node that leads to each such site pin for another net
+            blocker = design.createNet(Net.Z_NET);
+            for (String blockedPin : blockedPins) {
+                String[] tokens = blockedPin.split("/");
+                Node node = design.getDevice().getSite(tokens[0]).getConnectedNode(tokens[1]);
+                if (design.getSeries() == Series.Versal) {
+                    node = node.getAllUphillNodes().get(0);
+                }
+                blocker.addPIP(node.getAllUphillPIPs().get(0));
+            }
+        }
+
+        Map<String, Set<String>> candidates = new TreeMap<>();
+        RWRouteConfig config = new RWRouteConfig(timingDriven ? new String[] {"--lutPinSwapping"}
+                : new String[] {"--nonTimingDriven", "--lutPinSwapping"});
+        RWRoute router = new RWRoute(design, config) {
+            @Override
+            protected NetWrapper createNetWrapperAndConnections(Net net) {
+                NetWrapper netWrapper = super.createNetWrapperAndConnections(net);
+                for (Connection connection : netWrapper.getConnections()) {
+                    SitePinInst sink = connection.getSink();
+                    if (connection.isDirect() || !sink.isLUTInputPin()) {
+                        continue;
+                    }
+                    Set<String> pins = new TreeSet<>();
+                    pins.add(getLutInputSitePin(connection.getSinkRnode()).getPinName());
+                    for (RouteNode altSinkRnode : connection.getAltSinkRnodes()) {
+                        pins.add(getLutInputSitePin(altSinkRnode).getPinName());
+                    }
+                    candidates.put(sink.getSite().getName() + "/" + sink.getName(), pins);
+                }
+                return netWrapper;
+            }
+        };
+        RWRoute.routeDesign(router);
+
+        if (blocker != null) {
+            design.removeNet(blocker);
+        }
+        System.out.println("LUT pin swapping candidates: " + candidates);
+        assertAllPinsRouted(design);
+        return candidates;
+    }
+
+    /**
+     * Gets the physical pin that each input of a cell is mapped to, e.g. "I0:A3 I1:CASC".
+     */
+    private static String getInputPinMappings(Cell cell) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < LUTTools.MAX_LUT_SIZE; i++) {
+            String physicalPin = cell.getPhysicalPinMapping("I" + i);
+            if (physicalPin != null) {
+                sb.append(sb.length() == 0 ? "" : " ").append("I").append(i).append(':').append(physicalPin);
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Checks a Versal LUT lane's pin mappings against what Vivado 2026.1 accepts (from exhaustive LOCK_PINS +
+     * place_cell experiments): a cell on the 5LUT, or on the 6LUT while the 5LUT is used, uses at most one of A5, A6
+     * and CASC, unless the two form a LUT6_2 (the 6LUT cell using A6 and one of A5/CASC, and the 5LUT cell not using
+     * A6); a lone 6LUT cell does not use both A5 and CASC. Also (from Vivado's own placements, and its route_design
+     * rejecting otherwise): with both LUTs used and not a LUT6_2, the lane only uses A6 if the 6LUT cell's output is
+     * on O5.
+     */
+    private static void assertVersalLaneLegal(Cell lut6, Cell lut5) {
+        Map<String, Integer> top = new HashMap<>();
+        for (Cell cell : new Cell[] {lut6, lut5}) {
+            if (cell == null) {
+                continue;
+            }
+            int n = 0;
+            for (String pin : new String[] {"A5", "A6", "CASC"}) {
+                if (cell.getLogicalPinMapping(pin) != null) {
+                    n++;
+                }
+            }
+            top.put(cell.getBELName(), n);
+        }
+        if (lut5 == null) {
+            Assertions.assertFalse(lut6.getLogicalPinMapping("A5") != null && lut6.getLogicalPinMapping("CASC") != null);
+            return;
+        }
+        Assertions.assertTrue(top.get(lut5.getBELName()) <= 1, getInputPinMappings(lut5));
+        if (lut6 == null) {
+            return;
+        }
+        boolean lut6_2 = lut6.getLogicalPinMapping("A6") != null &&
+                (lut6.getLogicalPinMapping("A5") != null || lut6.getLogicalPinMapping("CASC") != null);
+        if (lut6_2) {
+            Assertions.assertNull(lut5.getLogicalPinMapping("A6"));
+        } else {
+            Assertions.assertTrue(top.get(lut6.getBELName()) <= 1, getInputPinMappings(lut6));
+            if (lut6.getLogicalPinMapping("O5") == null) {
+                Assertions.assertNull(lut6.getLogicalPinMapping("A6"), getInputPinMappings(lut6));
+                Assertions.assertNull(lut5.getLogicalPinMapping("A6"), getInputPinMappings(lut5));
+            }
+        }
+    }
+
+    /**
+     * Tests LUT pin swapping on a LUT6_2 (a 6-input 6LUT cell and a 5LUT cell, here its A6=0 half) on UltraScale+
+     * (a LUT6_2 macro, since Vivado rejects a separate LUT6 and LUT5 using A6 there) and Versal (separate cells,
+     * which Vivado accepts there): the input on A6, used only by the 6LUT cell, must stay there, and the others may
+     * only swap among the bottom 5 pins (on UltraScale+, since the 5LUT has only those; on Versal, since A6 selects
+     * between the 6LUT's halves).
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "xcvu3p,false",
+            "xcvu3p,true",
+            "xcvc1902,false",
+    })
+    public void testLutPinSwappingLut6_2(String partName, boolean timingDriven) {
+        boolean versal = PartNameTools.getPart(partName).getSeries() == Series.Versal;
+        Design design = createLutLaneDesign(partName, "SLICE_X40Y61", 'A',
+                "LUT6 O=I0^I1^I2^I3^I4^I5 a@A1 b@A2 c@A3 d@A4 e@A5 f@A6",
+                "LUT5 O=I0^I1^I2^I3^I4 a@A1 b@A2 c@A3 d@A4 e@A5", !versal);
+        Map<String, Set<String>> candidates = routeLutPinSwapping(design, timingDriven);
+
+        Set<String> a1a5 = new HashSet<>(Arrays.asList("A1", "A2", "A3", "A4", "A5"));
+        for (int i = 1; i <= 5; i++) {
+            Assertions.assertEquals(a1a5, candidates.get("SLICE_X40Y61/A" + i));
+        }
+        Assertions.assertEquals(Collections.singleton("A6"), candidates.get("SLICE_X40Y61/A6"));
+
+        Cell lut6 = design.getCell(versal ? "lut6" : "lut62/LUT6");
+        Cell lut5 = design.getCell(versal ? "lut5" : "lut62/LUT5");
+        Assertions.assertEquals("A6", lut6.getPhysicalPinMapping("I5"));
+        Set<String> pins = new HashSet<>();
+        for (int i = 0; i < 5; i++) {
+            // Both halves have each shared input on the same pin
+            String pin = lut6.getPhysicalPinMapping("I" + i);
+            Assertions.assertEquals(pin, lut5.getPhysicalPinMapping("I" + i));
+            pins.add(pin);
+        }
+        Assertions.assertEquals(a1a5, pins);
+        if (versal) {
+            assertVersalLaneLegal(lut6, lut5);
+        }
+    }
+
+    /**
+     * Tests LUT pin swapping on Versal with both LUTs of a lane used by cells of up to five inputs each, which
+     * Vivado accepts only if each cell uses at most one of A5 and A6 (and, to use A6, the 6LUT cell's output is on
+     * O5): inputs on A1-A4 may only swap among A1-A4, and those on A5/A6 only between A5 and A6. Here the 6LUT cell
+     * (output on O5) uses A5 and the 5LUT cell A6 for inputs of their own; with A1 blocked, the shared inputs on
+     * A1-A3 must end up on A2-A4.
+     */
+    @Test
+    public void testVersalLutPinSwappingTwoLutsDifferentTopPins() {
+        Design design = createLutLaneDesign("xcvc1902", "SLICE_X40Y61", 'A',
+                "LUT4/O5 O=I0^I1^I2^I3 a@A1 b@A2 c@A3 e@A5",
+                "LUT4 O=I0&I1&I2&I3 a@A1 b@A2 c@A3 f@A6", false);
+        Map<String, Set<String>> candidates = routeLutPinSwapping(design, false, "SLICE_X40Y61/A1");
+
+        Set<String> a1a4 = new HashSet<>(Arrays.asList("A1", "A2", "A3", "A4"));
+        Set<String> a5a6 = new HashSet<>(Arrays.asList("A5", "A6"));
+        for (int i = 1; i <= 3; i++) {
+            Assertions.assertEquals(a1a4, candidates.get("SLICE_X40Y61/A" + i));
+        }
+        Assertions.assertEquals(a5a6, candidates.get("SLICE_X40Y61/A5"));
+        Assertions.assertEquals(a5a6, candidates.get("SLICE_X40Y61/A6"));
+
+        Cell lut6 = design.getCell("lut6");
+        Cell lut5 = design.getCell("lut5");
+        Set<String> pins = new HashSet<>();
+        for (int i = 0; i < 3; i++) {
+            Assertions.assertEquals(lut6.getPhysicalPinMapping("I" + i), lut5.getPhysicalPinMapping("I" + i));
+            pins.add(lut6.getPhysicalPinMapping("I" + i));
+        }
+        Assertions.assertEquals(new HashSet<>(Arrays.asList("A2", "A3", "A4")), pins);
+        Assertions.assertEquals(a5a6, new HashSet<>(Arrays.asList(lut6.getPhysicalPinMapping("I3"),
+                lut5.getPhysicalPinMapping("I3"))));
+        assertVersalLaneLegal(lut6, lut5);
+    }
+
+    /**
+     * Tests LUT pin swapping on Versal with both LUTs of a lane used by two cells sharing all their inputs (which
+     * Vivado accepts on A1-A4 plus one of A5/A6). With the 6LUT cell's output on O5, the input on A5 may move to A6:
+     * with A5 blocked, it must (for both cells). With its output on O6 (the whole LUT6, of which A6 is the select),
+     * the lane may not use A6, so the input on A5 must stay there; with A1 blocked, the inputs on A1-A3 must end up
+     * on A2-A4.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testVersalLutPinSwappingTwoLutsSharedInputs(boolean lut6OutputO5) {
+        Design design = createLutLaneDesign("xcvc1902", "SLICE_X40Y61", 'A',
+                lut6OutputO5 ? "LUT5/O5 O=I0^I1^I2^I3^I4 a@A1 b@A2 c@A3 d@A4 e@A5"
+                             : "LUT4 O=I0^I1^I2^I3 a@A1 b@A2 c@A3 e@A5",
+                lut6OutputO5 ? "LUT5 O=I0&I1&I2&I3&I4 a@A1 b@A2 c@A3 d@A4 e@A5"
+                             : "LUT4 O=I0&I1&I2&I3 a@A1 b@A2 c@A3 e@A5", false);
+        Map<String, Set<String>> candidates = routeLutPinSwapping(design, false,
+                lut6OutputO5 ? "SLICE_X40Y61/A5" : "SLICE_X40Y61/A1");
+
+        Set<String> a1a4 = new HashSet<>(Arrays.asList("A1", "A2", "A3", "A4"));
+        for (int i = 1; i <= (lut6OutputO5 ? 4 : 3); i++) {
+            Assertions.assertEquals(a1a4, candidates.get("SLICE_X40Y61/A" + i));
+        }
+        Assertions.assertEquals(lut6OutputO5 ? new HashSet<>(Arrays.asList("A5", "A6")) : Collections.singleton("A5"),
+                candidates.get("SLICE_X40Y61/A5"));
+
+        Cell lut6 = design.getCell("lut6");
+        Cell lut5 = design.getCell("lut5");
+        int last = lut6OutputO5 ? 4 : 3;
+        Assertions.assertEquals(lut6OutputO5 ? "A6" : "A5", lut6.getPhysicalPinMapping("I" + last));
+        Assertions.assertEquals(lut6OutputO5 ? "A6" : "A5", lut5.getPhysicalPinMapping("I" + last));
+        Set<String> pins = new HashSet<>();
+        for (int i = 0; i < last; i++) {
+            Assertions.assertEquals(lut6.getPhysicalPinMapping("I" + i), lut5.getPhysicalPinMapping("I" + i));
+            pins.add(lut6.getPhysicalPinMapping("I" + i));
+        }
+        Assertions.assertEquals(lut6OutputO5 ? a1a4 : new HashSet<>(Arrays.asList("A2", "A3", "A4")), pins);
+        assertVersalLaneLegal(lut6, lut5);
+    }
+
+    /**
+     * Tests LUT pin swapping on Versal with only one LUT of a lane used: a lone 6LUT cell may use any pins (so,
+     * with A1-A3 blocked, its inputs must move to A4-A6); a lone 5LUT cell, like two cells, at most one of A5/A6 (so
+     * its inputs on A1-A4 may only swap among A1-A4, and with A1 and A5 blocked, those on A1/A2 must end up on A2-A4
+     * and that on A5 on A6).
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testVersalLutPinSwappingOneLut(boolean lut5Only) {
+        String spec = "LUT3 O=I0^I1^I2 a@A1 b@A2 c@" + (lut5Only ? "A5" : "A3");
+        Design design = createLutLaneDesign("xcvc1902", "SLICE_X40Y61", 'A',
+                lut5Only ? null : spec, lut5Only ? spec : null, false);
+        Map<String, Set<String>> candidates = routeLutPinSwapping(design, false, lut5Only
+                ? new String[] {"SLICE_X40Y61/A1", "SLICE_X40Y61/A5"}
+                : new String[] {"SLICE_X40Y61/A1", "SLICE_X40Y61/A2", "SLICE_X40Y61/A3"});
+
+        Cell cell = design.getCell(lut5Only ? "lut5" : "lut6");
+        if (lut5Only) {
+            Set<String> a1a4 = new HashSet<>(Arrays.asList("A1", "A2", "A3", "A4"));
+            Assertions.assertEquals(a1a4, candidates.get("SLICE_X40Y61/A1"));
+            Assertions.assertEquals(a1a4, candidates.get("SLICE_X40Y61/A2"));
+            Assertions.assertEquals(new HashSet<>(Arrays.asList("A5", "A6")), candidates.get("SLICE_X40Y61/A5"));
+            String i0 = cell.getPhysicalPinMapping("I0");
+            String i1 = cell.getPhysicalPinMapping("I1");
+            Assertions.assertNotEquals(i0, i1);
+            Assertions.assertTrue(Arrays.asList("A2", "A3", "A4").containsAll(Arrays.asList(i0, i1)),
+                    getInputPinMappings(cell));
+            Assertions.assertEquals("A6", cell.getPhysicalPinMapping("I2"));
+            assertVersalLaneLegal(null, cell);
+        } else {
+            Set<String> all = new HashSet<>(Arrays.asList("A1", "A2", "A3", "A4", "A5", "A6"));
+            for (int i = 1; i <= 3; i++) {
+                Assertions.assertEquals(all, candidates.get("SLICE_X40Y61/A" + i));
+            }
+            Set<String> pins = new HashSet<>();
+            for (int i = 0; i < 3; i++) {
+                pins.add(cell.getPhysicalPinMapping("I" + i));
+            }
+            Assertions.assertEquals(new HashSet<>(Arrays.asList("A4", "A5", "A6")), pins);
+            assertVersalLaneLegal(cell, null);
+        }
+    }
+
+    /**
+     * Tests LUT pin swapping on Versal with a cell using the cascade input CASC (driven by the 6LUT of the lane
+     * below). Vivado accepts CASC as an alternative to A5 and A6: a cell on the 5LUT, or on the 6LUT while the 5LUT
+     * is used, that uses CASC may not use A5 or A6; a lone 6LUT cell that uses CASC may not use A5. Here the 6LUT
+     * cell uses CASC, either alone (its inputs, with A1-A3 blocked, must move to A4 and A6, never A5), or with a 5LUT
+     * cell that uses CASC too, or with one that does not (and uses A5, which must stay there with the 6LUT cell's
+     * output on O6); in both, with A1 blocked, the inputs on A1-A3 must end up on A2-A4.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"lone", "both", "one"})
+    public void testVersalLutPinSwappingCascade(String lut5) {
+        boolean lut5Used = !lut5.equals("lone");
+        Design design = createLutLaneDesign("xcvc1902", "SLICE_X40Y61", 'B',
+                "LUT3 O=I0^I1^I2 z@CASC a@A1 b@A2",
+                lut5.equals("both") ? "LUT2 O=I0&I1 z@CASC c@A3" : lut5.equals("one") ? "LUT2 O=I0&I1 c@A3 e@A5" : null,
+                false);
+        Map<String, Set<String>> candidates = routeLutPinSwapping(design, false, lut5Used
+                ? new String[] {"SLICE_X40Y61/B1"}
+                : new String[] {"SLICE_X40Y61/B1", "SLICE_X40Y61/B2", "SLICE_X40Y61/B3"});
+
+        Cell lut6 = design.getCell("lut6");
+        Cell lut5Cell = design.getCell("lut5");
+        Assertions.assertEquals("CASC", lut6.getPhysicalPinMapping("I0"));
+        if (lut5Used) {
+            Set<String> a1a4 = new HashSet<>(Arrays.asList("B1", "B2", "B3", "B4"));
+            for (int i = 1; i <= 3; i++) {
+                Assertions.assertEquals(a1a4, candidates.get("SLICE_X40Y61/B" + i));
+            }
+            // (The 5LUT cell's input on A3 is its I1 when it uses CASC, its I0 otherwise)
+            String lut5Pin = lut5.equals("both") ? "I1" : "I0";
+            Assertions.assertEquals(new HashSet<>(Arrays.asList("A2", "A3", "A4")), new HashSet<>(Arrays.asList(
+                    lut6.getPhysicalPinMapping("I1"), lut6.getPhysicalPinMapping("I2"),
+                    lut5Cell.getPhysicalPinMapping(lut5Pin))));
+            if (lut5.equals("both")) {
+                Assertions.assertEquals("CASC", lut5Cell.getPhysicalPinMapping("I0"));
+            } else {
+                Assertions.assertEquals(Collections.singleton("B5"), candidates.get("SLICE_X40Y61/B5"));
+                Assertions.assertEquals("A5", lut5Cell.getPhysicalPinMapping("I1"));
+            }
+        } else {
+            Set<String> noA5 = new HashSet<>(Arrays.asList("B1", "B2", "B3", "B4", "B6"));
+            Assertions.assertEquals(noA5, candidates.get("SLICE_X40Y61/B1"));
+            Assertions.assertEquals(noA5, candidates.get("SLICE_X40Y61/B2"));
+            Assertions.assertEquals(new HashSet<>(Arrays.asList("A4", "A6")),
+                    new HashSet<>(Arrays.asList(lut6.getPhysicalPinMapping("I1"), lut6.getPhysicalPinMapping("I2"))));
+        }
+        assertVersalLaneLegal(lut6, lut5Cell);
+    }
+
+    /**
+     * Tests LUT pin swapping on a whole Versal design placed and routed by Vivado (with LUT6_2s, cells using CASC, and
+     * LUT inputs tied to VCC/GND): every pin must be routed, some LUT inputs swapped, and every lane must still be one
+     * that Vivado accepts (see {@link #assertVersalLaneLegal(Cell, Cell)}).
+     */
+    @Test
+    public void testNonTimingDrivenRoutingOnVersalDeviceWithLutPinSwapping() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        design.setTrackNetChanges(true);
+        Map<Cell, String> before = new HashMap<>();
+        for (Cell cell : design.getCells()) {
+            if (cell.getBEL() != null && cell.getBEL().isLUT()) {
+                before.put(cell, getInputPinMappings(cell));
+            }
+        }
+
+        RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--lutPinSwapping"});
+
+        Assertions.assertFalse(design.getModifiedNets().isEmpty());
+        for (Net net : design.getModifiedNets()) {
+            assertAllPinsRouted(net);
+        }
+        long swapped = before.entrySet().stream().filter((e) -> !e.getValue().equals(getInputPinMappings(e.getKey())))
+                .count();
+        Assertions.assertTrue(swapped > 0);
+        for (SiteInst si : design.getSiteInsts()) {
+            if (!Utils.isSLICE(si)) {
+                continue;
+            }
+            for (char lane : LUTTools.lutLetters) {
+                Cell lut6 = RWRoute.getUsedLutCell(si, lane + "6LUT");
+                Cell lut5 = RWRoute.getUsedLutCell(si, lane + "5LUT");
+                if (lut6 != null || lut5 != null) {
+                    assertVersalLaneLegal(lut6, lut5);
+                }
+            }
+        }
+
+        if (FileTools.isVivadoOnPath()) {
+            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+            Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
+        }
     }
 
     @ParameterizedTest
