@@ -345,8 +345,8 @@ public class RouteNodeGraph {
     /** Map of the TileTypeEnum to the highest base wire index */
     protected final Map<TileTypeEnum, Integer> highestBaseWireIndex;
 
-    protected final static int MAX_OCCUPANCY = 256;
-    protected final float[] presentCongestionCosts;
+    /** Present congestion factor, as last set by updatePresentCongestionCosts() */
+    protected float presentCongestionFactor;
 
     protected static int getTileCount(Design design) {
         Device device = design.getDevice();
@@ -853,8 +853,6 @@ public class RouteNodeGraph {
         }
         nextCrossingHalfColumn = next;
         prevCrossingHalfColumn = prev;
-
-        presentCongestionCosts = new float[MAX_OCCUPANCY];
 
         String pblockString = config.getPBlock();
         if (pblockString != null) {
@@ -2731,18 +2729,19 @@ public class RouteNodeGraph {
     }
 
     public void updatePresentCongestionCosts(float presentCongestionFactor) {
-        for (int occupancy = 0; occupancy < presentCongestionCosts.length; occupancy++) {
-            int overuse = occupancy - RouteNode.capacity;
-            if (overuse < 0) {
-                presentCongestionCosts[occupancy] = RouteNode.initialPresentCongestionCost;
-            } else {
-                presentCongestionCosts[occupancy] = RouteNode.initialPresentCongestionCost + (overuse + 1) * presentCongestionFactor;
-            }
-        }
+        this.presentCongestionFactor = presentCongestionFactor;
     }
 
+    /**
+     * Gets the present congestion cost of a node with the given occupancy: RouteNode.initialPresentCongestionCost, plus
+     * the present congestion factor (see updatePresentCongestionCosts()) for each user that the node would have over
+     * its capacity with one more. Linear in the occupancy, so computed rather than looked up, for any occupancy.
+     * @param occupancy Number of users of the node.
+     * @return That cost.
+     */
     public float getPresentCongestionCost(int occupancy) {
-        return presentCongestionCosts[occupancy];
+        return RouteNode.initialPresentCongestionCost +
+                Math.max(0, occupancy - RouteNode.capacity + 1) * presentCongestionFactor;
     }
 
     /**
