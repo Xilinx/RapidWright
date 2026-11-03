@@ -218,7 +218,6 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                     case NODE_CLE_OUTPUT:    // CLE outputs (US+ and Versal)
                     case NODE_LAGUNA_OUTPUT: // LAG_LAG.RXD* (US+), and LAG_LAG.LAG_MUX_ATOM_*_TXOUT other than those
                                              // leading to an SLR crossing (which are LOCAL_LEADING_TO_SLL)
-                    case NODE_LAGUNA_DATA:   // LAG_LAG.UBUMP* super long lines for u-turns at the boundary of the device (US+)
                     case NODE_SLL_INPUT:     // Versal only
                     case NODE_SLL_OUTPUT:    // Versal only
                     case INTENT_DEFAULT:     // INT.VCC_WIRE
@@ -249,11 +248,13 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         // U-turns at the edge of the device, intra-tile singles between the halves of their INT tile,
                         // and the feedthrough member of each family (one BEG index per INT tile on UltraScale(+), which
                         // carries an extra *_BLN_*/*_BLS_* wire one tile further on, as measured on xcvu440 and xcvu3p):
-                        //  - vertical ones (UltraScale SS1/NN2/NN5, UltraScale+ NN4/SS4): their END wire at the nominal
-                        //    distance has no downhill PIPs, so they can only be left one tile further on (UltraScale's
-                        //    NN16 can be left at both);
-                        //  - horizontal ones (UltraScale EE2/EE4/WW12, UltraScale+ EE12/WW1_W): their END wire at the
-                        //    nominal distance can still be left, with the extra wire one row over as another exit;
+                        //  - vertical ones (e.g. UltraScale SS1/NN2/NN5, UltraScale+ NN4/SS4): their END wire at the
+                        //    nominal distance has no downhill PIPs, so they can only be left one tile further on
+                        //    (UltraScale's NN16 can be left at both);
+                        //  - horizontal ones (e.g. UltraScale EE2/EE4/WW12, UltraScale+ EE12/WW1_W): their END wire at
+                        //    the nominal distance can still be left, with the extra wire one row over as another exit;
+                        //  these lists are not exhaustive (e.g. UltraScale also has EE1_E, EE12 and SS12, and UltraScale+
+                        //  WW2_E, feedthroughs);
                         //  - EE1_W_0_FTS (UltraScale) and WW1_E_7_FT0 (UltraScale+), the only wires of their names: no
                         //    horizontal reach, but exits in their own tile and one tile south/north respectively
                         break;

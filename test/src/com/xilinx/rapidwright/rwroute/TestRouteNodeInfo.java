@@ -49,7 +49,7 @@ public class TestRouteNodeInfo {
             "xcvu3p,INT_X40Y150,EE1_E_BEG0,NON_LOCAL,W",
             "xcvu3p,INT_X40Y150,WW1_W_BEG0,NON_LOCAL,E",
             "xcvu3p,INT_X40Y150,WW1_E_7_FT0,NON_LOCAL,W",
-            // Vertical singles, doubles and quads keep their side
+            // Vertical singles, and doubles and quads in any direction, keep their side
             "xcvu3p,INT_X40Y150,NN1_E_BEG0,NON_LOCAL,E",
             "xcvu3p,INT_X40Y150,SS1_W_BEG0,NON_LOCAL,W",
             "xcvu3p,INT_X40Y150,EE2_W_BEG0,NON_LOCAL,W",
@@ -109,14 +109,6 @@ public class TestRouteNodeInfo {
         Assertions.assertEquals(expectedHalf.equals("E") ? 1 : 0, info.endHalfTileXCoordinate & 1);
     }
 
-    private static final Set<IntentCode> interTileIntentCodes = EnumSet.of(
-            // US/US+
-            IntentCode.NODE_SINGLE, IntentCode.NODE_DOUBLE, IntentCode.NODE_HQUAD, IntentCode.NODE_VQUAD,
-            IntentCode.NODE_HLONG, IntentCode.NODE_VLONG,
-            // Versal
-            IntentCode.NODE_HSINGLE, IntentCode.NODE_VSINGLE, IntentCode.NODE_HDOUBLE, IntentCode.NODE_VDOUBLE,
-            IntentCode.NODE_HLONG6, IntentCode.NODE_HLONG10, IntentCode.NODE_VLONG7, IntentCode.NODE_VLONG12);
-
     // Site pin inputs on the east/west side of an INT tile
     private static final Pattern pinPattern = Pattern.compile("(IMUX|BYPASS|IMUX_B)_(?<eastwest>[EW])\\d+");
 
@@ -156,7 +148,7 @@ public class TestRouteNodeInfo {
                         continue;
                     }
                     // ... and only those wires that stay within it (e.g. intra-tile singles)
-                    if (interTileIntentCodes.contains(downhill.getIntentCode())) {
+                    if (RouteNode.isSingleDoubleQuadLong(downhill.getIntentCode())) {
                         RouteNodeInfo info = RouteNodeInfo.get(downhill, null);
                         if ((info.endHalfTileXCoordinate >> 1) != tile.getTileXCoordinate() ||
                                 info.endTileYCoordinate != tile.getTileYCoordinate()) {

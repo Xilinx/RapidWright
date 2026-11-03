@@ -2466,10 +2466,12 @@ public class RWRoute {
                 newTotalPathCost += state.rnodeCostWeight * RouteNode.DEPTH_FIRST_BIAS;
             } else if (deltaSLR == 0 && deltaHalfX == 0 && deltaY == 0 && !childRnode.isINode() && !childRnode.isTarget()) {
                 // At the sink's half tile, where the estimate is zero, a node other than an INODE (e.g. a bounce or GNODE)
-                // must still take an INODE if only INODEs drive the sink: charge it uncongested. A non-local one (e.g.
-                // an SDQ node, which drives only singles, doubles, quads and longs) must take one of those first:
-                // charge that too, at its base cost. (Singles, doubles, quads and longs already carry
-                // DEPTH_FIRST_BIAS, which is more than an INODE.)
+                // must still take an INODE if only INODEs drive the sink: charge it uncongested. A non-local one must
+                // take one more node: an SDQ node one of the singles, doubles, quads and longs that it drives, before
+                // the INODE; a site output (e.g. a CLE output, which can drive INODEs directly) the sink itself, after
+                // it, whose cost (at least LOCAL_BASE_COST) is in no lower bound of a node other than a target. Charge
+                // that too, at LOCAL_BASE_COST. (Singles, doubles, quads and longs already carry DEPTH_FIRST_BIAS,
+                // which is more than an INODE.)
                 // On a marked connection, the exact cost of the cheapest driver instead, without the excess
                 newTotalPathCost += state.sinkHalfTileCost;
                 if (state.driversMarked) {
@@ -2488,7 +2490,12 @@ public class RWRoute {
                     // child wire's own lower bound will on being pushed, so that the floor already includes finishCost
                     // (and none of the sink's half-tile charges above, which no child wire bears). One that the net
                     // already uses keeps its own lower bound: its child wires may be shared, by an unknown number of
-                    // the net's connections, and so cost less than the table can tell
+                    // the net's connections, and so cost less than the table can tell.
+                    // Note: the net may use a child wire even through an SDQ node that it does not use, having reached
+                    // it from another of the wire's SDQ-node drivers (each has several), and the floor is then above
+                    // that child wire's lower bound (see getSdqLookaheadChildFloor()). Finding such a child wire would
+                    // take a lookup of each child wire's rnode on every push, which was measured to cost about 9% of
+                    // routing time for no measurable difference in routing; so it is not looked for
                     final float floor = getSdqLookaheadFloor(state, childRnode, entry, newPartialPathCost);
                     // (Every term that a floor adds to the path cost is at least 0)
                     assert(floor >= newPartialPathCost);
@@ -2790,10 +2797,17 @@ public class RWRoute {
     }
 
     /**
-     * Gets the floor of a child wire of an SDQ node that the net does not use (so that the net cannot use the child
-     * wire through it, and its sharing factor is 1): the least that the lower bound that evaluateCostAndPush() gives
-     * it can be, whether or not it exists yet as an rnode, from its entry in RouteNodeGraph.sdqLookahead alone (see
-     * getSdqLookaheadChildBound()). A target child wire is priced as any other.
+     * Gets the floor of a child wire of an SDQ node that the net does not use (taking its sharing factor to be 1): the
+     * least that the lower bound that evaluateCostAndPush() gives it can be, whether or not it exists yet as an rnode,
+     * from its entry in RouteNodeGraph.sdqLookahead alone (see getSdqLookaheadChildBound()). A target child wire is
+     * priced as any other.
+     * Note: this is not a floor where the net already uses the child wire, reached through another of its SDQ-node
+     * drivers (e.g. on xcvu3p, EE4_E_BEG0 is driven by INT_NODE_SDQ_0_INT_OUT1, _11_INT_OUT1, _33_INT_OUT0 and
+     * _44_INT_OUT0), where pushing it from this SDQ node would divide its cost by its sharing factor. Measured on
+     * vtr_mcml (FPGA'24 contest harness, non-timing-driven), 0.8% of the pushes of SDQ nodes keyed by a floor for nets
+     * of more than one connection had such a child wire, and in 86% of those the floor was above that child wire's
+     * lower bound (as was the SDQ node's own lower bound, in 65%). Nor is it one where the INT tile is not like the one
+     * measured (see RouteNodeGraph.sdqLookahead).
      * @param state State from the connection that is being routed.
      * @param entry The SDQ node's entry in RouteNodeGraph.sdqLookahead.
      * @param i Index in that entry of the child wire's fields.
@@ -2964,7 +2978,11 @@ public class RWRoute {
             // Per half tile horizontally and per row vertically, no more than the delay of the fastest wires in each axis,
             // so as not to overestimate: on UltraScale+, as little as 15.3ps per tile (7.65ps per half tile) horizontally
             // (an HLONG on xcvu9p) and 7.2ps per row vertically (a VLONG). With the default timing weight of 0.35 (and
-            // timing multiplier of 1), each unit here is worth 0.35 / ((1 - 0.35) / 100), or about 54ps, of path delay
+            // timing multiplier of 1), each unit here is worth 0.35 / ((1 - 0.35) / 100), or about 54ps, of path delay.
+            // Note: as each unit is worth 100 * timingWeight / (1 - timingWeight) ps, this is no more than those delays
+            // only while the timing weight is at most about 0.353; above that (e.g. --timingWeight 0.4, or a timing
+            // multiplier above 1 raising it from one iteration to the next) it can overestimate them, by about 20% at
+            // a timing weight of 0.4
             lowerBound += state.estDlyWeight * (deltaHalfX * 0.14f + deltaY * 0.13f);
         }
         return lowerBound;
@@ -3013,7 +3031,7 @@ public class RWRoute {
      * single only when it is entered at an SDQ node; on Versal, only those after the node it was entered at (see
      * getSendingChainLocalsCharged()). Each is also charged {@link RouteNode#SLL_CHAIN_TIE_BREAK}, which the nodes
      * after the entry take off as they inherit its lower bound. The receiving chain is: on UltraScale/UltraScale+, LAG_LAGUNA_SITE_*_RXD*, RXD*, then an SDQ
-     * node (the landing node); on Versal, LAG_OUT*, a CLE LAG_*_PIN, an [A-H]Q*_PIN, then an [A-H]Q* (the landing
+     * node or an INODE (the landing node, which RXD* can drive either of, of the same base cost); on Versal, LAG_OUT*, a CLE LAG_*_PIN, an [A-H]Q*_PIN, then an [A-H]Q* (the landing
      * node), unless the sink could be on it (a CLE LAG_*_PIN, of intent NODE_PINFEED), when it is not charged.
      * From the super long line onwards, nodes are priced as any other: as the lower bound of the entry (and so of its
      * siblings) is at least the true cost of the path through the landing node, that path is followed to the sink
@@ -3407,7 +3425,7 @@ public class RWRoute {
      * Checks if a driver of one of a connection's targets could be pushed while routing it, with that target as one
      * of its children: by those checks that RouteNode.getChildren() and exploreAndExpand() make on a node that is not
      * a target that do not depend on its parent.
-     * @param driver The driver in question.
+     * @param driver The driver in question (not itself a target, see markSinkDriver()).
      * @param target The target.
      * @param connection The connection being routed.
      * @return False if it could not.
@@ -3415,7 +3433,7 @@ public class RWRoute {
     private boolean isPushableSinkDriver(RouteNode driver, RouteNode target, Connection connection) {
         Net preservedNet = routingGraph.getPreservedNet(driver);
         if ((preservedNet != null && preservedNet != connection.getNet()) || !routingGraph.isAllowedTile(driver) ||
-                driver.isTarget() || !isAccessible(driver, connection) || routingGraph.isExcluded(driver, target)) {
+                !isAccessible(driver, connection) || routingGraph.isExcluded(driver, target)) {
             return false;
         }
         switch (driver.getType()) {
@@ -3459,9 +3477,8 @@ public class RWRoute {
 
     /**
      * Gets the cost that evaluateCostAndPush() adds to the path cost of a node on pushing it: exactly (with the same
-     * sharing factor, see getCountSharingUses()), other than the extra delay of a long after a long (never a sink or a
-     * driver of one), which is left out, and the bias cost of a super long line, which depends on the way it is taken
-     * (see RouteNode.getEndTileYCoordinate()), for which the most it could be is taken off.
+     * sharing factor, see getCountSharingUses()), other than the extra delay of a long after a long, which is left
+     * out (the node being a sink, or a driver of one that may be marked, see isMarkableDriver(), never a long).
      * @param state State from the connection that is being routed.
      * @param rnode The node in question.
      * @return That cost, or a lower bound on it.
@@ -3470,11 +3487,9 @@ public class RWRoute {
         final Connection connection = state.connection;
         final int countSourceUses = rnode.countConnectionsOfUser(connection.getNetWrapper());
         final float sharingFactor = 1 + state.shareWeight * getCountSharingUses(state, rnode, countSourceUses);
+        // Never a super long line (whose bias cost depends on the way it is taken; see RouteNode.getEndTileYCoordinate())
+        assert(rnode.getType() != RouteNodeType.SUPER_LONG_LINE);
         float nodeCost = getNodeCost(rnode, connection, countSourceUses, sharingFactor, state.shareWeight);
-        if (rnode.getType() == RouteNodeType.SUPER_LONG_LINE) {
-            // getNodeCost() adds a bias cost of at most half of the rest
-            nodeCost /= 1.5f;
-        }
         float cost = state.rnodeCostWeight * nodeCost;
         cost += state.rnodeWLWeight * 0.5f * rnode.getHalfTileWirelength() / sharingFactor;
         if (config.isTimingDriven()) {

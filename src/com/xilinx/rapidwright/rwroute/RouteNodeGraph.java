@@ -363,6 +363,11 @@ public class RouteNodeGraph {
      * {@link #buildSdqLookahead(Tile[][])}) and taken to hold for every INT tile, so that a child wire need not exist
      * (as an rnode) to be priced; null if no INT tile was found to measure. Kept in its own field rather than in the
      * INT entry of {@link #tileTypeInfos}, as it is read on every push of a node in an INT tile.
+     * Note: not every INT tile is like the measured one. For example, on xcv80, in INT_X16Y167 the OUT_WW4_E_BEG* child
+     * wires of 64 of its 256 SDQ nodes end one INT tile west rather than the two that the table gives, so that a floor
+     * there can be above the lower bound of that child wire. And on xcvu3p, in the bottom row of INT tiles (e.g.
+     * INT_X63Y0 and INT_X64Y0), the feedthrough SDQ nodes SDQNODE_[EW]_0_FT1 drive wires of their own tile (NN1, SS1,
+     * WW2 and WW4_[EW]_BEG0) rather than the ones of the row below that the table gives, which does not exist there.
      */
     protected final int[][] sdqLookahead;
     /**
@@ -801,13 +806,9 @@ public class RouteNodeGraph {
                 wireIndicesLeadingToSLL = new IdentityHashMap<>();
                 populateLagunaLookups(device, lagunaTiles, crossingHalfColumns);
             } else if (isVersal) {
-                populateSllCrossingHalfColumns(device, crossingHalfColumns);
-                boolean anyCrossing = false;
-                for (boolean crossing : crossingHalfColumns) {
-                    anyCrossing |= crossing;
-                }
                 // Filled in for each SLL and INT tile when first needed (see getWireIndicesLeadingToSLL())
-                wireIndicesLeadingToSLL = anyCrossing ? new ConcurrentHashMap<>() : null;
+                wireIndicesLeadingToSLL = populateSllCrossingHalfColumns(device, crossingHalfColumns) ?
+                        new ConcurrentHashMap<>() : null;
             } else {
                 wireIndicesLeadingToSLL = null;
             }
@@ -1236,9 +1237,11 @@ public class RouteNodeGraph {
      * tile in another column), which are excluded from the routing graph (see {@link #isExcluded(RouteNode, Node)}).
      * @param device Device in question.
      * @param crossingHalfColumns Array, indexed by half-tile X coordinate, to mark.
+     * @return True if any were marked.
      */
-    private static void populateSllCrossingHalfColumns(Device device, boolean[] crossingHalfColumns) {
+    private static boolean populateSllCrossingHalfColumns(Device device, boolean[] crossingHalfColumns) {
         final int numUbumps = 6; // UBUMP0..5 in each SLL tile
+        boolean any = false;
         for (Tile tile : device.getAllTiles()) {
             if (tile.getTileTypeEnum() != TileTypeEnum.SLL || tile.getSLR().getId() != 0) {
                 continue;
@@ -1257,10 +1260,12 @@ public class RouteNodeGraph {
                     if (wireTile.getTileXCoordinate() == tile.getTileXCoordinate() && wireTile.getSLR().getId() != 0) {
                         crossingHalfColumns[2 * westX + 1] = true;
                         crossingHalfColumns[2 * westX + 2] = true;
+                        any = true;
                     }
                 }
             }
         }
+        return any;
     }
 
     /**
@@ -1327,7 +1332,9 @@ public class RouteNodeGraph {
             return NO_WIRE_INDICES_LEADING_TO_SLL;
         }
         if (tileTypeEnum == TileTypeEnum.SLL) {
-            return wireIndicesLeadingToSLL.computeIfAbsent(tile, this::computeSllLookup);
+            // get() first: computeIfAbsent() may lock even when the entry exists
+            BitSet[] bs = wireIndicesLeadingToSLL.get(tile);
+            return (bs != null) ? bs : wireIndicesLeadingToSLL.computeIfAbsent(tile, this::computeSllLookup);
         }
         // Only an INT tile with a half on a half column beside an SLL column whose SLLs cross SLRs (see
         // nextCrossingHalfColumn) has a PINBOUNCE that can drive a BNODE leading to one
@@ -1598,7 +1605,7 @@ public class RouteNodeGraph {
      * @param x INT tile X coordinate.
      * @return That X coordinate, or Integer.MAX_VALUE if there is none.
      */
-    public int getNextCrossingColumn(int x) {
+    private int getNextCrossingColumn(int x) {
         int halfX = nextCrossingHalfColumn[2 * x];
         return (halfX == Integer.MAX_VALUE) ? halfX : halfX >> 1;
     }
@@ -1609,9 +1616,42 @@ public class RouteNodeGraph {
      * @param x INT tile X coordinate.
      * @return That X coordinate, or Integer.MIN_VALUE if there is none.
      */
-    public int getPrevCrossingColumn(int x) {
+    private int getPrevCrossingColumn(int x) {
         int halfX = prevCrossingHalfColumn[2 * x + 1];
         return (halfX == Integer.MIN_VALUE) ? halfX : halfX >> 1;
+    }
+
+    /**
+     * Gets the highest X coordinate of the horizontal span of an SLR-crossing bounding box, widened if needed so that
+     * the span contains at least one INT tile column from which super long lines can cross SLRs (Laguna on
+     * UltraScale/UltraScale+, SLL on Versal): the next such column at or above its lowest X coordinate, if any (see
+     * also {@link #getCrossingWidenedXMin(int, int)}).
+     * @param xMin Lowest INT tile X coordinate of the span.
+     * @param xMax Highest INT tile X coordinate of the span.
+     * @return That X coordinate (xMax if there are no such columns at all).
+     */
+    public int getCrossingWidenedXMax(int xMin, int xMax) {
+        if (nextCrossingHalfColumn == null) {
+            return xMax;
+        }
+        int nextColumn = getNextCrossingColumn(xMin);
+        return (nextColumn != Integer.MAX_VALUE) ? Math.max(xMax, nextColumn) : xMax;
+    }
+
+    /**
+     * Gets the lowest X coordinate of the horizontal span of an SLR-crossing bounding box, widened if needed so that
+     * the span contains at least one INT tile column from which super long lines can cross SLRs: the previous such
+     * column at or below its highest X coordinate, if any (see also {@link #getCrossingWidenedXMax(int, int)}).
+     * @param xMin Lowest INT tile X coordinate of the span.
+     * @param xMax Highest INT tile X coordinate of the span.
+     * @return That X coordinate (xMin if there are no such columns at all).
+     */
+    public int getCrossingWidenedXMin(int xMin, int xMax) {
+        if (prevCrossingHalfColumn == null) {
+            return xMin;
+        }
+        int prevColumn = getPrevCrossingColumn(xMax);
+        return (prevColumn != Integer.MIN_VALUE) ? Math.min(xMin, prevColumn) : xMin;
     }
 
     private void populateLagunaLookups(Device device, Tile[][] lagunaTiles, boolean[] crossingHalfColumns) {

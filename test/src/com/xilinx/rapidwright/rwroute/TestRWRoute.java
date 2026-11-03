@@ -1182,8 +1182,8 @@ public class TestRWRoute {
             "xcku115,SLICE_X18Y240,SLICE_X18Y359,100",
             "xcku115,SLICE_X18Y359,SLICE_X18Y240,100",
 
-            // Riding: one SLR crossing, far, with a source in the crossing rows from which the on-ramp is not typed, so
-            // that the search rides vertical wires towards the sink before stepping onto it
+            // Riding: SLR crossings, far, with a source from which the on-ramp is not typed (mostly in the crossing
+            // rows), so that the search rides vertical wires towards the sink before stepping onto it
             // US+: on the west half of the INT tile on the other side (west) of a Laguna column (INT_X4: EE2_W doubles
             // into INT_X5), and one INT tile further west (INT_X3)
             Device.AWS_F1 + ",SLICE_X6Y240,SLICE_X6Y359,300",
@@ -1192,7 +1192,7 @@ public class TestRWRoute {
             // US: on the west half of the INT tile on the other side (west) of a Laguna column (INT_X12)
             "xcku115,SLICE_X17Y240,SLICE_X17Y359,200",
             "xcku115,SLICE_X17Y359,SLICE_X17Y240,200",
-            // Versal: in the crossing band (INT Y262-Y335 northbound, Y337-Y410 southbound) on or beside a crossing half
+            // Versal: in the crossing band (INT Y261-Y335 northbound, Y336-Y410 southbound) on or beside a crossing half
             "xcv80,SLICE_X54Y257,SLICE_X54Y402,200",            // On a crossing half (INT_X17 west)
             "xcv80,SLICE_X56Y257,SLICE_X56Y402,100",            // Beside a crossing half (INT_X17 east)
             "xcv80,SLICE_X54Y402,SLICE_X54Y257,100",

@@ -126,18 +126,13 @@ public class Connection implements Comparable<Connection>{
         yMax = maxOfThree(sourceRnode.getEndTileYCoordinate(), sinkRnode.getEndTileYCoordinate(), yNetCenter);
         yMin = minOfThree(sourceRnode.getEndTileYCoordinate(), sinkRnode.getEndTileYCoordinate(), yNetCenter);
 
-        if (isCrossSLR() && routingGraph.nextCrossingHalfColumn != null) {
+        if (isCrossSLR()) {
             // For SLR-crossing connections, ensure the bounding box width contains at least one column from which
             // super long lines can cross SLRs (Laguna on UltraScale/UltraScale+, SLL on Versal) before bounding box
             // extension
-            int nextColumn = routingGraph.getNextCrossingColumn(xMin);
-            int prevColumn = routingGraph.getPrevCrossingColumn(xMax);
-            if (nextColumn != Integer.MAX_VALUE) {
-                xMax = (short) Math.max(xMax, nextColumn);
-            }
-            if (prevColumn != Integer.MIN_VALUE) {
-                xMin = (short) Math.min(xMin, prevColumn);
-            }
+            short widenedXMin = (short) routingGraph.getCrossingWidenedXMin(xMin, xMax);
+            xMax = (short) routingGraph.getCrossingWidenedXMax(xMin, xMax);
+            xMin = widenedXMin;
         }
 
         xMaxBB = (short) (xMax + boundingBoxExtensionX);

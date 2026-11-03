@@ -98,14 +98,9 @@ public class NetWrapper{
             // As for each connection's bounding box (see Connection.computeConnectionBoundingBox()): for nets with an
             // SLR-crossing connection, ensure it contains at least one column from which super long lines can cross
             // SLRs (Laguna on UltraScale/UltraScale+, SLL on Versal), and is at least as high as a super long line
-            int nextColumn = routingGraph.getNextCrossingColumn(xMin);
-            int prevColumn = routingGraph.getPrevCrossingColumn(xMax);
-            if (nextColumn != Integer.MAX_VALUE) {
-                xMax = Math.max(xMax, nextColumn);
-            }
-            if (prevColumn != Integer.MIN_VALUE) {
-                xMin = Math.min(xMin, prevColumn);
-            }
+            int widenedXMin = routingGraph.getCrossingWidenedXMin(xMin, xMax);
+            xMax = routingGraph.getCrossingWidenedXMax(xMin, xMax);
+            xMin = widenedXMin;
             yMax = Math.max(yMax, yMin + routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
         }
 

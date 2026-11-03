@@ -129,7 +129,7 @@ public class RouteNodeInfo {
      * @param wireName Name of the node's base wire.
      * @return True if so.
      */
-    public static boolean isVertical(IntentCode ic, String wireName) {
+    private static boolean isVertical(IntentCode ic, String wireName) {
         switch (ic) {
             case NODE_VSINGLE:
             case NODE_VDOUBLE:
