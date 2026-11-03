@@ -123,8 +123,8 @@ public class RWRouteConfig {
         criticalityExponent = 3;
         minRerouteCriticality = 0.85f;
         reroutePercentage = (short) 3;
-        initialPresentCongestionFactor = 0.5f;
-        presentCongestionMultiplier = 2f;
+        initialPresentCongestionFactor = 2f;
+        presentCongestionMultiplier = 1.3f;
         historicalCongestionFactor = 1f;
         timingDriven = true;
         clkRouteTiming = null;
@@ -577,7 +577,7 @@ public class RWRouteConfig {
 
     /**
      * Gets the initial present congestion cost penalty factor.
-     * It should be greater than 0. Default: 0.5.
+     * It should be greater than 0. Default: 2.
      * Can be modified by using "--initialPresentCongestionFactor" option, e.g. "--initialPresentCongestionFactor 1".
      * @return The initial present congestion cost penalty factor.
      */
@@ -587,7 +587,7 @@ public class RWRouteConfig {
 
     /**
      * Sets the initial present congestion cost penalty factor.
-     * It should be greater than 0. Default: 0.5.
+     * It should be greater than 0. Default: 2.
      * Can be modified by using "--initialPresentCongestionFactor" option, e.g. "--initialPresentCongestionFactor 1".
      * @param initialPresentCongestionFactor The value to set.
      */
@@ -599,7 +599,7 @@ public class RWRouteConfig {
 
     /**
      * Gets the present congestion factor multiplier.
-     * It should be greater than 1. Default: 2.
+     * It should be greater than 1. Default: 1.3.
      * Can be modified by using "--presentCongestionMultiplier" option, e.g. "--presentCongestionMultiplier 3".
      * @return
      */
@@ -609,7 +609,7 @@ public class RWRouteConfig {
 
     /**
      * Sets the present congestion factor multiplier.
-     * It should be greater than 1. Default: 2.
+     * It should be greater than 1. Default: 1.3.
      * Can be modified by using "--presentCongestionMultiplier" option, e.g. "--presentCongestionMultiplier 3".
      * @param presentCongestionMultiplier
      */
