@@ -30,7 +30,6 @@ import java.nio.file.Path;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -1064,36 +1063,12 @@ public class TestRWRoute {
     }
 
     /**
-     * A PartialRouter that routes timing-driven, as PartialRouter.routeDesignPartialTimingDriven() (with any further
-     * arguments), and times every net of its design rather than only those that it routes (see
-     * routeSingleConnectionTimingDriven()).
-     */
-    static class AllNetsTimingRouter extends PartialRouter {
-        AllNetsTimingRouter(Design design, Collection<SitePinInst> pinsToRoute, String... args) {
-            super(design, new RWRouteConfig(concat(new String[] {"--fixBoundingBox", "--useUTurnNodes", "--verbose"},
-                    args)), pinsToRoute, false);
-        }
-
-        private static String[] concat(String[] a, String[] b) {
-            String[] c = Arrays.copyOf(a, a.length + b.length);
-            System.arraycopy(b, 0, c, a.length, b.length);
-            return c;
-        }
-
-        @Override
-        protected Collection<Net> getTimingNets() {
-            return design.getNets();
-        }
-    }
-
-    /**
-     * Routes a single connection timing-driven with AllNetsTimingRouter, between placed cells: from a LUT6's output
-     * ([A-H]_O) or an FDRE's ([A-H]Q, or [A-H]Q2 on the second flop) to an input of a LUT6 that drives the flop beside
-     * it ([A-H]FF), through an intra-site net, so that the connection is on a timing path (flop or LUT to flop).
-     * PartialRouter times only the nets that it routes (getTimingNets()), so a lone connection into a LUT is on no
-     * timing path, with or without that flop, and gets criticality 0, its delay counting for nothing in its search.
-     * AllNetsTimingRouter times the intra-site net too, so that the connection's only timing path is the critical path,
-     * and it gets RWRoute's MAX_CRITICALITY (0.99).
+     * Routes a single connection timing-driven with PartialRouter, as PartialRouter.routeDesignPartialTimingDriven()
+     * (with any further arguments), between placed cells: from a LUT6's output ([A-H]_O) or an FDRE's ([A-H]Q, or
+     * [A-H]Q2 on the second flop) to an input of a LUT6 that drives the flop beside it ([A-H]FF), through an
+     * intra-site net, so that the connection is on a timing path (flop or LUT to flop). PartialRouter times that
+     * intra-site net too (getTimingNets()), so that the connection's only timing path is the critical path, and it
+     * gets RWRoute's MAX_CRITICALITY (0.99).
      * @param srcSitePin The source pin, as "SITE.PIN".
      * @param dstSitePin The sink pin (a LUT input, [A-H][1-6]), as "SITE.PIN".
      * @param args Further arguments for RWRouteConfig (e.g. "--timingWeight", "0.5").
@@ -1129,7 +1104,11 @@ public class TestRWRoute {
         SitePinInst dstSpi = net.getSinkPins().get(0);
         Assertions.assertEquals(srcSitePin, net.getSource().getSiteInstName() + "." + net.getSource().getName());
         Assertions.assertEquals(dstSitePin, dstSpi.getSiteInstName() + "." + dstSpi.getName());
-        PartialRouter router = new AllNetsTimingRouter(design, Collections.singletonList(dstSpi), args);
+        String[] configArgs = Arrays.copyOf(new String[] {"--fixBoundingBox", "--useUTurnNodes", "--verbose"},
+                3 + args.length);
+        System.arraycopy(args, 0, configArgs, 3, args.length);
+        PartialRouter router = new PartialRouter(design, new RWRouteConfig(configArgs),
+                Collections.singletonList(dstSpi), false);
         RWRoute.routeDesign(router);
         Assertions.assertTrue(dstSpi.isRouted());
         return router;

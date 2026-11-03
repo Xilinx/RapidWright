@@ -27,7 +27,6 @@ package com.xilinx.rapidwright.rwroute;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -121,9 +120,20 @@ public class PartialRouter extends RWRoute {
         // routeDesignWithUserDefinedArguments() which needs to infer pinsToRoute.
     }
 
+    /**
+     * Gets the nets to time: those with pins to route, and those that never leave their site (no sink site pins,
+     * e.g. a LUT driving the flop beside it), which are never routed but lie on the timing paths of routed
+     * connections (without them, such paths would stop at, or restart from, the intra-site net).
+     */
     @Override
     protected Collection<Net> getTimingNets() {
-        return Collections.unmodifiableSet(netToPins.keySet());
+        List<Net> timingNets = new ArrayList<>(netToPins.keySet());
+        for (Net net : design.getNets()) {
+            if (net.getSinkPins().isEmpty()) {
+                timingNets.add(net);
+            }
+        }
+        return timingNets;
     }
 
     /**
