@@ -2652,13 +2652,13 @@ public class RWRoute {
         // was found to be non-zero on none of their pushes on one benchmark and 0.5% on another, with no difference in
         // wirelength, so that is not done
         final float finishCost = (state.driversMarked && !childRnode.isTarget()) ? state.drvExcess : 0;
+        final boolean wire = RouteNode.isSingleDoubleQuadLong(childRnode.getIntentCode());
         float newTotalPathCost;
         if (sendingHalfX < 0) {
-            newTotalPathCost = addEstimate(state, newPartialPathCost, deltaHalfX, deltaY + deltaSLR * sllLength,
-                    sharingFactor) + finishCost;
-            if (RouteNode.isSingleDoubleQuadLong(childRnode.getIntentCode())) {
-                newTotalPathCost += state.rnodeCostWeight * RouteNode.DEPTH_FIRST_BIAS;
-            } else if (deltaSLR == 0 && deltaHalfX == 0 && deltaY == 0 && !childRnode.isINode() && !childRnode.isTarget()) {
+            newTotalPathCost = getLowerBound(state, newPartialPathCost, deltaHalfX, deltaY + deltaSLR * sllLength,
+                    sharingFactor, finishCost, wire);
+            if (!wire && deltaSLR == 0 && deltaHalfX == 0 && deltaY == 0 && !childRnode.isINode() &&
+                    !childRnode.isTarget()) {
                 // At the sink's half tile, where the estimate is zero, a node other than an INODE (e.g. a bounce or GNODE)
                 // must still take an INODE if only INODEs drive the sink: charge it uncongested. A non-local one must
                 // take one more node: an SDQ node one of the singles, doubles, quads and longs that it drives, before
@@ -2721,26 +2721,24 @@ public class RWRoute {
             }
             // The rows from where it lands to the sink, as for deltaY above but from the row that it is taken from
             final int landDeltaY = Math.abs(Math.abs(sendingY - sinkY) - deltaSLR * sllLength);
-            newTotalPathCost = newPartialPathCost + getSendingChainCost(state, childRnode, sendingHalfX, sendingY) / sharingFactor;
-            newTotalPathCost = addEstimate(state, newTotalPathCost, getDeltaHalfX(sinkRnode, landHalfX, sinkHalfX),
-                    landDeltaY + (deltaSLR - 1) * sllLength, sharingFactor) + finishCost;
             // From the landing node, a route mostly goes on through a single, double, quad or long, each of which is
             // given DEPTH_FIRST_BIAS in its lower bound (as is an UltraScale/UltraScale+ landing SDQ node itself, by
-            // SDQ lookahead, in the sink's SLR): charge it here too, so that the other chains of the same node (which
-            // inherit this lower bound) are not all followed to their landing before the first one's landing is
-            // expanded.
+            // SDQ lookahead, in the sink's SLR): charge it here too (as for a wire), so that the other chains of the
+            // same node (which inherit this lower bound) are not all followed to their landing before the first one's
+            // landing is expanded.
             // Note: a route to a sink in or beside the landing's INT tile may take none (on UltraScale/UltraScale+,
             // RXD* also drives INODEs; on Versal, the landing [A-H]Q* also drives BNODEs, which drive INODEs; nor
             // does one to a Versal sink on the receiving chain), for which this lower bound is then above the true
             // cost by up to DEPTH_FIRST_BIAS
-            newTotalPathCost += state.rnodeCostWeight * RouteNode.DEPTH_FIRST_BIAS;
+            newTotalPathCost = getLowerBound(state,
+                    newPartialPathCost + getSendingChainCost(state, childRnode, sendingHalfX, sendingY) / sharingFactor,
+                    getDeltaHalfX(sinkRnode, landHalfX, sinkHalfX), landDeltaY + (deltaSLR - 1) * sllLength,
+                    sharingFactor, finishCost, true);
         }
         // A discounted node's lower bound is lower than if it were charged as not being on a chain (at the span
         // estimate), which it must be for the discount to be one
-        assert(sendingHalfX < 0 ||
-               newTotalPathCost <= addEstimate(state, newPartialPathCost, deltaHalfX, deltaY + deltaSLR * sllLength,
-                    sharingFactor) + (RouteNode.isSingleDoubleQuadLong(childRnode.getIntentCode()) ?
-                    state.rnodeCostWeight * RouteNode.DEPTH_FIRST_BIAS : 0) + finishCost);
+        assert(sendingHalfX < 0 || newTotalPathCost <= getLowerBound(state, newPartialPathCost, deltaHalfX,
+                deltaY + deltaSLR * sllLength, sharingFactor, finishCost, wire));
 
         if (state.driversMarked && childRnode.isTarget() && !rnode.isTarget()) {
             // A sink pushed from an unmarked driver (see setFinishCosts()): shifted as the marked drivers are (see
@@ -3075,10 +3073,8 @@ public class RWRoute {
         final int deltaHalfX = getDeltaHalfX(sinkRnode, endHalfX, sinkRnode.getEndHalfTileXCoordinate());
         final int deltaY = Math.abs(endY - sinkRnode.getBeginTileYCoordinate());
         // As evaluateCostAndPush() for a single, double, quad or long in the sink's SLR, not on a sending chain
-        float lowerBound = addEstimate(state, partialPathCost, deltaHalfX, deltaY, sharingFactor) +
-                getSdqLookaheadChildFinishCost(state);
-        lowerBound += state.rnodeCostWeight * RouteNode.DEPTH_FIRST_BIAS;
-        return lowerBound;
+        return getLowerBound(state, partialPathCost, deltaHalfX, deltaY, sharingFactor,
+                getSdqLookaheadChildFinishCost(state), true);
     }
 
     /**
@@ -3163,6 +3159,29 @@ public class RWRoute {
             return (halfX <= sinkHalfX) ? sinkHalfX - halfX : Math.max(0, halfX - sinkHalfX - 1);
         }
         return Math.abs(halfX - sinkHalfX);
+    }
+
+    /**
+     * Gets the lower bound that evaluateCostAndPush() gives a node from its path cost and where it ends: the estimate
+     * still to reach the sink (see addEstimate()), finishCost and, for a single, double, quad or long,
+     * DEPTH_FIRST_BIAS, added in that order (so that SDQ lookahead, which prices child wires with this too, gets the
+     * same lower bound, rounding included).
+     * @param state State from the connection that is being routed.
+     * @param partialPathCost The node's path cost (and, on entering a sending chain, the chain's cost).
+     * @param deltaHalfX Horizontal distance to the sink, in half tiles.
+     * @param deltaY Vertical distance to the sink, in rows.
+     * @param sharingFactor Sharing factor of the node.
+     * @param finishCost What every node other than a target is charged (see evaluateCostAndPush()).
+     * @param wire True if the node is a single, double, quad or long (or stands for the one that will follow it).
+     * @return That lower bound.
+     */
+    private float getLowerBound(ConnectionState state, float partialPathCost, int deltaHalfX, int deltaY,
+                                float sharingFactor, float finishCost, boolean wire) {
+        float lowerBound = addEstimate(state, partialPathCost, deltaHalfX, deltaY, sharingFactor) + finishCost;
+        if (wire) {
+            lowerBound += state.rnodeCostWeight * RouteNode.DEPTH_FIRST_BIAS;
+        }
+        return lowerBound;
     }
 
     /**
