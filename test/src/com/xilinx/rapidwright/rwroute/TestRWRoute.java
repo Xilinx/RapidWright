@@ -1237,17 +1237,10 @@ public class TestRWRoute {
     /**
      * The delay (see getRouteDelay()) expected of RWRoute's route on those rows of
      * testDelayWithinFastestTimingDriven() where it is more than {@link #LOWER_BOUND_LEEWAY} slower than the fastest
-     * route, keyed by the row ("part,src,dst", with ",timingWeight" if given); each entry gives both routes and why.
+     * route, keyed by the row ("part,src,dst", with ",timingWeight" if given); each entry is to give both routes and
+     * why. None at present.
      */
     private static final Map<String, Float> DELAY_KNOWN_EXCESS = new HashMap<>();
-    static {
-        // At a timing weight above about 0.353, RWRoute.addEstimate()'s delay estimate can exceed the delay still to
-        // come (see there), so its lower bounds are no longer lower bounds. Fastest, 305: NN4_W_BEG3 (61), NN12_BEG4
-        // (86) to the west half, NN4_W_BEG3 (61), NN2_W_BEG3 (53), IMUX_W22 (44). RWRoute, 348: NN4_W_BEG2, NN12_BEG3,
-        // which lands on the east half, so an intra-tile single back (INT_INT_SDQ_73_INT_OUT0, 43), then NN4_W_BEG2 and
-        // NN2_W_BEG2
-        DELAY_KNOWN_EXCESS.put("xcvu9p-flgb2104-2-i,SLICE_X129Y480.AQ,SLICE_X129Y502.A4,0.5", 348f);
-    }
 
     /**
      * Tests that RWRoute finds a fast route for a single uncongested critical connection, routed timing-driven: one
@@ -1353,7 +1346,7 @@ public class TestRWRoute {
             "xcvu9p-flgb2104-2-i,SLICE_X129Y480.HQ,SLICE_X125Y473.D3,",      // -4,-7; least 293
             "xcvu9p-flgb2104-2-i,SLICE_X130Y480.E_O,SLICE_X125Y467.C4,",     // -5,-13; least 340
             "xcvu9p-flgb2104-2-i,SLICE_X129Y480.HQ,SLICE_X122Y458.F6,",      // -7,-22; least 460
-            // At a higher timing weight (see DELAY_KNOWN_EXCESS)
+            // At a higher timing weight than the default
             "xcvu9p-flgb2104-2-i,SLICE_X129Y480.A_O,SLICE_X129Y462.A6,0.5",  // 0,-18; least 243
             "xcvu9p-flgb2104-2-i,SLICE_X130Y480.AQ,SLICE_X136Y480.A1,0.5",   // 6,0; least 212
             "xcvu9p-flgb2104-2-i,SLICE_X130Y480.E_O,SLICE_X134Y493.C3,0.5",  // 4,13; least 301
