@@ -27,8 +27,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -70,6 +72,7 @@ import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.interchange.Interchange;
 import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.util.CodeGenerator;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
@@ -499,8 +502,8 @@ public class TestRWRoute {
      * SLL input, the super long line, LAG_OUT and the CLE flop route-through it lands on (LAG pin, [A-H]Q2 pin and
      * output). The landing is then a source of its own: an RXD drives SDQ nodes (and on UltraScale INODEs), as a LUT
      * output does, and the Versal flop output launches longs. On UltraScale the crossing's INODE, as the sink's,
-     * cannot directly follow a vertical quad or long or a horizontal long. An exact search found no cheaper route for the existing SLR-crossing tests' connections (and
-     * testCostWithinLowerBoundNonTimingDriven()'s), all of whose cheapest routes cross this way, nor for 1,533 more on
+     * cannot directly follow a vertical quad or long or a horizontal long. An exact search found no cheaper route for
+     * the existing SLR-crossing tests' connections (and testCostWithinLowerBoundNonTimingDriven()'s), all of whose cheapest routes cross this way, nor for 1,533 more on
      * xcku115.
      * @param series The device's series.
      * @param graph The routing graph (for the SLRs and the crossing columns).
@@ -1055,6 +1058,317 @@ public class TestRWRoute {
         // improvement, for which the entry is to be updated
         Assertions.assertTrue(cost >= expected - 1e-4f,
                 "less than expected (update LOWER_BOUND_KNOWN_EXCESS): " + message);
+    }
+
+    /**
+     * A PartialRouter that routes timing-driven, as PartialRouter.routeDesignPartialTimingDriven() (with any further
+     * arguments), and times every net of its design rather than only those that it routes (see
+     * routeSingleConnectionTimingDriven()).
+     */
+    static class AllNetsTimingRouter extends PartialRouter {
+        AllNetsTimingRouter(Design design, Collection<SitePinInst> pinsToRoute, String... args) {
+            super(design, new RWRouteConfig(concat(new String[] {"--fixBoundingBox", "--useUTurnNodes", "--verbose"},
+                    args)), pinsToRoute, false);
+        }
+
+        private static String[] concat(String[] a, String[] b) {
+            String[] c = Arrays.copyOf(a, a.length + b.length);
+            System.arraycopy(b, 0, c, a.length, b.length);
+            return c;
+        }
+
+        @Override
+        protected Collection<Net> getTimingNets() {
+            return design.getNets();
+        }
+    }
+
+    /**
+     * Routes a single connection timing-driven with AllNetsTimingRouter, between placed cells: from a LUT6's output
+     * ([A-H]_O) or an FDRE's ([A-H]Q, or [A-H]Q2 on the second flop) to an input of a LUT6 that drives the flop beside
+     * it ([A-H]FF), through an intra-site net, so that the connection is on a timing path (flop or LUT to flop).
+     * PartialRouter times only the nets that it routes (getTimingNets()), so a lone connection into a LUT is on no
+     * timing path, with or without that flop, and gets criticality 0, its delay counting for nothing in its search.
+     * AllNetsTimingRouter times the intra-site net too, so that the connection's only timing path is the critical path,
+     * and it gets RWRoute's MAX_CRITICALITY (0.99).
+     * @param srcSitePin The source pin, as "SITE.PIN".
+     * @param dstSitePin The sink pin (a LUT input, [A-H][1-6]), as "SITE.PIN".
+     * @param args Further arguments for RWRouteConfig (e.g. "--timingWeight", "0.5").
+     * @return The router, whose only connection holds the route (see getRoute()).
+     */
+    static PartialRouter routeSingleConnectionTimingDriven(String partName, String srcSitePin, String dstSitePin,
+                                                           String... args) {
+        Design design = new Design("top", partName);
+        String[] src = srcSitePin.split("\\.");
+        String[] dst = dstSitePin.split("\\.");
+        Assertions.assertNotEquals(src[0], dst[0]);
+        Cell srcCell;
+        if (src[1].matches("[A-H]_O")) {
+            srcCell = design.createAndPlaceCell("src", Unisim.LUT6, src[0] + "/" + src[1].charAt(0) + "6LUT");
+            LUTTools.configureLUT(srcCell, "O=I0");
+        } else {
+            Assertions.assertTrue(src[1].matches("[A-H]Q2?"), src[1]);
+            srcCell = design.createAndPlaceCell("src", Unisim.FDRE,
+                    src[0] + "/" + src[1].charAt(0) + (src[1].endsWith("2") ? "FF2" : "FF"));
+        }
+        Assertions.assertTrue(dst[1].matches("[A-H][1-6]"), dst[1]);
+        Cell lut = design.createAndPlaceCell("dst", Unisim.LUT6, dst[0] + "/" + dst[1].charAt(0) + "6LUT");
+        String lutInput = "I" + (dst[1].charAt(1) - '1');
+        LUTTools.configureLUT(lut, "O=" + lutInput);
+        Cell ff = design.createAndPlaceCell("ff", Unisim.FDRE, dst[0] + "/" + dst[1].charAt(0) + "FF");
+        Net net = design.createNet("net");
+        ECOTools.connectNet(design, srcCell, src[1].endsWith("_O") ? "O" : "Q", net);
+        ECOTools.connectNet(design, lut, lutInput, net);
+        Net lutToFf = design.createNet("lut_to_ff");
+        ECOTools.connectNet(design, lut, "O", lutToFf);
+        ECOTools.connectNet(design, ff, "D", lutToFf);
+        Assertions.assertTrue(lutToFf.getSinkPins().isEmpty());
+        SitePinInst dstSpi = net.getSinkPins().get(0);
+        Assertions.assertEquals(srcSitePin, net.getSource().getSiteInstName() + "." + net.getSource().getName());
+        Assertions.assertEquals(dstSitePin, dstSpi.getSiteInstName() + "." + dstSpi.getName());
+        PartialRouter router = new AllNetsTimingRouter(design, Collections.singletonList(dstSpi), args);
+        RWRoute.routeDesign(router);
+        Assertions.assertTrue(dstSpi.isRouted());
+        return router;
+    }
+
+    /**
+     * Gets a route's delay as RWRoute computes it (Connection.getRouteDelay()): the sum of its nodes' delays
+     * (RouteNode.getDelay()), plus DelayEstimatorBase.getExtraDelay() for each long that follows a long.
+     * @param route The route's nodes, from source to sink.
+     * @return That delay, in ps.
+     */
+    static float getRouteDelay(List<RouteNode> route) {
+        float delay = route.get(0).getDelay();
+        for (int i = 1; i < route.size(); i++) {
+            RouteNode rnode = route.get(i);
+            delay += rnode.getDelay() + DelayEstimatorBase.getExtraDelay(rnode,
+                    DelayEstimatorBase.isLong(route.get(i - 1)));
+        }
+        return delay;
+    }
+
+    /**
+     * Finds a fastest route of a router's only connection (by getRouteDelay()), with an exact search: a Dijkstra from
+     * its source to its sink, by delay alone, over RWRoute's routing graph. It takes a node's children from
+     * RouteNode.getChildren() and keeps those that RWRoute's search could push (as RWRoute.exploreAndExpand()) but for
+     * the connection's bounding box: the sink, and any other node that is not an exclusive sink and that
+     * RouteNodeGraph.isAccessible() accepts. So no route in that graph is faster, even one that leaves the bounding box
+     * (as was found, 6 ps faster, for one of 2,360 connections on xcvu9p). Of RWRoute's search, it shares nothing else:
+     * not its costs, lower bounds, bounding box or queue order, and it may reach a node again by a faster path.
+     * @param router The router, after routing a connection that does not cross SLRs.
+     * @return A fastest route's nodes, from source to sink.
+     */
+    static List<RouteNode> getFastestRoute(RWRoute router) {
+        Assertions.assertEquals(1, router.indirectConnections.size());
+        RouteNodeGraph graph = router.routingGraph;
+        Connection connection = router.indirectConnections.get(0);
+        // Every node that a crossing takes is accessible only to a connection that crosses SLRs, for which
+        // RouteNodeGraph.isAccessible() reads the path (RouteNode.getPrev()) that this search does not set
+        Assertions.assertFalse(connection.isCrossSLR());
+        RouteNode source = connection.getSourceRnode();
+        RouteNode sink = connection.getSinkRnode();
+        Map<RouteNode, Float> delays = new HashMap<>();
+        Map<RouteNode, RouteNode> parents = new HashMap<>();
+        PriorityQueue<Map.Entry<Float, RouteNode>> queue = new PriorityQueue<>(Map.Entry.comparingByKey());
+        delays.put(source, source.getDelay());
+        queue.add(new AbstractMap.SimpleImmutableEntry<>(source.getDelay(), source));
+        while (!queue.isEmpty()) {
+            Map.Entry<Float, RouteNode> entry = queue.poll();
+            float delay = entry.getKey();
+            RouteNode rnode = entry.getValue();
+            if (rnode == sink) {
+                break;
+            }
+            if (delay > delays.get(rnode)) {
+                // Reached again by a faster path since
+                continue;
+            }
+            boolean longParent = DelayEstimatorBase.isLong(rnode);
+            for (RouteNode child : rnode.getChildren(graph)) {
+                if (child != sink && (child.getType().isAnyExclusiveSink() ||
+                        !graph.isAccessible(child, rnode, connection))) {
+                    continue;
+                }
+                float childDelay = delay + child.getDelay() + DelayEstimatorBase.getExtraDelay(child, longParent);
+                Float known = delays.get(child);
+                if (known == null || childDelay < known) {
+                    delays.put(child, childDelay);
+                    parents.put(child, rnode);
+                    queue.add(new AbstractMap.SimpleImmutableEntry<>(childDelay, child));
+                }
+            }
+        }
+        Assertions.assertTrue(delays.containsKey(sink));
+        List<RouteNode> route = new ArrayList<>();
+        for (RouteNode rnode = sink; rnode != null; rnode = parents.get(rnode)) {
+            route.add(rnode);
+        }
+        Collections.reverse(route);
+        return route;
+    }
+
+    /**
+     * Describes a route for a message: each node's INT tile coordinates, wire name and delay (as getRouteDelay()).
+     */
+    private static String describeRoute(List<RouteNode> route) {
+        StringBuilder s = new StringBuilder();
+        for (int i = 0; i < route.size(); i++) {
+            RouteNode rnode = route.get(i);
+            float delay = rnode.getDelay() + ((i == 0) ? 0 : DelayEstimatorBase.getExtraDelay(rnode,
+                    DelayEstimatorBase.isLong(route.get(i - 1))));
+            s.append(i == 0 ? "" : ", ").append(rnode.getTile().getName()).append('/').append(rnode.getWireName());
+            if (delay != 0) {
+                s.append(" (").append((int) delay).append(')');
+            }
+        }
+        return s.toString();
+    }
+
+    /**
+     * The delay (see getRouteDelay()) expected of RWRoute's route on those rows of
+     * testDelayWithinFastestTimingDriven() where it is more than {@link #LOWER_BOUND_LEEWAY} slower than the fastest
+     * route, keyed by the row ("part,src,dst", with ",timingWeight" if given); each entry gives both routes and why.
+     */
+    private static final Map<String, Float> DELAY_KNOWN_EXCESS = new HashMap<>();
+    static {
+        // At a timing weight above about 0.353, RWRoute.addEstimate()'s delay estimate can exceed the delay still to
+        // come (see there), so its lower bounds are no longer lower bounds. Fastest, 305: NN4_W_BEG3 (61), NN12_BEG4
+        // (86) to the west half, NN4_W_BEG3 (61), NN2_W_BEG3 (53), IMUX_W22 (44). RWRoute, 348: NN4_W_BEG2, NN12_BEG3,
+        // which lands on the east half, so an intra-tile single back (INT_INT_SDQ_73_INT_OUT0, 43), then NN4_W_BEG2 and
+        // NN2_W_BEG2
+        DELAY_KNOWN_EXCESS.put("xcvu9p-flgb2104-2-i,SLICE_X129Y480.AQ,SLICE_X129Y502.A4,0.5", 348f);
+    }
+
+    /**
+     * Tests that RWRoute finds a fast route for a single uncongested critical connection, routed timing-driven: one
+     * whose delay, under RWRoute's own delay model (getRouteDelay(), as Connection.getRouteDelay()), is within
+     * {@link #LOWER_BOUND_LEEWAY} of the least delay of any route in RWRoute's routing graph (getFastestRoute()), or of
+     * its known excess over it ({@link #DELAY_KNOWN_EXCESS}). The counterpart of
+     * testCostWithinLowerBoundNonTimingDriven(), on UltraScale+ only: RWRoute routes timing-driven only with timing
+     * data, which only UltraScale+ has (in $RAPIDWRIGHT_PATH/timing).
+     * <p>
+     * Each connection is routed with RWRoute's default timing-driven configuration as PartialRouter applies it
+     * (routeDesignPartialTimingDriven()), between placed cells, its sink LUT driving a flop (see
+     * routeSingleConnectionTimingDriven()), so that it is on a timing path and gets RWRoute's MAX_CRITICALITY (0.99),
+     * as asserted. Its delay rather than its combined cost is checked: delay is what a timing-driven route is for, and
+     * the least delay does not depend on RWRoute's weights, so that the same check applies at another timing weight
+     * (the fourth field, else the default).
+     * <p>
+     * The reference is the exact least delay, not a lower bound from a hand-built model of the fabric (as
+     * getLowerBound()): priced by delay, such a model was found either not to be a lower bound (fabric features such as
+     * INODE and SDQ node feedthroughs, NN4/SS4 members that travel 5 rows and a WW1_W member that lands a row north
+     * give faster routes than it allows) or, with those features allowed everywhere, so loose that RWRoute was more
+     * than 5% above it on all but one of these rows. What this checks is RWRoute's search (its costs, lower bounds,
+     * bounding box and queue) against a plain Dijkstra that shares none of them; not RWRoute's routing graph or delays,
+     * which both use.
+     * <p>
+     * The rows lie in xcvu9p's SLR1, between the RCLK rows below INT row 450 and below row 510, across whose RCLK row a
+     * vertical wire has a greater delay; neither RWRoute's route nor the fastest route of any row crosses one. Sources
+     * are in row 480, in the middle, on either half of INT_X83 (SLICE_X129 on its west half, SLICE_X130 on its east),
+     * so that sinks lie up to 24 rows away in either direction, and in INT_X79 to INT_X86, whose columns have no BRAM,
+     * DSP or URAM column between them; the rows cover every direction at several distances (half tiles, rows), from LUT
+     * and flop outputs, to inputs of all eight LUTs and of all six numbers.
+     * <p>
+     * TODO: rows that cross an SLR boundary, once super long lines have a delay. RouterHelper.computeNodeDelay() gives
+     * a delay only to nodes for which RouteNode.isExitNode() holds, which a super long line is not, so that a
+     * crossing's delay is not yet meaningful.
+     * @param partName Part.
+     * @param srcSitePin Source pin, as "SITE.PIN": a LUT output ([A-H]_O) or a flop output ([A-H]Q).
+     * @param dstSitePin Sink pin, as "SITE.PIN": a LUT input ([A-H][1-6]).
+     * @param timingWeight RWRoute's timing weight ("--timingWeight"), or null for its default.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            // Each row's comment gives the source-sink distance (half tiles, rows) and the least delay (ps).
+            // North and south, on the west half (SLICE_X129, INT_X83)
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.A_O,SLICE_X129Y481.A1,",     // 0,1; least 185
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.A_O,SLICE_X129Y482.B2,",     // 0,2; least 171
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.A_O,SLICE_X129Y484.D4,",     // 0,4; least 189
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.A_O,SLICE_X129Y486.F6,",     // 0,6; least 203
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.A_O,SLICE_X129Y492.A6,",     // 0,12; least 271
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.A_O,SLICE_X129Y504.D3,",     // 0,24; least 362
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.A_O,SLICE_X129Y479.E2,",     // 0,-1; least 164
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.A_O,SLICE_X129Y478.F1,",     // 0,-2; least 127
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.A_O,SLICE_X129Y476.H3,",     // 0,-4; least 212
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.A_O,SLICE_X129Y474.B2,",     // 0,-6; least 225
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.A_O,SLICE_X129Y468.E5,",     // 0,-12; least 265
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.A_O,SLICE_X129Y456.H6,",     // 0,-24; least 350
+            // North and south, on the east half (SLICE_X130, INT_X83)
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.AQ,SLICE_X130Y483.H6,",      // 0,3; least 207
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.AQ,SLICE_X130Y485.B5,",      // 0,5; least 151
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.AQ,SLICE_X130Y488.D3,",      // 0,8; least 254
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.AQ,SLICE_X130Y490.E2,",      // 0,10; least 228
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.AQ,SLICE_X130Y496.G6,",      // 0,16; least 298
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.AQ,SLICE_X130Y500.H3,",      // 0,20; least 299
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.AQ,SLICE_X130Y477.D4,",      // 0,-3; least 143
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.AQ,SLICE_X130Y475.F6,",      // 0,-5; least 150
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.AQ,SLICE_X130Y472.H6,",      // 0,-8; least 249
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.AQ,SLICE_X130Y470.A6,",      // 0,-10; least 283
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.AQ,SLICE_X130Y464.C4,",      // 0,-16; least 297
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.AQ,SLICE_X130Y460.D3,",      // 0,-20; least 340
+            // West, and to the other half of the same INT tile
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.A_O,SLICE_X129Y480.G6,",     // -1,0; least 132
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.A_O,SLICE_X128Y480.H3,",     // -1,0; least 159
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.A_O,SLICE_X127Y480.G6,",     // -2,0; least 149
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.A_O,SLICE_X126Y480.F1,",     // -3,0; least 180
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.A_O,SLICE_X125Y480.E2,",     // -4,0; least 202
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.A_O,SLICE_X124Y480.D3,",     // -5,0; least 214
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.A_O,SLICE_X123Y480.C4,",     // -6,0; least 182
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.A_O,SLICE_X122Y480.B5,",     // -7,0; least 228
+            // East, and to the other half of the same INT tile
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.AQ,SLICE_X130Y480.H6,",      // 1,0; least 151
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.AQ,SLICE_X131Y480.G1,",      // 1,0; least 185
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.AQ,SLICE_X132Y480.H6,",      // 2,0; least 168
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.AQ,SLICE_X133Y480.A6,",      // 3,0; least 214
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.AQ,SLICE_X134Y480.B5,",      // 4,0; least 164
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.AQ,SLICE_X135Y480.C4,",      // 5,0; least 210
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.AQ,SLICE_X136Y480.D3,",      // 6,0; least 251
+            // North-east
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.HQ,SLICE_X132Y483.G1,",      // 3,3; least 230
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.E_O,SLICE_X134Y487.F1,",     // 4,7; least 312
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.HQ,SLICE_X134Y493.A1,",      // 5,13; least 327
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.E_O,SLICE_X136Y502.H6,",     // 6,22; least 474
+            // North-west
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.E_O,SLICE_X127Y483.E2,",     // -3,3; least 255
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.HQ,SLICE_X127Y487.H3,",      // -2,7; least 268
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.E_O,SLICE_X125Y493.G1,",     // -5,13; least 392
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.HQ,SLICE_X122Y502.B2,",      // -7,22; least 470
+            // South-east
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.HQ,SLICE_X134Y477.C3,",      // 5,-3; least 230
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.E_O,SLICE_X132Y473.B5,",     // 2,-7; least 264
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.HQ,SLICE_X136Y467.E2,",      // 7,-13; least 391
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.E_O,SLICE_X134Y458.D4,",     // 4,-22; least 383
+            // South-west
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.E_O,SLICE_X127Y477.A1,",     // -3,-3; least 276
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.HQ,SLICE_X125Y473.D3,",      // -4,-7; least 293
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.E_O,SLICE_X125Y467.C4,",     // -5,-13; least 340
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.HQ,SLICE_X122Y458.F6,",      // -7,-22; least 460
+            // At a higher timing weight (see DELAY_KNOWN_EXCESS)
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.A_O,SLICE_X129Y462.A6,0.5",  // 0,-18; least 243
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.AQ,SLICE_X136Y480.A1,0.5",   // 6,0; least 212
+            "xcvu9p-flgb2104-2-i,SLICE_X130Y480.E_O,SLICE_X134Y493.C3,0.5",  // 4,13; least 301
+            "xcvu9p-flgb2104-2-i,SLICE_X129Y480.AQ,SLICE_X129Y502.A4,0.5",   // 0,22; least 305
+    })
+    public void testDelayWithinFastestTimingDriven(String partName, String srcSitePin, String dstSitePin,
+                                                   String timingWeight) {
+        PartialRouter rwroute = (timingWeight == null)
+                ? routeSingleConnectionTimingDriven(partName, srcSitePin, dstSitePin)
+                : routeSingleConnectionTimingDriven(partName, srcSitePin, dstSitePin, "--timingWeight", timingWeight);
+        // RWRoute's MAX_CRITICALITY: the connection's only timing path is the critical path
+        Assertions.assertEquals(0.99f, rwroute.indirectConnections.get(0).getCriticality());
+        List<RouteNode> route = getRoute(rwroute);
+        List<RouteNode> fastest = getFastestRoute(rwroute);
+        float delay = getRouteDelay(route);
+        float leastDelay = getRouteDelay(fastest);
+        float expected = DELAY_KNOWN_EXCESS.getOrDefault(partName + "," + srcSitePin + "," + dstSitePin +
+                (timingWeight == null ? "" : "," + timingWeight), leastDelay);
+        String message = "delay " + delay + ", expected " + expected + ", least " + leastDelay + ", ratio " +
+                delay / leastDelay + "; RWRoute: " + describeRoute(route) + "; fastest: " + describeRoute(fastest);
+        System.out.println(srcSitePin + " -> " + dstSitePin + ": " + message);
+        Assertions.assertTrue(delay >= leastDelay, "faster than the fastest route: " + message);
+        Assertions.assertTrue(delay <= expected * (1 + LOWER_BOUND_LEEWAY), "more than expected: " + message);
+        Assertions.assertTrue(delay >= expected, "less than expected (update DELAY_KNOWN_EXCESS): " + message);
     }
 
     Design testSingleConnectionHelper(String partName,
