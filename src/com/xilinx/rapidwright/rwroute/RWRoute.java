@@ -1728,6 +1728,8 @@ public class RWRoute {
         protected float estWlWeight;
         protected float dlyWeight;
         protected float estDlyWeight;
+        /** If timing driven: each target's LUT logic delay in excess of the fastest one's, as targets */
+        protected final float[] targetExcessLogicDelays = new float[LUTTools.MAX_LUT_SIZE];
 
         /** Number of nodes popped during the routing of this connection */
         protected int nodesPopped;
@@ -1840,6 +1842,9 @@ public class RWRoute {
             }
             if (config.isTimingDriven()) {
                 connection.updateRouteDelay();
+                // With LUT pin swapping, the route may arrive at a different LUT pin: keep the timing graph's
+                // logic delays in step, for the criticalities of the next iteration (and the final report)
+                routingGraph.getLutLogicDelay(timingManager.getTimingGraph(), connection, connection.getRnodes().get(0), true);
             }
             assert(connection.isRouted());
         } else {
@@ -2105,8 +2110,10 @@ public class RWRoute {
             if (childRNode.isVisited(sequence)) {
                 // Node must be in queue already
 
-                // Targets that are visited more than once must be overused (unless marked drivers of the sinks)
-                assert(!childRNode.isTarget() || state.driversMarked || childRNode.willOverUse(netWrapper));
+                // Targets that are visited more than once must be overused (unless marked drivers of the sinks, or,
+                // with timing-driven LUT pin swaps, pushed without early termination)
+                assert(!childRNode.isTarget() || state.driversMarked || childRNode.willOverUse(netWrapper) ||
+                       (config.isTimingDriven() && connection.hasAltSinks()));
 
                 // Note: it is possible this is a cheaper path to childRNode; however, because the
                 // PriorityQueue class does not support (efficiently) reducing the cost of nodes
@@ -2133,8 +2140,11 @@ public class RWRoute {
                     state.earlyTermination = !state.driversMarked;
                 } else {
                     // Target is not an exclusive sink, only early terminate if this net will not
-                    // (further) overuse this node
-                    state.earlyTermination = !state.driversMarked && !childRNode.willOverUse(netWrapper);
+                    // (further) overuse this node, and (with timing-driven LUT pin swapping) no
+                    // other candidate pin has a lower LUT logic delay or is already queued. If the drivers are
+                    // marked, the search ends only when a target is popped
+                    state.earlyTermination = !state.driversMarked && !childRNode.willOverUse(netWrapper) &&
+                                             routingGraph.isEarlyTerminable(state, childRNode);
                 }
 
                 if (state.earlyTermination) {
@@ -2308,6 +2318,11 @@ public class RWRoute {
         newPartialPathCost += state.rnodeWLWeight * 0.5f * childRnode.getHalfTileWirelength() / sharingFactor;
         if (config.isTimingDriven()) {
             newPartialPathCost += state.dlyWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode, longParent));
+            if (childRnode.isTarget() && isValidSink(connection, childRnode)) {
+                // With LUT pin swapping, each candidate LUT input pin has its own logic delay through the LUT (not a
+                // marked driver of the sinks, also a target; see setFinishCosts())
+                newPartialPathCost += state.dlyWeight * routingGraph.getTargetExcessLogicDelay(state, childRnode);
+            }
         }
 
         if (state.driversMarked && childRnode.isTarget() && !rnode.isTarget() && !isValidSink(connection, childRnode)) {
@@ -3171,6 +3186,7 @@ public class RWRoute {
 
         // Sets the sink rnode(s) of the connection as the target(s)
         connection.setAllTargets(state);
+        routingGraph.setTargetExcessLogicDelays(state, timingManager);
 
         // Marks the drivers of the sinks, if possible, and prices them
         setFinishCosts(state);
@@ -3204,8 +3220,6 @@ public class RWRoute {
      */
     private void setFinishCosts(ConnectionState state) {
         final Connection connection = state.connection;
-        final RouteNode sinkRnode = connection.getSinkRnode();
-        final List<RouteNode> altSinkRnodes = connection.getAltSinkRnodes();
         final boolean hasAltSinks = connection.hasAltSinks();
         final List<RouteNode> targets = state.targets;
         final int firstDriver = targets.size();
@@ -3214,8 +3228,11 @@ public class RWRoute {
         state.minUnmarkedDriverCost = Float.MAX_VALUE;
         state.minUnmarkedDriver = null;
         boolean markable = true;
-        for (int i = -1; i < altSinkRnodes.size() && markable; i++) {
-            final RouteNode target = (i < 0) ? sinkRnode : altSinkRnodes.get(i);
+        // The targets so far are the connection's sinks that are targets (see Connection.setAllTargets(): not those
+        // that another connection of its net already uses, with LUT pin swapping)
+        for (int i = 0; i < firstDriver && markable; i++) {
+            final RouteNode target = targets.get(i);
+            assert(isValidSink(connection, target));
             if (hasAltSinks) {
                 minSinkCost = Math.min(minSinkCost, getSinkFinishCost(state, target));
             }
@@ -3374,7 +3391,8 @@ public class RWRoute {
     private boolean hasFreeSinkChild(RouteNode driver, Connection connection) {
         final NetWrapper netWrapper = connection.getNetWrapper();
         for (RouteNode child : driver.getChildren(routingGraph)) {
-            if (isValidSink(connection, child) && !child.willOverUse(netWrapper)) {
+            // Only a sink that is a target (see Connection.setAllTargets())
+            if (child.isTarget() && isValidSink(connection, child) && !child.willOverUse(netWrapper)) {
                 return true;
             }
         }
@@ -3494,6 +3512,10 @@ public class RWRoute {
         cost += state.rnodeWLWeight * 0.5f * rnode.getHalfTileWirelength() / sharingFactor;
         if (config.isTimingDriven()) {
             cost += state.dlyWeight * rnode.getDelay();
+            if (rnode.isTarget() && isValidSink(connection, rnode)) {
+                // As evaluateCostAndPush(): with LUT pin swapping, each candidate LUT input pin has its own logic delay
+                cost += state.dlyWeight * routingGraph.getTargetExcessLogicDelay(state, rnode);
+            }
         }
         return cost;
     }
