@@ -477,10 +477,14 @@ public class TestRWRoute {
      * xcvc1902, in every direction from LUT and flop outputs, nor for any of 3,600 on xcku115 from five LUT and flop
      * outputs (AQ, A_O, DQ2, EQ2, HQ) to 24 LUT inputs 1 to 17 rows away: it is known to be a lower bound for those
      * connections only. testCostWithinLowerBoundNonTimingDriven()'s rows are among those whose cheapest route attains
-     * it (but for three on xcku040; see there). It is loose where moves cannot follow each other as freely as here:
-     * which SDQ nodes and INODE feedthroughs a wire's end reaches depends on the member (BEG index) of its family, e.g.
-     * on xcku040 and xcku115 the INODE feedthroughs that NN2_[EW]_BEG7 (3 rows) reaches lead back a row south, and
-     * those that NN2_[EW]_BEG6 reaches lead a row north.
+     * it. It is loose where moves cannot follow each other as freely as here: which SDQ nodes and INODE feedthroughs a
+     * wire's end reaches depends on the member (BEG index) of its family, e.g. on xcku040 and xcku115 the INODE
+     * feedthroughs that NN2_[EW]_BEG7 (3 rows) reaches lead back a row south, and those that NN2_[EW]_BEG6 reaches lead
+     * a row north; and which members a CLE output reaches depends on the output, e.g. on xcku040 SLICE_X51Y120's H_O
+     * reaches NN5_BEG7 (6 rows) through an SDQ node, but its A_O and AQ do not. So on xcku040, 7 rows north in the
+     * same half tile column (3.4: NN2_[EW]_BEG7 twice, then an INODE feedthrough a row north), it was attained by none
+     * of the connections from A_O or AQ of SLICE_X50 or SLICE_X51, Y100 to Y140, to the 48 LUT inputs there, nor
+     * from any of 24 LUT and flop outputs of SLICE_X50Y120 or SLICE_X51Y120.
      * <p>
      * It is not a lower bound for every source and sink pin. Known gaps, where a route can be cheaper (each also a
      * place where RWRoute's own view of the wire, RouteNodeInfo.get(), differs from these moves), from an exact
@@ -817,15 +821,11 @@ public class TestRWRoute {
      * The cost (see getModelCost()) expected of RWRoute's route on those rows of
      * testCostWithinLowerBoundNonTimingDriven() where it costs more than {@link #LOWER_BOUND_LEEWAY} above the lower
      * bound, keyed by the row ("part,src,dst"); each entry gives RWRoute's route and the cheapest one (from an exact
-     * search under the same costs). They are of two kinds:
-     * <ul>
-     * <li>RWRoute misses: the cheapest route attains the bound, but RWRoute's costs more. In each, near the source
-     * RWRoute takes a wire that looks as cheap or cheaper one wire ahead (it travels a row further, or lands on the
-     * other half), but the wires that follow it cost more; the lower bounds of the nodes near the source are then too
-     * high (being estimates that exceed the true cost) for the search to come back to them.</li>
-     * <li>A loose bound: RWRoute finds the cheapest route, but the bound cannot be attained, since getLowerBound()
-     * lets any move follow any other (see there).</li>
-     * </ul>
+     * search under the same costs). All are RWRoute misses: the cheapest route attains the bound, but RWRoute's costs
+     * more. In each, near the source RWRoute takes a wire that looks as cheap or cheaper one wire ahead (it travels a
+     * row further, or lands on the other half), but the wires that follow it cost more; the lower bounds of the nodes
+     * near the source are then too high (being estimates that exceed the true cost) for the search to come back to
+     * them.
      */
     private static final Map<String, Float> LOWER_BOUND_KNOWN_EXCESS = new HashMap<>();
     static {
@@ -853,11 +853,6 @@ public class TestRWRoute {
         LOWER_BOUND_KNOWN_EXCESS.put("xcvc1902,SLICE_X60Y140.AQ,SLICE_X60Y117.A4", 8.2f);
         // As above, on the west half: OUT_SS4_W_BEG0 and OUT_NN1_W_BEG0
         LOWER_BOUND_KNOWN_EXCESS.put("xcvc1902,SLICE_X62Y140.AQ,SLICE_X62Y117.A4", 8.2f);
-        // Loose bound (UltraScale): bound 3.4 (NN2_[EW]_BEG7 3 rows twice, then an INODE feedthrough a row north, but
-        // the INODE feedthroughs that NN2_[EW]_BEG7 reaches lead a row south). RWRoute takes the cheapest route:
-        // INT_NODE_QUAD_LONG_*, NN5_BEG0 5 rows, NN2_E_BEG0
-        LOWER_BOUND_KNOWN_EXCESS.put("xcku040-ffva1156-2-e,SLICE_X51Y120.A_O,SLICE_X51Y127.A6", 3.8f);
-        LOWER_BOUND_KNOWN_EXCESS.put("xcku040-ffva1156-2-e,SLICE_X51Y120.AQ,SLICE_X51Y127.A6", 3.8f);
     }
 
     /**
@@ -881,9 +876,8 @@ public class TestRWRoute {
      * getModelCost() (RWRoute's own costs without bias), is within {@link #LOWER_BOUND_LEEWAY} of a lower bound
      * (getLowerBound()), or of its known excess over that bound ({@link #LOWER_BOUND_KNOWN_EXCESS}). The connections
      * were chosen, with an exact search under the same model, as ones whose cheapest route attains that lower bound,
-     * so the bound is known to be achievable; except three on xcku040, where the bound is loose (see
-     * getLowerBound()), whose rows give their cheapest cost too. Which wires the route takes does not matter, so
-     * neither does how ties are broken.
+     * so the bound is known to be achievable. Which wires the route takes does not matter, so neither does how ties
+     * are broken.
      * @param partName Part.
      * @param srcSitePin Source pin, as "SITE.PIN".
      * @param dstSitePin Sink pin, as "SITE.PIN".
@@ -946,13 +940,13 @@ public class TestRWRoute {
             "xcvu9p-flgb2104-2-i,SLICE_X129Y450.AQ,SLICE_X130Y450.A4",     // 1,0; bound 1.7
             // UltraScale (xcku040): CLEL_R_X33 on the east half of INT_X33, CLE_M_X33 on its west half
             "xcku040-ffva1156-2-e,SLICE_X51Y120.A_O,SLICE_X51Y122.A6",     // 0,2; bound 2.0
-            "xcku040-ffva1156-2-e,SLICE_X51Y120.A_O,SLICE_X51Y127.A6",     // 0,7; bound 3.4 (cheapest 3.8)
+            "xcku040-ffva1156-2-e,SLICE_X51Y120.A_O,SLICE_X50Y113.H6",     // -1,-7; bound 3.6
             "xcku040-ffva1156-2-e,SLICE_X51Y120.A_O,SLICE_X52Y120.A6",     // 1,0; bound 1.7
             "xcku040-ffva1156-2-e,SLICE_X51Y120.AQ,SLICE_X51Y122.A6",      // 0,2; bound 2.0
-            "xcku040-ffva1156-2-e,SLICE_X51Y120.AQ,SLICE_X51Y127.A6",      // 0,7; bound 3.4 (cheapest 3.8)
+            "xcku040-ffva1156-2-e,SLICE_X51Y120.AQ,SLICE_X50Y113.H6",      // -1,-7; bound 3.6
             "xcku040-ffva1156-2-e,SLICE_X51Y120.AQ,SLICE_X52Y120.A6",      // 1,0; bound 1.7
             "xcku040-ffva1156-2-e,SLICE_X50Y120.A_O,SLICE_X50Y122.A6",     // 0,2; bound 2.0
-            "xcku040-ffva1156-2-e,SLICE_X50Y120.A_O,SLICE_X50Y97.A4",      // 0,-23; bound 8.0 (cheapest 8.2)
+            "xcku040-ffva1156-2-e,SLICE_X50Y120.A_O,SLICE_X50Y97.C2",      // 0,-23; bound 8.0
             "xcku040-ffva1156-2-e,SLICE_X50Y120.A_O,SLICE_X51Y120.A6",     // 1,0; bound 1.7
             "xcku040-ffva1156-2-e,SLICE_X50Y120.AQ,SLICE_X50Y122.A6",      // 0,2; bound 2.0
             "xcku040-ffva1156-2-e,SLICE_X50Y120.AQ,SLICE_X51Y120.A6",      // 1,0; bound 1.7
