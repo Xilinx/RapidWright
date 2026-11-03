@@ -191,8 +191,10 @@ public class NetWrapper{
                 continue;
             }
 
-            RouteNode driver = rnodes.get(rnodes.size() - 2);
-            for (int i = rnodes.size() - 1; i >= 0; i--) {
+            // Nodes run from the sink to the source, which has no driver (and may drive
+            // the first node of each connection's route differently)
+            RouteNode driver = rnodes.get(rnodes.size() - 1);
+            for (int i = rnodes.size() - 2; i >= 0; i--) {
                 assert(driver != null);
                 RouteNode rnode = rnodes.get(i);
                 if (rnode.isVisited(sequence)) {
