@@ -21,10 +21,12 @@
 package com.xilinx.rapidwright.edif;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Random;
 
 import org.junit.jupiter.api.Assertions;
@@ -199,5 +201,170 @@ public class TestEDIFPortInstArray {
         Assertions.assertSame(b, net.getPortInst(u0, "I"));
         view.clear();
         Assertions.assertEquals(0, net.getPortInsts().size());
+    }
+
+    /** Net "n" with port "I" on cell insts u0..u{n-1}, sorted u0 < u1 < ... */
+    private static EDIFNet netWithPins(Fixture f, int n) {
+        EDIFNet net = f.top.createNet("n");
+        for (int i = 0; i < n; i++) {
+            net.createPortInst(f.in, f.leaf.createCellInst("u" + i, f.top));
+        }
+        return net;
+    }
+
+    @Test
+    public void testPositionalAddIsCheckedAndExact() {
+        Fixture f = new Fixture();
+        EDIFNet net = netWithPins(f, 0);
+        EDIFCellInst u0 = f.leaf.createCellInst("u0", f.top);
+        EDIFCellInst u1 = f.leaf.createCellInst("u1", f.top);
+        EDIFCellInst u2 = f.leaf.createCellInst("u2", f.top);
+        EDIFPortInst p0 = net.createPortInst(f.in, u0);
+        EDIFPortInst p2 = net.createPortInst(f.in, u2);
+        List<EDIFPortInst> view = net.getPortInsts();
+        EDIFPortInst p1 = new EDIFPortInst(f.in, null, u1);
+        // Out of bounds: throws, list unchanged
+        Assertions.assertThrows(IndexOutOfBoundsException.class, () -> view.add(3, p1));
+        Assertions.assertThrows(IndexOutOfBoundsException.class, () -> view.add(-1, p1));
+        // Not the sorted position: throws, list unchanged
+        Assertions.assertThrows(IllegalArgumentException.class, () -> view.add(0, p1));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> view.add(2, p1));
+        // An equal entry is present: throws instead of overwriting (size must grow by one)
+        EDIFPortInst p2b = new EDIFPortInst(f.in, null, u2);
+        Assertions.assertThrows(IllegalArgumentException.class, () -> view.add(1, p2b));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> view.add(2, p2b));
+        Assertions.assertEquals(2, view.size());
+        view.add(1, p1);
+        Assertions.assertEquals(Arrays.asList(p0, p1, p2), view);
+        Assertions.assertSame(p1, net.getPortInst(u1, "I"));
+
+        // ListIterator.add() inserts at the cursor and keeps the cursor consistent
+        view.remove(p1);
+        ListIterator<EDIFPortInst> it = view.listIterator();
+        Assertions.assertSame(p0, it.next());
+        it.add(p1);
+        Assertions.assertEquals(2, it.nextIndex());
+        Assertions.assertSame(p2, it.next());
+        Assertions.assertFalse(it.hasNext());
+        Assertions.assertEquals(Arrays.asList(p0, p1, p2), view);
+
+        // A sub-list insertion stays inside the sub-list
+        view.remove(p1);
+        List<EDIFPortInst> sub = view.subList(1, 2);
+        Assertions.assertThrows(IllegalArgumentException.class, () -> sub.add(1, p1));
+        sub.add(0, p1);
+        Assertions.assertEquals(Arrays.asList(p1, p2), sub);
+        Assertions.assertEquals(Arrays.asList(p0, p1, p2), view);
+    }
+
+    @Test
+    public void testStaleIteratorsFailFastOnOwnerChanges() {
+        // Copilot scenario: a list iterator reads a from [a, b]; a is removed through the owner;
+        // the iterator's remove() must throw instead of removing b.
+        Fixture f = new Fixture();
+        EDIFNet net = netWithPins(f, 2);
+        EDIFPortInst a = net.getPortInsts().get(0);
+        EDIFPortInst b = net.getPortInsts().get(1);
+        ListIterator<EDIFPortInst> lit = net.getPortInsts().listIterator();
+        Assertions.assertSame(a, lit.next());
+        net.removePortInst(a);
+        Assertions.assertThrows(ConcurrentModificationException.class, lit::remove);
+        Assertions.assertEquals(Collections.singletonList(b), net.getPortInsts());
+
+        // Same through a sub-list iterator
+        net = netWithPins(f = new Fixture(), 3);
+        List<EDIFPortInst> all = new ArrayList<>(net.getPortInsts());
+        Iterator<EDIFPortInst> sit = net.getPortInsts().subList(0, 2).iterator();
+        Assertions.assertSame(all.get(0), sit.next());
+        net.removePortInst(all.get(0));
+        Assertions.assertThrows(ConcurrentModificationException.class, sit::remove);
+        Assertions.assertEquals(all.subList(1, 3), net.getPortInsts());
+
+        // Remove and re-add through the owner (same size afterwards) is detected
+        net = netWithPins(f = new Fixture(), 4);
+        all = new ArrayList<>(net.getPortInsts());
+        Iterator<EDIFPortInst> it = net.getPortInsts().iterator();
+        it.next();
+        net.removePortInst(all.get(2));
+        net.addPortInst(all.get(2));
+        Assertions.assertEquals(all, net.getPortInsts());
+        Assertions.assertThrows(ConcurrentModificationException.class, it::next);
+
+        // Single element removed and a different one added: stale remove() must not remove it
+        net = netWithPins(f = new Fixture(), 1);
+        EDIFPortInst only = net.getPortInsts().get(0);
+        it = net.getPortInsts().iterator();
+        Assertions.assertSame(only, it.next());
+        net.removePortInst(only);
+        EDIFPortInst other = net.createPortInst(f.out, only.getCellInst());
+        Assertions.assertThrows(ConcurrentModificationException.class, it::remove);
+        Assertions.assertEquals(Collections.singletonList(other), net.getPortInsts());
+
+        // Deferred adds followed by a reordering sort are detected
+        Fixture g = new Fixture();
+        net = g.top.createNet("d");
+        for (int i = 3; i >= 0; i--) {
+            net.createPortInst(g.in, g.leaf.createCellInst("u" + i, g.top), true);
+        }
+        it = net.getPortInsts().iterator();
+        it.next();
+        g.top.sortEDIFPortInstLists();
+        Assertions.assertThrows(ConcurrentModificationException.class, it::next);
+    }
+
+    @Test
+    public void testSingleElementReplacementKeepsIterators() {
+        // Copilot scenario: replacing the only port inst is not a structural change
+        Fixture f = new Fixture();
+        EDIFNet net = netWithPins(f, 1);
+        EDIFPortInst a = net.getPortInsts().get(0);
+        List<EDIFPortInst> view = net.getPortInsts();
+        Iterator<EDIFPortInst> it = view.iterator();
+        EDIFPortInst r = new EDIFPortInst(f.in, null, a.getCellInst());
+        Assertions.assertSame(a, view.set(0, r));
+        Assertions.assertTrue(it.hasNext());
+        Assertions.assertSame(r, it.next());
+        Assertions.assertFalse(it.hasNext());
+
+        // Overwriting the connection through the owner
+        it = net.getPortInsts().iterator();
+        EDIFPortInst c = net.createPortInst(f.in, a.getCellInst());
+        Assertions.assertSame(c, it.next());
+        it.remove();
+        Assertions.assertTrue(net.getPortInsts().isEmpty());
+
+        // ListIterator.set() on a single element, then remove()
+        net = netWithPins(f = new Fixture(), 1);
+        EDIFPortInst x = net.getPortInsts().get(0);
+        ListIterator<EDIFPortInst> lit = net.getPortInsts().listIterator();
+        lit.next();
+        EDIFPortInst y = new EDIFPortInst(f.in, null, x.getCellInst());
+        lit.set(y);
+        Assertions.assertEquals(Collections.singletonList(y), net.getPortInsts());
+        lit.remove();
+        Assertions.assertTrue(net.getPortInsts().isEmpty());
+    }
+
+    @Test
+    public void testListIteratorBidirectionalAndEquality() {
+        Fixture f = new Fixture();
+        EDIFNet net = netWithPins(f, 5);
+        List<EDIFPortInst> ref = new ArrayList<>(net.getPortInsts());
+        ListIterator<EDIFPortInst> it = net.getPortInsts().listIterator(5);
+        for (int i = 4; i >= 0; i--) {
+            Assertions.assertTrue(it.hasPrevious());
+            Assertions.assertEquals(i, it.previousIndex());
+            Assertions.assertSame(ref.get(i), it.previous());
+        }
+        Assertions.assertFalse(it.hasPrevious());
+        Assertions.assertThrows(IndexOutOfBoundsException.class, () -> net.getPortInsts().listIterator(6));
+        Assertions.assertEquals(ref, net.getPortInsts());
+        Assertions.assertEquals(ref.hashCode(), net.getPortInsts().hashCode());
+        Assertions.assertEquals(ref.subList(1, 4), net.getPortInsts().subList(1, 4));
+        net.getPortInsts().subList(1, 4).clear();
+        Assertions.assertEquals(Arrays.asList(ref.get(0), ref.get(4)), net.getPortInsts());
+        for (EDIFPortInst pi : ref.subList(1, 4)) {
+            Assertions.assertNull(net.getPortInst(pi.getCellInst(), pi.getName()));
+        }
     }
 }
