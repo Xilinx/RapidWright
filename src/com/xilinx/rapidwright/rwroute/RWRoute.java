@@ -2724,6 +2724,16 @@ public class RWRoute {
             newTotalPathCost = newPartialPathCost + getSendingChainCost(state, childRnode, sendingHalfX, sendingY) / sharingFactor;
             newTotalPathCost = addEstimate(state, newTotalPathCost, getDeltaHalfX(sinkRnode, landHalfX, sinkHalfX),
                     landDeltaY + (deltaSLR - 1) * sllLength, sharingFactor) + finishCost;
+            // From the landing node, a route mostly goes on through a single, double, quad or long, each of which is
+            // given DEPTH_FIRST_BIAS in its lower bound (as is an UltraScale/UltraScale+ landing SDQ node itself, by
+            // SDQ lookahead, in the sink's SLR): charge it here too, so that the other chains of the same node (which
+            // inherit this lower bound) are not all followed to their landing before the first one's landing is
+            // expanded.
+            // Note: a route to a sink in or beside the landing's INT tile may take none (on UltraScale/UltraScale+,
+            // RXD* also drives INODEs; on Versal, the landing [A-H]Q* also drives BNODEs, which drive INODEs; nor
+            // does one to a Versal sink on the receiving chain), for which this lower bound is then above the true
+            // cost by up to DEPTH_FIRST_BIAS
+            newTotalPathCost += state.rnodeCostWeight * RouteNode.DEPTH_FIRST_BIAS;
         }
         // A discounted node's lower bound is lower than if it were charged as not being on a chain (at the span
         // estimate), which it must be for the discount to be one

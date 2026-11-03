@@ -1419,8 +1419,8 @@ public class TestRWRoute {
             "xcv80,SLICE_X53Y331,SLICE_X53Y406,200",            // Source adjacent to crossing SLL (west, north)
             "xcv80,SLICE_X54Y406,SLICE_X54Y331,100",            // Sink adjacent to crossing SLL (east, south)
             "xcv80,SLICE_X53Y406,SLICE_X53Y331,100",            // Sink adjacent to crossing SLL (west, south)
-            "xcv80,SLICE_X51Y331,SLICE_X51Y406,200",            // Source close to crossing SLL
-            "xcv80,SLICE_X0Y331,SLICE_X49Y406,300",             // Source far from crossing SLL
+            "xcv80,SLICE_X51Y331,SLICE_X51Y406,100",            // Source close to crossing SLL
+            "xcv80,SLICE_X0Y331,SLICE_X49Y406,200",             // Source far from crossing SLL
 
             // US+
             // One SLR crossing
@@ -1440,7 +1440,7 @@ public class TestRWRoute {
             Device.AWS_F1 + ",SLICE_X9Y300,SLICE_X9Y241,100",
             Device.AWS_F1 + ",SLICE_X9Y358,SLICE_X9Y299,200",
             Device.AWS_F1 + ",SLICE_X9Y299,SLICE_X9Y358,100",
-            Device.AWS_F1 + ",SLICE_X53Y241,SLICE_X69Y300,300",
+            Device.AWS_F1 + ",SLICE_X53Y241,SLICE_X69Y300,200",
             Device.AWS_F1 + ",SLICE_X53Y358,SLICE_X69Y299,100",
             // Far
             Device.AWS_F1 + ",SLICE_X9Y240,SLICE_X9Y359,100",    // On Laguna
@@ -1449,7 +1449,7 @@ public class TestRWRoute {
 
             Device.AWS_F1 + ",SLICE_X162Y430,SLICE_X162Y240,100",
             Device.AWS_F1 + ",SLICE_X0Y240,SLICE_X12Y430,100",   // Far from Laguna
-            Device.AWS_F1 + ",SLICE_X0Y430,SLICE_X12Y240,200",
+            Device.AWS_F1 + ",SLICE_X0Y430,SLICE_X12Y240,100",
 
             // Two SLR crossings
             Device.AWS_F1 + ",SLICE_X162Y299,SLICE_X162Y599,100",
@@ -1486,7 +1486,7 @@ public class TestRWRoute {
             Device.AWS_F1 + ",SLICE_X5Y240,SLICE_X5Y359,200",
             // US: on the west half of the INT tile on the other side (west) of a Laguna column (INT_X12)
             "xcku115,SLICE_X17Y240,SLICE_X17Y359,200",
-            "xcku115,SLICE_X17Y359,SLICE_X17Y240,200",
+            "xcku115,SLICE_X17Y359,SLICE_X17Y240,100",
             // Versal: in the crossing band (INT Y261-Y335 northbound, Y336-Y410 southbound) on or beside a crossing half
             "xcv80,SLICE_X54Y257,SLICE_X54Y402,200",            // On a crossing half (INT_X17 west)
             "xcv80,SLICE_X56Y257,SLICE_X56Y402,100",            // Beside a crossing half (INT_X17 east)
