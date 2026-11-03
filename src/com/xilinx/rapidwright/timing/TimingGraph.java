@@ -328,7 +328,16 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 if (v.equals(superSink)) {
                     v.setMinRequiredTime(requirement);
                 } else {
-                    v.setMinRequiredTime(Short.MAX_VALUE);//NOTE: there are dangling timing vertices not connected to super sink
+                    // A dangling vertex, one with no path to the super sink, has no requirement: so that a vertex
+                    // none of whose paths reaches the super sink has an infinite required time and slack, whatever
+                    // the requirement (rather than a finite stand-in, below which a slow enough clock would bring
+                    // its slack)
+                    // TODO: Not all dangling vertices are unconstrained. Some are timing paths that this graph cuts
+                    // short, for want of an arc or an endpoint: e.g. on boom_medium_routed (timing driven), about
+                    // 99% of the 37,971 connections with no path to the super sink end at MUXF7/MUXF8 inputs (no
+                    // arc to O), the write side of distributed RAMs (I, WE, WADR*), DSP inputs (A, B, CE*) or block
+                    // RAM parity inputs (DINPADINP*), rather than at an output port. Their timing is not seen
+                    v.setMinRequiredTime(Float.POSITIVE_INFINITY);
                 }
             }
             

@@ -188,7 +188,11 @@ public class Connection implements Comparable<Connection>{
         // normalized correctly.
         assert(minSlack >= 0);
 
-        float tempCriticality  = (1 - minSlack / maxDelay);
+        // At least 0 (and at most 1, as minSlack is not negative): a connection none of whose paths reaches a timing
+        // endpoint (see TimingGraph.setTimingRequirementTopologicalOrder()), or that has no timing edges, is left with
+        // minSlack at Float.MAX_VALUE, and so a base far below -1, which Math.pow() raises to NaN for an exponent that
+        // is not an integer, and (cast to float) to plus infinity for an even one
+        float tempCriticality = Math.max(0f, 1 - minSlack / maxDelay);
 
         tempCriticality = (float) Math.pow(tempCriticality, criticalityExponent) * maxCriticality;
 
