@@ -370,6 +370,15 @@ public class RouteNodeGraph {
      * there can be above the lower bound of that child wire. And on xcvu3p, in the bottom row of INT tiles (e.g.
      * INT_X63Y0 and INT_X64Y0), the feedthrough SDQ nodes SDQNODE_[EW]_0_FT1 drive wires of their own tile (NN1, SS1,
      * WW2 and WW4_[EW]_BEG0) rather than the ones of the row below that the table gives, which does not exist there.
+     * Nor, likewise, are the INT tiles near the edge of an SLR, where wires that would cross it are cut short or
+     * missing: their tables differ from the measured one in the first and last row of each SLR (on every device
+     * checked: xcku040, xcku115, xcvu440, xcvu3p, xcvu9p, xcvc1902, xcv80 and xcvp1802), and up to 16 rows in on
+     * UltraScale or 4 on UltraScale+ and Versal. E.g. on xcku115, in SLR1's bottom row (INT_X13Y300), EE1_W_0_FTS ends
+     * in its own row, where the table gives a row south (in SLR0, so that SDQ lookahead skips it and its SDQ node's
+     * floor is above that wire's lower bound; e.g. TestRWRoute.testCostWithinLowerBoundNonTimingDriven()'s xcku115
+     * row SLICE_X20Y240.A_O -&gt; SLICE_X20Y300.A6 costs 0.2 above its bound for it). Giving the first and last
+     * row of each SLR tables of their own was measured to fix that, with little effect on routing elsewhere, and was not
+     * done.
      */
     protected final int[][] sdqLookahead;
     /**
