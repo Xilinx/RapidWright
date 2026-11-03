@@ -863,33 +863,34 @@ public class EDIFCell extends EDIFPropertyObject {
         return null;
     }
 
+    /**
+     * Sorts the port instances of all nets and cell instances of this cell, after a batch of
+     * deferred-sort additions (see {@link EDIFNet#addPortInst(EDIFPortInst, boolean)}). This also
+     * trims their unused capacity.
+     */
     public void sortEDIFPortInstLists() {
         for (EDIFNet net : getNets()) {
-            EDIFPortInstList list = net.getEDIFPortInstList();
-            if (list != null) list.reSortList();
+            net.sortPortInsts();
         }
         for (EDIFCellInst inst : getCellInsts()) {
-            EDIFPortInstList list = inst.getEDIFPortInstList();
-            if (list != null) list.reSortList();
+            inst.sortPortInsts();
         }
     }
 
     /**
-     * Trims the backing capacity of all {@link EDIFPortInstList} objects on the
-     * nets and cell instances of this cell down to their current size. The lists
-     * are built via incremental {@link java.util.ArrayList} insertion (which
-     * leaves unused capacity slack), so calling this after a netlist is fully
+     * Trims the backing capacity of the port instance storage of all nets and
+     * cell instances of this cell down to their current size. The arrays are
+     * built via incremental insertion (which leaves unused capacity slack),
+     * so calling this after a netlist is fully
      * loaded reclaims that slack. This is purely a memory optimization and does
      * not change the contents of any list.
      */
     public void trimEDIFPortInstLists() {
         for (EDIFNet net : getNets()) {
-            EDIFPortInstList list = net.getEDIFPortInstList();
-            if (list != null) list.trimToSize();
+            net.trimPortInsts();
         }
         for (EDIFCellInst inst : getCellInsts()) {
-            EDIFPortInstList list = inst.getEDIFPortInstList();
-            if (list != null) list.trimToSize();
+            inst.trimPortInsts();
         }
     }
 

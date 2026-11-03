@@ -817,10 +817,9 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
-     * Trims the backing capacity of every {@link EDIFPortInstList} in the netlist
+     * Trims the backing capacity of every port instance array in the netlist
      * down to its current size (see {@link EDIFCell#trimEDIFPortInstLists()}).
-     * Port instance lists are built via incremental {@link java.util.ArrayList}
-     * insertion during parsing, which leaves unused capacity slack; calling this
+     * Port instance arrays are built via incremental insertion during parsing, which leaves unused capacity slack; calling this
      * once after a netlist is fully loaded reclaims that slack. This is purely a
      * memory optimization and does not change the netlist contents.
      */
