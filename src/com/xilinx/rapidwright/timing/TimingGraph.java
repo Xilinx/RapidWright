@@ -333,10 +333,10 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                     // the requirement (rather than a finite stand-in, below which a slow enough clock would bring
                     // its slack)
                     // TODO: Not all dangling vertices are unconstrained. Some are timing paths that this graph cuts
-                    // short, for want of an arc or an endpoint: e.g. on boom_medium_routed (timing driven), about
-                    // 99% of the 37,971 connections with no path to the super sink end at MUXF7/MUXF8 inputs (no
-                    // arc to O), the write side of distributed RAMs (I, WE, WADR*), DSP inputs (A, B, CE*) or block
-                    // RAM parity inputs (DINPADINP*), rather than at an output port. Their timing is not seen
+                    // short, for want of an arc or an endpoint: e.g. on boom_medium_routed (timing driven), many
+                    // connections with no path to the super sink end at the write side of distributed RAMs (I, WE,
+                    // WADR*), DSP inputs (A, B, CE*) or block RAM parity inputs (DINPADINP*), rather than at an
+                    // output port. Their timing is not seen
                     v.setMinRequiredTime(Float.POSITIVE_INFINITY);
                 }
             }
@@ -1078,7 +1078,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                     }
                 }
             }
-            else if (myCellName.startsWith("LUT") || myCellName.startsWith("RAM") || myCellName.startsWith("SRL")) {
+            else if (myCellName.startsWith("LUT") || myCellName.startsWith("RAM") || myCellName.startsWith("SRL") ||
+                    myCellName.startsWith("MUXF")) {
                 EDIFCell parent = c.getParentCell();
                 boolean excludeSomeEdges = false;
                 boolean eqHasI0 = false;
