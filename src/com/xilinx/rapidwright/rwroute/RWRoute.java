@@ -1131,10 +1131,12 @@ public class RWRoute {
         for (Connection connection : indirectConnections) {
             RouteNode source = connection.getSourceRnode();
             RouteNode[] children = source.getChildren(routingGraph);
-            if (children.length == 0) {
-                // output pin is blocked
-                swapOutputPin(connection);
+            // An output pin with no children is blocked: swap to the alternate output, unless the connection is
+            // already routed (e.g. recovered by PartialRouter from its net's preserved routing), which swapping would
+            // unroute
+            if (children.length == 0 && !connection.isRouted() && swapOutputPin(connection)) {
                 source = connection.getSourceRnode();
+                children = source.getChildren(routingGraph);
             }
             short estDelay = (short) 10000;
             for (RouteNode child : children) {

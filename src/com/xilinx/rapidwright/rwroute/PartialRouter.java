@@ -67,6 +67,9 @@ public class PartialRouter extends RWRoute {
 
     protected Map<Net, List<SitePinInst>> netToPins;
 
+    /** Connections whose routing was recovered from their net's existing routing (see setPIPsOfNets()) */
+    protected Set<Connection> recoveredConnections;
+
     protected static class RouteNodeGraphPartial extends RouteNodeGraph {
 
         public RouteNodeGraphPartial(Design design, RWRouteConfig config) {
@@ -103,6 +106,7 @@ public class PartialRouter extends RWRoute {
         super(design, config);
         this.softPreserve = softPreserve;
         partiallyPreservedNets = new HashSet<>();
+        recoveredConnections = new HashSet<>();
         netToPins = pinsToRoute.stream()
                 .filter((spi) -> !spi.isOutPin())
                 .collect(Collectors.groupingBy(SitePinInst::getNet));
@@ -507,6 +511,9 @@ public class PartialRouter extends RWRoute {
 
                     RouteNode sinkRnode = connection.getSinkRnode();
                     finishRouteConnection(connection, sinkRnode);
+                    if (connection.isRouted()) {
+                        recoveredConnections.add(connection);
+                    }
                 }
             }
         }
@@ -556,6 +563,28 @@ public class PartialRouter extends RWRoute {
 
         if (!connection.isRouted()) {
             connection.resetRoute();
+        }
+    }
+
+    /**
+     * As {@link RWRoute#setPIPsOfNets()}, which sets each net's PIPs from its connections' routing alone, and so drops
+     * the existing routing of any connection that was routed before (recovered from its net's routing) but could not
+     * be routed again: warns of each such sink.
+     */
+    @Override
+    protected void setPIPsOfNets() {
+        super.setPIPsOfNets();
+
+        int lost = 0;
+        for (Connection connection : recoveredConnections) {
+            if (!connection.isRouted()) {
+                System.out.println("WARNING: Sink " + connection.getSink() + " of net " + connection.getNet() +
+                        " was routed before but is not now; its existing routing has been removed");
+                lost++;
+            }
+        }
+        if (lost > 0) {
+            System.out.println("WARNING: " + lost + " sinks that were routed before are not now");
         }
     }
 
