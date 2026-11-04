@@ -345,7 +345,7 @@ public class RouteNodeGraph {
     /** Map of the TileTypeEnum to the highest base wire index */
     protected final Map<TileTypeEnum, Integer> highestBaseWireIndex;
 
-    /** Present congestion factor, as last set by updatePresentCongestionCosts() */
+    /** Present congestion factor, as last set by setPresentCongestionFactor() */
     protected float presentCongestionFactor;
 
     protected static int getTileCount(Design design) {
@@ -2728,13 +2728,13 @@ public class RouteNodeGraph {
         return true;
     }
 
-    public void updatePresentCongestionCosts(float presentCongestionFactor) {
+    public void setPresentCongestionFactor(float presentCongestionFactor) {
         this.presentCongestionFactor = presentCongestionFactor;
     }
 
     /**
      * Gets the present congestion cost of a node with the given occupancy: RouteNode.initialPresentCongestionCost, plus
-     * the present congestion factor (see updatePresentCongestionCosts()) for each user that the node would have over
+     * the present congestion factor (see setPresentCongestionFactor()) for each user that the node would have over
      * its capacity with one more. Linear in the occupancy, so computed rather than looked up, for any occupancy.
      * @param occupancy Number of users of the node.
      * @return That cost.

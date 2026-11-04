@@ -48,7 +48,7 @@ public class RWRouteConfig {
     private short extensionXIncrement;
     /** Wirelength-driven weighting factor */
     private float wirelengthWeight;
-    /** Timing weight: a connection's delay is weighted its criticality * (1 - timingWeight) */
+    /** Timing weight: a connection's delay is weighted its criticality * (1 - timingWeight) per 100ps */
     private float timingWeight;
     /** The multiplier for timing weight update along iterations */
     private float timingMultiplier;
@@ -443,7 +443,7 @@ public class RWRouteConfig {
     /**
      * Gets the timing weight, which sets how much a connection's delay counts against its congestion and wirelength:
      * its delay, both that of the path so far and the estimate of what is still to come, is weighted its criticality
-     * times (1 - timingWeight), while its congestion and wirelength are weighted (1 - criticality) (see
+     * times (1 - timingWeight) per 100ps, while its congestion and wirelength are weighted (1 - criticality) (see
      * {@link #getCriticalityExponent()}).
      * It should be within [0, 1]. The greater it is, the faster the router will run, at the cost of a greater critical
      * path delay. E.g. on four UltraScale+ designs (bnn, optical-flow, boom_medium_routed and vtr_mcml), 0 gave a

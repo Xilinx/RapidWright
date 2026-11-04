@@ -395,13 +395,14 @@ public class TestPartialRouter {
      */
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
+    @LargeTest
     public void testRoutedPinsKeepRouting(boolean softPreserve) {
         Design design = Design.readCheckpoint(getRoutedBnnDcp());
         Map<String, Set<PIP>> before = getPIPs(design);
 
         List<SitePinInst> pinsToRoute = new ArrayList<>();
         for (Net net : design.getNets()) {
-            if (NetTools.isGlobalClock(net) || net.isStaticNet() || net.getType() != NetType.WIRE ||
+            if (NetTools.isGlobalClock(net) || net.getType() != NetType.WIRE ||
                     !RouterHelper.isRoutableNetWithSourceSinks(net) || !net.hasPIPs()) {
                 continue;
             }

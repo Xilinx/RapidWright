@@ -401,10 +401,11 @@ public class TestRWRoute {
      * wire's end reaches depends on the member (BEG index) of its family, e.g. on xcku040 and xcku115 the INODE
      * feedthroughs that NN2_[EW]_BEG7 (3 rows) reaches lead back a row south, and those that NN2_[EW]_BEG6 reaches lead
      * a row north; and which members a CLE output reaches depends on the output, e.g. on xcku040 SLICE_X51Y120's H_O
-     * reaches NN5_BEG7 (6 rows) through an SDQ node, but its A_O and AQ do not. So on xcku040, 7 rows north in the
-     * same half tile column (3.4: NN2_[EW]_BEG7 twice, then an INODE feedthrough a row north), it was attained by none
-     * of the connections from A_O or AQ of SLICE_X50 or SLICE_X51, Y100 to Y140, to the 48 LUT inputs there, nor
-     * from any of 24 LUT and flop outputs of SLICE_X50Y120 or SLICE_X51Y120.
+     * reaches NN5_BEG7 (6 rows) through an SDQ node, but its A_O and AQ do not: 7 rows north, H_O's cheapest route
+     * costs 3.6, theirs 3.8. On xcku040, 7 rows north in the same half tile column (3.4: NN2_[EW]_BEG7 twice, then
+     * an INODE feedthrough a row north), it was attained by none of the connections from A_O or AQ of SLICE_X50 or
+     * SLICE_X51, Y100 to Y140, to the 48 LUT inputs there, nor from the other 22 LUT and flop outputs of each of
+     * SLICE_X50Y120 and SLICE_X51Y120.
      * <p>
      * It is not a lower bound for every source and sink pin. Known gaps, where a route can be cheaper (each also a
      * place where RWRoute's own view of the wire, RouteNodeInfo.get(), differs from these moves), from an exact
@@ -433,8 +434,8 @@ public class TestRWRoute {
      * the Laguna tile, its TXOUT, the super long line and the receiving site's RXD and RXD; on Versal, a BNODE (reached
      * from a CLE output or a wire end; from anywhere else only after an INODE and a bounce too, which cost more), the
      * SLL input, the super long line, LAG_OUT and the CLE flop route-through it lands on (LAG pin, [A-H]Q2 pin and
-     * output). The landing is then a source of its own: an RXD drives SDQ nodes (and on UltraScale INODEs), as a LUT
-     * output does, and the Versal flop output launches longs. On UltraScale the crossing's INODE, as the sink's,
+     * output). The landing is then a source of its own: an RXD drives SDQ nodes and INODEs (and on UltraScale, quads
+     * and longs), and the Versal flop output launches longs. On UltraScale the crossing's INODE, as the sink's,
      * cannot directly follow a vertical quad or long or a horizontal long. An exact search found no cheaper route for
      * the existing SLR-crossing tests' connections (and testCostWithinLowerBoundNonTimingDriven()'s), all of whose cheapest routes cross this way, nor for 1,533 more on
      * xcku115.
@@ -674,7 +675,8 @@ public class TestRWRoute {
                 // output does: e.g. LAGUNA_TILE_X13Y300/RXD19 drives INT_X13Y300/INT_NODE_IMUX_122_INT_OUT)
                 return new int[] {12 + sll + 8, 2};
             case UltraScalePlus:
-                // INODE, IMUX, TXOUT; super long line; RXD site, RXD (which drives SDQ nodes, as a LUT output does)
+                // INODE, IMUX, TXOUT; super long line; RXD site, RXD (which drives SDQ nodes and INODEs: e.g.
+                // LAG_LAG_X57Y29/RXD0 drives INT_X58Y29/INT_NODE_SDQ_84_INT_OUT1 and INT_NODE_IMUX_56_INT_OUT0)
                 return new int[] {12 + sll + 8, 0};
             case Versal:
                 // BNODE (reached from a CLE output, or from a wire landing beside it; otherwise after an INODE and a

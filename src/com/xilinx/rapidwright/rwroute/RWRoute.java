@@ -1189,7 +1189,7 @@ public class RWRoute {
             if (config.isTimingDriven()) {
                 setRerouteCriticality();
             }
-            routingGraph.updatePresentCongestionCosts(presentCongestionFactor);
+            routingGraph.setPresentCongestionFactor(presentCongestionFactor);
             routeIndirectConnections(sortedIndirectConnections);
             rnodesTimer.setTime(routingGraph.getCreateRnodeTime());
 
