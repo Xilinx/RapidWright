@@ -2936,7 +2936,9 @@ public class DesignTools {
                             if (isVersal && net.isStaticNet() && bel.isLUT()) {
                                 siteWireNet = net;
                                 synchronized (si) {
-                                    si.routeIntraSiteNet(net, belPin, belPin);
+                                    synchronized (changeTrackingLock(design)) {
+                                        si.routeIntraSiteNet(net, belPin, belPin);
+                                    }
                                 }
                             } else {
                                 continue;
@@ -3043,8 +3045,25 @@ public class DesignTools {
             if (siteInst.getSitePinInst(sitePinName) != null) {
                 return null;
             }
-            return net.createPin(sitePinName, siteInst);
+            synchronized (changeTrackingLock(net.getDesign())) {
+                return net.createPin(sitePinName, siteInst);
+            }
         }
+    }
+
+    /**
+     * The lock to hold while changing a design's nets or site instances from multiple threads (as
+     * {@link #createMissingSitePinInsts(Design)} does): the design itself if it tracks such changes,
+     * as it records them in sets that it shares and that are not thread-safe, else a new (so never
+     * contended) object.
+     */
+    // TODO: Remove this lock (and its uses) once a rapidwright-api-lib release makes Design's change
+    // tracking thread-safe
+    private static Object changeTrackingLock(Design design) {
+        if (design != null && (design.isTrackingNetChanges() || design.isTrackingSiteInstChanges())) {
+            return design;
+        }
+        return new Object();
     }
 
     private static boolean isNetDrivenByMBUFGCE(EDIFHierNet net) {
