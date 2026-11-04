@@ -1739,7 +1739,20 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                     continue;
                 if (dstCell == null)
                     continue;
-                if (local_spi_source == null || spi_sink == null) {
+                Short intraSiteHop = (spi_sink == null && source != null && sink != null &&
+                        dstCell.getSiteInst() == srcCell.getSiteInst())
+                        ? intrasiteAndLogicDelayModel.getIntraSiteDelay(srcCell.getSiteInst().getSiteTypeEnum(),
+                                srcCell.getBELName() + "/" + source.getName(),
+                                dstCell.getBELName() + "/" + sink.getName())
+                        : null;
+                if (intraSiteHop != null) {
+                    // A sink that the net reaches without leaving the source's site (e.g. the flip-flop beside a
+                    // LUT or MUXF whose output also leaves the site), which calcDelay() would give no delay as it
+                    // has no site pin: the hop between the two BEL pins, as for a net that never leaves its site
+                    netDelay = Math.max(0f, intraSiteHop);
+                    intraSiteDelay = netDelay;
+                    forceUpdateEdge = true;
+                } else if (local_spi_source == null || spi_sink == null) {
                     if (local_spi_source == null && spi_sink == null) {//source and sink are null
                         String param2 = srcCell.getBELName()+"/"+ source.getName();
                         String param3 =  dstCell.getBELName() +"/" +sink_belpins.get(D).getName();
