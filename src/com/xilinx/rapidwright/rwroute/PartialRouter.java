@@ -158,14 +158,13 @@ public class PartialRouter extends RWRoute {
         // Presence of a prev pointer means that:
         //   (a) end node has been visited before
         //   (b) only that arc is allowed to enter this end node
+        // Note that this must not depend on whether either node has been visited by the current search: the result
+        // decides whether end is one of start's children, which RouteNode.getChildren() computes once and caches for
+        // every later search (and may compute outside of any search, e.g. for estimateDelayOfConnections(), when no
+        // node has been visited and so every node appears to have been visited by the same, non-existent, search).
+        // A node already visited by the current search is skipped by exploreAndExpand() anyway.
         RouteNode prev = endRnode.getPrev();
         if (prev != null) {
-            if (endRnode.isVisited(start.getVisited())) {
-                // Visited possibly from a different arc uphill of end, or possibly from
-                // the same start -> end arc during prepareRouteConnection()
-                return false;
-            }
-
             if (prev == start && routingGraph.isPreserved(end)) {
                 // Arc matches start node and end node is preserved
                 // This implies that both start and end nodes must be preserved for the same net

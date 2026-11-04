@@ -25,21 +25,28 @@ package com.xilinx.rapidwright.rwroute;
 
 import static com.xilinx.rapidwright.rwroute.TestRWRoute.assertAllPinsRouted;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetTools;
+import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
@@ -341,5 +348,69 @@ public class TestPartialRouter {
         // far outside the bounding box of any connection that a sink near the buffer could
         // create. Reaching the buffer is not necessary here: this test only requires that such
         // routing be preserved, not extended.
+    }
+
+    @TempDir
+    static Path tempDir;
+
+    /** bnn routed timing-driven, as a DCP (see getRoutedBnnDcp()) */
+    private static Path routedBnnDcp;
+
+    /**
+     * Gets bnn routed timing-driven, written to a DCP on first use (and shared thereafter), so that each user reads
+     * its own copy. The round trip also orders each net's PIPs: RWRoute leaves them in no particular order, and
+     * NetTools.getNodeTrees() then flags nodes as multiply driven when a PIP leaving a node comes before the one
+     * entering it, which PartialRouter asserts against.
+     * @return The DCP's path.
+     */
+    private static synchronized Path getRoutedBnnDcp() {
+        if (routedBnnDcp == null) {
+            Design design = RapidWrightDCP.loadDCP("bnn.dcp");
+            RWRoute.routeDesignFullTimingDriven(design);
+            routedBnnDcp = tempDir.resolve("bnn_routed.dcp");
+            design.writeCheckpoint(routedBnnDcp);
+        }
+        return routedBnnDcp;
+    }
+
+    private static Map<String, Set<PIP>> getPIPs(Design design) {
+        Map<String, Set<PIP>> pips = new HashMap<>();
+        for (Net net : design.getNets()) {
+            pips.put(net.getName(), new HashSet<>(net.getPIPs()));
+        }
+        return pips;
+    }
+
+    /**
+     * Timing-driven PartialRouter, given as pins to route the (already routed) sinks of every routed signal net, has
+     * nothing to route: every connection is recovered from its net's routing, which must be kept as it is. Previously,
+     * PartialRouter.isPartOfExistingRoute() excluded a net's own preserved arc from a node whenever both nodes had been
+     * visited by the same search -- including before any search, when neither had (both 0) -- and
+     * RouteNode.getChildren() caches that: so every source's own arcs were excluded by estimateDelayOfConnections()
+     * (sources with no other free arc were swapped to their alternate output, and their connections, rerouted, became
+     * unroutable), and a sink's arc from its own driver could also be excluded when computed in
+     * prepareRouteConnection(); unroutable connections were abandoned, and setPIPsOfNets() then rewrote their nets
+     * without their routing.
+     * @param softPreserve Whether PartialRouter may rip up preserved routing.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testRoutedPinsKeepRouting(boolean softPreserve) {
+        Design design = Design.readCheckpoint(getRoutedBnnDcp());
+        Map<String, Set<PIP>> before = getPIPs(design);
+
+        List<SitePinInst> pinsToRoute = new ArrayList<>();
+        for (Net net : design.getNets()) {
+            if (NetTools.isGlobalClock(net) || net.isStaticNet() || net.getType() != NetType.WIRE ||
+                    !RouterHelper.isRoutableNetWithSourceSinks(net) || !net.hasPIPs()) {
+                continue;
+            }
+            pinsToRoute.addAll(net.getSinkPins());
+        }
+        Assertions.assertFalse(pinsToRoute.isEmpty());
+
+        PartialRouter.routeDesignWithUserDefinedArguments(design, new String[] {}, pinsToRoute, softPreserve);
+
+        Assertions.assertEquals(before, getPIPs(design));
     }
 }
