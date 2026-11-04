@@ -181,4 +181,26 @@ public class TestCompactStringMap {
         Assertions.assertEquals(new HashMap<>(m), h);
         Assertions.assertEquals(new HashMap<>(m), new HashMap<>(h));
     }
+
+    @Test
+    public void testCapacityLimitFailsInsteadOfHanging() {
+        int max = CompactStringMap.MAX_CAPACITY;
+        int maxThreshold = (max >> 1) + (max >> 3);
+        Assertions.assertTimeoutPreemptively(Duration.ofSeconds(10), () -> {
+            // More than half full at the largest capacity: rebuild in place instead of overflowing
+            Assertions.assertEquals(max, CompactStringMap.rebuildCapacity(max, maxThreshold / 2 + 1));
+            Assertions.assertEquals(max, CompactStringMap.rebuildCapacity(max, maxThreshold));
+            Assertions.assertThrows(IllegalStateException.class,
+                    () -> CompactStringMap.rebuildCapacity(max, maxThreshold + 1));
+            Assertions.assertThrows(IllegalStateException.class,
+                    () -> CompactStringMap.rebuildCapacity(max >> 1, maxThreshold + 1));
+            Assertions.assertThrows(IllegalStateException.class,
+                    () -> CompactStringMap.capacityFor(2, Integer.MAX_VALUE));
+            Assertions.assertEquals(max, CompactStringMap.capacityFor(2, maxThreshold));
+        });
+        // Normal growth is unchanged: threshold(16) = 10
+        Assertions.assertEquals(16, CompactStringMap.rebuildCapacity(16, 5));
+        Assertions.assertEquals(32, CompactStringMap.rebuildCapacity(16, 6));
+        Assertions.assertEquals(64, CompactStringMap.rebuildCapacity(16, 25));
+    }
 }

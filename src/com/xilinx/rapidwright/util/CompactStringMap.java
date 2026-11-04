@@ -77,6 +77,8 @@ public class CompactStringMap<V> implements Map<String, V> {
     // Tags of occupied slots have the top bit set (negative bytes), see tag()
 
     private static final int MIN_CAPACITY = 2;
+    /** Largest power-of-two array length */
+    static final int MAX_CAPACITY = 1 << 30;
 
     /** Key function of a derived-key map, null for a map created in keyed mode */
     private final Function<? super V, String> keyFn;
@@ -196,12 +198,30 @@ public class CompactStringMap<V> implements Map<String, V> {
     }
 
     private static int capacityFor(int entries) {
-        int cap = MIN_CAPACITY;
+        return capacityFor(MIN_CAPACITY, entries);
+    }
+
+    /**
+     * Smallest power-of-two capacity, at least cap, whose threshold holds the given number of
+     * entries.
+     * @throws IllegalStateException if that exceeds {@link #MAX_CAPACITY}.
+     */
+    static int capacityFor(int cap, int entries) {
         while (threshold(cap) < entries) {
+            if (cap >= MAX_CAPACITY) throw new IllegalStateException("Map too large");
             cap <<= 1;
-            if (cap <= 0) throw new IllegalStateException("Map too large");
         }
         return cap;
+    }
+
+    /**
+     * Capacity for rebuilding a table of the given capacity with room for at least minEntries:
+     * grows it unless the table is mostly tombstones (then it is rebuilt at the same capacity),
+     * and never shrinks it.
+     */
+    static int rebuildCapacity(int cap, int minEntries) {
+        if (minEntries > threshold(cap) / 2 && cap < MAX_CAPACITY) cap <<= 1;
+        return capacityFor(cap, minEntries);
     }
 
     @SuppressWarnings("unchecked")
@@ -368,11 +388,7 @@ public class CompactStringMap<V> implements Map<String, V> {
         Object[] oldVals = vals;
         byte[] oldTags = tags;
         String[] oldKeys = keys;
-        int cap = oldTags.length;
-        // Grow, unless the table is mostly tombstones (then rebuild it at the same capacity)
-        if (minEntries > threshold(cap) / 2) cap <<= 1;
-        while (threshold(cap) < minEntries) cap <<= 1;
-        if (cap <= 0) throw new IllegalStateException("Map too large");
+        int cap = rebuildCapacity(oldTags.length, minEntries);
         Object[] newVals = new Object[cap];
         byte[] newTags = new byte[cap];
         String[] newKeys = oldKeys != null ? new String[cap] : null;
