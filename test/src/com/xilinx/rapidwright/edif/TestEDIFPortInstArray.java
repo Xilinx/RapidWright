@@ -346,6 +346,39 @@ public class TestEDIFPortInstArray {
     }
 
     @Test
+    public void testNullElementsRejected() {
+        // Copilot scenario: five entries in a six-slot array; set(2, null) must not truncate the list
+        Fixture f = new Fixture();
+        EDIFNet net = netWithPins(f, 5);
+        List<EDIFPortInst> ref = new ArrayList<>(net.getPortInsts());
+        List<EDIFPortInst> view = net.getPortInsts();
+        Assertions.assertThrows(NullPointerException.class, () -> view.set(2, null));
+        Assertions.assertThrows(NullPointerException.class, () -> view.add(null));
+        Assertions.assertThrows(NullPointerException.class, () -> view.add(5, null));
+        Assertions.assertThrows(NullPointerException.class, () -> view.subList(1, 3).set(0, null));
+        ListIterator<EDIFPortInst> lit = view.listIterator();
+        lit.next();
+        Assertions.assertThrows(NullPointerException.class, () -> lit.set(null));
+        Assertions.assertThrows(NullPointerException.class, () -> lit.add(null));
+        Assertions.assertEquals(ref, net.getPortInsts());
+        f.netlist.trimEDIFPortInstLists();
+        Assertions.assertEquals(ref, net.getPortInsts());
+        for (EDIFPortInst pi : ref) {
+            Assertions.assertSame(pi, net.getPortInst(pi.getCellInst(), pi.getName()));
+        }
+
+        // Single-element and empty stores
+        EDIFNet one = netWithPins(new Fixture(), 1);
+        EDIFPortInst a = one.getPortInsts().get(0);
+        Assertions.assertThrows(NullPointerException.class, () -> one.getPortInsts().set(0, null));
+        Assertions.assertEquals(Collections.singletonList(a), one.getPortInsts());
+        EDIFNet empty = netWithPins(new Fixture(), 0);
+        Assertions.assertThrows(NullPointerException.class, () -> empty.getPortInsts().add(null));
+        Assertions.assertThrows(NullPointerException.class, () -> empty.getPortInsts().add(0, null));
+        Assertions.assertTrue(empty.getPortInsts().isEmpty());
+    }
+
+    @Test
     public void testListIteratorBidirectionalAndEquality() {
         Fixture f = new Fixture();
         EDIFNet net = netWithPins(f, 5);

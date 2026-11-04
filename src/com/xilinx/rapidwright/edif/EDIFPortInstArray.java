@@ -27,6 +27,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.RandomAccess;
 
 /**
@@ -128,8 +129,10 @@ final class EDIFPortInstArray {
     /**
      * Sorted insertion; an existing equal entry (same cell inst name and port inst name) is
      * overwritten, as in {@link EDIFPortInstList#add(EDIFPortInst)}.
+     * @throws NullPointerException if e is null (null marks unused capacity).
      */
     static Object add(Object store, EDIFPortInst e) {
+        Objects.requireNonNull(e);
         if (store == null) return e;
         EDIFCellInst inst = e.getCellInst();
         String name = e.getName();
@@ -152,8 +155,10 @@ final class EDIFPortInstArray {
     /**
      * Inserts e at index idx (0 <= idx <= size), shifting later entries up; does not check the
      * sort order. Uses the unused capacity of an array store in place, if any.
+     * @throws NullPointerException if e is null (null marks unused capacity).
      */
     static Object insertAt(Object store, int idx, EDIFPortInst e) {
+        Objects.requireNonNull(e);
         if (store == null) return e;
         if (store instanceof EDIFPortInst) {
             EDIFPortInst single = (EDIFPortInst) store;
@@ -187,8 +192,10 @@ final class EDIFPortInstArray {
     /**
      * Appends without sorting or duplicate replacement, as in
      * {@link EDIFPortInstList#deferSortAdd(EDIFPortInst)}. Conclude a batch with {@link #sort(Object)}.
+     * @throws NullPointerException if e is null (null marks unused capacity).
      */
     static Object deferSortAdd(Object store, EDIFPortInst e) {
+        Objects.requireNonNull(e);
         if (store == null) return e;
         if (store instanceof EDIFPortInst) {
             return new EDIFPortInst[] {(EDIFPortInst) store, e};
@@ -317,7 +324,8 @@ final class EDIFPortInstArray {
      * {@link #add(EDIFPortInst)} is a sorted insert (overwriting an equal entry), removals keep the
      * order. Like ArrayList, mutations through the view do not update the port inst's net/cell
      * inst back-references; use the owner's add/remove methods for that. Iterators are fail-fast
-     * on structural changes made outside of the iterator.
+     * on structural changes made outside of the iterator. Null elements are not permitted:
+     * add() and set() throw NullPointerException without changing the list.
      */
     abstract static class View extends AbstractList<EDIFPortInst> implements RandomAccess {
 
@@ -346,6 +354,8 @@ final class EDIFPortInstArray {
 
         @Override
         public EDIFPortInst set(int index, EDIFPortInst element) {
+            // null marks unused capacity, so storing it would truncate the list
+            Objects.requireNonNull(element);
             Object s = store();
             EDIFPortInst old = get(index);
             if (s instanceof EDIFPortInst) {
