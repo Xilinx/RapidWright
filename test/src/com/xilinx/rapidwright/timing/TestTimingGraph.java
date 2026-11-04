@@ -35,7 +35,10 @@ import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.eco.ECOTools;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.rwroute.RWRouteConfig;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
+import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
 
 public class TestTimingGraph {
 
@@ -93,8 +96,43 @@ public class TestTimingGraph {
 
         TimingGraph tg = new TimingManager(design).getTimingGraph();
         GraphPath<TimingVertex, TimingEdge> path = tg.getTimingPath("lut/O", "ff/D");
-        tg.prettyPrintPathDelays(path);
         // A6LUT/O6 to AFF/D, from $RAPIDWRIGHT_PATH/timing/ultrascaleplus/intrasite_delay_terms.txt
         Assertions.assertEquals(50f, tg.getPathDelay(path));
+    }
+
+    /**
+     * Tests that a cell whose every pin is on a net that never leaves its site (here a MUXF7 between two LUT6s and the
+     * flip-flop beside it) has its arcs in the timing graph, also when it is built for partial routing (as
+     * PartialRouter does), which gives arcs only to the cells of the nets it is given.
+     * @param isPartialRouting Whether the timing graph is built for partial routing.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testIntraSiteOnlyCellArcs(boolean isPartialRouting) {
+        Design design = new Design("top", "xcvu3p-ffvc1517-2-e");
+        Cell lutA = design.createAndPlaceCell("lutA", Unisim.LUT6, "SLICE_X0Y0/A6LUT");
+        LUTTools.configureLUT(lutA, "O=I0");
+        Cell lutB = design.createAndPlaceCell("lutB", Unisim.LUT6, "SLICE_X0Y0/B6LUT");
+        LUTTools.configureLUT(lutB, "O=I0");
+        Cell mux = design.createAndPlaceCell("mux", Unisim.MUXF7, "SLICE_X0Y0/F7MUX_AB");
+        Cell ff = design.createAndPlaceCell("ff", Unisim.FDRE, "SLICE_X0Y0/BFF");
+        String[][] connections = {{"lutA", "O", "mux", "I1"}, {"lutB", "O", "mux", "I0"}, {"mux", "O", "ff", "D"}};
+        for (String[] c : connections) {
+            Net net = design.createNet(c[0] + "_" + c[1]);
+            ECOTools.connectNet(design, design.getCell(c[0]), c[1], net);
+            ECOTools.connectNet(design, design.getCell(c[2]), c[3], net);
+            Assertions.assertTrue(net.getSinkPins().isEmpty());
+        }
+
+        RWRouteConfig config = new RWRouteConfig(new String[] {});
+        DelayEstimatorBase<InterconnectInfo> estimator = new DelayEstimatorBase<>(design.getDevice(),
+                new InterconnectInfo(), config.isUseUTurnNodes(), 0);
+        TimingGraph tg = new TimingManager(design, null, config, null, design.getNets(), isPartialRouting, estimator)
+                .getTimingGraph();
+        GraphPath<TimingVertex, TimingEdge> path = tg.getTimingPath("lutA/O", "ff/D");
+        // A6LUT/O6 to F7MUX_AB/1 (21), the MUXF7 from 1 (70), F7MUX_AB/OUT to BFF/D (32), from
+        // $RAPIDWRIGHT_PATH/timing/ultrascaleplus/intrasite_delay_terms.txt
+        Assertions.assertNotNull(path);
+        Assertions.assertEquals(21f + 70 + 32, tg.getPathDelay(path));
     }
 }

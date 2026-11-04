@@ -171,20 +171,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             if (net.isStaticNet()) continue;
             addNetDelayEdges(net);
         }
-        
-        addTimingEdgesOfNets(isPartialRouting, targetNets);
-        
+
         if (routerTimer != null) routerTimer.getRuntimeTracker("add net dly edges").stop();
-    }
-    
-    private void addTimingEdgesOfNets(boolean isPartialRouting, Collection<Net> assignedNets) {
-        for (Net net : assignedNets) {
-            if (net.isClockNet()) continue;//this is for getting rid of the problem in addNetDelayEdges() of clock net
-            if (net.isStaticNet()) continue;
-            if (!isPartialRouting || !net.hasPIPs()) {
-                addNetDelayEdges(net);
-            }
-        }
     }
     
     public void populateHierCellInstMap() {
@@ -223,7 +211,9 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         Set<String> keys = new HashSet<>();
         for (Net n : nets) {
             if (n.isClockNet() || n.isStaticNet() || n.hasPIPs()) continue;
-            if (!RouterHelper.isRoutableNetWithSourceSinks(n)) continue;
+            // A net that never leaves its site has no sink site pins (e.g. a LUT driving the flip-flop beside it), but
+            // its cells' arcs are as needed as those of one that does
+            if (!n.getSinkPins().isEmpty() && !RouterHelper.isRoutableNetWithSourceSinks(n)) continue;
             List<EDIFHierPortInst> ehportInsts = design.getNetlist().getPhysicalPins(n.getName());
             if (ehportInsts == null) {
                 System.out.println("WARNING: Unable to find physical pins on Net '" + n.getName() + "'; possibly due to an encrypted netlist.");
@@ -1712,47 +1702,32 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
 
             boolean forceUpdateEdge = false;
             float netDelay = 0f;
-            if (haveIntrasiteNet) {//LUT driving a FF is here
-                String param2 = srcCell.getBELName()+"/"+ source.getName();
-                String param3 = null;
-                if (sink_belpins.get(D) == null) {
-                    param3 =  dstCell.getBELName() +"/" + stringSinks.get(D).getName();
-                } else {
-                    param3 =  dstCell.getBELName() +"/" +sink_belpins.get(D).getName();
-                }
-                float tmpNetDelay;
-                Short returnValue = intrasiteAndLogicDelayModel.getIntraSiteDelay(
-                            si.getSiteTypeEnum(),
-                            param2,
-                            param3);
-                if (returnValue == null) {
+            // A sink that the net reaches without leaving its source's site is given the hop between their BEL pins:
+            // every sink of a net that never leaves its site (e.g. a LUT driving the flip-flop beside it), and one
+            // without a site pin of its own of a net that does (e.g. that flip-flop, when the LUT's output also leaves
+            // the site), which calcDelay() would give no delay
+            Short intraSiteHop = null;
+            if (haveIntrasiteNet || (spi_sink == null && srcCell != null && dstCell != null && source != null &&
+                    sink != null && dstCell.getSiteInst() == srcCell.getSiteInst())) {
+                String sinkPinName = (sink_belpins.get(D) == null) ? stringSinks.get(D).getName()
+                        : sink_belpins.get(D).getName();
+                intraSiteHop = intrasiteAndLogicDelayModel.getIntraSiteDelay(srcCell.getSiteInst().getSiteTypeEnum(),
+                        srcCell.getBELName() + "/" + source.getName(), dstCell.getBELName() + "/" + sinkPinName);
+                if (intraSiteHop == null && haveIntrasiteNet) {
                     continue;
                 }
-                tmpNetDelay = (float) returnValue;
-                
-                intraSiteDelay = Math.max(0f, tmpNetDelay);// YZhou: for intrasite net, its intrasite delay is equal to net delay
-                netDelay = Math.max(0f, tmpNetDelay);
+            }
+            if (intraSiteHop != null) {
+                // YZhou: for intrasite net, its intrasite delay is equal to net delay
+                intraSiteDelay = Math.max(0f, intraSiteHop);
+                netDelay = intraSiteDelay;
                 forceUpdateEdge = true;
-                
             } else {
                 if (srcCell == null)
                     continue;
                 if (dstCell == null)
                     continue;
-                Short intraSiteHop = (spi_sink == null && source != null && sink != null &&
-                        dstCell.getSiteInst() == srcCell.getSiteInst())
-                        ? intrasiteAndLogicDelayModel.getIntraSiteDelay(srcCell.getSiteInst().getSiteTypeEnum(),
-                                srcCell.getBELName() + "/" + source.getName(),
-                                dstCell.getBELName() + "/" + sink.getName())
-                        : null;
-                if (intraSiteHop != null) {
-                    // A sink that the net reaches without leaving the source's site (e.g. the flip-flop beside a
-                    // LUT or MUXF whose output also leaves the site), which calcDelay() would give no delay as it
-                    // has no site pin: the hop between the two BEL pins, as for a net that never leaves its site
-                    netDelay = Math.max(0f, intraSiteHop);
-                    intraSiteDelay = netDelay;
-                    forceUpdateEdge = true;
-                } else if (local_spi_source == null || spi_sink == null) {
+                if (local_spi_source == null || spi_sink == null) {
                     if (local_spi_source == null && spi_sink == null) {//source and sink are null
                         String param2 = srcCell.getBELName()+"/"+ source.getName();
                         String param3 =  dstCell.getBELName() +"/" +sink_belpins.get(D).getName();
