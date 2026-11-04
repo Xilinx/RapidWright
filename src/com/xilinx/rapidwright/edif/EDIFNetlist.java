@@ -54,6 +54,7 @@ import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
@@ -1089,6 +1090,11 @@ public class EDIFNetlist extends EDIFName {
         if (out instanceof ParallelDCPOutput) {
             try (ParallelDCPOutput dcpOut = (ParallelDCPOutput) out) {
                 dcpOut.writePieces(exportEDIFPieces(dcpOut, stable));
+            } catch (CancellationException e) {
+                // Once writing the DCP has failed, a piece whose task only starts then throws a CancellationException
+                // whose cause is what failed. The pieces are waited for in order, so such a piece can come before the
+                // one that failed: throw what failed, whichever piece reports it first
+                throw failureOf(e);
             } catch (UncheckedIOException e) {
                 // From the pieces' writers, which cannot throw an IOException themselves
                 throw e.getCause();
@@ -1264,6 +1270,27 @@ public class EDIFNetlist extends EDIFName {
         pieces.addAll(submitExportChunks(dcpOut, getLibrariesInExportOrder(stable, false), cache));
         pieces.add(CompletableFuture.completedFuture(footer));
         return pieces;
+    }
+
+    /**
+     * What made writing a DCP fail, given the CancellationException that a piece of its EDIF threw instead (see
+     * {@link #exportEDIF(OutputStream, boolean)}): its cause, if any, else the exception itself.
+     */
+    private static IOException failureOf(CancellationException e) {
+        Throwable cause = e.getCause();
+        if (cause instanceof UncheckedIOException) {
+            return ((UncheckedIOException) cause).getCause();
+        }
+        if (cause instanceof IOException) {
+            return (IOException) cause;
+        }
+        if (cause instanceof RuntimeException) {
+            throw (RuntimeException) cause;
+        }
+        if (cause instanceof Error) {
+            throw (Error) cause;
+        }
+        throw e;
     }
 
     public void exportEDIF(OutputStream out) throws IOException {
