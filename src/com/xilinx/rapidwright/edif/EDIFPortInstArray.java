@@ -22,6 +22,7 @@ package com.xilinx.rapidwright.edif;
 
 import java.util.AbstractList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.List;
@@ -29,6 +30,7 @@ import java.util.ListIterator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.RandomAccess;
+import java.util.function.Predicate;
 
 /**
  * Compact storage for the port instances of an {@link EDIFNet} or {@link EDIFCellInst}, replacing a
@@ -229,6 +231,58 @@ final class EDIFPortInstArray {
         return b;
     }
 
+    /**
+     * Removes the elements at indices [from, to) (0 <= from <= to <= size) in one pass and returns
+     * the new store; like {@link #removeAt}, never modifies an array in place.
+     */
+    static Object removeRange(Object store, int from, int to) {
+        if (from == to) return store;
+        int size = size(store);
+        int n = size - (to - from);
+        if (n == 0) return null;
+        if (n == 1) return get(store, from == 0 ? to : 0);
+        EDIFPortInst[] a = (EDIFPortInst[]) store;
+        EDIFPortInst[] b = new EDIFPortInst[n];
+        System.arraycopy(a, 0, b, 0, from);
+        System.arraycopy(a, to, b, from, size - to);
+        return b;
+    }
+
+    /**
+     * Removes the elements at indices [from, to) that match the filter in one pass. Returns the
+     * same store if none match, else a new store (never modifies an array in place). The filter is
+     * applied to all elements first, so the store is unchanged if it throws.
+     */
+    static Object removeIf(Object store, int from, int to, Predicate<? super EDIFPortInst> filter) {
+        Objects.requireNonNull(filter);
+        if (store == null || from == to) return store;
+        if (store instanceof EDIFPortInst) {
+            return filter.test((EDIFPortInst) store) ? null : store;
+        }
+        EDIFPortInst[] a = (EDIFPortInst[]) store;
+        int size = arraySize(a);
+        boolean[] remove = null;
+        int removed = 0;
+        for (int i = from; i < to; i++) {
+            if (filter.test(a[i])) {
+                if (remove == null) remove = new boolean[to - from];
+                remove[i - from] = true;
+                removed++;
+            }
+        }
+        if (removed == 0) return store;
+        int n = size - removed;
+        if (n == 0) return null;
+        EDIFPortInst[] b = new EDIFPortInst[n];
+        System.arraycopy(a, 0, b, 0, from);
+        int j = from;
+        for (int i = from; i < to; i++) {
+            if (!remove[i - from]) b[j++] = a[i];
+        }
+        System.arraycopy(a, to, b, j, size - to);
+        return n == 1 ? b[0] : b;
+    }
+
     /** Index of the matching entry, or a negative value if none. */
     static int indexOf(Object store, EDIFCellInst inst, String portInstName) {
         if (store == null) return -1;
@@ -417,6 +471,34 @@ final class EDIFPortInstArray {
         @Override
         public void clear() {
             store(null);
+        }
+
+        @Override
+        protected void removeRange(int fromIndex, int toIndex) {
+            store(EDIFPortInstArray.removeRange(store(), fromIndex, toIndex));
+        }
+
+        // Bulk removals in one pass (removing through the iterator one by one would copy the
+        // array for every removed element)
+        @Override
+        public boolean removeIf(Predicate<? super EDIFPortInst> filter) {
+            Object s = store();
+            Object r = EDIFPortInstArray.removeIf(s, 0, EDIFPortInstArray.size(s), filter);
+            if (r == s) return false;
+            store(r);
+            return true;
+        }
+
+        @Override
+        public boolean removeAll(Collection<?> c) {
+            Objects.requireNonNull(c);
+            return removeIf(c::contains);
+        }
+
+        @Override
+        public boolean retainAll(Collection<?> c) {
+            Objects.requireNonNull(c);
+            return removeIf(e -> !c.contains(e));
         }
 
         @Override
@@ -714,9 +796,37 @@ final class EDIFPortInstArray {
 
         @Override
         protected void removeRange(int fromIndex, int toIndex) {
-            for (int i = toIndex - 1; i >= fromIndex; i--) {
-                remove(i);
-            }
+            checkForComodification();
+            if (fromIndex == toIndex) return;
+            root.store(EDIFPortInstArray.removeRange(root.store(), offset + fromIndex, offset + toIndex));
+            resync();
+            size -= toIndex - fromIndex;
+            modCount++;
+        }
+
+        @Override
+        public boolean removeIf(Predicate<? super EDIFPortInst> filter) {
+            checkForComodification();
+            Object s = root.store();
+            Object r = EDIFPortInstArray.removeIf(s, offset, offset + size, filter);
+            if (r == s) return false;
+            root.store(r);
+            size -= EDIFPortInstArray.size(s) - EDIFPortInstArray.size(r);
+            resync();
+            modCount++;
+            return true;
+        }
+
+        @Override
+        public boolean removeAll(Collection<?> c) {
+            Objects.requireNonNull(c);
+            return removeIf(c::contains);
+        }
+
+        @Override
+        public boolean retainAll(Collection<?> c) {
+            Objects.requireNonNull(c);
+            return removeIf(e -> !c.contains(e));
         }
     }
 }

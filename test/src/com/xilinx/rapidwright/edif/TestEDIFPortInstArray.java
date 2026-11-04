@@ -346,6 +346,72 @@ public class TestEDIFPortInstArray {
     }
 
     @Test
+    public void testBulkRemovalsMatchArrayList() {
+        Random r = new Random(7);
+        for (int trial = 0; trial < 300; trial++) {
+            int n = r.nextInt(8);
+            Fixture f = new Fixture();
+            EDIFNet net = netWithPins(f, n);
+            List<EDIFPortInst> view = net.getPortInsts();
+            List<EDIFPortInst> ref = new ArrayList<>(view);
+            int from = n == 0 ? 0 : r.nextInt(n + 1);
+            int to = from + (n == from ? 0 : r.nextInt(n - from + 1));
+            Iterator<EDIFPortInst> stale = view.iterator();
+            int op = trial % 6;
+            boolean changed;
+            if (op == 0) {
+                view.subList(from, to).clear();
+                ref.subList(from, to).clear();
+                changed = from < to;
+            } else if (op == 1) {
+                // Remove cell insts with an odd index
+                changed = view.removeIf(p -> p.getCellInst().getName().hashCode() % 2 != 0);
+                Assertions.assertEquals(ref.removeIf(p -> p.getCellInst().getName().hashCode() % 2 != 0), changed);
+            } else if (op == 2) {
+                List<EDIFPortInst> c = new ArrayList<>(ref.subList(from, to));
+                changed = view.removeAll(c);
+                Assertions.assertEquals(ref.removeAll(c), changed);
+            } else if (op == 3) {
+                List<EDIFPortInst> c = new ArrayList<>(ref.subList(from, to));
+                changed = view.retainAll(c);
+                Assertions.assertEquals(ref.retainAll(c), changed);
+            } else if (op == 4) {
+                List<EDIFPortInst> sub = view.subList(from, to);
+                changed = sub.removeIf(p -> p.getCellInst().getName().hashCode() % 2 == 0);
+                List<EDIFPortInst> refSub = ref.subList(from, to);
+                Assertions.assertEquals(refSub.removeIf(p -> p.getCellInst().getName().hashCode() % 2 == 0), changed);
+                Assertions.assertEquals(refSub, sub);
+            } else {
+                List<EDIFPortInst> sub = view.subList(from, to);
+                List<EDIFPortInst> c = ref.isEmpty() ? ref : Collections.singletonList(ref.get(r.nextInt(n)));
+                changed = sub.retainAll(c);
+                List<EDIFPortInst> refSub = ref.subList(from, to);
+                Assertions.assertEquals(refSub.retainAll(c), changed);
+                Assertions.assertEquals(refSub.size(), sub.size());
+                Assertions.assertEquals(refSub, sub);
+            }
+            Assertions.assertEquals(ref, view);
+            Assertions.assertEquals(ref.size(), net.getPortInstCount());
+            for (EDIFPortInst pi : ref) {
+                Assertions.assertSame(pi, net.getPortInst(pi.getCellInst(), pi.getName()));
+            }
+            if (changed) {
+                // A bulk removal is a structural change for iterators created before it
+                Assertions.assertThrows(ConcurrentModificationException.class, stale::next);
+            }
+        }
+        // A throwing filter leaves the list unchanged
+        EDIFNet net = netWithPins(new Fixture(), 4);
+        List<EDIFPortInst> ref = new ArrayList<>(net.getPortInsts());
+        EDIFPortInst third = ref.get(2);
+        Assertions.assertThrows(IllegalStateException.class, () -> net.getPortInsts().removeIf(p -> {
+            if (p == third) throw new IllegalStateException();
+            return true;
+        }));
+        Assertions.assertEquals(ref, net.getPortInsts());
+    }
+
+    @Test
     public void testNullElementsRejected() {
         // Copilot scenario: five entries in a six-slot array; set(2, null) must not truncate the list
         Fixture f = new Fixture();
