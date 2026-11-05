@@ -99,7 +99,9 @@ public class EDIFNetlist extends EDIFName {
     // The parent net and physical pin maps are built on first use. Each is completely built before
     // it is assigned (under this netlist's lock), so that threads reading the netlist at the same
     // time never see a map under construction. physicalNetPinMap is assigned after the GND/VCC pin
-    // lists, and parentNetMap last.
+    // lists, and parentNetMap last. Once assigned, a map or list is never changed, except that
+    // until the parent net map is built, getNetAliases() adds the pins of new parent nets to
+    // physicalNetPinMap (then a ConcurrentHashMap) and replaces the GND/VCC pin lists with copies.
     private volatile Map<EDIFHierNet,EDIFHierNet> parentNetMap;
     private volatile Map<String,String> parentNetMapNames;
 
@@ -1624,8 +1626,9 @@ public class EDIFNetlist extends EDIFName {
 
     /**
      * Gets all equivalent nets in the netlist from the provided net.
-     * The returned list also includes the provided net. The leaf cell pins of these nets are
-     * recorded as the physical pins of their parent net (see {@link #getPhysicalNetPinMap()}).
+     * The returned list also includes the provided net. If the parent net map is not built, the
+     * leaf cell pins of these nets are recorded as the physical pins of their parent net (see
+     * {@link #getPhysicalNetPinMap()}), unless they already are; building the map records them all.
      * @param initialNet The net to use as a starting point in the search.
      * @return A list of all electrically connected nets in the netlist that are equivalent.
      * @throws RuntimeException If the net has more than one source, or has connections but no
@@ -1633,15 +1636,50 @@ public class EDIFNetlist extends EDIFName {
      */
     public List<EDIFHierNet> getNetAliases(EDIFHierNet initialNet) {
         List<EDIFHierNet> aliases = new ArrayList<>();
-        synchronized (this) {
-            if (physicalNetPinMap == null) {
-                physicalGndPins = new ArrayList<>();
-                physicalVccPins = new ArrayList<>();
-                physicalNetPinMap = new HashMap<>();
-            }
-            recordParentNet(initialNet, aliases, physicalNetPinMap, physicalGndPins, physicalVccPins);
+        // Search into private collections, then record the pins under the lock
+        Map<EDIFHierNet, List<EDIFHierPortInst>> netPins = new HashMap<>(2);
+        List<EDIFHierPortInst> gndPins = new ArrayList<>(0);
+        List<EDIFHierPortInst> vccPins = new ArrayList<>(0);
+        EDIFHierNet parentNet = recordParentNet(initialNet, aliases, netPins, gndPins, vccPins);
+        if (parentNet != null) {
+            recordPhysicalPins(parentNet, netPins.get(parentNet), gndPins, vccPins);
         }
         return aliases;
+    }
+
+    /**
+     * Records the physical pins of a parent net found by {@link #getNetAliases(EDIFHierNet)}, unless
+     * the parent net map is built (which records the pins of every parent net) or they are already
+     * recorded. Threads reading the physical pin maps at the same time without the lock see either
+     * no map, or a map with the complete pins of each parent net in it; the GND/VCC pin lists they
+     * read are never changed, as new pins are added to copies.
+     */
+    private synchronized void recordPhysicalPins(EDIFHierNet parentNet, List<EDIFHierPortInst> pins,
+                                                 List<EDIFHierPortInst> gndPins,
+                                                 List<EDIFHierPortInst> vccPins) {
+        Map<EDIFHierNet, List<EDIFHierPortInst>> map = physicalNetPinMap;
+        if (parentNetMap != null || (map != null && map.containsKey(parentNet))) {
+            return;
+        }
+        List<EDIFHierPortInst> allGndPins = (map == null) ? new ArrayList<>() : physicalGndPins;
+        List<EDIFHierPortInst> allVccPins = (map == null) ? new ArrayList<>() : physicalVccPins;
+        if (!gndPins.isEmpty()) {
+            allGndPins = new ArrayList<>(allGndPins);
+            allGndPins.addAll(gndPins);
+        }
+        if (!vccPins.isEmpty()) {
+            allVccPins = new ArrayList<>(allVccPins);
+            allVccPins.addAll(vccPins);
+        }
+        physicalGndPins = allGndPins;
+        physicalVccPins = allVccPins;
+        if (map == null) {
+            map = new ConcurrentHashMap<>();
+            map.put(parentNet, pins);
+            physicalNetPinMap = map;
+        } else {
+            map.put(parentNet, pins);
+        }
     }
 
     /**
