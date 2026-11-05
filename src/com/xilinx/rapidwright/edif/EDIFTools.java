@@ -1175,13 +1175,27 @@ public class EDIFTools {
     public static void writeEDIFFile(OutputStream out, Path dcpFileName, EDIFNetlist edif,
                                         String partName) {
         try {
-            ensureCorrectPartInEDIF(edif, partName);
-            edif.exportEDIF(out);
-            if (dcpFileName != null && edif.hasEncryptedCells()) {
-                writeTclLoadScriptForPartialEncryptedDesigns(edif, dcpFileName, partName);
-            }
+            exportEDIF(out, dcpFileName, edif, partName);
         } catch (IOException e) {
             e.printStackTrace();
+        }
+    }
+
+    /**
+     * As {@link #writeEDIFFile(OutputStream, Path, EDIFNetlist, String)}, but throwing any
+     * IOException rather than printing it.
+     * @param out The output stream
+     * @param dcpFileName The name of the DCP file associated with this netlist
+     * @param edif The netlist of the design
+     * @param partName The target part for this design
+     * @throws IOException If writing the EDIF fails.
+     */
+    public static void exportEDIF(OutputStream out, Path dcpFileName, EDIFNetlist edif,
+                                  String partName) throws IOException {
+        ensureCorrectPartInEDIF(edif, partName);
+        edif.exportEDIF(out);
+        if (dcpFileName != null && edif.hasEncryptedCells()) {
+            writeTclLoadScriptForPartialEncryptedDesigns(edif, dcpFileName, partName);
         }
     }
 
