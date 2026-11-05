@@ -320,6 +320,9 @@ public class RWRoute {
             Collection<Net> timingNets = getTimingNets();
             timingManager = createTimingManager(clkTiming, timingNets);
             timingManager.setTimingEdgesOfConnections(indirectConnections);
+            DelayEstimatorBase<InterconnectInfo> estimator = routingGraph.getDelayEstimator();
+            minDelayPerHalfTilePs = estimator.getMinDelayPerTile(InterconnectInfo.Orientation.HORIZONTAL) / 2;
+            minDelayPerRowPs = estimator.getMinDelayPerTile(InterconnectInfo.Orientation.VERTICAL);
         }
 
         sortedIndirectConnections = new ArrayList<>(indirectConnections.size());
@@ -3185,17 +3188,13 @@ public class RWRoute {
     }
 
     /**
-     * Least delay, in ps, of travelling one half tile horizontally, for the delay estimate (see addEstimate()): that
-     * of the fastest horizontal wire on UltraScale+ (the only series with timing data here), an HLONG at 15.3ps per
-     * INT tile on xcvu9p.
+     * Least delay, in ps, of travelling one half tile horizontally and one row vertically, for the delay estimate (see
+     * addEstimate()) when timing-driven: per tile of its nominal length, of the fastest single, double, quad or long
+     * in each axis (DelayEstimatorBase.getMinDelayPerTile()), e.g. on UltraScale+ an HLONG at 92ps per 6 INT tiles
+     * (12 half tiles) and a VLONG at 86ps per 12 rows.
      */
-    private static final float MIN_DELAY_PER_HALF_TILE_PS = 7.65f;
-
-    /**
-     * Least delay, in ps, of travelling one row vertically, for the delay estimate (see addEstimate()): that of the
-     * fastest vertical wire on UltraScale+, a VLONG at 7.2ps per row on xcvu9p.
-     */
-    private static final float MIN_DELAY_PER_ROW_PS = 7.2f;
+    private float minDelayPerHalfTilePs;
+    private float minDelayPerRowPs;
 
     /**
      * Adds the estimate of the cost still to reach the sink to a lower bound.
@@ -3212,8 +3211,9 @@ public class RWRoute {
         lowerBound += state.estWlWeight * distanceToSink / sharingFactor;
         if (config.isTimingDriven()) {
             // The least delay still to come, at the fastest wires in each axis, weighted as path delay is (dlyWeight), so
-            // that it does not overestimate the delay of any route whatever the timing weight (or timing multiplier)
-            lowerBound += state.dlyWeight * (deltaHalfX * MIN_DELAY_PER_HALF_TILE_PS + deltaY * MIN_DELAY_PER_ROW_PS);
+            // that it does not exceed any wire's delay over its nominal length whatever the timing weight (or timing
+            // multiplier)
+            lowerBound += state.dlyWeight * (deltaHalfX * minDelayPerHalfTilePs + deltaY * minDelayPerRowPs);
         }
         return lowerBound;
     }
