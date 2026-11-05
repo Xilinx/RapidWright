@@ -636,10 +636,16 @@ public class RouterHelper {
      * @param estimator An instantiation of the DelayEstimatorBase.
      * @param node The node in question.
      * @return The delay of the node.
+     * @throws RuntimeException If the node is a super long line (an SLR crossing), for which the timing model has no
+     *                          delay.
      */
     public static short computeNodeDelay(DelayEstimatorBase estimator, Node node) {
         if (RouteNode.isExitNode(node)) {
             return estimator.getDelayOf(node);
+        }
+        IntentCode ic = node.getIntentCode();
+        if (ic == IntentCode.NODE_LAGUNA_DATA || ic == IntentCode.NODE_SLL_DATA) {
+            throw new RuntimeException("ERROR: No delay is modelled for super long line " + node);
         }
         return 0;
     }
