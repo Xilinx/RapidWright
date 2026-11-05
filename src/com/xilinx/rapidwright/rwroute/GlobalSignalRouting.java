@@ -230,17 +230,19 @@ public class GlobalSignalRouting {
         // divides clock regions into two groups
         divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
 
-        RouteNode clkRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
-        RouteNode centroidHRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
+        // Avoid the routing tracks of clocks already routed (e.g. when two clock buffers share the muxes onto
+        // the routing tracks, as the BUFGCE_HDIOs of a RCLK_HDIO tile do)
+        RouteNode centroidHRouteNode = UltraScaleClockRouting.routeBUFGToCentroid(clk, centroid, getNodeStatus);
 
         RouteNode vrouteUp = null;
         RouteNode vrouteDown;
         // Two VROUTEs going up and down
         ClockRegion aboveCentroid = upClockRegions.isEmpty() ? null : centroid.getNeighborClockRegion(1, 0);
         if (aboveCentroid != null) {
-            vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
+            vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false, getNodeStatus);
         }
-        vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
+        vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false,
+                getNodeStatus);
 
         List<RouteNode> upDownDistLines = new ArrayList<>();
         if (aboveCentroid != null) {

@@ -369,6 +369,46 @@ public class TestGlobalSignalRouting {
         }
     }
 
+    @Test
+    public void testSymmetricClkRoutingSharedClockBufferMuxes() {
+        // The two BUFGCE_HDIOs of a RCLK_HDIO tile reach the clock routing tracks through the same muxes: the
+        // second clock must avoid the tracks of the first one
+        Design design = new Design("hdio_clks", "xcku9p-ffve900-2-e");
+        Net vcc = design.getVccNet();
+        Net gnd = design.getGndNet();
+        List<Net> clks = new ArrayList<>();
+        int i = 0;
+        for (String bufgce : new String[]{"BUFGCE_HDIO_X0Y2", "BUFGCE_HDIO_X0Y3"}) {
+            Net clk = design.createNet("clk" + clks.size());
+            clk.connect(design.createAndPlaceCell("bufgce" + clks.size(), Unisim.BUFGCE, bufgce + "/BUFCE"), "O");
+            for (int y : new int[]{275, 247, 230, 380}) {
+                String slice = "SLICE_X" + (32 + clks.size()) + "Y" + y;
+                Cell ff = design.createAndPlaceCell("ff" + i++, Unisim.FDRE, slice + "/AFF");
+                clk.connect(ff, "C");
+                vcc.connect(ff, "CE");
+                gnd.connect(ff, "D");
+                gnd.connect(ff, "R");
+            }
+            clks.add(clk);
+        }
+        design.routeSites();
+
+        // Simulate the preserve method
+        Map<Node, Net> used = new HashMap<>();
+        for (Net clk : clks) {
+            GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(),
+                    (n) -> used.containsKey(n) && used.get(n) != clk ? NodeStatus.UNAVAILABLE : NodeStatus.AVAILABLE,
+                    new HashMap<>());
+            for (PIP pip : clk.getPIPs()) {
+                for (Node node : Arrays.asList(pip.getStartNode(), pip.getEndNode())) {
+                    Net other = used.putIfAbsent(node, clk);
+                    Assertions.assertTrue(other == null || other == clk, "Node " + node + " used by " + other + " and " + clk);
+                }
+            }
+            Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        }
+    }
+
     private static Cell createBUFGCE(Design design, EDIFCell parent, String name, Site location) {
         // TODO - An improved version of this method is coming in ArrayBuilder
         Cell bufgce = design.createAndPlaceCell(parent, name, Unisim.BUFGCE, location, location.getBEL("BUFCE"));
