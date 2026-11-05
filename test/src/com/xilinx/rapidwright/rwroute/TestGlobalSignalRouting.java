@@ -369,6 +369,57 @@ public class TestGlobalSignalRouting {
         }
     }
 
+    @Test
+    public void testSymmetricClkRoutingUltraScalePlusMultiSLR() {
+        // A clock spanning most of the clock region rows of a 4-SLR device, with two clock
+        // regions per row: each row buffer of the vertical distribution column must be driven
+        // only once, even when a row is also passed through to reach the rows beyond it
+        Design design = new Design("us_clk_multi_slr", "xcvu13p-fsga2577-1-i");
+        Device device = design.getDevice();
+        Net clk = design.createNet("clk");
+        Net vcc = design.getVccNet();
+        Net gnd = design.getGndNet();
+        Cell bufgce = design.createAndPlaceCell("bufgceInst", Unisim.BUFGCE, "BUFGCE_X0Y120/BUFCE");
+        clk.connect(bufgce, "O");
+
+        // One flip-flop in each of 17 clock regions spanning rows 2 to 12 (SLRs 0 to 3); the order
+        // matters, as it determines the order in which the clock regions are routed
+        String[] sinkSites = {"SLICE_X117Y570", "SLICE_X114Y575", "SLICE_X116Y621", "SLICE_X113Y724",
+                "SLICE_X117Y720", "SLICE_X116Y717", "SLICE_X116Y489", "SLICE_X116Y352", "SLICE_X118Y352",
+                "SLICE_X113Y183", "SLICE_X117Y183", "SLICE_X117Y166", "SLICE_X110Y163", "SLICE_X117Y240",
+                "SLICE_X116Y298", "SLICE_X116Y361", "SLICE_X117Y369"};
+        int i = 0;
+        for (String site : sinkSites) {
+            Cell ff = design.createAndPlaceCell("ff" + i++, Unisim.FDRE, site + "/AFF");
+            clk.connect(ff, "C");
+            vcc.connect(ff, "CE");
+            gnd.connect(ff, "D");
+            gnd.connect(ff, "R");
+        }
+        design.routeSites();
+
+        GlobalSignalRouting.symmetricClkRouting(clk, device, (n) -> NodeStatus.AVAILABLE, new HashMap<>());
+
+        Map<Node, PIP> driver = new HashMap<>();
+        Set<Node> starts = new HashSet<>();
+        for (PIP pip : clk.getPIPs()) {
+            Node start = pip.isReversed() ? pip.getEndNode() : pip.getStartNode();
+            Node end = pip.isReversed() ? pip.getStartNode() : pip.getEndNode();
+            starts.add(start);
+            PIP other = driver.put(end, pip);
+            Assertions.assertNull(other, "Node " + end + " driven by " + pip + " and " + other);
+        }
+        // No undriven routing (an island) other than at the clock source
+        Node source = clk.getSource().getConnectedNode();
+        for (Node start : starts) {
+            Assertions.assertTrue(start.equals(source) || driver.containsKey(start), "Undriven node " + start);
+        }
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        for (SitePinInst spi : clk.getPins()) {
+            Assertions.assertTrue(spi.isRouted(), spi.toString());
+        }
+    }
+
     private static Cell createBUFGCE(Design design, EDIFCell parent, String name, Site location) {
         // TODO - An improved version of this method is coming in ArrayBuilder
         Cell bufgce = design.createAndPlaceCell(parent, name, Unisim.BUFGCE, location, location.getBEL("BUFCE"));
