@@ -165,7 +165,9 @@ public class PartialRouter extends RWRoute {
         // Note that this must not depend on whether either node has been visited by the current search: the result
         // decides whether end is one of start's children, which RouteNode.getChildren() computes once and caches for
         // every later search (and may compute outside of any search, e.g. for estimateDelayOfConnections(), when no
-        // node has been visited and so every node appears to have been visited by the same, non-existent, search).
+        // node has been visited and so every node appears to have been visited by the same, non-existent, search),
+        // and whether start can drive end when end is a sink, which RWRoute.isPushableSinkDriver() asks (through
+        // RouteNodeGraph.isExcluded(), uncached) during a search, in either mode.
         // A node already visited by the current search is skipped by exploreAndExpand() anyway.
         RouteNode prev = endRnode.getPrev();
         if (prev != null) {
