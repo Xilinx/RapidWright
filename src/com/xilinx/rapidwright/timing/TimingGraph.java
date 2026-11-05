@@ -1583,8 +1583,19 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 }
             } else {
                 physPinName = cell.getPhysicalPinMapping(portName);
+                if (physPinName != null && physPinName.startsWith("WA") && cell.getBEL().isLUT()) {
+                    // A distributed RAM's address pin maps to both a read (A*) and a write (WA*) address pin, whose
+                    // site pins differ (SLICEM.H[1-6] also serves as the WA for A-G LUTs); use the former since that
+                    // is where its logic edges (to its outputs) begin
+                    for (String pin : cell.getAllPhysicalPinMappings(portName)) {
+                        if (pin.startsWith("A")) {
+                            physPinName = pin;
+                            break;
+                        }
+                    }
+                }
                 // spi5 = cell.getSitePinFromLogicalPin(hport.getPortInst().getName(), null);
-                spi5 = cell.getSiteInst().getSitePinInst(DesignTools.getRoutedSitePin(cell, net, portName)); // use the new method to get over unmatched SitePinInst issue
+                spi5 = cell.getSiteInst().getSitePinInst(DesignTools.getRoutedSitePinFromPhysicalPin(cell, net, physPinName)); // use the new method to get over unmatched SitePinInst issue
             }
            
            // if cell is dsp, and port name included in DSP pin mapping, override the fullName that is used to build timing edges
@@ -1866,10 +1877,14 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             if (hportsFromSitePinInsts.isEmpty()) {
                 throw new RuntimeException("ERROR: Unable to find hierarchical logical cell pins from: " + connection.getSink());
             }
-            EDIFHierPortInst hportSink = hportsFromSitePinInsts.get(0);
-            SitePinInst mappedSink = edifHPortMap.get(hportSink);
-            
-            List<TimingEdge> timingEdges = sinkSitePinInstTimingEdges.get(mappedSink);
+            // Prefer the timing edges of this sink pin, since it may also reach cell pins whose timing edges are
+            // those of another site pin (e.g. SLICEM.H[1-6] also serves as the WA for A-G LUTs used as distributed RAM)
+            List<TimingEdge> timingEdges = sinkSitePinInstTimingEdges.get(connection.getSink());
+            if (timingEdges == null) {
+                EDIFHierPortInst hportSink = hportsFromSitePinInsts.get(0);
+                SitePinInst mappedSink = edifHPortMap.get(hportSink);
+                timingEdges = sinkSitePinInstTimingEdges.get(mappedSink);
+            }
             if (timingEdges == null) {
                 throw new RuntimeException("ERROR: No timing edges for connection from: " + connection.getSource() + " to " + connection.getSink());
             }

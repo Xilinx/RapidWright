@@ -316,7 +316,7 @@ public class VersalClockRouting {
                     }
                     IntentCode currIC = curr.getIntentCode();
                     ClockRegion currCR = curr.getTile().getClockRegion();
-                    if (currCR != null && targetCR == currCR && currIC == targetIC) {
+                    if (currCR != null && targetCR == currCR && currIC == targetIC && drivesDistribution(curr)) {
                         q.clear();
                         visited.clear();
                         q.add(curr);
@@ -359,6 +359,20 @@ public class VersalClockRouting {
         }
 
         return crToVdist;
+    }
+
+    /**
+     * Checks if a vertical distribution node can continue the clock tree, i.e. it
+     * drives at least one node. This excludes dead ends such as
+     * CLK_REBUF_VERT_VNOC_TOP_COA_TILE_X69Y327/CLK_CMT_DRVR_TRI_1_CLK_OUT_B on
+     * xcvc1902, a GLOBAL_VDISTR node in the top clock region row without any
+     * downhill node, which would otherwise be picked as the vertical distribution
+     * line of that row.
+     * @param node The vertical distribution node.
+     * @return True if the node drives at least one node.
+     */
+    private static boolean drivesDistribution(Node node) {
+        return !node.getAllDownhillNodes().isEmpty();
     }
 
     private static List<Pair<IntentCode, ClockRegion>> getVDistrPath(VersalClockTree clkTree,
@@ -587,7 +601,7 @@ public class VersalClockRouting {
         RouteThruHelper routeThruHelper = new RouteThruHelper(clk.getDesign().getDevice());
 
         nextPin: for (SitePinInst p: clk.getPins()) {
-            if (p.isOutPin() || p.isRouted() || Utils.isIOB(p.getSiteInst())) {
+            if (p.isOutPin() || p.isRouted() || Utils.isIOB(p.getSiteInst()) || isDrivenByGlobalClockNode(p)) {
                 continue;
             }
             NodeWithPrev sink = new NodeWithPrev(p.getConnectedNode());
@@ -633,6 +647,48 @@ public class VersalClockRouting {
         return lcbMappings;
     }
 
+    /**
+     * Checks if a sink pin of a clock net is driven only by global clock (GCLK)
+     * nodes rather than through a leaf clock buffer (LCB). This is the case for the
+     * inputs of clock buffers (e.g. a BUFGCE cascaded from another BUFGCE), which
+     * must be reached directly from the clock tree (e.g. through a horizontal
+     * distribution track of the clock buffer row) instead of from an LCB.
+     * @param p The sink pin.
+     * @return True if all nodes driving the pin's node are global clock nodes.
+     */
+    public static boolean isDrivenByGlobalClockNode(SitePinInst p) {
+        Node node = p.getConnectedNode();
+        if (node == null) {
+            return false;
+        }
+        List<Node> uphill = node.getAllUphillNodes();
+        if (uphill.isEmpty()) {
+            return false;
+        }
+        for (Node n : uphill) {
+            if (n.getIntentCode() != IntentCode.NODE_GLOBAL_GCLK) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Intent codes of the nodes that routes to pins driven by global clock nodes
+     * may use (see {@link #isDrivenByGlobalClockNode(SitePinInst)}).
+     */
+    private static final Set<IntentCode> GLOBAL_CLOCK_SINK_INTENT_CODES = EnumSet.of(
+            IntentCode.NODE_GLOBAL_BUFG,
+            IntentCode.NODE_GLOBAL_GCLK,
+            IntentCode.NODE_GLOBAL_HROUTE,
+            IntentCode.NODE_GLOBAL_HROUTE_HSR,
+            IntentCode.NODE_GLOBAL_VROUTE,
+            IntentCode.NODE_GLOBAL_HDISTR,
+            IntentCode.NODE_GLOBAL_HDISTR_HSR,
+            IntentCode.NODE_GLOBAL_VDISTR,
+            IntentCode.NODE_GLOBAL_VDISTR_LVL1,
+            IntentCode.NODE_GLOBAL_VDISTR_LVL2);
+
     public static void routeNonLCBPins(Net clk, List<SitePinInst> sinks,
             Function<Node, NodeStatus> getNodeStatus) {
         Set<Node> visited = new HashSet<>();
@@ -641,6 +697,8 @@ public class VersalClockRouting {
         nextPin: for (SitePinInst p : sinks) {
             q.clear();
             visited.clear();
+            // Clock buffer inputs may only be reached through the dedicated global clock routing
+            boolean globalClockOnly = isDrivenByGlobalClockNode(p);
             NodeWithPrev sink = new NodeWithPrev(p.getConnectedNode());
             List<Node> uphill = sink.getAllUphillNodes();
             boolean sinkOneHopLater = false;
@@ -652,6 +710,10 @@ public class VersalClockRouting {
                 int cost = pip.getTile().getManhattanDistance(sink.getTile());
                 q.add(new NodeWithPrevAndCost(pip.getEndNode(), null, cost));
             }
+            // Also start from the clock source, in case the net has no PIPs yet
+            // (e.g. when it only drives the input of another clock buffer)
+            Node srcNode = clk.getSource().getConnectedNode();
+            q.add(new NodeWithPrevAndCost(srcNode, null, srcNode.getTile().getManhattanDistance(sink.getTile())));
 
             while (!q.isEmpty()) {
                 NodeWithPrevAndCost curr = q.poll();
@@ -676,6 +738,9 @@ public class VersalClockRouting {
                 }
 
                 for (Node downhill : curr.getAllDownhillNodes()) {
+                    if (globalClockOnly && !GLOBAL_CLOCK_SINK_INTENT_CODES.contains(downhill.getIntentCode())) {
+                        continue;
+                    }
                     if (!visited.add(downhill)) {
                         continue;
                     }

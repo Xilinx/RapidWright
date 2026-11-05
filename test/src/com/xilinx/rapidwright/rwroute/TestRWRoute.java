@@ -199,6 +199,27 @@ public class TestRWRoute {
         VivadoToolsHelper.assertFullyRouted(design);
     }
 
+    /**
+     * Tests the timing-driven full routing with LUT pin swapping enabled. Both designs have LUTs that are
+     * routethrus into a CARRY8, whose connections have alternate sinks but whose timing edges go to the
+     * CARRY8 rather than to a LUT input. bnn.dcp also has distributed RAMs on A-G LUTs whose address pins are
+     * also fed (as their WA) by H site pins, so the connections to their own site pins must be given their timing
+     * edges rather than those of the H LUTs.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "bnn.dcp",
+            "optical-flow.dcp"
+    })
+    @LargeTest(max_memory_gb = 8)
+    public void testTimingDrivenFullRoutingWithLutPinSwapping(String path) {
+        Design design = RapidWrightDCP.loadDCP(path);
+        RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--lutPinSwapping"});
+        assertAllSourcesRoutedFlagSet(design);
+        assertAllPinsRouted(design);
+        VivadoToolsHelper.assertFullyRouted(design);
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {
             "bnn.dcp",

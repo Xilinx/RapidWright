@@ -3537,6 +3537,10 @@ public class DesignTools {
             return null;
         }
         EDIFPortInst portInst = eci.getPortInst(logPinName);
+        if (portInst == null) {
+            // The logical pin is not connected in the netlist
+            return null;
+        }
         final EDIFNetlist netlist = targetCell.getSiteInst().getDesign().getNetlist();
         EDIFHierPortInst hierPortInst =
                 new EDIFHierPortInst(netlist.getHierCellInstFromName(targetCell.getParentHierarchicalInstName()), portInst);
@@ -4510,6 +4514,10 @@ public class DesignTools {
                 throw new RuntimeException(series.toString());
             }
             for (Cell cell : design.getCells()) {
+                if (cell.getSiteInst() == null) {
+                    // Not placed: no site pins to tie
+                    continue;
+                }
                 if (isFlipFlopOrLatchNeedingCeSrToVcc(cell.getType())) {
                     SiteInst si = cell.getSiteInst();
                     if (!Utils.isSLICE(si)) {

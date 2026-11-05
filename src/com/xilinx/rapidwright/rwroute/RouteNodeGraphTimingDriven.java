@@ -139,7 +139,11 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
             String inputName = input.getName();
             Cell cell = design.getCell(inputName.substring(0, inputName.lastIndexOf('/')));
             BEL bel = cell.getBEL();
-            assert(bel.isLUT());
+            if (!bel.isLUT()) {
+                // The connection reaches this cell (e.g. a CARRY8) through a LUT routethru, whose logic delay is not
+                // modelled per LUT input pin
+                continue;
+            }
             String inputPin = null;
             for (BELPin belPin : bel.getPins()) {
                 if (belPin.isInput() && sitePinName.equals(belPin.getConnectedSitePinName())) {
