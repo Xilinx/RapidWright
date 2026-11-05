@@ -47,6 +47,7 @@ import static com.xilinx.rapidwright.util.routestatus.NodeKeys.sortedDistinct;
 import static com.xilinx.rapidwright.util.routestatus.SitePinClaims.getStaleSitePinKeys;
 import static com.xilinx.rapidwright.util.routestatus.SiteRouting.MAX_SITE_ROUTING_DEPTH;
 import static com.xilinx.rapidwright.util.routestatus.SiteRouting.hasStaleSitePin;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isBlockRamSite;
 import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isHardBlockCell;
 import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isIOSite;
 import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isUltraScale;
@@ -86,6 +87,7 @@ import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.ReportRouteStatus;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult.NetRouteStatus;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
+import com.xilinx.rapidwright.util.Utils;
 
 /**
  * Computes the route status of a design the way Vivado's `report_route_status` does. See
@@ -915,9 +917,17 @@ public final class RouteStatusEngine {
                 // Routing without a driver is all islands
                 return s | NODRIVER | ANTENNAS | lockedNodes(graph);
             }
-            // Not routed, but needs routing if its loads are not all in one site
-            boolean needsRouting = (net != null && !storedPins(net).isEmpty()) || flat.hasPinsInMultipleSites(design);
-            return s | NODRIVER | (needsRouting ? PARTIAL : 0);
+            if (flat.hasPinsInMultipleSites(design)) {
+                // Not routed, but needs routing to its loads in different sites
+                return s | NODRIVER | PARTIAL;
+            }
+            if (!has(s, UNPLACED) && !flat.hasTopPorts() && flat.blackBoxLoads == 0
+                    && !usesInputSitePin(flat, entry)) {
+                // Its placed loads are all in one site, and none is reached from a site pin: internally
+                // routed (as Vivado reports it, and not as an error)
+                return s | INTRASITE;
+            }
+            return s | NODRIVER;
         }
         if (net == null && flat.unplacedLeafPins == 0 && !entries.aliasNets.containsKey(entry)
                 && flat.leafDrivers > 0) {
@@ -943,6 +953,26 @@ public final class RouteStatusEngine {
             return s | (internalDriver || (loads == 0 && flat.blackBoxLoads > 0) ? INTRASITE : NOLOADS);
         }
         return UNDECIDED;
+    }
+
+    /**
+     * Checks whether a net without routing enters the site of its loads at an input site pin: one its
+     * site routing uses, or that of a control pin (clock enable or set/reset), which follows from the
+     * placement alone (in UltraScale(+) and Versal devices). A load in a site other than a slice or a
+     * block RAM is taken to enter at one (as in a DSP, where Vivado reports such a net as having no
+     * driver, even without site routing).
+     */
+    private boolean usesInputSitePin(FlatNet flat, int entry) {
+        if (entries.sitePinKeys[entry] != null
+                || (design.getDevice().getSeries() != Series.Series7 && flat.getControlPinLoads(design) != 0)) {
+            return true;
+        }
+        for (LeafPin pin : flat.getLeafPins(design)) {
+            if (pin.isPlaced() && !Utils.isSLICE(pin.cell.getSiteInst()) && !isBlockRamSite(pin.cell.getSiteInst())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

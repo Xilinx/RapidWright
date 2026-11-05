@@ -956,6 +956,72 @@ public class TestReportRouteStatus {
         }
     }
 
+    /**
+     * Nets without a driver or routing, each with its loads in one site, are internally routed (not
+     * errors), unless a site pin leads to a load: through their site routing (from a bypass or LUT
+     * input pin), or from the placement alone for a clock enable or set/reset pin. Those have no
+     * driver; loads in different sites are also partially routed. (The summary and statuses of Vivado
+     * 2026.1's report_route_status -list_all_nets for the checkpoint written from this design.)
+     */
+    @Test
+    public void testReportRouteStatusUndrivenLoadsInOneSite() {
+        Design design = createUndrivenLoadsDesign();
+        ReportRouteStatusResult rrs = ReportRouteStatus.reportRouteStatus(design, true);
+        Assertions.assertEquals("Design Route Status\n" +
+                "                                               :      # nets :\n" +
+                "   ------------------------------------------- : ----------- :\n" +
+                "   # of logical nets.......................... :           8 :\n" +
+                "       # of nets not needing routing.......... :           8 :\n" +
+                "           # of internally routed nets........ :           4 :\n" +
+                "       # of routable nets..................... :           0 :\n" +
+                "       # of nets with routing errors.......... :           4 :\n" +
+                "           # of nets with no driver........... :           4 :\n" +
+                "           # of nets with some unrouted pins.. :           1 :\n" +
+                "   ------------------------------------------- : ----------- :", rrs.toString());
+        assertNetStatuses(rrs, new String[]{"ff_d=INTRASITE",
+                "ff_d_twice=INTRASITE",
+                "ff_clk=INTRASITE",
+                "lut_input=INTRASITE",
+                "ff_d_bypass=NODRIVER",
+                "lut_input_site_routed=NODRIVER",
+                "ff_ce=NODRIVER",
+                "ff_d_two_sites=PARTIAL,NODRIVER"});
+    }
+
+    private static Design createUndrivenLoadsDesign() {
+        Design design = new Design("undriven_loads", "xcvu3p-ffvc1517-2-e");
+        // (the site routing of each load: from a site pin, of its BEL pin only, or none)
+        connectUndrivenLoad(design, "ff_d", Unisim.FDRE, "SLICE_X10Y10/AFF", "D", "bel");
+        connectUndrivenLoad(design, "ff_d_twice", Unisim.FDRE, "SLICE_X10Y11/AFF", "D", "bel");
+        connectUndrivenLoad(design, "ff_d_twice", Unisim.FDRE, "SLICE_X10Y11/BFF", "D", "bel");
+        connectUndrivenLoad(design, "ff_clk", Unisim.FDRE, "SLICE_X10Y12/AFF", "C", "bel");
+        connectUndrivenLoad(design, "lut_input", Unisim.LUT1, "SLICE_X10Y13/A6LUT", "I0", "none");
+        connectUndrivenLoad(design, "ff_d_bypass", Unisim.FDRE, "SLICE_X10Y14/AFF", "D", "sitepin");
+        connectUndrivenLoad(design, "lut_input_site_routed", Unisim.LUT1, "SLICE_X10Y15/A6LUT", "I0", "bel");
+        connectUndrivenLoad(design, "ff_ce", Unisim.FDRE, "SLICE_X10Y16/AFF", "CE", "none");
+        connectUndrivenLoad(design, "ff_d_two_sites", Unisim.FDRE, "SLICE_X10Y17/AFF", "D", "bel");
+        connectUndrivenLoad(design, "ff_d_two_sites", Unisim.FDRE, "SLICE_X10Y18/AFF", "D", "bel");
+        return design;
+    }
+
+    private static void connectUndrivenLoad(Design design, String netName, Unisim type, String siteBel, String pin,
+                                            String siteRouting) {
+        Net net = design.getNet(netName);
+        if (net == null) {
+            net = design.createNet(netName);
+        }
+        Cell cell = design.createAndPlaceCell(netName + "_" + siteBel.replace('/', '_'), type, siteBel);
+        net.getLogicalNet().createPortInst(pin, cell);
+        SiteInst si = cell.getSiteInst();
+        BELPin belPin = cell.getBEL().getPin(cell.getPhysicalPinMapping(pin));
+        if (siteRouting.equals("sitepin")) {
+            String sitePin = cell.getCorrespondingSitePinName(pin);
+            Assertions.assertTrue(si.routeIntraSiteNet(net, si.getSite().getBEL(sitePin).getPin(sitePin), belPin));
+        } else if (siteRouting.equals("bel")) {
+            si.routeIntraSiteNet(net, belPin, belPin);
+        }
+    }
+
     private static void connectClockEnableReset(Design design, Cell ff, Net clk) {
         ECOTools.connectNet(design, ff, "C", clk);
         ECOTools.connectNet(design, ff, "CE", design.getVccNet());
