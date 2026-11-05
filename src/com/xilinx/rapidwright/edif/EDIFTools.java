@@ -554,7 +554,7 @@ public class EDIFTools {
                     EDIFCellInst nextTargetInst = sinkHier.get(commonAncestor.getDepth());
                     EDIFNet evalNet = finalSrc.getPortInst().getNet();
                     if (evalNet != null) {
-                        for (EDIFPortInst pi : evalNet.getEDIFPortInstList()) {
+                        for (EDIFPortInst pi : evalNet.getPortInsts()) {
                             // Does this net connect to the next instance in hierarchy?
                             if (pi.getCellInst() == nextTargetInst) {
                                 EDIFNet internalNet = pi.getInternalNet();
