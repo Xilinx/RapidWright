@@ -493,4 +493,40 @@ public class TestGlobalSignalRouting {
 
         VivadoToolsHelper.assertFullyRouted(d);
     }
+
+    /**
+     * An XPIO output buffer with a constant input: its OP_S site pin is on a dedicated node that is
+     * only reached from the fabric through routethrus of the XPIO logic (OPFF D1->Q) and XPHY
+     * (D*->O0*) sites, optionally marked by &lt;LOCKED&gt; cells as left by unrouting a routed design.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testRouteStaticNetToVersalXpioOutputBuffer(boolean lockedRoutethruCell) {
+        Design design = new Design("versal_xpio_const", "xcvc1902-vsva2197-2MP-e-S");
+        Cell obuf = design.createAndPlaceCell("obuf", Unisim.OBUF, "IOB_X24Y1/IOB_S");
+        Net gndNet = design.getGndNet();
+        SitePinInst opS = gndNet.createPin("OP_S", obuf.getSiteInst());
+        Assertions.assertEquals(IntentCode.NODE_DEDICATED, opS.getConnectedNode().getIntentCode());
+        if (lockedRoutethruCell) {
+            Site xpioLogic = design.getDevice().getSite("XPIOLOGIC_X23Y1");
+            SiteInst si = design.createSiteInst(xpioLogic);
+            si.addCell(new Cell(Cell.LOCKED, xpioLogic.getBEL("OPFF_SLAVE")));
+        }
+
+        List<SitePinInst> gndPins = new ArrayList<>(gndNet.getPins());
+        RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
+        GlobalSignalRouting.routeStaticNet(gndPins, (n) -> getNodeState(design, NetType.GND, n), design, routeThruHelper);
+
+        Assertions.assertTrue(opS.isRouted());
+        Assertions.assertEquals(1, gndNet.getPins().stream().filter(SitePinInst::isOutPin).count());
+        Set<String> routethrus = new HashSet<>();
+        for (PIP pip : gndNet.getPIPs()) {
+            if (pip.isRouteThru()) {
+                routethrus.add(pip.getStartWireName() + "->" + pip.getEndWireName());
+            }
+        }
+        Assertions.assertTrue(routethrus.contains("XPIO_LOGICPAIR_1_OPFFS_D1_PIN->XPIO_LOGICPAIR_1_OPFFS_Q_PIN"), routethrus.toString());
+        Assertions.assertTrue(routethrus.contains("XPHY_CORE_3_D3_0__PIN->XPHY_CORE_3_O0_3__PIN"), routethrus.toString());
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(gndNet));
+    }
 }
