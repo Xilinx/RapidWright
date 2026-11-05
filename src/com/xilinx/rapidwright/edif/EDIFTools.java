@@ -60,6 +60,9 @@ import com.xilinx.rapidwright.design.PinType;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
+import com.xilinx.rapidwright.edif.optimizer.EDIFNetlistOptimizer;
+import com.xilinx.rapidwright.edif.optimizer.EDIFOptOptions;
+import com.xilinx.rapidwright.edif.optimizer.EDIFOptStats;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
@@ -922,6 +925,69 @@ public class EDIFTools {
             staticNet.addPortInst(outputPortInst);
         }
         return staticNet;
+    }
+
+    /**
+     * Propagates constants through the netlist, equivalent to Vivado's opt_design -propconst.
+     * Leaf cells whose outputs become constant are removed (their loads are driven by GND/VCC),
+     * LUTs are simplified (constant, duplicate and unused inputs removed, buffers removed),
+     * flip-flops that can only ever hold one value are removed, and inverters are absorbed into
+     * the LUTs and programmably-invertible pins they drive. Cells marked DONT_TOUCH or
+     * MARK_DEBUG (on the cell, its hierarchy or a connected net) are preserved. Hierarchy is
+     * preserved: shared cell definitions are uniquified only where their instances need
+     * different edits.
+     * @param netlist The netlist to optimize (modified in place).
+     * @return Statistics of the changes, counted as in Vivado's opt_design summary.
+     */
+    public static EDIFOptStats propagateConstants(EDIFNetlist netlist) {
+        return propagateConstants(netlist, new EDIFOptOptions());
+    }
+
+    /**
+     * Propagates constants through the netlist, see {@link #propagateConstants(EDIFNetlist)}.
+     * @param netlist The netlist to optimize (modified in place).
+     * @param opts Options; the propConst/sweep selections are overridden.
+     * @return Statistics of the changes.
+     */
+    public static EDIFOptStats propagateConstants(EDIFNetlist netlist, EDIFOptOptions opts) {
+        return optimizeNetlist(netlist, new EDIFOptOptions(opts).setPropConst(true)
+                .setSweep(false));
+    }
+
+    /**
+     * Removes dead logic: leaf cells that do not (transitively) drive a top-level output,
+     * preserved (DONT_TOUCH/MARK_DEBUG) cell or net, or black box, equivalent to Vivado's
+     * opt_design -sweep. Hierarchical instances left empty are removed as well. As in Vivado,
+     * this is followed by the post-processing step that removes inverters by absorbing them into
+     * the cells they drive (see {@link EDIFOptOptions#setPostProcess(boolean)}).
+     * @param netlist The netlist to optimize (modified in place).
+     * @return Statistics of the changes, counted as in Vivado's opt_design summary.
+     */
+    public static EDIFOptStats sweepDeadLogic(EDIFNetlist netlist) {
+        return sweepDeadLogic(netlist, new EDIFOptOptions());
+    }
+
+    /**
+     * Removes dead logic, see {@link #sweepDeadLogic(EDIFNetlist)}.
+     * @param netlist The netlist to optimize (modified in place).
+     * @param opts Options; the propConst/sweep selections are overridden.
+     * @return Statistics of the changes.
+     */
+    public static EDIFOptStats sweepDeadLogic(EDIFNetlist netlist, EDIFOptOptions opts) {
+        return optimizeNetlist(netlist, new EDIFOptOptions(opts).setPropConst(false)
+                .setSweep(true));
+    }
+
+    /**
+     * Runs constant propagation and/or sweep (as selected in the options) on the netlist,
+     * equivalent to Vivado's opt_design -propconst -sweep. Both analyses share one flat
+     * connectivity index and all netlist edits are applied once at the end.
+     * @param netlist The netlist to optimize (modified in place).
+     * @param opts Options selecting the optimizations.
+     * @return Statistics of the changes, counted as in Vivado's opt_design summary.
+     */
+    public static EDIFOptStats optimizeNetlist(EDIFNetlist netlist, EDIFOptOptions opts) {
+        return EDIFNetlistOptimizer.optimize(netlist, opts);
     }
 
     public static void main(String[] args) {

@@ -127,7 +127,7 @@ public class EDIFCellInst extends EDIFPropertyObject {
      * @param epr The port instance object to remove
      * @return The removed port instance, or null if it was not found.
      */
-    protected EDIFPortInst removePortInst(EDIFPortInst epr) {
+    public EDIFPortInst removePortInst(EDIFPortInst epr) {
         if (portInsts == null) return null;
         return portInsts.remove(epr);
     }
