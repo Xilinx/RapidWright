@@ -2812,6 +2812,25 @@ public class TestDesignTools {
     }
 
     @Test
+    public void testCreateCeSrRstPinsToVCCUnplacedCell() {
+        Design design = new Design("test", "xcvu3p");
+        Cell placed = design.createAndPlaceCell("ff", Unisim.FDRE, "SLICE_X0Y0/AFF");
+        // A flip-flop (and a block RAM) in the design but not placed: nothing to tie, no failure
+        Cell unplaced = design.createCell("ff_unplaced", Unisim.FDRE);
+        design.createCell("ram_unplaced", Unisim.RAMB36E2);
+        Assertions.assertNull(unplaced.getSiteInst());
+        Assertions.assertTrue(design.getCells().contains(unplaced));
+
+        DesignTools.createPossiblePinsToStaticNets(design);
+
+        Pair<String, String> sitePinNames = DesignTools.belTypeSitePinNameMapping.get(Series.UltraScalePlus)
+                .get(placed.getBEL().getBELType());
+        SiteInst si = placed.getSiteInst();
+        Assertions.assertEquals(design.getVccNet(), si.getSitePinInst(sitePinNames.getFirst()).getNet());
+        Assertions.assertEquals(design.getVccNet(), si.getSitePinInst(sitePinNames.getSecond()).getNet());
+    }
+
+    @Test
     public void testCreateCeSrRstPinsToVCCLaguna() {
         Device device = Device.getDevice("xcvu5p");
         Design design = new Design("testDesign", device.getName());
