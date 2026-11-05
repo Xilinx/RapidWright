@@ -274,6 +274,12 @@ public class GlobalSignalRouting {
         if (usedClockRegions.isEmpty()) {
             usedClockRegions = usedCRsAndNonLCBPinsTuple.getFirst();
         }
+        if (usedClockRegions.isEmpty()) {
+            // No sinks reached through leaf clock buffers (e.g. a clock buffer only driving
+            // the input of another clock buffer): no clock tree needed, route straight from the source
+            VersalClockRouting.routeNonLCBPins(clk, usedCRsAndNonLCBPinsTuple.getSecond(), getNodeStatus);
+            return;
+        }
         SitePinInst source = clk.getSource();
         SiteTypeEnum sourceTypeEnum = source.getSiteTypeEnum();
         // In US/US+ clock routing, we use two VROUTE nodes to reach the clock regions above and below the centroid.
@@ -468,6 +474,10 @@ public class GlobalSignalRouting {
             ClockRegion cr = t.getClockRegion();
             SiteInst si = pin.getSiteInst();
             if (Utils.isIOB(si)) {
+                offFabricClkSinks.add(pin);
+            } else if (t.getDevice().getSeries() == Series.Versal && VersalClockRouting.isDrivenByGlobalClockNode(pin)) {
+                // Clock buffer inputs (e.g. BUFGCE cascades) are reached directly from the
+                // clock tree, not through a leaf clock buffer of their clock region
                 offFabricClkSinks.add(pin);
             } else if (Utils.isPS(si)) {
                 // PS clock input will be driven by East CR neighbor
