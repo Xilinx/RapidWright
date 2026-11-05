@@ -409,6 +409,52 @@ public class TestGlobalSignalRouting {
         }
     }
 
+    @Test
+    public void testSymmetricClkRoutingBlockedBeyondCentroid() {
+        // Routing tracks keep their index: a track that reaches the centroid can still be blocked by another clock
+        // further on, on the vertical routing track up to the clock region above the centroid or on the vertical
+        // distribution track that the vertical routing tracks transition onto. Block each of these nodes in turn
+        // (as another clock would) and check that the clock is routed on another track instead
+        Design design = new Design("blocked", "xcku9p-ffve900-2-e");
+        Net vcc = design.getVccNet();
+        Net gnd = design.getGndNet();
+        Net clk = design.createNet("clk");
+        clk.connect(design.createAndPlaceCell("bufgce", Unisim.BUFGCE, "BUFGCE_HDIO_X0Y2/BUFCE"), "O");
+        int i = 0;
+        for (int y : new int[]{275, 247, 230, 380}) {
+            Cell ff = design.createAndPlaceCell("ff" + i++, Unisim.FDRE, "SLICE_X32Y" + y + "/AFF");
+            clk.connect(ff, "C");
+            vcc.connect(ff, "CE");
+            gnd.connect(ff, "D");
+            gnd.connect(ff, "R");
+        }
+        design.routeSites();
+
+        GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), (n) -> NodeStatus.AVAILABLE, new HashMap<>());
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        Set<Node> nodesToBlock = new HashSet<>();
+        for (PIP pip : clk.getPIPs()) {
+            IntentCode startIntent = pip.getStartNode().getIntentCode();
+            IntentCode endIntent = pip.getEndNode().getIntentCode();
+            if (endIntent == IntentCode.NODE_GLOBAL_VROUTE ||
+                    (startIntent == IntentCode.NODE_GLOBAL_VROUTE && endIntent == IntentCode.NODE_GLOBAL_VDISTR)) {
+                nodesToBlock.add(pip.getEndNode());
+            }
+        }
+        Assertions.assertFalse(nodesToBlock.isEmpty());
+
+        for (Node blocked : nodesToBlock) {
+            clk.unroute();
+            GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(),
+                    (n) -> n.equals(blocked) ? NodeStatus.UNAVAILABLE : NodeStatus.AVAILABLE, new HashMap<>());
+            for (PIP pip : clk.getPIPs()) {
+                Assertions.assertNotEquals(blocked, pip.getStartNode(), pip.toString());
+                Assertions.assertNotEquals(blocked, pip.getEndNode(), pip.toString());
+            }
+            Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk), "Blocked " + blocked);
+        }
+    }
+
     private static Cell createBUFGCE(Design design, EDIFCell parent, String name, Site location) {
         // TODO - An improved version of this method is coming in ArrayBuilder
         Cell bufgce = design.createAndPlaceCell(parent, name, Unisim.BUFGCE, location, location.getBEL("BUFCE"));

@@ -230,27 +230,25 @@ public class GlobalSignalRouting {
         // divides clock regions into two groups
         divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
 
-        // Avoid the routing tracks of clocks already routed (e.g. when two clock buffers share the muxes onto
-        // the routing tracks, as the BUFGCE_HDIOs of a RCLK_HDIO tile do)
-        RouteNode centroidHRouteNode = UltraScaleClockRouting.routeBUFGToCentroid(clk, centroid, getNodeStatus);
-
-        RouteNode vrouteUp = null;
-        RouteNode vrouteDown;
-        // Two VROUTEs going up and down
+        // Two VROUTEs going up and down, each onto a vertical distribution track. Avoid the routing tracks of
+        // clocks already routed (e.g. when two clock buffers share the muxes onto the routing tracks, as the
+        // BUFGCE_HDIOs of a RCLK_HDIO tile do)
         ClockRegion aboveCentroid = upClockRegions.isEmpty() ? null : centroid.getNeighborClockRegion(1, 0);
-        if (aboveCentroid != null) {
-            vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false, getNodeStatus);
+        Pair<RouteNode, RouteNode> distLinesDownUp = UltraScaleClockRouting.routeBUFGToVerticalDistributionLines(clk,
+                centroid, aboveCentroid, getNodeStatus);
+        if (distLinesDownUp == null) {
+            throw new RuntimeException("ERROR: Unable to route clock " + clk + " to its centroid clock region " + centroid);
         }
-        vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false,
-                getNodeStatus);
+        RouteNode distLineDown = distLinesDownUp.getFirst();
+        RouteNode distLineUp = distLinesDownUp.getSecond();
 
         List<RouteNode> upDownDistLines = new ArrayList<>();
         if (aboveCentroid != null) {
-            List<RouteNode> upLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false, getNodeStatus);
+            List<RouteNode> upLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, distLineUp, upClockRegions, false, getNodeStatus);
             if (upLines != null) upDownDistLines.addAll(upLines);
         }
 
-        List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
+        List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, distLineDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
         if (downLines != null) upDownDistLines.addAll(downLines);
 
         Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk.getPins(), getNodeStatus);
