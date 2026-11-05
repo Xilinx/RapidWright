@@ -33,7 +33,13 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Assertions;
@@ -1029,5 +1035,62 @@ class TestEDIFNetlist {
         Assertions.assertSame(d, other.getCell("d"));
         // Only the work library is cleaned up otherwise
         Assertions.assertEquals(allWorkLibraries ? null : e, other.getCell("e"));
+    }
+
+    /**
+     * The parent net and physical pin maps are built on first use. Threads that use them for the
+     * first time at the same time must all see the complete maps.
+     */
+    @Test
+    public void testParentNetMapsConcurrentFirstUse() throws Exception {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        EDIFNetlist netlist = design.getNetlist();
+        Map<EDIFHierNet, EDIFHierNet> expectedParents = new HashMap<>(netlist.getParentNetMap());
+        Map<EDIFHierNet, List<EDIFHierPortInst>> expectedPins = new HashMap<>(netlist.getPhysicalNetPinMap());
+        List<EDIFHierNet> aliases = new ArrayList<>(expectedParents.keySet());
+        Assertions.assertFalse(aliases.isEmpty());
+
+        final int numThreads = 8;
+        ExecutorService pool = Executors.newFixedThreadPool(numThreads);
+        try {
+            for (int iteration = 0; iteration < 20; iteration++) {
+                netlist.resetParentNetMap();
+                CountDownLatch ready = new CountDownLatch(numThreads);
+                CountDownLatch start = new CountDownLatch(1);
+                List<Future<Integer>> futures = new ArrayList<>();
+                for (int t = 0; t < numThreads; t++) {
+                    // Each thread starts at a different net; half of them use the physical pin map first
+                    final int offset = t * aliases.size() / numThreads;
+                    final boolean pinsFirst = (t % 2) == 1;
+                    futures.add(pool.submit(() -> {
+                        ready.countDown();
+                        start.await();
+                        int mismatches = 0;
+                        for (int i = 0; i < aliases.size(); i++) {
+                            EDIFHierNet alias = aliases.get((offset + i) % aliases.size());
+                            EDIFHierNet expectedParent = expectedParents.get(alias);
+                            if (pinsFirst && expectedParent != null) {
+                                if (!Objects.equals(expectedPins.get(expectedParent), netlist.getPhysicalPins(expectedParent))) {
+                                    mismatches++;
+                                }
+                            }
+                            if (!Objects.equals(expectedParent, netlist.getParentNet(alias))) {
+                                mismatches++;
+                            }
+                        }
+                        return mismatches;
+                    }));
+                }
+                ready.await();
+                start.countDown();
+                for (Future<Integer> f : futures) {
+                    Assertions.assertEquals(0, f.get(60, TimeUnit.SECONDS), "iteration " + iteration);
+                }
+                Assertions.assertEquals(expectedParents, netlist.getParentNetMap());
+                Assertions.assertEquals(expectedPins, netlist.getPhysicalNetPinMap());
+            }
+        } finally {
+            pool.shutdownNow();
+        }
     }
 }

@@ -90,18 +90,22 @@ public class EDIFNetlist extends EDIFName {
 
     private EDIFDesign design;
 
-    private EDIFCellInst topCellInstance = null;
+    private volatile EDIFCellInst topCellInstance = null;
 
     private List<String> comments;
 
     private Map<String,EDIFPropertyValue> metax;
 
-    private Map<EDIFHierNet,EDIFHierNet> parentNetMap;
-    private Map<String,String> parentNetMapNames;
+    // The parent net and physical pin maps are built on first use. Each is completely built before
+    // it is assigned (under this netlist's lock), so that threads reading the netlist at the same
+    // time never see a map under construction. physicalNetPinMap is assigned after the GND/VCC pin
+    // lists, and parentNetMap last.
+    private volatile Map<EDIFHierNet,EDIFHierNet> parentNetMap;
+    private volatile Map<String,String> parentNetMapNames;
 
-    private Map<EDIFHierNet, List<EDIFHierPortInst>> physicalNetPinMap;
-    private List<EDIFHierPortInst> physicalGndPins;
-    private List<EDIFHierPortInst> physicalVccPins;
+    private volatile Map<EDIFHierNet, List<EDIFHierPortInst>> physicalNetPinMap;
+    private volatile List<EDIFHierPortInst> physicalGndPins;
+    private volatile List<EDIFHierPortInst> physicalVccPins;
 
     protected int nameSpaceUniqueCount = 0;
 
@@ -485,18 +489,32 @@ public class EDIFNetlist extends EDIFName {
     }
 
     public EDIFCellInst getTopCellInst() {
-        if (topCellInstance == null) {
-            topCellInstance = getTopCell().createCellInst("top", null);
+        EDIFCellInst inst = topCellInstance;
+        if (inst == null) {
+            synchronized (this) {
+                inst = topCellInstance;
+                if (inst == null) {
+                    inst = getTopCell().createCellInst("top", null);
+                    topCellInstance = inst;
+                }
+            }
         }
-        return topCellInstance;
+        return inst;
     }
 
-    private EDIFHierCellInst topHierCellInstance;
+    private volatile EDIFHierCellInst topHierCellInstance;
     public EDIFHierCellInst getTopHierCellInst() {
-        if (topHierCellInstance == null) {
-            topHierCellInstance = EDIFHierCellInst.createTopInst(getTopCellInst());
+        EDIFHierCellInst inst = topHierCellInstance;
+        if (inst == null) {
+            synchronized (this) {
+                inst = topHierCellInstance;
+                if (inst == null) {
+                    inst = EDIFHierCellInst.createTopInst(getTopCellInst());
+                    topHierCellInstance = inst;
+                }
+            }
         }
-        return topHierCellInstance;
+        return inst;
     }
 
     public boolean addComment(String comment) {
@@ -1615,7 +1633,14 @@ public class EDIFNetlist extends EDIFName {
      */
     public List<EDIFHierNet> getNetAliases(EDIFHierNet initialNet) {
         List<EDIFHierNet> aliases = new ArrayList<>();
-        recordParentNet(initialNet, aliases);
+        synchronized (this) {
+            if (physicalNetPinMap == null) {
+                physicalGndPins = new ArrayList<>();
+                physicalVccPins = new ArrayList<>();
+                physicalNetPinMap = new HashMap<>();
+            }
+            recordParentNet(initialNet, aliases, physicalNetPinMap, physicalGndPins, physicalVccPins);
+        }
         return aliases;
     }
 
@@ -1624,16 +1649,17 @@ public class EDIFNetlist extends EDIFName {
      * @param initialNet The net to use as a starting point in the search.
      * @param aliases All electrically connected nets in the netlist that are equivalent are added
      * to it.
+     * @param physicalNetPinMap The map to record the physical pins of the parent net in.
+     * @param physicalGndPins The list to add the physical pins to if the parent net is GND.
+     * @param physicalVccPins The list to add the physical pins to if the parent net is VCC.
      * @return The parent net, or null if the net has no connections.
      * @throws RuntimeException If the net has more than one source, or has connections but no
      * source.
      */
-    private EDIFHierNet recordParentNet(EDIFHierNet initialNet, List<EDIFHierNet> aliases) {
-        if (physicalNetPinMap == null) {
-            physicalNetPinMap = new HashMap<>();
-            physicalGndPins = new ArrayList<>();
-            physicalVccPins = new ArrayList<>();
-        }
+    private EDIFHierNet recordParentNet(EDIFHierNet initialNet, List<EDIFHierNet> aliases,
+                                        Map<EDIFHierNet, List<EDIFHierPortInst>> physicalNetPinMap,
+                                        List<EDIFHierPortInst> physicalGndPins,
+                                        List<EDIFHierPortInst> physicalVccPins) {
         List<EDIFHierPortInst> leafCellPins = new ArrayList<>();
         EDIFHierPortInst source = findParentPortInst(initialNet, aliases, leafCellPins);
         if (source != null) {
@@ -1772,8 +1798,9 @@ public class EDIFNetlist extends EDIFName {
      * @throws RuntimeException If the net has more than one source.
      */
     public EDIFHierNet findParentNet(EDIFHierNet netAlias) {
-        if (parentNetMap != null) {
-            return parentNetMap.get(netAlias);
+        Map<EDIFHierNet,EDIFHierNet> map = parentNetMap;
+        if (map != null) {
+            return map.get(netAlias);
         }
         EDIFHierPortInst source = findParentPortInst(netAlias, null, null);
         return (source != null) ? source.getHierarchicalNet() : null;
@@ -1785,10 +1812,12 @@ public class EDIFNetlist extends EDIFName {
      * @return the map
      */
     public Map<EDIFHierNet,EDIFHierNet> getParentNetMap() {
-        if (parentNetMap == null) {
+        Map<EDIFHierNet,EDIFHierNet> map = parentNetMap;
+        if (map == null) {
             generateParentNetMap();
+            map = parentNetMap;
         }
-        return parentNetMap;
+        return map;
     }
 
 
@@ -1800,20 +1829,27 @@ public class EDIFNetlist extends EDIFName {
      * @return the map
      */
     public Map<String, String> getParentNetMapNames() {
-        if (parentNetMapNames == null) {
-            parentNetMapNames = getParentNetMap().entrySet().stream().collect(Collectors.toMap(
-                n->n.getKey().getHierarchicalNetName(),
-                n->n.getValue().getHierarchicalNetName()
-            ));
+        Map<String, String> names = parentNetMapNames;
+        if (names == null) {
+            synchronized (this) {
+                names = parentNetMapNames;
+                if (names == null) {
+                    names = getParentNetMap().entrySet().stream().collect(Collectors.toMap(
+                        n->n.getKey().getHierarchicalNetName(),
+                        n->n.getValue().getHierarchicalNetName()
+                    ));
+                    parentNetMapNames = names;
+                }
+            }
         }
-        return parentNetMapNames;
+        return names;
     }
 
     /**
      * Resets the internal parent net map of the netlist.  This is necessary any time modifications
      * are made to the netlist (add/remove/change cells/nets, removing/adding black boxes, etc).
      */
-    public void resetParentNetMap() {
+    public synchronized void resetParentNetMap() {
         parentNetMap = null;
         parentNetMapNames = null;
         physicalNetPinMap = null;
@@ -1830,18 +1866,32 @@ public class EDIFNetlist extends EDIFName {
         return parentNetMap != null;
     }
 
-    private void generateParentNetMap() {
+    /**
+     * Builds the parent net map and the physical pin maps, unless another thread built them first.
+     * Each map is completely built before it is assigned to its field.
+     */
+    private synchronized void generateParentNetMap() {
+        if (parentNetMap != null) {
+            return;
+        }
         long start = 0;
         if (DEBUG) {
             start = System.currentTimeMillis();
         }
-        if (parentNetMap == null) {
-            parentNetMap = new HashMap<>();
-        }
-        if (physicalNetPinMap == null) {
+        Map<EDIFHierNet,EDIFHierNet> parentNetMap = new HashMap<>();
+        Map<EDIFHierNet, List<EDIFHierPortInst>> physicalNetPinMap;
+        List<EDIFHierPortInst> physicalGndPins;
+        List<EDIFHierPortInst> physicalVccPins;
+        if (this.physicalNetPinMap == null) {
             physicalNetPinMap = new HashMap<>();
             physicalGndPins = new ArrayList<>();
             physicalVccPins = new ArrayList<>();
+        } else {
+            // Keep the physical pins already recorded by getNetAliases(), as before, but add to
+            // copies so that the published lists and map are not changed while they are read
+            physicalNetPinMap = new HashMap<>(this.physicalNetPinMap);
+            physicalGndPins = new ArrayList<>(this.physicalGndPins);
+            physicalVccPins = new ArrayList<>(this.physicalVccPins);
         }
         EDIFCell c = getTopCell();
         EDIFHierCellInst topCellInst = getTopHierCellInst();
@@ -1885,11 +1935,18 @@ public class EDIFNetlist extends EDIFName {
             // input), so map the aliases to the parent net that the search resolves, just as
             // findParentNet() does
             List<EDIFHierNet> aliases = new ArrayList<>();
-            EDIFHierNet parentNet = recordParentNet(net, aliases);
+            EDIFHierNet parentNet = recordParentNet(net, aliases, physicalNetPinMap, physicalGndPins,
+                    physicalVccPins);
             for (EDIFHierNet alias : aliases) {
                 parentNetMap.put(alias, parentNet);
             }
         }
+        // Publish the complete maps: the GND/VCC pin lists before physicalNetPinMap, which guards
+        // them, and parentNetMap last
+        this.physicalGndPins = physicalGndPins;
+        this.physicalVccPins = physicalVccPins;
+        this.physicalNetPinMap = physicalNetPinMap;
+        this.parentNetMap = parentNetMap;
         if (DEBUG) {
             long stop = System.currentTimeMillis();
             System.out.println("generateParentNetMap() runtime: " + (stop-start)/1000.0f +" seconds ");
@@ -1946,10 +2003,12 @@ public class EDIFNetlist extends EDIFName {
      * @return the physicalNetPinMap
      */
     public Map<EDIFHierNet, List<EDIFHierPortInst>> getPhysicalNetPinMap() {
-        if (physicalNetPinMap == null) {
+        Map<EDIFHierNet, List<EDIFHierPortInst>> map = physicalNetPinMap;
+        if (map == null) {
             generateParentNetMap();
+            map = physicalNetPinMap;
         }
-        return physicalNetPinMap;
+        return map;
     }
 
 
