@@ -493,6 +493,23 @@ public class TestRWRoute {
     }
 
     @ParameterizedTest
+    @CsvSource({
+            // xcvp1902 has no CLE_BC_CORE tiles: the BNODEs/CNODEs/CTRL wires of its CLE pairs are hosted
+            // by SLL2 tiles; it also has mirrored SLRs, each with its own tile coordinates
+            "SLICE_S0X100Y100,AQ,SLICE_S0X104Y110,A1,186",
+            "SLICE_S1X100Y100,AQ,SLICE_S1X104Y110,A1,186",      // Mirrored SLR
+            "SLICE_S2X300Y500,AQ,SLICE_S2X310Y520,A1,277",
+            "SLICE_S3X300Y500,AQ,SLICE_S3X290Y480,A1,47",
+            "SLICE_S0X100Y100,AQ,SLICE_S0X101Y100,CKEN1,35",    // CTRL sink in an SLL2 tile
+            "SLICE_S1X201Y301,AQ,SLICE_S1X200Y300,CKEN2,129",
+    })
+    public void testSingleConnectionXcvp1902(String srcSiteName, String srcPinName,
+                                             String dstSiteName, String dstPinName,
+                                             long nodesPoppedLimit) {
+        testSingleConnectionHelper("xcvp1902", srcSiteName, srcPinName, dstSiteName, dstPinName, nodesPoppedLimit);
+    }
+
+    @ParameterizedTest
     @EnumSource(Series.class)
     public void testRWRouteDeviceSupport(Series series) {
         for (Part part : PartNameTools.getAllParts(series)) {
