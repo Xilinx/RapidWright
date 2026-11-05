@@ -1168,9 +1168,8 @@ public class TestRWRoute {
      * DSP or URAM column between them; the rows cover every direction at several distances (half tiles, rows), from LUT
      * and flop outputs, to inputs of all eight LUTs and of all six numbers.
      * <p>
-     * TODO: rows that cross an SLR boundary, once super long lines have a delay. RouterHelper.computeNodeDelay() gives
-     * a delay only to nodes for which RouteNode.isExitNode() holds, which a super long line is not, so that a
-     * crossing's delay is not yet meaningful.
+     * TODO: rows that cross an SLR boundary, once super long lines have a delay (RouterHelper.computeNodeDelay() throws
+     * on one).
      * @param partName Part.
      * @param srcSitePin Source pin, as "SITE.PIN": a LUT output ([A-H]_O) or a flop output ([A-H]Q).
      * @param dstSitePin Sink pin, as "SITE.PIN": a LUT input ([A-H][1-6]).
