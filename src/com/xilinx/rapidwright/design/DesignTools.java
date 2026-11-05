@@ -3528,6 +3528,10 @@ public class DesignTools {
             return null;
         }
         EDIFPortInst portInst = eci.getPortInst(logPinName);
+        if (portInst == null) {
+            // The logical pin is not connected in the netlist
+            return null;
+        }
         final EDIFNetlist netlist = targetCell.getSiteInst().getDesign().getNetlist();
         EDIFHierPortInst hierPortInst =
                 new EDIFHierPortInst(netlist.getHierCellInstFromName(targetCell.getParentHierarchicalInstName()), portInst);
