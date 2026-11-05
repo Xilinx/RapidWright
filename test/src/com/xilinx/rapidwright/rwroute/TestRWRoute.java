@@ -60,6 +60,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.eco.ECOTools;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
@@ -611,6 +612,32 @@ public class TestRWRoute {
                 srcSiteName, srcPinName,
                 dstSiteName, dstPinName,
                 nodesPoppedLimit);
+    }
+
+    @Test
+    public void testDedicatedClockInputsSharingFabricInput() {
+        // Two clock-capable HDIO inputs, each driving a BUFGCE_HDIO of the same RCLK_HDIO tile through its
+        // dedicated path. Both BUFGCE_HDIOs can also be reached from the fabric, but only through a single
+        // shared INT input: these connections must be routed through their dedicated paths
+        Design design = new Design("top", "xcku9p-ffve900-2-e");
+        List<SitePinInst> pinsToRoute = new ArrayList<>();
+        List<Net> nets = new ArrayList<>();
+        String[][] ioAndBuffer = {{"IOB_X0Y164", "BUFGCE_HDIO_X0Y2"}, {"IOB_X0Y182", "BUFGCE_HDIO_X0Y3"}};
+        for (String[] pair : ioAndBuffer) {
+            Net net = design.createNet(pair[0] + "_I");
+            net.createPin("I", design.createSiteInst(pair[0]));
+            pinsToRoute.add(net.createPin("CLK_IN", design.createSiteInst(pair[1])));
+            nets.add(net);
+        }
+        PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute, false);
+
+        for (Net net : nets) {
+            assertAllPinsRouted(net);
+            Assertions.assertFalse(net.getPIPs().isEmpty());
+            for (PIP pip : net.getPIPs()) {
+                Assertions.assertNotEquals(TileTypeEnum.INT, pip.getTile().getTileTypeEnum(), pip.toString());
+            }
+        }
     }
 
     @Test

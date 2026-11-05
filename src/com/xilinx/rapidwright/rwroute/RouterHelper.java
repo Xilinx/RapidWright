@@ -631,6 +631,54 @@ public class RouterHelper {
         return 0;
     }
 
+    /** Maximum number of nodes after the source node on a dedicated path (see {@link #isDedicatedConnection}). */
+    private static final int MAX_DEDICATED_PATH_LENGTH = 3;
+
+    /**
+     * Checks whether an input pin is driven by an output pin through dedicated resources only, i.e. a short
+     * path that does not enter an INT tile, such as from a global clock-capable IOB input to a clock buffer
+     * of its bank or CMT. Such a connection is best routed directly (as Vivado does) rather than projected
+     * onto INT tiles and routed through the fabric, where several clock buffers can share a single input
+     * (e.g. the BUFGCE_HDIOs of a RCLK_HDIO tile).
+     * @param source The output pin.
+     * @param sink The input pin.
+     * @return true, if the sink pin's node can be reached from the source pin's node through at most
+     * {@value #MAX_DEDICATED_PATH_LENGTH} nodes, none in an INT tile.
+     */
+    public static boolean isDedicatedConnection(SitePinInst source, SitePinInst sink) {
+        Node sourceNode = source.getConnectedNode();
+        Node sinkNode = sink.getConnectedNode();
+        if (sourceNode == null || sinkNode == null ||
+                Utils.isInterConnect(sourceNode.getTile().getTileTypeEnum()) ||
+                Utils.isInterConnect(sinkNode.getTile().getTileTypeEnum())) {
+            return false;
+        }
+        // As findPathBetweenNodes() does, only cross clocking tiles if the source or sink is in one
+        final boolean blockClocking = !Utils.isClocking(sourceNode.getTile().getTileTypeEnum()) &&
+                !Utils.isClocking(sinkNode.getTile().getTileTypeEnum());
+        List<Node> level = Collections.singletonList(sourceNode);
+        Set<Node> visited = new HashSet<>(level);
+        for (int length = 1; length <= MAX_DEDICATED_PATH_LENGTH && !level.isEmpty(); length++) {
+            List<Node> nextLevel = new ArrayList<>();
+            for (Node node : level) {
+                for (Node downhill : node.getAllDownhillNodes()) {
+                    if (downhill.equals(sinkNode)) {
+                        return true;
+                    }
+                    TileTypeEnum tileType = downhill.getTile().getTileTypeEnum();
+                    if (Utils.isInterConnect(tileType) || (blockClocking && Utils.isClocking(tileType))) {
+                        continue;
+                    }
+                    if (visited.add(downhill)) {
+                        nextLevel.add(downhill);
+                    }
+                }
+            }
+            level = nextLevel;
+        }
+        return false;
+    }
+
     /**
      * Routes and assigns nodes to a direct connection, e.g. carry chain connections and connections between cascaded BRAMs.
      * @param directConnection The target direct connection.
