@@ -210,7 +210,9 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         Map<String, EDIFCellInst> partialCellMap = new HashMap<>();
         Set<String> keys = new HashSet<>();
         for (Net n : nets) {
-            if (n.isClockNet() || n.isStaticNet() || n.hasPIPs()) continue;
+            // Including a net with routing: one being routed partially (e.g. by PartialRouter) keeps its routing until
+            // it is done, and its cells' arcs are as needed as those of an unrouted net
+            if (n.isClockNet() || n.isStaticNet()) continue;
             // A net that never leaves its site has no sink site pins (e.g. a LUT driving the flip-flop beside it), but
             // its cells' arcs are as needed as those of one that does
             if (!n.getSinkPins().isEmpty() && !RouterHelper.isRoutableNetWithSourceSinks(n)) continue;

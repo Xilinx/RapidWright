@@ -35,6 +35,7 @@ import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.eco.ECOTools;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.rwroute.RWRoute;
 import com.xilinx.rapidwright.rwroute.RWRouteConfig;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
@@ -134,5 +135,43 @@ public class TestTimingGraph {
         // $RAPIDWRIGHT_PATH/timing/ultrascaleplus/intrasite_delay_terms.txt
         Assertions.assertNotNull(path);
         Assertions.assertEquals(21f + 70 + 32, tg.getPathDelay(path));
+    }
+
+    /**
+     * Tests that a cell all of whose nets are routed (here a LUT6 between flip-flops in two other slices) has its arcs
+     * in the timing graph when it is built for partial routing (as PartialRouter does, whose nets being routed keep
+     * their routing until it is done): its path is as long as when the timing graph is not built for partial routing.
+     */
+    @Test
+    public void testRoutedNetCellArcs() {
+        Design design = new Design("top", "xcvu3p-ffvc1517-2-e");
+        design.createAndPlaceCell("ffA", Unisim.FDRE, "SLICE_X0Y0/AFF");
+        Cell lut = design.createAndPlaceCell("lut", Unisim.LUT6, "SLICE_X0Y1/A6LUT");
+        LUTTools.configureLUT(lut, "O=I0");
+        design.createAndPlaceCell("ffB", Unisim.FDRE, "SLICE_X0Y2/AFF");
+        String[][] connections = {{"ffA", "Q", "lut", "I0"}, {"lut", "O", "ffB", "D"}};
+        for (String[] c : connections) {
+            Net net = design.createNet(c[0] + "_" + c[1]);
+            ECOTools.connectNet(design, design.getCell(c[0]), c[1], net);
+            ECOTools.connectNet(design, design.getCell(c[2]), c[3], net);
+        }
+        RWRoute.routeDesignFullNonTimingDriven(design);
+        for (String[] c : connections) {
+            Assertions.assertTrue(design.getNet(c[0] + "_" + c[1]).hasPIPs());
+        }
+
+        RWRouteConfig config = new RWRouteConfig(new String[] {});
+        DelayEstimatorBase<InterconnectInfo> estimator = new DelayEstimatorBase<>(design.getDevice(),
+                new InterconnectInfo(), config.isUseUTurnNodes(), 0);
+        float[] pathDelays = new float[2];
+        for (int i = 0; i < 2; i++) {
+            boolean isPartialRouting = (i == 1);
+            TimingGraph tg = new TimingManager(design, null, config, null, design.getNets(), isPartialRouting,
+                    estimator).getTimingGraph();
+            GraphPath<TimingVertex, TimingEdge> path = tg.getTimingPath("ffA/Q", "ffB/D");
+            Assertions.assertNotNull(path);
+            pathDelays[i] = tg.getPathDelay(path);
+        }
+        Assertions.assertEquals(pathDelays[0], pathDelays[1]);
     }
 }
