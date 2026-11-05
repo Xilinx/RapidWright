@@ -1498,7 +1498,11 @@ public class TestRWRoute {
             "xcvu3p,IOB_X0Y47,I,SLICE_X77Y122,FX,100",
 
             // 240 CLB height SLR, no LAG tiles on Y0 (since HBM on bottom edge)
-            "xcu50,SLICE_X38Y239,AQ,SLICE_X38Y240,A1,100"
+            "xcu50,SLICE_X38Y239,AQ,SLICE_X38Y240,A1,100",
+
+            // SLR crossing whose bounding box, before the SLL height check, is exactly one row too
+            // short to hold an SLL strictly inside it
+            "xcvu13p,SLICE_X117Y218,D_O,SLICE_X116Y250,CX,200"
     })
     public void testSingleConnection(String partName,
                                      String srcSiteName, String srcPinName,
