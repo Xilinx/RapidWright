@@ -33,6 +33,7 @@ import com.xilinx.rapidwright.util.RuntimeTracker;
 import com.xilinx.rapidwright.util.Utils;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
@@ -545,28 +546,31 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     public RouteNode[] getChildren(RouteNodeGraph routingGraph) {
         if (children == null) {
             long start = RuntimeTracker.now();
-            List<Node> allDownHillNodes = getAllDownhillNodes();
-            List<RouteNode> childrenList = new ArrayList<>(allDownHillNodes.size());
-            for (Node downhill : allDownHillNodes) {
-                if (isExcluded(routingGraph, downhill)) {
-                    continue;
-                }
-
-                RouteNode child = routingGraph.getOrCreate(downhill);
-                if (child.getType() != RouteNodeType.INACCESSIBLE) {
-                    childrenList.add(child);
-                }
-            }
-            if (!childrenList.isEmpty()) {
-                children = childrenList.toArray(EMPTY_ARRAY);
-            } else {
-                children = EMPTY_ARRAY;
-            }
+            children = computeChildren(routingGraph);
             long time = RuntimeTracker.elapsed(start);
             routingGraph.addCreateRnodeTime(time);
+        } else {
+            // Cached for every later search, so whatever decided them (e.g. PartialRouter's preserved arcs) must not
+            // have changed since, unless they were reset (resetChildren())
+            assert(!enableComprehensiveAssertions || Arrays.equals(children, computeChildren(routingGraph)));
         }
         return children;
+    }
 
+    private RouteNode[] computeChildren(RouteNodeGraph routingGraph) {
+        List<Node> allDownHillNodes = getAllDownhillNodes();
+        List<RouteNode> childrenList = new ArrayList<>(allDownHillNodes.size());
+        for (Node downhill : allDownHillNodes) {
+            if (isExcluded(routingGraph, downhill)) {
+                continue;
+            }
+
+            RouteNode child = routingGraph.getOrCreate(downhill);
+            if (child.getType() != RouteNodeType.INACCESSIBLE) {
+                childrenList.add(child);
+            }
+        }
+        return childrenList.isEmpty() ? EMPTY_ARRAY : childrenList.toArray(EMPTY_ARRAY);
     }
 
     /**
