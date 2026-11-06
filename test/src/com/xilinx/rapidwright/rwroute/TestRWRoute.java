@@ -1117,4 +1117,28 @@ public class TestRWRoute {
         // create. Reaching the buffer is not necessary here: this test only requires that such
         // routing be preserved, not extended.
     }
+
+    @Test
+    public void testClockNetsDrivenByBUFGGTRoutedFirst() {
+        // A BUFG_GT reaches a single clock routing track, fixed by its site: its clock is routed before the
+        // clocks of other buffers, which can avoid that track
+        Design design = new Design("clock_order", "xcvu3p-ffvc1517-2-e");
+        List<Net> clks = new ArrayList<>();
+        int i = 0;
+        for (String bufg : new String[] {"BUFGCE_X0Y48", "BUFG_GT_X0Y29", "BUFGCE_X0Y49"}) {
+            Net clk = design.createNet("clk" + i);
+            Unisim type = bufg.startsWith("BUFG_GT") ? Unisim.BUFG_GT : Unisim.BUFGCE;
+            clk.connect(design.createAndPlaceCell("bufg" + i, type, bufg + "/" + (type == Unisim.BUFG_GT ? "BUFG_GT" : "BUFCE")), "O");
+            Cell ff = design.createAndPlaceCell("ff" + i, Unisim.FDRE, "SLICE_X40Y" + (100 + i) + "/AFF");
+            clk.connect(ff, "C");
+            clks.add(clk);
+            i++;
+        }
+        RWRoute router = new RWRoute(design, new RWRouteConfig(new String[] {"--nonTimingDriven"}));
+        router.preprocess();
+        router.initialize();
+        List<Net> order = router.getClkNetsInRoutingOrder();
+        Assertions.assertEquals(3, order.size());
+        Assertions.assertEquals(clks.get(1), order.get(0));
+    }
 }

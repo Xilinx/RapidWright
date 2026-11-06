@@ -212,7 +212,7 @@ public class PartialRouter extends RWRoute {
         if (clkNets.isEmpty())
             return;
 
-        for (Net clk : clkNets) {
+        for (Net clk : getClkNetsInRoutingOrder()) {
             List<SitePinInst> clkPins = netToPins.get(clk);
             if (clkPins == null || clkPins.isEmpty()) {
                 continue;
