@@ -455,6 +455,66 @@ public class TestGlobalSignalRouting {
         }
     }
 
+    private static Net createClockWithFFs(Design design, String name, String bufgceSite, String... slices) {
+        Net clk = design.createNet(name);
+        clk.connect(design.createAndPlaceCell(name + "_bufgce", Unisim.BUFGCE, bufgceSite + "/BUFCE"), "O");
+        int i = 0;
+        for (String slice : slices) {
+            Cell ff = design.createAndPlaceCell(name + "_ff" + i++, Unisim.FDRE, slice + "/AFF");
+            clk.connect(ff, "C");
+            design.getVccNet().connect(ff, "CE");
+            design.getGndNet().connect(ff, "D");
+            design.getGndNet().connect(ff, "R");
+        }
+        return clk;
+    }
+
+    @Test
+    public void testSymmetricClkRoutingBlockedHorizontalDistribution() {
+        // Distribution tracks keep the index of the routing track too: a track can be blocked by another clock as
+        // late as on the horizontal distribution track of one of the sinks' clock regions. Block each of these
+        // nodes in turn (as another clock would) and check that the clock is routed on another track instead
+        Design design = new Design("blocked_hdistr", "xcku9p-ffve900-2-e");
+        Net clk = createClockWithFFs(design, "clk", "BUFGCE_HDIO_X0Y2",
+                "SLICE_X32Y275", "SLICE_X32Y247", "SLICE_X32Y230", "SLICE_X32Y380", "SLICE_X2Y250", "SLICE_X60Y250");
+        design.routeSites();
+
+        GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), (n) -> NodeStatus.AVAILABLE, new HashMap<>());
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        Set<Node> nodesToBlock = new HashSet<>();
+        for (PIP pip : clk.getPIPs()) {
+            if (pip.getEndNode().getIntentCode() == IntentCode.NODE_GLOBAL_HDISTR) {
+                nodesToBlock.add(pip.getEndNode());
+            }
+        }
+        Assertions.assertFalse(nodesToBlock.isEmpty());
+
+        for (Node blocked : nodesToBlock) {
+            clk.unroute();
+            GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(),
+                    (n) -> n.equals(blocked) ? NodeStatus.UNAVAILABLE : NodeStatus.AVAILABLE, new HashMap<>());
+            for (PIP pip : clk.getPIPs()) {
+                Assertions.assertNotEquals(blocked, pip.getStartNode(), pip.toString());
+                Assertions.assertNotEquals(blocked, pip.getEndNode(), pip.toString());
+            }
+            Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk), "Blocked " + blocked);
+        }
+    }
+
+    @Test
+    public void testSymmetricClkRoutingUnreachableCentroid() {
+        // The routing tracks turn from horizontal to vertical only once and the clock regions in the lower left
+        // corner of this device have no clock routing: from a clock buffer in the bottom row, the centroid of
+        // sinks in the leftmost column cannot be reached and a clock root next to it is used instead
+        Design design = new Design("unreachable_centroid", "xcku9p-ffve900-2-e");
+        Net clk = createClockWithFFs(design, "clk", "BUFGCE_HDIO_X0Y0", // in clock region X3Y0
+                "SLICE_X10Y200", "SLICE_X10Y260", "SLICE_X10Y320");
+        design.routeSites();
+
+        GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), (n) -> NodeStatus.AVAILABLE, new HashMap<>());
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+    }
+
     private static Cell createBUFGCE(Design design, EDIFCell parent, String name, Site location) {
         // TODO - An improved version of this method is coming in ArrayBuilder
         Cell bufgce = design.createAndPlaceCell(parent, name, Unisim.BUFGCE, location, location.getBEL("BUFCE"));
