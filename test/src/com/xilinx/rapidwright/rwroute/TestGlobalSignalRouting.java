@@ -30,6 +30,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
@@ -528,6 +530,88 @@ public class TestGlobalSignalRouting {
         Assertions.assertTrue(routethrus.contains("XPIO_LOGICPAIR_1_OPFFS_D1_PIN->XPIO_LOGICPAIR_1_OPFFS_Q_PIN"), routethrus.toString());
         Assertions.assertTrue(routethrus.contains("XPHY_CORE_3_D3_0__PIN->XPHY_CORE_3_O0_3__PIN"), routethrus.toString());
         Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(gndNet));
+    }
+
+    /**
+     * An UltraScale+ HPIOB output buffer with a constant input: its OP site pin is only reached
+     * from the fabric through a TX routethru of the XIPHY BITSLICE_RX_TX site.
+     */
+    @Test
+    public void testRouteStaticNetToUltraScalePlusHpioOutputBuffer() {
+        Design design = new Design("usplus_hpio_const", "xcvu3p");
+        Cell obuf = design.createAndPlaceCell("obuf", Unisim.OBUF, "IOB_X0Y128/OUTBUF");
+        Net gndNet = design.getGndNet();
+        SitePinInst op = gndNet.createPin("OP", obuf.getSiteInst());
+
+        List<SitePinInst> gndPins = new ArrayList<>(gndNet.getPins());
+        RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
+        GlobalSignalRouting.routeStaticNet(gndPins, (n) -> getNodeState(design, NetType.GND, n), design, routeThruHelper);
+
+        Assertions.assertTrue(op.isRouted());
+        Assertions.assertEquals(1, gndNet.getPins().stream().filter(SitePinInst::isOutPin).count());
+        Set<String> routethrus = new HashSet<>();
+        for (PIP pip : gndNet.getPIPs()) {
+            if (pip.isRouteThru()) {
+                routethrus.add(pip.getStartWire().getSitePin() + "->" + pip.getEndWire().getSitePin());
+            }
+        }
+        Assertions.assertTrue(routethrus.contains("BITSLICE_RX_TX_X0Y128/TX_D0->BITSLICE_RX_TX_X0Y128/TX_Q"), routethrus.toString());
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(gndNet));
+    }
+
+    /**
+     * A routed design's static source pin remains on its SiteInst when RWRoute removes all output
+     * pins from the static net before rerouting it (see RWRoute.addStaticNetRoutingTargets()):
+     * rerouting must add that same pin back to the net exactly once and mark it routed.
+     */
+    @Test
+    public void testRouteStaticNetReattachesExistingSourcePin() {
+        Design design = new Design("static_source", "xcvu3p");
+        Device device = design.getDevice();
+        Net gndNet = design.getGndNet();
+        SitePinInst sink = gndNet.createPin("A1", design.createSiteInst(device.getSite("SLICE_X0Y0")));
+        // As in RWRoute, only the static net's sink pins are preserved
+        Node sinkNode = sink.getConnectedNode();
+        Function<Node, NodeStatus> nodeStatus = (n) -> n.equals(sinkNode) ? NodeStatus.INUSE : NodeStatus.AVAILABLE;
+        Function<Net, List<SitePinInst>> outPins = (net) -> net.getPins().stream()
+                .filter(SitePinInst::isOutPin).collect(Collectors.toList());
+        RouteThruHelper routeThruHelper = new RouteThruHelper(device);
+
+        // Find the LUT output used as the GND source ...
+        GlobalSignalRouting.routeStaticNet(new ArrayList<>(gndNet.getSinkPins()), nodeStatus, design, routeThruHelper);
+        List<SitePinInst> sources = outPins.apply(gndNet);
+        Assertions.assertEquals(1, sources.size());
+        Site sourceSite = sources.get(0).getSite();
+        String sourcePinName = sources.get(0).getName();
+        gndNet.unroute();
+        gndNet.removePin(sources.get(0));
+        sources.get(0).detachSiteInst();
+
+        // ... and route again with that site used by the design, as in a routed design
+        if (design.getSiteInstFromSite(sourceSite) == null) {
+            design.createSiteInst(sourceSite);
+        }
+        GlobalSignalRouting.routeStaticNet(new ArrayList<>(gndNet.getSinkPins()), nodeStatus, design, routeThruHelper);
+        SitePinInst source = design.getSiteInstFromSite(sourceSite).getSitePinInst(sourcePinName);
+        Assertions.assertNotNull(source);
+        Assertions.assertEquals(Arrays.asList(source), outPins.apply(gndNet));
+
+        // RWRoute.addStaticNetRoutingTargets() removes the source pin from the net, but it stays
+        // on its SiteInst
+        List<SitePinInst> sinks = gndNet.getSinkPins();
+        gndNet.unroute();
+        gndNet.setPins(sinks);
+        Assertions.assertEquals(Arrays.asList(sink), gndNet.getPins());
+        Assertions.assertSame(gndNet, source.getNet());
+        Assertions.assertFalse(source.isRouted());
+
+        GlobalSignalRouting.routeStaticNet(new ArrayList<>(sinks), nodeStatus, design, routeThruHelper);
+        Assertions.assertTrue(sink.isRouted());
+        List<SitePinInst> restored = outPins.apply(gndNet);
+        Assertions.assertEquals(1, restored.size());
+        Assertions.assertSame(source, restored.get(0));
+        Assertions.assertSame(source, design.getSiteInstFromSite(sourceSite).getSitePinInst(sourcePinName));
+        Assertions.assertTrue(source.isRouted());
     }
   
     /**
