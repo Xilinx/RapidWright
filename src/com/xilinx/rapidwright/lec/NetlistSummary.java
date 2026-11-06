@@ -23,12 +23,14 @@
 package com.xilinx.rapidwright.lec;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.function.IntUnaryOperator;
 
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.edif.EDIFDirection;
@@ -56,6 +58,9 @@ public class NetlistSummary {
     /** Every terminal, by canonical instance name, mapped to its configuration. */
     private final Map<String, TerminalAttributes> terminals = new TreeMap<>();
 
+    /** Literals of the pins a retiming certificate defines registers by. */
+    private final Map<String, Integer> definitionLiterals = new HashMap<>();
+
     private final NetlistStats stats;
 
     private LoopReport loops = new LoopReport();
@@ -80,12 +85,35 @@ public class NetlistSummary {
      */
     public static NetlistSummary build(String label, FlatNetlist flat, Connectivity conn,
             CellClassifier classifier, Aig aig, Series series, NetlistStats stats, LecLog log) {
+        return build(label, flat, conn, classifier, aig, series, stats, log,
+                Collections.emptySet(), Collections.emptySet());
+    }
+
+    /**
+     * As above, for a comparison with a retiming certificate.
+     *
+     * @param privateRegisters The registers of this netlist the certificate
+     *                         defines; their outputs get private variables.
+     * @param definitionPins   The pins of this netlist the certificate defines
+     *                         registers of the other netlist by.
+     */
+    public static NetlistSummary build(String label, FlatNetlist flat, Connectivity conn,
+            CellClassifier classifier, Aig aig, Series series, NetlistStats stats, LecLog log,
+            Set<String> privateRegisters, Set<String> definitionPins) {
         NetlistSummary summary = new NetlistSummary(label,
                 NetlistLoader.getPartName(flat.getNetlist()), series, stats);
         ConeBuilder cones = new ConeBuilder(flat, conn, classifier, aig, series, log, label);
+        cones.setPrivateRegisters(privateRegisters);
         int nodesBefore = aig.getNodeCount();
         summary.collectTerminalCones(flat, classifier, cones, log);
+        for (String register : privateRegisters) {
+            if (!summary.terminals.containsKey(register)) {
+                throw new LecException(label + ": the retiming map defines register '" + register
+                        + "', which is not a register of this netlist");
+            }
+        }
         summary.collectTopOutputCones(flat, conn, cones);
+        summary.resolveDefinitionPins(flat, cones, definitionPins);
         summary.collectShortedDriverCones(flat, cones);
         summary.loops = cones.getLoopReport();
         summary.aigNodesAdded = aig.getNodeCount() - nodesBefore;
@@ -168,6 +196,53 @@ public class NetlistSummary {
             putUnique(coneLiterals, TerminalKey.forTopPort(index.getPortBitName(bit)),
                     dir == EDIFDirection.INOUT ? cones.literalOfInoutRoot(root)
                             : cones.literalOfNetRoot(root));
+        }
+    }
+
+    /**
+     * Resolves each pin a retiming certificate defines a register by. Done
+     * here because the cone builder is released with this netlist.
+     */
+    private void resolveDefinitionPins(FlatNetlist flat, ConeBuilder cones, Set<String> pins) {
+        for (String pinKey : pins) {
+            int slash = pinKey.lastIndexOf(EDIFTools.EDIF_HIER_SEP);
+            String instName = pinKey.substring(0, slash);
+            String pinName = pinKey.substring(slash + 1);
+            int instId = flat.findInstId(instName);
+            if (instId < 0 || !flat.isLeaf(instId)) {
+                throw new LecException(label + ": the retiming map refers to pin '" + pinKey
+                        + "', but there is no leaf instance '" + instName + "'");
+            }
+            CellIndex index = flat.getIndex(instId);
+            int bit = index.portBitIndexOfPinName(pinName);
+            if (bit < 0 || index.getPortOfBit(bit).getDirection() != EDIFDirection.OUTPUT) {
+                throw new LecException(label + ": the retiming map refers to pin '" + pinKey
+                        + "', which is not an output of " + flat.getCellTypeName(instId));
+            }
+            definitionLiterals.put(pinKey, cones.literalOfPin(flat.getGlobalPin(instId, bit)));
+        }
+    }
+
+    /** @return The literal of each pin a retiming certificate defines by. */
+    Map<String, Integer> getDefinitionLiterals() {
+        return definitionLiterals;
+    }
+
+    /**
+     * Takes a register out of name matching: its terminal entry and the cones
+     * of the given input pins. Its correctness is then the retiming check's.
+     */
+    void removeRegister(String instName, String... pins) {
+        terminals.remove(instName);
+        for (String pin : pins) {
+            coneLiterals.remove(TerminalKey.forPin(instName, pin));
+        }
+    }
+
+    /** Rewrites every checked cone literal in place. */
+    void substituteConeLiterals(IntUnaryOperator substitution) {
+        for (Map.Entry<String, Integer> e : coneLiterals.entrySet()) {
+            e.setValue(substitution.applyAsInt(e.getValue()));
         }
     }
 

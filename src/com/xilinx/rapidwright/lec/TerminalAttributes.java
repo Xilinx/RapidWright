@@ -69,9 +69,13 @@ public class TerminalAttributes {
 
     private final Map<String, String> properties;
 
-    private TerminalAttributes(String cellTypeName, Map<String, String> properties) {
+    private final boolean devicePrimitive;
+
+    private TerminalAttributes(String cellTypeName, Map<String, String> properties,
+            boolean devicePrimitive) {
         this.cellTypeName = cellTypeName;
         this.properties = properties;
+        this.devicePrimitive = devicePrimitive;
     }
 
     private static Set<String> buildIgnored() {
@@ -115,7 +119,8 @@ public class TerminalAttributes {
                 properties.put(key, value == null ? "" : String.valueOf(value.getValue()));
             }
         }
-        return new TerminalAttributes(cellTypeName, properties);
+        return new TerminalAttributes(cellTypeName, properties,
+                inst != null && CellClassifier.isDevicePrimitive(inst.getCellType()));
     }
 
     /**
@@ -132,6 +137,14 @@ public class TerminalAttributes {
 
     public String getCellTypeName() {
         return cellTypeName;
+    }
+
+    /**
+     * @return True if the terminal is a device primitive rather than a black box
+     *         that merely shares a primitive's name.
+     */
+    public boolean isDevicePrimitive() {
+        return devicePrimitive;
     }
 
     public Map<String, String> getProperties() {
