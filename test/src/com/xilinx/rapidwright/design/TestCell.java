@@ -28,7 +28,7 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
-import com.xilinx.rapidwright.util.VivadoTools;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -151,7 +151,7 @@ public class TestCell {
         Assertions.assertNull(d.getCell(rtCell.getName()));
 
         if (FileTools.isVivadoOnPath()) {
-            Assertions.assertEquals(0, VivadoTools.reportRouteStatus(d).netsWithRoutingErrors);
+            Assertions.assertEquals(0, VivadoToolsHelper.reportRouteStatus(d).netsWithRoutingErrors);
         }
     }
 

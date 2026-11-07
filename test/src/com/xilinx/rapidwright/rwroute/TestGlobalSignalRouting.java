@@ -156,7 +156,7 @@ public class TestGlobalSignalRouting {
         Assertions.assertEquals(27491, vccNet.getPIPs().size());
 
         if (FileTools.isVivadoOnPath()) {
-            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+            ReportRouteStatusResult rrs = VivadoToolsHelper.reportRouteStatus(design);
             Assertions.assertEquals(2, rrs.fullyRoutedNets);
             Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
         }
@@ -239,7 +239,7 @@ public class TestGlobalSignalRouting {
         Assertions.assertEquals(464, vccNet.getPIPs().size());
 
         if (FileTools.isVivadoOnPath()) {
-            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+            ReportRouteStatusResult rrs = VivadoToolsHelper.reportRouteStatus(design);
             Assertions.assertEquals(2, rrs.fullyRoutedNets);
             Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
         }
@@ -361,7 +361,7 @@ public class TestGlobalSignalRouting {
         }
 
         if (FileTools.isVivadoOnPath()) {
-            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+            ReportRouteStatusResult rrs = VivadoToolsHelper.reportRouteStatus(design);
             Assertions.assertEquals(4, rrs.fullyRoutedNets);
             Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
         } else {

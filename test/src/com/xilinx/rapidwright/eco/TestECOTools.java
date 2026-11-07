@@ -419,7 +419,7 @@ public class TestECOTools {
 
         if (FileTools.isVivadoOnPath()) {
             // Check that Vivado shows 14 unrouted nets
-            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+            ReportRouteStatusResult rrs = VivadoToolsHelper.reportRouteStatus(design);
             Assertions.assertEquals(14, rrs.netsWithRoutingErrors);
             Assertions.assertEquals(14, rrs.netsWithSomeUnroutedPins);
         }
@@ -490,7 +490,7 @@ public class TestECOTools {
         Assertions.assertTrue(sourceSitePinInsts.get(1).contains(physNets.get(0).getSource().getSitePinName()));
 
         if (FileTools.isVivadoOnPath()) {
-            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+            ReportRouteStatusResult rrs = VivadoToolsHelper.reportRouteStatus(design);
             Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
             Assertions.assertEquals(2, rrs.unroutedNets);
         }
@@ -662,7 +662,7 @@ public class TestECOTools {
         DesignTools.batchRemoveSitePins(deferredRemovals, true);
 
         if (FileTools.isVivadoOnPath()) {
-            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+            ReportRouteStatusResult rrs = VivadoToolsHelper.reportRouteStatus(design);
             Assertions.assertEquals(0 /* TODO */, rrs.netsWithRoutingErrors);
         }
     }
@@ -688,7 +688,7 @@ public class TestECOTools {
         DesignTools.batchRemoveSitePins(deferredRemovals, true);
 
         if (FileTools.isVivadoOnPath()) {
-            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+            ReportRouteStatusResult rrs = VivadoToolsHelper.reportRouteStatus(design);
             Assertions.assertEquals(8, rrs.netsWithRoutingErrors);
             Assertions.assertEquals(8, rrs.netsWithNoDriver);
             Assertions.assertEquals(8, rrs.netsWithSomeUnroutedPins);
@@ -729,6 +729,8 @@ public class TestECOTools {
         }
 
         if (FileTools.isVivadoOnPath()) {
+            // (not compared with ReportRouteStatus.reportRouteStatus(), which names and counts the
+            // undriven nets of the unconnected copies of the cell differently from Vivado)
             ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
             Assertions.assertEquals(1135, rrs.logicalNets);
             Assertions.assertEquals(728, rrs.netsWithNoPlacedPins);
