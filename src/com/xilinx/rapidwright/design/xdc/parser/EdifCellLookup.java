@@ -94,7 +94,7 @@ public abstract class EdifCellLookup<T> {
         // (each part's pattern split into tokens once, not once per child)
         Map<String, WildcardPattern> patterns = new ConcurrentHashMap<>();
         return getChildBySomeAbsoluteName(cellName,
-                (s, item) -> patterns.computeIfAbsent(s, WildcardPattern::new).matches(getRelativeOriginalName(item)),
+                (s, item) -> wildcardPattern(patterns, s).matches(getRelativeOriginalName(item)),
                 isChildLookupByOriginalName());
     }
 
@@ -103,6 +103,11 @@ public abstract class EdifCellLookup<T> {
         Map<String, Pattern> patterns = new ConcurrentHashMap<>();
         return getChildBySomeAbsoluteName(cellName,
                 (s, item) -> patterns.computeIfAbsent(s, Pattern::compile).matcher(getRelativeOriginalName(item)).matches());
+    }
+
+    /** @return The wildcard pattern of a name part, split into tokens once per lookup. */
+    protected static WildcardPattern wildcardPattern(Map<String, WildcardPattern> patterns, String part) {
+        return patterns.computeIfAbsent(part, WildcardPattern::new);
     }
 
     /**
@@ -233,9 +238,23 @@ public abstract class EdifCellLookup<T> {
             return child == null ? Stream.empty()
                     : getChildBySomeAbsoluteNameWorker(parts, level + 1, child, filter, literalByName);
         }
-        return getChildrenOf(current)
-                .filter(child -> filter.test(parts[level], child))
-                .flatMap(c->getChildBySomeAbsoluteNameWorker(parts, level+1, c, filter, literalByName));
+        Stream<? extends T> children = literalByName
+                ? getChildrenWithName(current, parts[level], filter)
+                : getChildrenOf(current).filter(child -> filter.test(parts[level], child));
+        return children.flatMap(c->getChildBySomeAbsoluteNameWorker(parts, level+1, c, filter, literalByName));
+    }
+
+    /**
+     * The children of a cell whose relative original name the filter accepts for a name part. A subclass whose
+     * children's relative original names are known before the child objects exist may override this to build
+     * only the matching children (see {@link #isChildLookupByOriginalName()}).
+     * @param cell The parent cell.
+     * @param part The name part (pattern).
+     * @param filter The filter of {@link #getChildBySomeAbsoluteName(String, BiPredicate, boolean)}.
+     * @return The matching children.
+     */
+    protected Stream<? extends T> getChildrenWithName(T cell, String part, BiPredicate<String, T> filter) {
+        return getChildrenOf(cell).filter(child -> filter.test(part, child));
     }
 
 

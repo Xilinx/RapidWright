@@ -22,6 +22,7 @@
 
 package com.xilinx.rapidwright.design.xdc.parser;
 
+import java.util.function.BiPredicate;
 import java.util.stream.Stream;
 
 import com.xilinx.rapidwright.edif.EDIFCellInst;
@@ -51,6 +52,15 @@ public class RegularEdifCellLookup extends EdifCellLookup<EDIFHierCellInst> {
     @Override
     protected boolean isChildLookupByOriginalName() {
         return true;
+    }
+
+    @Override
+    protected Stream<? extends EDIFHierCellInst> getChildrenWithName(EDIFHierCellInst cell, String part,
+                                                                     BiPredicate<String, EDIFHierCellInst> filter) {
+        // Wildcard parts (the only filter used with isChildLookupByOriginalName): match the instance names first,
+        // build hierarchical instances of the matches only
+        WildcardPattern p = new WildcardPattern(part);
+        return cell.getCellType().getCellInsts().stream().filter(ci -> p.matches(ci.getName())).map(cell::getChild);
     }
 
     @Override
