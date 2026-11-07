@@ -965,6 +965,13 @@ public class TestRWRoute {
             "xcv80,SLICE_X53Y406.AQ,SLICE_X55Y331.A5",                     // 1,-75; bound 26.1
             "xcv80,SLICE_X53Y406.A_O,SLICE_X55Y331.A5",                    // 1,-75; bound 26.1
             "xcv80,SLICE_X53Y406.AQ,SLICE_X61Y331.A5",                     // 4,-75; bound 26.9
+            // Versal (xcvp1902, whose [BC]NODEs and CTRL pins are in SLL2 tiles): in SLR0, SLICE_S0X318 (CLE_E_CORE_S0X93)
+            // on the west half of INT_S0X93, SLICE_S0X316 (CLE_W_CORE_S0X92) on the east half of INT_S0X92, with
+            // SLL2_S0X93Y207 between them; in SLR2, whose tile X coordinates decrease eastward, SLICE_S2X54
+            // (CLE_E_CORE_S2X17) on the west half of INT_S2X17
+            "xcvp1902,SLICE_S0X318Y203.A_O,SLICE_S0X316Y203.A5",           // -1,0; bound 1.2
+            "xcvp1902,SLICE_S0X318Y203.AQ,SLICE_S0X318Y190.A4",            // 0,-13; bound 5.0
+            "xcvp1902,SLICE_S2X54Y302.AQ,SLICE_S2X54Y289.A4",              // 0,-13; bound 5.0
     })
     public void testCostWithinLowerBoundNonTimingDriven(String partName, String srcSitePin, String dstSitePin) {
         PartialRouter rwroute = routeSingleConnection(partName, srcSitePin, dstSitePin);

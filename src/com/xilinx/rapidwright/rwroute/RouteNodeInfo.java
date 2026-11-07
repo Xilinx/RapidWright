@@ -171,10 +171,10 @@ public class RouteNodeInfo {
         IntentCode baseIntentCode = node.getIntentCode();
         TileTypeEnum endTileType;
         if (baseIntentCode == IntentCode.NODE_CLE_CTRL) {
-            // Versal CTRL_[LR]_B* pins (in CLE_BC_CORE or SLL tiles) end at the CLE core tile that they serve, which
-            // has the same X coordinate as the INT tile that it is beside (see
+            // Versal CTRL_[LR]_B* pins (in CLE_BC_CORE, SLL or SLL2 tiles) end at the CLE core tile that they serve,
+            // which has the same X coordinate as the INT tile that it is beside (see
             // RouteNodeGraph.TileTypeInfo.eastSideWires)
-            assert(baseTileType == TileTypeEnum.CLE_BC_CORE || baseTileType == TileTypeEnum.SLL);
+            assert(RouteNodeGraph.BC_NODE_TILE_TYPES.contains(baseTileType));
             endTileType = null;
         } else if (baseIntentCode == IntentCode.NODE_CLE_BNODE || baseIntentCode == IntentCode.NODE_CLE_CNODE ||
                 !(Utils.isLaguna(baseTileType) || Utils.isInterConnect(baseTileType))) {
@@ -206,7 +206,7 @@ public class RouteNodeInfo {
             // they are in SLL tiles that sit between the east side of one INT tile and the west side of the next.
             // Record the former, as the lower end of that two-half span: RWRoute.evaluateCostAndPush() then takes
             // whichever of the two is nearer to the sink (see RouteNodeGraph.isOnBothSides())
-            assert(baseTileType == TileTypeEnum.SLL && endTile.getTileTypeEnum() == TileTypeEnum.SLL);
+            assert(RouteNodeGraph.isSllTileType(baseTileType) && RouteNodeGraph.isSllTileType(endTile.getTileTypeEnum()));
             endTileXCoordinate = getWestIntTileXCoordinate(endTile);
             endsOnEastSide = true;
         } else {
@@ -264,23 +264,46 @@ public class RouteNodeInfo {
     }
 
     /**
-     * Gets the X coordinate of the nearest INT tile to the west of the given tile, in the same row.
+     * Gets the X coordinate of the nearest INT tile to the west of the given tile, in the same row: the lower of
+     * the X coordinates of the nearest INT tiles on either side of it, since tile X coordinates can also decrease
+     * eastward (in SLR2 and SLR3 of xcvp1902).
      * @param tile Tile in question (e.g. a Versal SLL tile).
      * @return That X coordinate.
      */
     static short getWestIntTileXCoordinate(Tile tile) {
         // On xcv80, for example, INT_X113Y461 is 3 columns to the west of SLL_X114Y461
-        final int maxColumns = 8;
-        for (int dx = 1; dx <= maxColumns; dx++) {
-            Tile west = tile.getTileNeighbor(-dx, 0);
-            if (west == null) {
+        Tile west = getNearestIntTile(tile, -1);
+        Tile east = getNearestIntTile(tile, 1);
+        if (west != null && east != null) {
+            // On xcvp1902, for example, SLL2_1_S2X16Y306 is between INT_S2X17Y306 (in the column to its west) and
+            // INT_S2X16Y306
+            return (short) Math.min(west.getTileXCoordinate(), east.getTileXCoordinate());
+        }
+        if (west != null) {
+            return (short) west.getTileXCoordinate();
+        }
+        throw new RuntimeException("ERROR: No INT tile found within " + MAX_COLUMNS_TO_INT_TILE + " columns west of " + tile);
+    }
+
+    private static final int MAX_COLUMNS_TO_INT_TILE = 8;
+
+    /**
+     * Gets the nearest INT tile in the same row as the given tile, in the given direction of tile columns.
+     * @param tile Tile in question.
+     * @param direction -1 for the columns to its west, 1 for those to its east.
+     * @return That INT tile, or null if none is found within {@link #MAX_COLUMNS_TO_INT_TILE} columns.
+     */
+    static Tile getNearestIntTile(Tile tile, int direction) {
+        for (int dx = 1; dx <= MAX_COLUMNS_TO_INT_TILE; dx++) {
+            Tile neighbor = tile.getTileNeighbor(direction * dx, 0);
+            if (neighbor == null) {
                 break;
             }
-            if (west.getTileTypeEnum() == TileTypeEnum.INT) {
-                return (short) west.getTileXCoordinate();
+            if (neighbor.getTileTypeEnum() == TileTypeEnum.INT) {
+                return neighbor;
             }
         }
-        throw new RuntimeException("ERROR: No INT tile found within " + maxColumns + " columns west of " + tile);
+        return null;
     }
 
     private static short getEndTileXCoordinate(Node node, short endTileXCoordinate) {
@@ -355,7 +378,9 @@ public class RouteNodeInfo {
                 BitSet[] bs = (routingGraph.wireIndicesLeadingToSLL != null)
                         ? routingGraph.getWireIndicesLeadingToSLL(node.getTile()) : null;
                 boolean leadsToSLL = bs != null && bs[0].get(node.getWireIndex());
-                assert(leadsToSLL == routingGraph.isCrossingSLLInput(node));
+                // (Without that lookup, as on xcvp1902, whose SLL2 tiles' SLLs RWRoute does not take across SLRs, no
+                // SLL input leads to an SLR crossing)
+                assert(leadsToSLL == (routingGraph.wireIndicesLeadingToSLL != null && routingGraph.isCrossingSLLInput(node)));
                 return leadsToSLL ? RouteNodeType.LOCAL_LEADING_TO_SLL : RouteNodeType.LOCAL;
             }
 
