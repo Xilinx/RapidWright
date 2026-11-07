@@ -49,6 +49,11 @@ public class RegularEdifCellLookup extends EdifCellLookup<EDIFHierCellInst> {
     }
 
     @Override
+    protected boolean isChildLookupByOriginalName() {
+        return true;
+    }
+
+    @Override
     public EDIFHierCellInst getChild(EDIFHierCellInst cell, String name) {
         EDIFCellInst child = cell.getCellType().getCellInst(name);
         if (child==null) {

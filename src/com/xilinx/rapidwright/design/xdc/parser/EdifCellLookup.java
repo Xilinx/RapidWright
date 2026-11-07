@@ -22,10 +22,16 @@
 
 package com.xilinx.rapidwright.design.xdc.parser;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiPredicate;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -85,11 +91,129 @@ public abstract class EdifCellLookup<T> {
             }
             return Stream.of(res);
         }
-        return getChildBySomeAbsoluteName(cellName, (s, item) -> FilenameUtils.wildcardMatch(getRelativeOriginalName(item), s));
+        // (each part's pattern split into tokens once, not once per child)
+        Map<String, WildcardPattern> patterns = new ConcurrentHashMap<>();
+        return getChildBySomeAbsoluteName(cellName,
+                (s, item) -> patterns.computeIfAbsent(s, WildcardPattern::new).matches(getRelativeOriginalName(item)),
+                isChildLookupByOriginalName());
     }
 
     public Stream<T> getHierCellInstsFromRegexpName(String cellName) {
-        return getChildBySomeAbsoluteName(cellName, (s, item) -> getRelativeOriginalName(item).matches(s));
+        // (each part's pattern compiled once, not once per child)
+        Map<String, Pattern> patterns = new ConcurrentHashMap<>();
+        return getChildBySomeAbsoluteName(cellName,
+                (s, item) -> patterns.computeIfAbsent(s, Pattern::compile).matcher(getRelativeOriginalName(item)).matches());
+    }
+
+    /**
+     * Whether {@link #getChild(Object, String)} returns exactly the child whose relative original name is the given
+     * name. If so, the wildcard-free parts of a hierarchical name are looked up directly instead of being matched
+     * against every child of their parent.
+     * @return False here; subclasses whose child lookup is by original name return true.
+     */
+    protected boolean isChildLookupByOriginalName() {
+        return false;
+    }
+
+    /**
+     * Matches a name against a wildcard pattern exactly as {@link FilenameUtils#wildcardMatch(String, String)} does
+     * ('*' any sequence, '?' one character, case-sensitive, including its handling of '?' right after '*'), with
+     * the pattern split into tokens once ({@link WildcardPattern}).
+     * @param name The name.
+     * @param pattern The pattern.
+     * @return True if the name matches the pattern.
+     */
+    public static boolean wildcardMatch(String name, String pattern) {
+        if (name == null || pattern == null) {
+            return name == null && pattern == null;
+        }
+        return new WildcardPattern(pattern).matches(name);
+    }
+
+    /** A wildcard pattern split into its tokens once, matched as {@link FilenameUtils#wildcardMatch}. */
+    public static final class WildcardPattern {
+        private final String[] tokens;
+
+        public WildcardPattern(String pattern) {
+            List<String> list = new ArrayList<>();
+            StringBuilder buffer = new StringBuilder();
+            char prev = 0;
+            for (int i = 0; i < pattern.length(); i++) {
+                char ch = pattern.charAt(i);
+                if (ch == '?' || ch == '*') {
+                    if (buffer.length() != 0) {
+                        list.add(buffer.toString());
+                        buffer.setLength(0);
+                    }
+                    if (ch == '?') {
+                        list.add("?");
+                    } else if (prev != '*') {
+                        list.add("*");
+                    }
+                } else {
+                    buffer.append(ch);
+                }
+                prev = ch;
+            }
+            if (buffer.length() != 0 || list.isEmpty()) {
+                list.add(buffer.toString());
+            }
+            tokens = list.toArray(new String[0]);
+        }
+
+        /** @return True if the name matches (the algorithm of FilenameUtils#wildcardMatch, case-sensitive). */
+        public boolean matches(String name) {
+            boolean anyChars = false;
+            int textIdx = 0;
+            int wcsIdx = 0;
+            ArrayDeque<int[]> backtrack = null;
+            do {
+                if (backtrack != null && !backtrack.isEmpty()) {
+                    int[] array = backtrack.pop();
+                    wcsIdx = array[0];
+                    textIdx = array[1];
+                    anyChars = true;
+                }
+                while (wcsIdx < tokens.length) {
+                    String t = tokens[wcsIdx];
+                    if (t.equals("?")) {
+                        textIdx++;
+                        if (textIdx > name.length()) {
+                            break;
+                        }
+                        anyChars = false;
+                    } else if (t.equals("*")) {
+                        anyChars = true;
+                        if (wcsIdx == tokens.length - 1) {
+                            textIdx = name.length();
+                        }
+                    } else {
+                        if (anyChars) {
+                            textIdx = name.indexOf(t, textIdx);
+                            if (textIdx < 0) {
+                                break;
+                            }
+                            int repeat = name.indexOf(t, textIdx + 1);
+                            if (repeat >= 0) {
+                                if (backtrack == null) {
+                                    backtrack = new ArrayDeque<>();
+                                }
+                                backtrack.push(new int[] {wcsIdx, repeat});
+                            }
+                        } else if (!name.regionMatches(textIdx, t, 0, t.length())) {
+                            break;
+                        }
+                        textIdx += t.length();
+                        anyChars = false;
+                    }
+                    wcsIdx++;
+                }
+                if (wcsIdx == tokens.length && textIdx == name.length()) {
+                    return true;
+                }
+            } while (backtrack != null && !backtrack.isEmpty());
+            return false;
+        }
     }
 
     public abstract T getInstFromOriginalName(String cellName);
@@ -98,17 +222,33 @@ public abstract class EdifCellLookup<T> {
 
     public abstract T getChild(T cell, String name);
 
-    private Stream<T> getChildBySomeAbsoluteNameWorker(String[] parts, int level, T current, BiPredicate<String, T> filter) {
+    private Stream<T> getChildBySomeAbsoluteNameWorker(String[] parts, int level, T current, BiPredicate<String, T> filter,
+                                                       boolean literalByName) {
         if (level==parts.length) {
             return Stream.of(current);
         }
+        if (literalByName && parts[level].indexOf('*') < 0 && parts[level].indexOf('?') < 0) {
+            // A part without wildcards matches only the child of that name
+            T child = getChild(current, parts[level]);
+            return child == null ? Stream.empty()
+                    : getChildBySomeAbsoluteNameWorker(parts, level + 1, child, filter, literalByName);
+        }
         return getChildrenOf(current)
                 .filter(child -> filter.test(parts[level], child))
-                .flatMap(c->getChildBySomeAbsoluteNameWorker(parts, level+1, c, filter));
+                .flatMap(c->getChildBySomeAbsoluteNameWorker(parts, level+1, c, filter, literalByName));
     }
 
 
     public Stream<T> getChildBySomeAbsoluteName(String name, BiPredicate<String, T> filter) {
+        return getChildBySomeAbsoluteName(name, filter, false);
+    }
+
+    /**
+     * As {@link #getChildBySomeAbsoluteName(String, BiPredicate)}.
+     * @param literalByName If true, the filter is a wildcard match and {@link #isChildLookupByOriginalName()}
+     *        holds: parts without '*' or '?' are looked up with {@link #getChild(Object, String)}.
+     */
+    protected Stream<T> getChildBySomeAbsoluteName(String name, BiPredicate<String, T> filter, boolean literalByName) {
 
         if (name.isEmpty()) return Stream.of(getRoot());
 
@@ -119,7 +259,7 @@ public abstract class EdifCellLookup<T> {
             parts[parts.length-1] = parts[parts.length-1] + EDIFTools.EDIF_HIER_SEP;
         }
 
-        return getChildBySomeAbsoluteNameWorker(parts, 0, getRoot(), filter);
+        return getChildBySomeAbsoluteNameWorker(parts, 0, getRoot(), filter, literalByName);
     }
 
 
@@ -130,7 +270,8 @@ public abstract class EdifCellLookup<T> {
     }
 
     public Predicate<T> getAbsoluteWildcardFilter(String cellNames) {
-        return eci -> FilenameUtils.wildcardMatch(getAbsoluteOriginalName(eci), cellNames);
+        WildcardPattern p = new WildcardPattern(cellNames);
+        return eci -> p.matches(getAbsoluteOriginalName(eci));
     }
 
     public Stream<T> getAllCellInsts() {
