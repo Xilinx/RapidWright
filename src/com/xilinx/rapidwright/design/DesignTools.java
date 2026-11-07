@@ -5522,20 +5522,37 @@ public class DesignTools {
         n.setEncryptedCells(netlists.stream().map(Object::toString).collect(Collectors.toList()));
     }
 
+    /**
+     * Updates the pins of the Versal XPHY cells of a design that connect to a DDR memory controller (or, for inputs,
+     * an XPLL) to use the XPHY's dedicated DMC_* BEL pins and site pins. XPHY cells without a logical cell (e.g.
+     * inside encrypted IP), and pins without a net or without a leaf driver (inputs) or load (outputs), are left as
+     * they are.
+     * @param design The design to update.
+     */
     public static void updateVersalXPHYPinsForDMC(Design design) {
         // Check for XPHY BEL pin remapping needs (DMC remappings)
         for (Cell cell : design.getCells()) {
-            String type = cell.getType();
             if (cell.getType() == null || !cell.getType().equals("XPHY"))
                 continue;
-            for (EDIFHierPortInst portInst : cell.getEDIFHierCellInst().getHierPortInsts()) {
+            EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
+            if (ehci == null) {
+                // No logical cell to read the connections from (e.g. inside encrypted IP)
+                continue;
+            }
+            for (EDIFHierPortInst portInst : ehci.getHierPortInsts()) {
+                EDIFHierNet hierNet = portInst.getHierarchicalNet();
+                if (hierNet == null) {
+                    continue;
+                }
                 if (portInst.isInput()) {
                     EDIFCell srcType = null;
-                    for (EDIFHierPortInst src : portInst.getHierarchicalNet()
-                            .getLeafHierPortInsts(true, false)) {
+                    for (EDIFHierPortInst src : hierNet.getLeafHierPortInsts(true, false)) {
                         srcType = src.getPortInst().getCellInst().getCellType();
                     }
-    
+                    if (srcType == null) {
+                        continue;
+                    }
+
                     // If we are being driven by the memory controller, switch BEL pins to DMC
                     // inputs
                     if (srcType.getName().startsWith("DDRMC") || srcType.getName().equals("XPLL")) {
@@ -5561,11 +5578,13 @@ public class DesignTools {
                 } else {
                     assert (portInst.isOutput());
                     EDIFCell snkType = null;
-                    for (EDIFHierPortInst snk : portInst.getHierarchicalNet()
-                            .getLeafHierPortInsts(false, true)) {
+                    for (EDIFHierPortInst snk : hierNet.getLeafHierPortInsts(false, true)) {
                         snkType = snk.getPortInst().getCellInst().getCellType();
                     }
-    
+                    if (snkType == null) {
+                        continue;
+                    }
+
                     // If we are driving the memory controller, make sure we use the DMC pins
                     if (snkType.getName().startsWith("DDRMC")) {
                         BELPin belPin = cell.getBELPin(portInst);

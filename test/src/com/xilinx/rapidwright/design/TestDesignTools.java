@@ -53,6 +53,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
@@ -3542,5 +3543,28 @@ public class TestDesignTools {
         DesignTools.fullyUnplaceCell(ram, null);
 
         Assertions.assertFalse(ram.isPlaced());
+    }
+
+    /**
+     * A Versal XPHY cell without a logical cell (as for one inside encrypted IP) is skipped, rather than throwing a
+     * NullPointerException.
+     */
+    @Test
+    public void testUpdateVersalXPHYPinsForDMCWithoutLogicalCell() {
+        Design design = new Design("test", "xcvc1902-vsva2197-2MP-e-S");
+        Site site = design.getDevice().getAllSitesOfType(SiteTypeEnum.XPHY)[0];
+        Cell cell = design.createAndPlaceCell("xphy", Unisim.XPHY, site.getName() + "/XPHY");
+        Assertions.assertNotNull(cell.getEDIFHierCellInst());
+        // No logical cell, as for a cell inside encrypted IP
+        design.getTopEDIFCell().removeCellInst("xphy");
+        cell.setEDIFHierCellInst(null);
+        cell.setType("XPHY");
+        Assertions.assertNull(cell.getEDIFHierCellInst());
+        Assertions.assertEquals("XPHY", cell.getType());
+
+        DesignTools.updateVersalXPHYPinsForDMC(design);
+
+        Assertions.assertSame(cell, design.getCell("xphy"));
+        Assertions.assertTrue(cell.isPlaced());
     }
 }
