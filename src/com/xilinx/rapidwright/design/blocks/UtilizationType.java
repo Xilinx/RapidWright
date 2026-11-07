@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -26,13 +26,18 @@
  */
 package com.xilinx.rapidwright.design.blocks;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
 
 /**
  * Different categories of fabric utilization.
@@ -83,13 +88,11 @@ public enum UtilizationType {
     public static Map<UtilizationType, Integer> computeUtilization(Design design) {
         Map<UtilizationType, Integer> map = new HashMap<>();
 
-        design.getNetlist().collapseMacroUnisims(design.getSeries());
-
         Set<String> notTracked = new HashSet<>();
 
         int[] lutCounts = new int[7];
 
-        for (EDIFHierCellInst i : design.getNetlist().getAllLeafHierCellInstances()) {
+        for (EDIFCellInst i : getPrimitiveInstances(design.getNetlist())) {
             String type = i.getCellType().getName();
             switch (type) {
             case "LUT1":
@@ -185,8 +188,6 @@ public enum UtilizationType {
             }
         }
 
-        design.getNetlist().expandMacroUnisims(design.getSeries());
-
         // Calculate potential estimates for LUTs
         int lutEstimate = 0;
         for (int i = 1; i < 7; i++) {
@@ -197,5 +198,28 @@ public enum UtilizationType {
         map.put(CLB_REGS, map.getOrDefault(REGS_AS_FFS, 0) + map.getOrDefault(REGS_AS_LATCHES, 0));
         map.put(BRAMS, map.getOrDefault(RAMB36S_FIFOS, 0) + (map.getOrDefault(RAMB18S, 0) / 2));
         return map;
+    }
+
+    /**
+     * Gets every instance of a primitive in the netlist, once for each time it is in the hierarchy,
+     * with macros as primitives rather than the primitives they expand into.
+     * @param netlist The netlist.
+     * @return The instances of primitives (cells of the primitives library).
+     */
+    private static List<EDIFCellInst> getPrimitiveInstances(EDIFNetlist netlist) {
+        List<EDIFCellInst> insts = new ArrayList<>();
+        Queue<EDIFCellInst> toProcess = new ArrayDeque<>();
+        toProcess.add(netlist.getTopCellInst());
+        while (!toProcess.isEmpty()) {
+            EDIFCellInst curr = toProcess.poll();
+            for (EDIFCellInst child : curr.getCellType().getCellInsts()) {
+                if (child.getCellType().getLibrary().isHDIPrimitivesLibrary()) {
+                    insts.add(child);
+                } else {
+                    toProcess.add(child);
+                }
+            }
+        }
+        return insts;
     }
 }
