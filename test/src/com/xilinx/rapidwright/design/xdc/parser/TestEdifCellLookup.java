@@ -70,11 +70,11 @@ public class TestEdifCellLookup {
     }
 
     /** @return The names of all cells whose name, level by level, the filter accepts. */
-    private static Set<String> bruteForce(RegularEdifCellLookup lookup, String pattern, BiPredicate<String, String> match) {
+    private static Set<String> bruteForce(EdifCellLookup<EDIFHierCellInst> lookup, String pattern, BiPredicate<String, String> match) {
         String[] parts = pattern.split("/");
         Set<String> out = new TreeSet<>();
         for (EDIFHierCellInst ci : (Iterable<EDIFHierCellInst>) lookup.getAllCellInsts()::iterator) {
-            String name = ci.getFullHierarchicalInstName();
+            String name = lookup.getAbsoluteOriginalName(ci);
             if (name.isEmpty()) continue;
             String[] n = name.split("/");
             if (n.length != parts.length) continue;
@@ -101,6 +101,34 @@ public class TestEdifCellLookup {
             Set<String> got = lookup.getHierCellInstsFromRegexpName(p)
                     .map(EDIFHierCellInst::getFullHierarchicalInstName).collect(Collectors.toCollection(TreeSet::new));
             Assertions.assertEquals(bruteForce(lookup, p, String::matches), got, p);
+        }
+    }
+
+    /**
+     * A subclass of RegularEdifCellLookup with other original names (here upper case) gets the generic lookup:
+     * the by-name shortcuts of the base class do not apply to it.
+     */
+    @Test
+    public void testSubclassWithOtherNames() {
+        EDIFNetlist nl = netlist();
+        RegularEdifCellLookup upper = new RegularEdifCellLookup(nl) {
+            @Override
+            public String getRelativeOriginalName(EDIFHierCellInst current) {
+                return current.getInst().getName().toUpperCase();
+            }
+
+            @Override
+            public String getAbsoluteOriginalName(EDIFHierCellInst current) {
+                return current.getFullHierarchicalInstName().toUpperCase();
+            }
+        };
+        for (String p : List.of("A/X*", "M/S*/X1", "A*/X0", "M/S1/FIFO[*].REG")) {
+            Set<String> got = upper.getHierCellInstsFromWildcardName(p)
+                    .map(EDIFHierCellInst::getFullHierarchicalInstName).collect(Collectors.toCollection(TreeSet::new));
+            Set<String> want = new TreeSet<>();
+            for (String n : bruteForce(upper, p, FilenameUtils::wildcardMatch)) want.add(n);
+            Assertions.assertFalse(got.isEmpty(), p);
+            Assertions.assertEquals(want.size(), got.size(), p);
         }
     }
 }

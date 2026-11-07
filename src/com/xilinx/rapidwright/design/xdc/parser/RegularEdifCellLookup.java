@@ -49,18 +49,25 @@ public class RegularEdifCellLookup extends EdifCellLookup<EDIFHierCellInst> {
         return f.getCellType().getCellInsts().stream().map(f::getChild);
     }
 
+    /**
+     * True for this class itself: its children are looked up by instance name, the relative original name. A
+     * subclass that changes getChild or getRelativeOriginalName gets the generic lookup unless it overrides this.
+     */
     @Override
     protected boolean isChildLookupByOriginalName() {
-        return true;
+        return getClass() == RegularEdifCellLookup.class;
     }
 
     @Override
     protected Stream<? extends EDIFHierCellInst> getChildrenWithName(EDIFHierCellInst cell, String part,
-                                                                     BiPredicate<String, EDIFHierCellInst> filter) {
-        // Wildcard parts (the only filter used with isChildLookupByOriginalName): match the instance names first,
-        // build hierarchical instances of the matches only
-        WildcardPattern p = new WildcardPattern(part);
-        return cell.getCellType().getCellInsts().stream().filter(ci -> p.matches(ci.getName())).map(cell::getChild);
+                                                                     BiPredicate<String, EDIFHierCellInst> filter,
+                                                                     WildcardPattern pattern) {
+        if (getClass() != RegularEdifCellLookup.class) {
+            return super.getChildrenWithName(cell, part, filter, pattern);
+        }
+        // Match the instance names (the relative original names) first, build hierarchical instances of the
+        // matches only
+        return cell.getCellType().getCellInsts().stream().filter(ci -> pattern.matches(ci.getName())).map(cell::getChild);
     }
 
     @Override

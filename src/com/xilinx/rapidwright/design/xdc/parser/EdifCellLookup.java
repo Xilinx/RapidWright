@@ -95,7 +95,7 @@ public abstract class EdifCellLookup<T> {
         Map<String, WildcardPattern> patterns = new ConcurrentHashMap<>();
         return getChildBySomeAbsoluteName(cellName,
                 (s, item) -> wildcardPattern(patterns, s).matches(getRelativeOriginalName(item)),
-                isChildLookupByOriginalName());
+                isChildLookupByOriginalName() ? patterns : null);
     }
 
     public Stream<T> getHierCellInstsFromRegexpName(String cellName) {
@@ -228,46 +228,51 @@ public abstract class EdifCellLookup<T> {
     public abstract T getChild(T cell, String name);
 
     private Stream<T> getChildBySomeAbsoluteNameWorker(String[] parts, int level, T current, BiPredicate<String, T> filter,
-                                                       boolean literalByName) {
+                                                       Map<String, WildcardPattern> namePatterns) {
         if (level==parts.length) {
             return Stream.of(current);
         }
-        if (literalByName && parts[level].indexOf('*') < 0 && parts[level].indexOf('?') < 0) {
+        if (namePatterns != null && parts[level].indexOf('*') < 0 && parts[level].indexOf('?') < 0) {
             // A part without wildcards matches only the child of that name
             T child = getChild(current, parts[level]);
             return child == null ? Stream.empty()
-                    : getChildBySomeAbsoluteNameWorker(parts, level + 1, child, filter, literalByName);
+                    : getChildBySomeAbsoluteNameWorker(parts, level + 1, child, filter, namePatterns);
         }
-        Stream<? extends T> children = literalByName
-                ? getChildrenWithName(current, parts[level], filter)
+        Stream<? extends T> children = namePatterns != null
+                ? getChildrenWithName(current, parts[level], filter, wildcardPattern(namePatterns, parts[level]))
                 : getChildrenOf(current).filter(child -> filter.test(parts[level], child));
-        return children.flatMap(c->getChildBySomeAbsoluteNameWorker(parts, level+1, c, filter, literalByName));
+        return children.flatMap(c->getChildBySomeAbsoluteNameWorker(parts, level+1, c, filter, namePatterns));
     }
 
     /**
-     * The children of a cell whose relative original name the filter accepts for a name part. A subclass whose
+     * The children of a cell whose relative original name matches a wildcard name part. A subclass whose
      * children's relative original names are known before the child objects exist may override this to build
      * only the matching children (see {@link #isChildLookupByOriginalName()}).
      * @param cell The parent cell.
-     * @param part The name part (pattern).
-     * @param filter The filter of {@link #getChildBySomeAbsoluteName(String, BiPredicate, boolean)}.
+     * @param part The name part.
+     * @param filter The filter of {@link #getChildBySomeAbsoluteName(String, BiPredicate, Map)} (the wildcard
+     *        match of a child's relative original name).
+     * @param pattern The part as a wildcard pattern (split once per lookup).
      * @return The matching children.
      */
-    protected Stream<? extends T> getChildrenWithName(T cell, String part, BiPredicate<String, T> filter) {
+    protected Stream<? extends T> getChildrenWithName(T cell, String part, BiPredicate<String, T> filter,
+                                                      WildcardPattern pattern) {
         return getChildrenOf(cell).filter(child -> filter.test(part, child));
     }
 
 
     public Stream<T> getChildBySomeAbsoluteName(String name, BiPredicate<String, T> filter) {
-        return getChildBySomeAbsoluteName(name, filter, false);
+        return getChildBySomeAbsoluteName(name, filter, null);
     }
 
     /**
      * As {@link #getChildBySomeAbsoluteName(String, BiPredicate)}.
-     * @param literalByName If true, the filter is a wildcard match and {@link #isChildLookupByOriginalName()}
-     *        holds: parts without '*' or '?' are looked up with {@link #getChild(Object, String)}.
+     * @param namePatterns If not null, the filter is a wildcard match, {@link #isChildLookupByOriginalName()} holds
+     *        and this is the lookup's cache of the parts' patterns: parts without '*' or '?' are looked up with
+     *        {@link #getChild(Object, String)}, the others with {@link #getChildrenWithName}.
      */
-    protected Stream<T> getChildBySomeAbsoluteName(String name, BiPredicate<String, T> filter, boolean literalByName) {
+    protected Stream<T> getChildBySomeAbsoluteName(String name, BiPredicate<String, T> filter,
+                                                   Map<String, WildcardPattern> namePatterns) {
 
         if (name.isEmpty()) return Stream.of(getRoot());
 
@@ -278,7 +283,7 @@ public abstract class EdifCellLookup<T> {
             parts[parts.length-1] = parts[parts.length-1] + EDIFTools.EDIF_HIER_SEP;
         }
 
-        return getChildBySomeAbsoluteNameWorker(parts, 0, getRoot(), filter, literalByName);
+        return getChildBySomeAbsoluteNameWorker(parts, 0, getRoot(), filter, namePatterns);
     }
 
 
