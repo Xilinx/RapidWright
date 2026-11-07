@@ -55,6 +55,7 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFCollapsedView;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
@@ -181,7 +182,8 @@ public class TestDesign {
         // A cell that fails to be written
         new EDIFCell(netlist.getWorkLibrary(), "failing") {
             @Override
-            public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) {
+            public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable,
+                                   EDIFCollapsedView collapsedView) {
                 throw thrown;
             }
         };
