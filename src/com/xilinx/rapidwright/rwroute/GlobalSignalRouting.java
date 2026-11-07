@@ -536,10 +536,14 @@ public class GlobalSignalRouting {
         return new Pair<>(clockRegions, offFabricClkSinks);
     }
 
+    /**
+     * Divides the clock regions of a clock into those in the row of its clock root and above it, driven from the
+     * vertical distribution track going up from the root, and those below it, driven from the one going down.
+     */
     private static void divideClockRegions(Set<ClockRegion> clockRegions, ClockRegion centroid, List<ClockRegion> upClockRegions,
             List<ClockRegion> downClockRegions) {
         for (ClockRegion cr : clockRegions) {
-            if (cr.getInstanceY() > centroid.getInstanceY()) {
+            if (cr.getInstanceY() >= centroid.getInstanceY()) {
                 upClockRegions.add(cr);
             } else {
                 downClockRegions.add(cr);

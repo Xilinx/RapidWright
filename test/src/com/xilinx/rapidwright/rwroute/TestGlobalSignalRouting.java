@@ -62,6 +62,7 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
+import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFTools;
@@ -795,6 +796,44 @@ public class TestGlobalSignalRouting {
                 Assertions.assertNotEquals(blocked, pip.getEndNode(), pip.toString());
             }
             Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk), "Blocked " + blocked);
+        }
+    }
+
+    @Test
+    public void testSymmetricClkRoutingDistributionWithinSinkRows() {
+        // At the clock root, the row of the root is driven from the vertical distribution track going up from it
+        // (as Vivado does) and the one going down is only taken for rows below the root: a clock needs no vertical
+        // distribution track reaching the rows above and below those of its sinks, which can be taken by another
+        // clock on the same track (e.g. a BUFG_GT, whose track is fixed by its site). Block them all
+        Design design = new Design("rows", "xcvu3p-ffvc1517-2-e");
+        Net clk = design.createNet("clk");
+        clk.connect(design.createAndPlaceCell("bufg_gt", Unisim.BUFG_GT, "BUFG_GT_X0Y70/BUFG_GT"), "O");
+        int i = 0;
+        for (String slice : new String[]{"SLICE_X0Y90", "SLICE_X0Y150"}) { // in clock regions X0Y1 and X0Y2
+            Cell ff = design.createAndPlaceCell("ff" + i++, Unisim.FDRE, slice + "/AFF");
+            clk.connect(ff, "C");
+            design.getVccNet().connect(ff, "CE");
+            design.getGndNet().connect(ff, "D");
+            design.getGndNet().connect(ff, "R");
+        }
+        design.routeSites();
+
+        Function<Node, NodeStatus> getNodeStatus = (n) -> {
+            if (n.getIntentCode() == IntentCode.NODE_GLOBAL_VDISTR) {
+                for (Wire w : n.getAllWiresInNode()) {
+                    ClockRegion cr = w.getTile().getClockRegion();
+                    if (cr != null && (cr.getRow() < 1 || cr.getRow() > 2)) {
+                        return NodeStatus.UNAVAILABLE;
+                    }
+                }
+            }
+            return NodeStatus.AVAILABLE;
+        };
+        GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), getNodeStatus, new HashMap<>());
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        for (PIP pip : clk.getPIPs()) {
+            Assertions.assertEquals(NodeStatus.AVAILABLE, getNodeStatus.apply(pip.getStartNode()), pip.toString());
+            Assertions.assertEquals(NodeStatus.AVAILABLE, getNodeStatus.apply(pip.getEndNode()), pip.toString());
         }
     }
 
