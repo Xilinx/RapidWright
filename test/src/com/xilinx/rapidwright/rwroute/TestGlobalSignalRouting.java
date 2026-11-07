@@ -359,6 +359,31 @@ public class TestGlobalSignalRouting {
     }
 
     @Test
+    public void testSymmetricClkRoutingBitsliceFifoClk() {
+        // The CLB2PHY_FIFO_CLK input of an UltraScale+ BITSLICE_RX_TX is only reached from its INT tile node through
+        // a route-thru of a site of the XIPHY_BYTE tile (as Vivado routes it)
+        Design design = new Design("bitslice_fifo_clk", "xcvu3p-ffvc1517-2-e");
+        Device device = design.getDevice();
+        Net clk = design.createNet("clk");
+        clk.connect(design.createAndPlaceCell("bufgce", Unisim.BUFGCE, "BUFGCE_X0Y21/BUFCE"), "O");
+        Cell ff = design.createAndPlaceCell("ff", Unisim.FDRE, "SLICE_X55Y30/AFF");
+        clk.connect(ff, "C");
+        design.getVccNet().connect(ff, "CE");
+        design.getGndNet().connect(ff, "D");
+        design.getGndNet().connect(ff, "R");
+        SiteInst bitslice = design.createSiteInst(device.getSite("BITSLICE_RX_TX_X0Y23"));
+        SitePinInst fifoClk = clk.createPin("CLB2PHY_FIFO_CLK", bitslice);
+        design.routeSites();
+
+        GlobalSignalRouting.symmetricClkRouting(clk, device, (n) -> NodeStatus.AVAILABLE, new HashMap<>());
+
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        Assertions.assertTrue(fifoClk.isRouted());
+        Assertions.assertTrue(clk.getPIPs().stream().anyMatch((pip) -> pip.isRouteThru() &&
+                pip.getTile() == fifoClk.getTile()));
+    }
+
+    @Test
     public void testSymmetricClkRouting() {
         Design design = RapidWrightDCP.loadDCP("two_clk_check_NetTools.dcp");
         design.unrouteDesign();

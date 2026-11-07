@@ -484,6 +484,7 @@ public class UltraScaleClockRouting {
 
             nextPin: for (SitePinInst sink : e.getValue()) {
                 RouteNode target = sink.getRouteNode();
+                Design design = sink.getSiteInst().getDesign();
                 q.clear();
                 q.add(lcb);
 
@@ -512,7 +513,14 @@ public class UltraScaleClockRouting {
                     for (Wire w : curr.getWireConnections()) {
                         if (!visited.add(w)) continue;
                         if (used.contains(w)) continue;
-                        if (w.isRouteThru()) continue;
+                        // No route-thrus (e.g. through a LUT), except through an unused site of the tile of the
+                        // sink pin: some sink pins are only reached from their INT tile that way (e.g. the
+                        // CLB2PHY_FIFO_CLK input of an UltraScale+ BITSLICE_RX_TX, through a site of its
+                        // XIPHY_BYTE tile), as Vivado routes them
+                        if (w.isRouteThru() && (w.getTile() != target.getTile() ||
+                                !RouteThruHelper.isRouteThruPIPAvailable(design, new Wire(curr.getTile(), curr.getWire()), w))) {
+                            continue;
+                        }
                         if (isNodeUnavailable.test(w.getNode())) continue;
                         q.add(new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1));
                     }
