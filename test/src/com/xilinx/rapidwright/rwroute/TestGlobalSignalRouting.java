@@ -535,14 +535,22 @@ public class TestGlobalSignalRouting {
         GlobalSignalRouting.symmetricClkRouting(clk, device, (n) -> NodeStatus.AVAILABLE, new HashMap<>());
 
         Map<Node, PIP> driver = new HashMap<>();
+        Set<Node> starts = new HashSet<>();
         for (PIP pip : clk.getPIPs()) {
             Node end = pip.isReversed() ? pip.getStartNode() : pip.getEndNode();
             PIP other = driver.put(end, pip);
             Assertions.assertNull(other, "Node " + end + " driven by " + pip + " and " + other);
+            starts.add(pip.isReversed() ? pip.getEndNode() : pip.getStartNode());
         }
         Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        Set<Node> sinkNodes = new HashSet<>();
         for (SitePinInst spi : clk.getPins()) {
-            Assertions.assertTrue(spi.isRouted(), spi.toString());
+            Assertions.assertTrue(spi.isOutPin() || spi.isRouted(), spi.toString());
+            sinkNodes.add(spi.getConnectedNode());
+        }
+        // No dangling routing (e.g. to the vertical distribution of clock region rows without sinks)
+        for (Node end : driver.keySet()) {
+            Assertions.assertTrue(starts.contains(end) || sinkNodes.contains(end), "Dangling node " + end);
         }
     }
 

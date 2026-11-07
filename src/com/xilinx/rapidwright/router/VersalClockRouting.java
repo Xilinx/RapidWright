@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -304,7 +305,16 @@ public class VersalClockRouting {
         // from any node of the distribution routed so far
         Map<ClockRegion, List<Pair<IntentCode, ClockRegion>>> distrPaths = new HashMap<>();
         List<ClockRegion> spineCRsWithoutPath = new ArrayList<>();
+        // Only route to the vertical distribution lines of the clock region rows with sinks:
+        // those of the other rows would be left dangling
+        Set<Integer> rowsWithSinks = new HashSet<>();
+        for (ClockRegion cr : clockRegions) {
+            rowsWithSinks.add(cr.getInstanceY());
+        }
         for (ClockRegion cr : verticalSpineCRs) {
+            if (!rowsWithSinks.contains(cr.getInstanceY())) {
+                continue;
+            }
             List<Pair<IntentCode, ClockRegion>> distrPath = getVDistrPath(clkTree, cr);
             if (distrPath.isEmpty()) {
                 distrPath = getVDistrPath(null, cr);
@@ -312,7 +322,8 @@ public class VersalClockRouting {
             }
             distrPaths.put(cr, distrPath);
         }
-        List<ClockRegion> spineCRsInRoutingOrder = new ArrayList<>(verticalSpineCRs);
+        List<ClockRegion> spineCRsInRoutingOrder = new ArrayList<>(distrPaths.keySet());
+        spineCRsInRoutingOrder.sort(Comparator.comparingInt(ClockRegion::getInstanceY));
         spineCRsInRoutingOrder.removeAll(spineCRsWithoutPath);
         spineCRsInRoutingOrder.addAll(spineCRsWithoutPath);
         Set<Node> distrNodes = new HashSet<>();
