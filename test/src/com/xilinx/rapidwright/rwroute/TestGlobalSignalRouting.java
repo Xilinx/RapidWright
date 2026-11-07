@@ -57,6 +57,7 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFTools;
@@ -495,6 +496,53 @@ public class TestGlobalSignalRouting {
         }
         for (Node node : driven) {
             Assertions.assertTrue(driving.contains(node), "Antenna " + node);
+        }
+    }
+
+    /**
+     * A clock spanning the clock regions of three SLRs of a multi-SLR Versal device, for which
+     * the vertical distribution trees lack paths for some clock region rows: those must still
+     * get a vertical distribution line.
+     */
+    @Test
+    public void testVersalClockRoutingMultiSLRMissingVDistrPaths() {
+        Design design = new Design("versal_clk_multi_slr", "xcvp1802-lsvc4072-2MP-e-S");
+        EDIFCell top = design.getTopEDIFCell();
+        Device device = design.getDevice();
+        Net vcc = design.getVccNet();
+
+        Net clkIn = design.createNet("clkIn");
+        clkIn.getLogicalNet().createPortInst(top.createPort(clkIn.getName(), EDIFDirection.INPUT, 1));
+        Net clk = design.createNet("clk");
+        Cell bufgce = createBUFGCE(design, top, "bufgce", device.getSite("BUFGCE_X12Y23"));
+        clkIn.connect(bufgce, "I");
+        clk.connect(bufgce, "O");
+        vcc.connect(bufgce, "CE");
+
+        // One flip-flop in each of these clock regions (rows 2 to 11, in SLRs 0 to 3)
+        Set<String> clockRegions = new HashSet<>(Arrays.asList("X5Y5", "X5Y8", "X5Y11", "X7Y2", "X7Y3",
+                "X6Y3", "X5Y3"));
+        int i = 0;
+        for (Site site : device.getAllSitesOfType(SiteTypeEnum.SLICEL)) {
+            if (clockRegions.remove(site.getTile().getClockRegion().getName())) {
+                Cell ff = design.createAndPlaceCell("ff" + i++, Unisim.FDRE, site.getName() + "/AFF");
+                clk.connect(ff, "C");
+            }
+        }
+        Assertions.assertTrue(clockRegions.isEmpty(), clockRegions.toString());
+        design.routeSites();
+
+        GlobalSignalRouting.symmetricClkRouting(clk, device, (n) -> NodeStatus.AVAILABLE, new HashMap<>());
+
+        Map<Node, PIP> driver = new HashMap<>();
+        for (PIP pip : clk.getPIPs()) {
+            Node end = pip.isReversed() ? pip.getStartNode() : pip.getEndNode();
+            PIP other = driver.put(end, pip);
+            Assertions.assertNull(other, "Node " + end + " driven by " + pip + " and " + other);
+        }
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        for (SitePinInst spi : clk.getPins()) {
+            Assertions.assertTrue(spi.isRouted(), spi.toString());
         }
     }
 
