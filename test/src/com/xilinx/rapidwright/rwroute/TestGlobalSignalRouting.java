@@ -336,6 +336,29 @@ public class TestGlobalSignalRouting {
     }
 
     @Test
+    public void testSymmetricClkRoutingPS8ClockInputs() {
+        // The PS8 tile of an UltraScale+ device is outside the clock regions: its clock inputs are reached through
+        // leaf clock buffers of the clock regions of their INT tiles
+        Design design = new Design("ps8_clk", "xczu3eg-sfvc784-2-e");
+        Device device = design.getDevice();
+        Net clk = design.createNet("clk");
+        clk.connect(design.createAndPlaceCell("bufgce", Unisim.BUFGCE, "BUFGCE_X0Y2/BUFCE"), "O");
+        SiteInst ps8 = design.createSiteInst(device.getSite("PS8_X0Y0"));
+        Assertions.assertNull(ps8.getTile().getClockRegion());
+        List<SitePinInst> sinks = new ArrayList<>();
+        for (String pin : new String[]{"PL_GP0_CLOCKIN", "PL_GP2_CLOCKIN"}) {
+            sinks.add(clk.createPin(pin, ps8));
+        }
+
+        GlobalSignalRouting.symmetricClkRouting(clk, device, (n) -> NodeStatus.AVAILABLE, new HashMap<>());
+
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        for (SitePinInst sink : sinks) {
+            Assertions.assertTrue(sink.isRouted(), sink.toString());
+        }
+    }
+
+    @Test
     public void testSymmetricClkRouting() {
         Design design = RapidWrightDCP.loadDCP("two_clk_check_NetTools.dcp");
         design.unrouteDesign();
