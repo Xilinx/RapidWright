@@ -593,19 +593,21 @@ public class VersalClockRouting {
             IntentCode.NODE_INTF_CTRL,
             IntentCode.NODE_IRI,
             IntentCode.NODE_PINFEED,
-            IntentCode.NODE_GLOBAL_LEAF
+            IntentCode.NODE_GLOBAL_LEAF,
+            IntentCode.NODE_DEDICATED
         );
         Set<Node> visited = new HashSet<>();
         Queue<NodeWithPrev> q = new ArrayDeque<>();
         Predicate<Node> isNodeUnavailable = (node) -> getNodeStatus.apply(node) == NodeStatus.UNAVAILABLE;
-        RouteThruHelper routeThruHelper = new RouteThruHelper(clk.getDesign().getDevice());
+        Design design = clk.getDesign();
+        RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
 
         nextPin: for (SitePinInst p: clk.getPins()) {
             if (p.isOutPin() || p.isRouted() || Utils.isIOB(p.getSiteInst()) || isDrivenByGlobalClockNode(p)) {
                 continue;
             }
             NodeWithPrev sink = new NodeWithPrev(p.getConnectedNode());
-            ClockRegion cr = p.getTile().getClockRegion();
+            ClockRegion cr = getSinkClockRegion(sink);
             boolean crossCRSink = Utils.isPS(p.getSiteInst()) || Utils.isNOC(p.getSiteInst());
             q.clear();
             q.add(sink);
@@ -623,7 +625,8 @@ public class VersalClockRouting {
                     if (!visited.add(uphill)) {
                         continue;
                     }
-                    if (routeThruHelper.isRouteThru(uphill, curr) && curr.getIntentCode() != IntentCode.NODE_IRI) {
+                    if (routeThruHelper.isRouteThru(uphill, curr) && curr.getIntentCode() != IntentCode.NODE_IRI
+                            && !isRouteThruToDedicatedNodeAvailable(design, uphill, curr)) {
                         continue;
                     }
                     if (isNodeUnavailable.test(uphill)) {
@@ -645,6 +648,44 @@ public class VersalClockRouting {
         }
 
         return lcbMappings;
+    }
+
+    /**
+     * Gets the clock region whose leaf clock buffers (LCBs) can reach a clock sink: that of the
+     * sink's node, unless all the nodes driving it are in another clock region (the clock region
+     * of the interface tile through which a hard block is reached, e.g. that of the DCLK input of
+     * a CMT_DPLL or CMT_MMCM site on xcvc1902, which is in the clock region row below).
+     * @param sinkNode The node of the sink pin.
+     * @return The clock region of the LCBs to search for.
+     */
+    private static ClockRegion getSinkClockRegion(Node sinkNode) {
+        ClockRegion cr = sinkNode.getTile().getClockRegion();
+        ClockRegion uphillCR = null;
+        for (Node uphill : sinkNode.getAllUphillNodes()) {
+            ClockRegion ucr = uphill.getTile().getClockRegion();
+            if (ucr == null || ucr.equals(cr) || (uphillCR != null && !uphillCR.equals(ucr))) {
+                return cr;
+            }
+            uphillCR = ucr;
+        }
+        return uphillCR == null ? cr : uphillCR;
+    }
+
+    /**
+     * Checks if a routethru onto a dedicated node can be used to reach a clock sink from a leaf
+     * clock buffer, as Vivado does: e.g. the APB3CLK input of a GTY_QUAD site on xcvc1902 is only
+     * reached through the APB3CLK routethru of the neighboring XPIPE_QUAD site.
+     * @param design The design.
+     * @param head The routethru's start node.
+     * @param tail The routethru's end node.
+     * @return True if the tail is a dedicated node and the routethru is free.
+     */
+    private static boolean isRouteThruToDedicatedNodeAvailable(Design design, Node head, Node tail) {
+        if (tail.getIntentCode() != IntentCode.NODE_DEDICATED) {
+            return false;
+        }
+        PIP routethru = PIP.getArbitraryPIP(head, tail);
+        return routethru != null && RouteThruHelper.isRouteThruPIPAvailable(design, routethru);
     }
 
     /**

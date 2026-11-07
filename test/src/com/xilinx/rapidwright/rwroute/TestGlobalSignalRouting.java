@@ -420,6 +420,37 @@ public class TestGlobalSignalRouting {
         }
     }
 
+    /**
+     * Clocks driving the clock inputs of hard blocks on xcvc1902 that are not reached from a leaf
+     * clock buffer (LCB) of their own clock region: the APB3CLK input of a GTY_QUAD (through a
+     * routethru of the neighboring XPIPE_QUAD site, from a clock driven by a BUFG_GT) and the DCLK
+     * inputs of CMT_MMCM and CMT_DPLL sites (from the LCBs of the clock region row above them).
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "BUFG_GT_X0Y30,GTY_QUAD_SINGLE_X0Y192/GTY_QUAD_SITE_0_APB3CLK_PIN,XPIPE_QUAD",
+            "BUFGCE_X4Y0,CMT_MMCM_X23Y0/CMT_MMCM_TOP_0_DCLK_PIN,",
+            "BUFGCE_X4Y0,CMT_DPLL_X37Y0/CMT_DPLL_TOP_0_DCLK_PIN,"
+    })
+    public void testVersalClockToHardBlockClockInput(String sourceSiteName, String sinkNodeName,
+                                                     String routeThruTilePrefix) {
+        Design design = new Design("versal_hard_block_clk", "xcvc1902-vsva2197-2MP-e-S");
+        Device device = design.getDevice();
+        Net clk = design.createNet("clk");
+        clk.createPin("O", design.createSiteInst(device.getSite(sourceSiteName)));
+        SitePin sinkSitePin = device.getNode(sinkNodeName).getSitePin();
+        SitePinInst sink = clk.createPin(sinkSitePin.getPinName(), design.createSiteInst(sinkSitePin.getSite()));
+
+        GlobalSignalRouting.symmetricClkRouting(clk, device, (n) -> NodeStatus.AVAILABLE, new HashMap<>());
+
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        Assertions.assertTrue(sink.isRouted());
+        if (routeThruTilePrefix != null) {
+            Assertions.assertTrue(clk.getPIPs().stream().anyMatch((pip) -> pip.isRouteThru()
+                    && pip.getTile().getName().startsWith(routeThruTilePrefix)));
+        }
+    }
+
     private static Cell createBUFGCE(Design design, EDIFCell parent, String name, Site location) {
         // TODO - An improved version of this method is coming in ArrayBuilder
         Cell bufgce = design.createAndPlaceCell(parent, name, Unisim.BUFGCE, location, location.getBEL("BUFCE"));

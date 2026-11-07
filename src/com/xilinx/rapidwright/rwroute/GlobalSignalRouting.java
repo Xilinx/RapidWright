@@ -309,13 +309,16 @@ public class GlobalSignalRouting {
 
             // Notice that Vivado always uses the above VROUTE node, there is no need to find a centroid clock region to route to.
             centroidHRouteNode = source.getConnectedNode();
-        } else if (sourceTypeEnum == SiteTypeEnum.BUFGCE) {
+        } else if (sourceTypeEnum == SiteTypeEnum.BUFGCE || sourceTypeEnum == SiteTypeEnum.BUFG_GT) {
             // Assume that these source sites are located in the bottom of the device (Y=0).
             // The path from the output pin to VROUTE matches the following pattern:
             //   NODE_GLOBAL_BUFG -> NODE_GLOBAL_BUFG -> NODE_GLOBAL_GCLK ->  NODE_GLOBAL_HROUTE_HSR -> NODE_GLOBAL_VROUTE
             // which is similar to US/US+ clock routing.
             // Notice that we have to quickly reach a NODE_GLOBAL_HROUTE_HSR node, and if we allow the Y coordinate of centroid to be bigger than 1,
             // we may fail to do so. Thus, we need to force the Y-coordinate of centroid to be 1.
+            // BUFG_GT sites (in the GT columns, at the left and right edges of the device) are
+            // similar: NODE_GLOBAL_BUFG -> NODE_GLOBAL_BUFG -> NODE_GLOBAL_GCLK -> NODE_GLOBAL_HROUTE,
+            // from which the horizontal routing tracks lead to the centroid
             Node clkRoutingLine = VersalClockRouting.routeBUFGToNearestRoutingTrack(clk, getNodeStatus);// first HROUTE
             Pair<Node, ClockRegion> result = findCentroid(clk, clkRoutingLine, centroid, true,
                     getNodeStatus, unavailableTracks, usedClockRegions);
@@ -362,9 +365,12 @@ public class GlobalSignalRouting {
                 System.err.println("WARNING: Unable to identify clock track for " + clk);
             } else {
                 clk.getLogicalNet().addProperty("CLOCK_TRACK", track);
-                Set<ClockRegion> collision = usedRoutingTracks.put(track,
-                        new HashSet<>(usedClockRegions));
-                assert (collision == null);
+                // Clocks whose clock regions do not overlap may share a track (see unavailableTracks
+                // above): keep the clock regions of all the clocks using it
+                Set<ClockRegion> trackClockRegions = usedRoutingTracks.computeIfAbsent(track,
+                        (k) -> new HashSet<>());
+                assert (Collections.disjoint(trackClockRegions, usedClockRegions));
+                trackClockRegions.addAll(usedClockRegions);
             }
         }
     }
