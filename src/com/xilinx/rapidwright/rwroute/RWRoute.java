@@ -3812,8 +3812,8 @@ public class RWRoute {
             for (IntentCode ic : nodeTypeList) {
                 long usage = nodeTypeUsage.getOrDefault(ic, 0L);
                 // Accumulated in half INT tiles (see RouteNodeInfo.halfTileWirelength)
-                long length = nodeTypeLength.getOrDefault(ic, 0L) / 2;
-                System.out.printf(" %-16s  %13d  %12d\n", ic, usage, length);
+                double length = nodeTypeLength.getOrDefault(ic, 0L) / 2.0;
+                System.out.printf(" %-16s  %13d  %12.1f\n", ic, usage, length);
             }
             System.out.println();
         }
@@ -3861,7 +3861,8 @@ public class RWRoute {
         MessageGenerator.printHeader("Statistics");
         computesNodeUsageAndTotalWirelength();
         printNodeTypeUsageAndWirelength(config.isVerbose(), nodeTypeUsage, nodeTypeLength, design.getSeries());
-        printFormattedString("Total wirelength:", totalWL / 2);
+        // In INT tiles, to the half tile it is accumulated in (see RouteNodeInfo.halfTileWirelength)
+        System.out.printf("%-35s %10.1f\n", "Total wirelength:", totalWL / 2.0);
         if (config.isVerbose()) {
             printFormattedString("Total INT tile nodes:", totalINTNodes);
             printFormattedString("Total rnodes created:", routingGraph.numNodes());
