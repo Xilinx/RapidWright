@@ -48,8 +48,8 @@ public class EDIFCellInst extends EDIFPropertyObject {
     public static final String BLACK_BOX_PROP = "IS_IMPORTED";
     public static final String BLACK_BOX_PROP_VERSAL = "black_box";
 
-    /** null, a single {@link EDIFPortInst} or a sorted EDIFPortInst[] (see {@link EDIFPortInstArray}) */
-    private Object portInsts;
+    /** null or a non-empty sorted array (see {@link EDIFPortInstArray}) */
+    private EDIFPortInst[] portInsts;
 
     protected EDIFCellInst() {
 
@@ -197,12 +197,12 @@ public class EDIFCellInst extends EDIFPropertyObject {
     /** Live list view over {@link #portInsts}. */
     private final class PortInstView extends EDIFPortInstArray.View {
         @Override
-        Object store() {
+        EDIFPortInst[] store() {
             return portInsts;
         }
 
         @Override
-        void store(Object s) {
+        void store(EDIFPortInst[] s) {
             portInsts = s;
         }
     }

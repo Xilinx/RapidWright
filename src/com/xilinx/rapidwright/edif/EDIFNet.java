@@ -46,8 +46,8 @@ public class EDIFNet extends EDIFPropertyObject {
 
     private EDIFCell parentCell;
 
-    /** null, a single {@link EDIFPortInst} or a sorted EDIFPortInst[] (see {@link EDIFPortInstArray}) */
-    private Object portInsts;
+    /** null or a non-empty sorted array (see {@link EDIFPortInstArray}) */
+    private EDIFPortInst[] portInsts;
 
     public EDIFNet(String name, EDIFCell parentCell) {
         super(name);
@@ -248,12 +248,12 @@ public class EDIFNet extends EDIFPropertyObject {
     /** Live list view over {@link #portInsts}. */
     private final class PortInstView extends EDIFPortInstArray.View {
         @Override
-        Object store() {
+        EDIFPortInst[] store() {
             return portInsts;
         }
 
         @Override
-        void store(Object s) {
+        void store(EDIFPortInst[] s) {
             portInsts = s;
         }
     }

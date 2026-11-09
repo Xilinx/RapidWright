@@ -105,6 +105,35 @@ public class TestEDIFPortInstArray {
     }
 
     @Test
+    public void testRemoveAtShiftsInPlaceUntilHalfEmpty() {
+        Fixture f = new Fixture();
+        EDIFNet net = netWithPins(f, 8);
+        EDIFPortInst[] a = new EDIFPortInst[8];
+        for (int i = 0; i < 8; i++) {
+            a[i] = net.getPortInsts().get(i);
+        }
+        List<EDIFPortInst> ref = new ArrayList<>(Arrays.asList(a));
+        // Removals shift in place (no new array) while more than half of the array stays used
+        EDIFPortInst[] s = a;
+        for (int idx : new int[] {0, 5, 2}) {
+            s = EDIFPortInstArray.removeAt(s, idx);
+            ref.remove(idx);
+            Assertions.assertSame(a, s);
+            Assertions.assertEquals(ref, Arrays.asList(s).subList(0, EDIFPortInstArray.size(s)));
+        }
+        // Then it shrinks to an exact-size array
+        s = EDIFPortInstArray.removeAt(s, 4);
+        ref.remove(4);
+        Assertions.assertNotSame(a, s);
+        Assertions.assertEquals(ref, Arrays.asList(s));
+        while (s != null) {
+            s = EDIFPortInstArray.removeAt(s, 0);
+            ref.remove(0);
+            Assertions.assertEquals(ref, s == null ? Collections.emptyList() : Arrays.asList(s).subList(0, EDIFPortInstArray.size(s)));
+        }
+    }
+
+    @Test
     public void testDuplicateOverwrite() {
         Fixture f = new Fixture();
         EDIFCellInst u0 = f.leaf.createCellInst("u0", f.top);
@@ -280,14 +309,14 @@ public class TestEDIFPortInstArray {
         Assertions.assertThrows(ConcurrentModificationException.class, sit::remove);
         Assertions.assertEquals(all.subList(1, 3), net.getPortInsts());
 
-        // Remove and re-add through the owner (same size afterwards) is detected
+        // A removal through the owner that shifts the array in place is detected (a removal followed
+        // by an insertion, leaving the same size, is not: fail-fast is best-effort)
         net = netWithPins(f = new Fixture(), 4);
         all = new ArrayList<>(net.getPortInsts());
         Iterator<EDIFPortInst> it = net.getPortInsts().iterator();
         it.next();
         net.removePortInst(all.get(2));
-        net.addPortInst(all.get(2));
-        Assertions.assertEquals(all, net.getPortInsts());
+        Assertions.assertEquals(Arrays.asList(all.get(0), all.get(1), all.get(3)), net.getPortInsts());
         Assertions.assertThrows(ConcurrentModificationException.class, it::next);
 
         // Single element removed and a different one added: stale remove() must not remove it
