@@ -1121,4 +1121,29 @@ public class TestRWRoute {
         // create. Reaching the buffer is not necessary here: this test only requires that such
         // routing be preserved, not extended.
     }
+
+    @Test
+    public void testSinksSharingINTNode() {
+        // The same input of the two BITSLICE_CONTROLs of a byte of the XIPHY is fed from a single INT tile node:
+        // the connections to both sinks share it
+        Design design = new Design("shared_sink", "xcvu3p-ffvc1517-2-e");
+        Device device = design.getDevice();
+        Cell ff = design.createAndPlaceCell("ff", Unisim.FDRE, "SLICE_X35Y23/GFF");
+        Net net = design.createNet("riu_addr");
+        net.connect(ff, "Q");
+        List<SitePinInst> sinks = new ArrayList<>();
+        for (String site : new String[] {"BITSLICE_CONTROL_X0Y6", "BITSLICE_CONTROL_X0Y7"}) {
+            SiteInst si = design.createSiteInst(device.getSite(site));
+            sinks.add(net.createPin("CLB2RIU_ADDR2", si));
+        }
+        Node intNode = RouterHelper.projectInputPinToINTNode(sinks.get(0));
+        Assertions.assertNotNull(intNode);
+        Assertions.assertEquals(intNode, RouterHelper.projectInputPinToINTNode(sinks.get(1)));
+
+        RWRoute.routeDesignFullNonTimingDriven(design);
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(net));
+        for (SitePinInst sink : sinks) {
+            Assertions.assertTrue(sink.isRouted(), sink.toString());
+        }
+    }
 }
