@@ -490,19 +490,21 @@ public class RouteNodeGraph {
         } else {
             assert(isVersal);
 
-            // Find an INT tile adjacent to a CLE_BC_CORE tile since Versal devices may contain AIEs on their northern edge
-            Tile bcCoreTile = device.getArbitraryTileOfType(TileTypeEnum.CLE_BC_CORE);
-            Tile tile = bcCoreTile.getTileNeighbor(2, 0);
-            assert(tile.getTileTypeEnum() == TileTypeEnum.INT);
-
+            // Find an INT tile adjacent to a CLE_BC_CORE tile since Versal devices may contain AIEs on their northern edge,
+            // and one adjacent to each type of SLL tile (which host the BNODEs/CNODEs of their CLE pair instead).
+            // Some devices (e.g. xcvp1902, where all such tiles are SLL2) have no CLE_BC_CORE tiles at all.
             intTilesToExamine = new ArrayList<>(2);
-            intTilesToExamine.add(tile);
-
-            Tile sllTile = device.getArbitraryTileOfType(TileTypeEnum.SLL);
-            if (sllTile != null) {
-                tile = sllTile.getTileNeighbor(2, 0);
-                assert(tile.getTileTypeEnum() == TileTypeEnum.INT);
-                intTilesToExamine.add(tile);
+            for (TileTypeEnum bcType : versalBCTileTypes) {
+                Tile bcTile = device.getArbitraryTileOfType(bcType);
+                if (bcTile != null) {
+                    Tile tile = bcTile.getTileNeighbor(2, 0);
+                    assert(tile.getTileTypeEnum() == TileTypeEnum.INT);
+                    intTilesToExamine.add(tile);
+                }
+            }
+            if (intTilesToExamine.isEmpty()) {
+                throw new RuntimeException("ERROR: No tile of type " + versalBCTileTypes + " found on device " +
+                        device.getName());
             }
 
             intTileIntentCodeCareSet = EnumSet.of(
@@ -1997,7 +1999,7 @@ public class RouteNodeGraph {
     protected int getHighestBaseWireIndex(Tile tile, int startWireIndex) {
         return highestBaseWireIndex.compute(tile.getTileTypeEnum(), (tte, highestBaseWire) -> {
             if (highestBaseWire == null || highestBaseWire <= startWireIndex) {
-                final boolean isSLLType = (tte == TileTypeEnum.SLL); // Versal only
+                final boolean isSLLType = versalSLLTileTypes.contains(tte); // Versal only
                 // Check all wires in tile to find the index of the last base wire
                 int lastBaseWire = startWireIndex;
                 for (int i = lastBaseWire + 1; i < tile.getWireCount(); i++) {
@@ -2154,6 +2156,16 @@ public class RouteNodeGraph {
         return nets != null && nets[wireIndex] != null;
     }
 
+    /** Versal tile types hosting the BNODEs/CNODEs (and CTRL wires) of a CLE pair */
+    private static final Set<TileTypeEnum> versalBCTileTypes = EnumSet.of(
+            TileTypeEnum.CLE_BC_CORE,
+            TileTypeEnum.SLL,
+            TileTypeEnum.SLL2   // e.g. xcvp1902
+    );
+
+    /** Versal tile types hosting SLLs */
+    private static final Set<TileTypeEnum> versalSLLTileTypes = EnumSet.of(TileTypeEnum.SLL, TileTypeEnum.SLL2);
+
     private static final Set<TileTypeEnum> allowedTileEnums;
     static {
         allowedTileEnums = EnumSet.noneOf(TileTypeEnum.class);
@@ -2161,8 +2173,7 @@ public class RouteNodeGraph {
         allowedTileEnums.addAll(Utils.getLagunaTileTypes());
 
         // Versal only: include tiles hosting BNODE/CNODEs
-        allowedTileEnums.add(TileTypeEnum.CLE_BC_CORE);
-        allowedTileEnums.add(TileTypeEnum.SLL);
+        allowedTileEnums.addAll(versalBCTileTypes);
         allowedTileEnums.add(TileTypeEnum.INTF_LOCF_TL_TILE);
         allowedTileEnums.add(TileTypeEnum.INTF_LOCF_TR_TILE);
         allowedTileEnums.add(TileTypeEnum.INTF_LOCF_BL_TILE);
@@ -2468,7 +2479,7 @@ public class RouteNodeGraph {
                 (!isVersal && Utils.isLaguna(childTileType) && type.isLocalLeadingToSLL()) ||
                 (isVersal && EnumSet.of(TileTypeEnum.INTF_LOCF_TR_TILE, TileTypeEnum.INTF_LOCF_BR_TILE, TileTypeEnum.INTF_ROCF_TR_TILE, TileTypeEnum.INTF_ROCF_BR_TILE,
                                         TileTypeEnum.INTF_LOCF_TL_TILE, TileTypeEnum.INTF_LOCF_BL_TILE, TileTypeEnum.INTF_ROCF_TL_TILE, TileTypeEnum.INTF_ROCF_BL_TILE,
-                                      TileTypeEnum.CLE_BC_CORE, TileTypeEnum.SLL)
+                                      TileTypeEnum.CLE_BC_CORE, TileTypeEnum.SLL, TileTypeEnum.SLL2)
                        .contains(childTileType)) ||
                 (isVersal && Utils.isCLB(childTileType) && parentRnode != null && parentRnode.getIntentCode() == IntentCode.NODE_SLL_OUTPUT && childRnode.getIntentCode() == IntentCode.NODE_PINFEED) ||
                 // Allow NODE_PINFEEDs in RCLK tiles that are preserved (belonging to a partially routed net)

@@ -222,7 +222,25 @@ public class GlobalSignalRouting {
         // Clock routing on UltraScale/UltraScale+ devices
         assert(device.getSeries() == Series.UltraScale || device.getSeries() == Series.UltraScalePlus);
 
-        Set<ClockRegion> clockRegions = getFabricClockRegionsOfNet(clk).getFirst();
+        // Sinks not fed from an INT tile (e.g. the CLKIN1 or CLKFBIN input of an MMCM, reached from the horizontal
+        // distribution through the clock muxes of its CMT tile) are not reached through a leaf clock buffer:
+        // they are routed from the clock tree of the other sinks, or straight from the source if there are none
+        List<SitePinInst> lcbPins = new ArrayList<>();
+        List<SitePinInst> distributionPins = new ArrayList<>();
+        for (SitePinInst p : clk.getPins()) {
+            if (p.isOutPin()) continue;
+            if (RouterHelper.projectInputPinToINTNode(p) == null) {
+                distributionPins.add(p);
+            } else {
+                lcbPins.add(p);
+            }
+        }
+        if (lcbPins.isEmpty() && !distributionPins.isEmpty()) {
+            VersalClockRouting.routeNonLCBPins(clk, distributionPins, getNodeStatus);
+            return;
+        }
+
+        Set<ClockRegion> clockRegions = getFabricClockRegionsOfPins(lcbPins).getFirst();
 
         ClockRegion centroid = findCentroid(clk, device);
         List<ClockRegion> upClockRegions = new ArrayList<>();
@@ -234,13 +252,17 @@ public class GlobalSignalRouting {
         RouteNode centroidHRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
 
         RouteNode vrouteUp = null;
-        RouteNode vrouteDown;
+        RouteNode vrouteDown = null;
         // Two VROUTEs going up and down
         ClockRegion aboveCentroid = upClockRegions.isEmpty() ? null : centroid.getNeighborClockRegion(1, 0);
         if (aboveCentroid != null) {
             vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
         }
-        vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
+        // (no downward branch when no leaf clock buffer sink is at or below the centroid, which the sinks
+        // routed from the distribution, e.g. MMCM inputs, can leave)
+        if (!downClockRegions.isEmpty()) {
+            vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
+        }
 
         List<RouteNode> upDownDistLines = new ArrayList<>();
         if (aboveCentroid != null) {
@@ -248,13 +270,19 @@ public class GlobalSignalRouting {
             if (upLines != null) upDownDistLines.addAll(upLines);
         }
 
-        List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
-        if (downLines != null) upDownDistLines.addAll(downLines);
+        if (!downClockRegions.isEmpty()) {
+            List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
+            if (downLines != null) upDownDistLines.addAll(downLines);
+        }
 
-        Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk.getPins(), getNodeStatus);
+        Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(lcbPins, getNodeStatus);
         UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
 
         UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, getNodeStatus);
+
+        if (!distributionPins.isEmpty()) {
+            VersalClockRouting.routeNonLCBPins(clk, distributionPins, getNodeStatus);
+        }
     }
 
     private static void symmetricClockRoutingVersal(Net clk, Device device,
@@ -271,6 +299,12 @@ public class GlobalSignalRouting {
         Set<ClockRegion> usedClockRegions = getClockRegionsOfNodes(lcbMappings.keySet());
         if (usedClockRegions.isEmpty()) {
             usedClockRegions = usedCRsAndNonLCBPinsTuple.getFirst();
+        }
+        if (usedClockRegions.isEmpty()) {
+            // No sinks reached through leaf clock buffers (e.g. a clock buffer only driving
+            // the input of another clock buffer): no clock tree needed, route straight from the source
+            VersalClockRouting.routeNonLCBPins(clk, usedCRsAndNonLCBPinsTuple.getSecond(), getNodeStatus);
+            return;
         }
         SitePinInst source = clk.getSource();
         SiteTypeEnum sourceTypeEnum = source.getSiteTypeEnum();
@@ -458,18 +492,33 @@ public class GlobalSignalRouting {
      * @return A list of clock regions of the net's sink pins.
      */
     private static Pair<Set<ClockRegion>, List<SitePinInst>> getFabricClockRegionsOfNet(Net clk) {
+        return getFabricClockRegionsOfPins(clk.getPins());
+    }
+
+    private static Pair<Set<ClockRegion>, List<SitePinInst>> getFabricClockRegionsOfPins(List<SitePinInst> pins) {
         Set<ClockRegion> clockRegions = new HashSet<>();
         List<SitePinInst> offFabricClkSinks = new ArrayList<>();
-        for (SitePinInst pin : clk.getPins()) {
+        for (SitePinInst pin : pins) {
             if (pin.isOutPin()) continue;
             Tile t = pin.getTile();
             ClockRegion cr = t.getClockRegion();
             SiteInst si = pin.getSiteInst();
             if (Utils.isIOB(si)) {
                 offFabricClkSinks.add(pin);
+            } else if (t.getDevice().getSeries() == Series.Versal && VersalClockRouting.isDrivenByGlobalClockNode(pin)) {
+                // Clock buffer inputs (e.g. BUFGCE cascades) are reached directly from the
+                // clock tree, not through a leaf clock buffer of their clock region
+                offFabricClkSinks.add(pin);
             } else if (Utils.isPS(si)) {
-                // PS clock input will be driven by East CR neighbor
-                clockRegions.add(cr.getNeighborClockRegion(0, 1));
+                if (cr == null) {
+                    // The PS8 tile of an UltraScale+ device is outside the clock regions: its clock inputs are
+                    // reached through a leaf clock buffer of the clock region of their INT tile
+                    cr = getClockRegionOfSink(pin);
+                    if (cr != null) clockRegions.add(cr);
+                } else {
+                    // PS clock input will be driven by East CR neighbor
+                    clockRegions.add(cr.getNeighborClockRegion(0, 1));
+                }
             } else if (Utils.isNOC(si)) {
                 // NOC sites might also need to look at neighbors for LCB 
                 clockRegions.add(cr);
@@ -567,6 +616,23 @@ public class GlobalSignalRouting {
     }
 
     /**
+     * Gets the clock region of a sink pin: that of its tile or, for a tile outside the clock regions (e.g. the PS8
+     * tile of an UltraScale+ device), that of the INT tile through which it is reached.
+     * @param pin The sink pin.
+     * @return The clock region of the sink pin, or null if there is none.
+     */
+    private static ClockRegion getClockRegionOfSink(SitePinInst pin) {
+        ClockRegion cr = pin.getTile().getClockRegion();
+        if (cr == null) {
+            Node intNode = RouterHelper.projectInputPinToINTNode(pin);
+            if (intNode != null) {
+                cr = intNode.getTile().getClockRegion();
+            }
+        }
+        return cr;
+    }
+
+    /**
      * Finds the centroid clock region of a clock net.
      * @param clk The clock net of a design.
      * @param device The device of the design.
@@ -576,7 +642,8 @@ public class GlobalSignalRouting {
         HashSet<Point> sitePinInstTilePoints = new HashSet<>();
         for (SitePinInst spi : clk.getPins()) {
             if (spi.isOutPin()) continue;
-            ClockRegion c = spi.getTile().getClockRegion();
+            ClockRegion c = getClockRegionOfSink(spi);
+            if (c == null) continue;
             sitePinInstTilePoints.add(new Point(c.getColumn(),c.getRow()));
         }
         Point center = SmallestEnclosingCircle.getCenterPoint(sitePinInstTilePoints);
