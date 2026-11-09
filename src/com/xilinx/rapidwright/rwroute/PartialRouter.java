@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -39,6 +40,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetTools;
+import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Node;
@@ -127,14 +129,23 @@ public class PartialRouter extends RWRoute {
     /**
      * Gets the nets to time: those with pins to route, and those that never leave their site (no sink site pins,
      * e.g. a LUT driving the flop beside it), which are never routed but lie on the timing paths of routed
-     * connections (without them, such paths would stop at, or restart from, the intra-site net).
+     * connections (without them, such paths would stop at, or restart from, the intra-site net). Only the latter in
+     * the sites of the former's pins are taken: any other is cut off from those paths by nets that are not timed.
      */
     @Override
     protected Collection<Net> getTimingNets() {
-        List<Net> timingNets = new ArrayList<>(netToPins.keySet());
-        for (Net net : design.getNets()) {
-            if (net.getSinkPins().isEmpty()) {
-                timingNets.add(net);
+        Set<Net> timingNets = new LinkedHashSet<>(netToPins.keySet());
+        Set<SiteInst> siteInsts = new LinkedHashSet<>();
+        for (Net net : netToPins.keySet()) {
+            for (SitePinInst spi : net.getPins()) {
+                siteInsts.add(spi.getSiteInst());
+            }
+        }
+        for (SiteInst si : siteInsts) {
+            for (Net net : si.getNetToSiteWiresMap().keySet()) {
+                if (net.getSinkPins().isEmpty()) {
+                    timingNets.add(net);
+                }
             }
         }
         return timingNets;
