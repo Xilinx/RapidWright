@@ -510,6 +510,19 @@ public class TestRWRoute {
     }
 
     @ParameterizedTest
+    @CsvSource({
+            // The CTRL wires of the CE/CLK/RST inputs of xcvc1902's IRI_QUAD sites (at the
+            // bottom edge of the fabric) are in CLE_BC_CORE_MX tiles
+            "SLICE_X60Y0,AQ,IRI_QUAD_X38Y12,CE0,71",
+            "SLICE_X60Y0,AQ,IRI_QUAD_X38Y12,RST,73",
+    })
+    public void testSingleConnectionXcvc1902CleBcCoreMx(String srcSiteName, String srcPinName,
+                                                        String dstSiteName, String dstPinName,
+                                                        long nodesPoppedLimit) {
+        testSingleConnectionHelper("xcvc1902", srcSiteName, srcPinName, dstSiteName, dstPinName, nodesPoppedLimit);
+    }
+
+    @ParameterizedTest
     @EnumSource(Series.class)
     public void testRWRouteDeviceSupport(Series series) {
         for (Part part : PartNameTools.getAllParts(series)) {
