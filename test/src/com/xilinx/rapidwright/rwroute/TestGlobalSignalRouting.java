@@ -336,6 +336,29 @@ public class TestGlobalSignalRouting {
     }
 
     @Test
+    public void testSymmetricClkRoutingPS8ClockInputs() {
+        // The PS8 tile of an UltraScale+ device is outside the clock regions: its clock inputs are reached through
+        // leaf clock buffers of the clock regions of their INT tiles
+        Design design = new Design("ps8_clk", "xczu3eg-sfvc784-2-e");
+        Device device = design.getDevice();
+        Net clk = design.createNet("clk");
+        clk.connect(design.createAndPlaceCell("bufgce", Unisim.BUFGCE, "BUFGCE_X0Y2/BUFCE"), "O");
+        SiteInst ps8 = design.createSiteInst(device.getSite("PS8_X0Y0"));
+        Assertions.assertNull(ps8.getTile().getClockRegion());
+        List<SitePinInst> sinks = new ArrayList<>();
+        for (String pin : new String[]{"PL_GP0_CLOCKIN", "PL_GP2_CLOCKIN"}) {
+            sinks.add(clk.createPin(pin, ps8));
+        }
+
+        GlobalSignalRouting.symmetricClkRouting(clk, device, (n) -> NodeStatus.AVAILABLE, new HashMap<>());
+
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        for (SitePinInst sink : sinks) {
+            Assertions.assertTrue(sink.isRouted(), sink.toString());
+        }
+    }
+
+    @Test
     public void testSymmetricClkRouting() {
         Design design = RapidWrightDCP.loadDCP("two_clk_check_NetTools.dcp");
         design.unrouteDesign();
@@ -366,6 +389,112 @@ public class TestGlobalSignalRouting {
             Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
         } else {
             System.err.println("WARNING: vivado not on PATH");
+        }
+    }
+
+    @Test
+    public void testSymmetricClkRoutingUltraScalePlusMultiSLR() {
+        // A clock spanning most of the clock region rows of a 4-SLR device, with two clock
+        // regions per row: each row buffer of the vertical distribution column must be driven
+        // only once, even when a row is also passed through to reach the rows beyond it
+        Design design = new Design("us_clk_multi_slr", "xcvu13p-fsga2577-1-i");
+        Device device = design.getDevice();
+        Net clk = design.createNet("clk");
+        Net vcc = design.getVccNet();
+        Net gnd = design.getGndNet();
+        Cell bufgce = design.createAndPlaceCell("bufgceInst", Unisim.BUFGCE, "BUFGCE_X0Y120/BUFCE");
+        clk.connect(bufgce, "O");
+
+        // One flip-flop in each of 17 clock regions spanning rows 2 to 12 (SLRs 0 to 3); the order
+        // matters, as it determines the order in which the clock regions are routed
+        String[] sinkSites = {"SLICE_X117Y570", "SLICE_X114Y575", "SLICE_X116Y621", "SLICE_X113Y724",
+                "SLICE_X117Y720", "SLICE_X116Y717", "SLICE_X116Y489", "SLICE_X116Y352", "SLICE_X118Y352",
+                "SLICE_X113Y183", "SLICE_X117Y183", "SLICE_X117Y166", "SLICE_X110Y163", "SLICE_X117Y240",
+                "SLICE_X116Y298", "SLICE_X116Y361", "SLICE_X117Y369"};
+        int i = 0;
+        for (String site : sinkSites) {
+            Cell ff = design.createAndPlaceCell("ff" + i++, Unisim.FDRE, site + "/AFF");
+            clk.connect(ff, "C");
+            vcc.connect(ff, "CE");
+            gnd.connect(ff, "D");
+            gnd.connect(ff, "R");
+        }
+        design.routeSites();
+
+        GlobalSignalRouting.symmetricClkRouting(clk, device, (n) -> NodeStatus.AVAILABLE, new HashMap<>());
+
+        Map<Node, PIP> driver = new HashMap<>();
+        Set<Node> starts = new HashSet<>();
+        for (PIP pip : clk.getPIPs()) {
+            Node start = pip.isReversed() ? pip.getEndNode() : pip.getStartNode();
+            Node end = pip.isReversed() ? pip.getStartNode() : pip.getEndNode();
+            starts.add(start);
+            PIP other = driver.put(end, pip);
+            Assertions.assertNull(other, "Node " + end + " driven by " + pip + " and " + other);
+        }
+        // No undriven routing (an island) other than at the clock source
+        Node source = clk.getSource().getConnectedNode();
+        for (Node start : starts) {
+            Assertions.assertTrue(start.equals(source) || driver.containsKey(start), "Undriven node " + start);
+        }
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        for (SitePinInst spi : clk.getPins()) {
+            Assertions.assertTrue(spi.isRouted(), spi.toString());
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "CLKFBIN,''",
+            "CLKIN1,SLICE_X50Y30 SLICE_X50Y100",
+            // The only flip-flop above the centroid: no downward branch of the clock tree
+            "CLKIN1,SLICE_X50Y250"
+    })
+    public void testSymmetricClkRoutingUltraScalePlusMMCMInput(String mmcmPinName, String flipFlopSites) {
+        // A clock driving the clock input or the feedback clock input of an MMCM: such an input is reached from
+        // the horizontal distribution through the clock muxes of the CMT tile, not from an INT tile through a
+        // leaf clock buffer
+        Design design = new Design("us_clk_mmcm_input", "xcvu3p");
+        Device device = design.getDevice();
+        Net clk = design.createNet("clk");
+        Net vcc = design.getVccNet();
+        Net gnd = design.getGndNet();
+        Cell bufgce = design.createAndPlaceCell("bufgceInst", Unisim.BUFGCE, "BUFGCE_X0Y0/BUFCE");
+        clk.connect(bufgce, "O");
+        Cell mmcm = design.createAndPlaceCell("mmcmInst", Unisim.MMCME4_ADV, "MMCM_X0Y0/MMCM");
+        clk.connect(mmcm, mmcmPinName);
+        int i = 0;
+        for (String site : flipFlopSites.split(" ")) {
+            if (site.isEmpty()) continue;
+            Cell ff = design.createAndPlaceCell("ff" + i++, Unisim.FDRE, site + "/AFF");
+            clk.connect(ff, "C");
+            vcc.connect(ff, "CE");
+            gnd.connect(ff, "D");
+            gnd.connect(ff, "R");
+        }
+        design.routeSites();
+        SitePinInst mmcmPin = mmcm.getSiteInst().getSitePinInst(mmcmPinName);
+        Assertions.assertNotNull(mmcmPin);
+        Assertions.assertEquals(clk, mmcmPin.getNet());
+
+        GlobalSignalRouting.symmetricClkRouting(clk, device, (n) -> NodeStatus.AVAILABLE, new HashMap<>());
+
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        for (SitePinInst spi : clk.getPins()) {
+            Assertions.assertTrue(spi.isRouted(), spi.toString());
+        }
+        // No dangling routing (an antenna): each node driven by the clock drives another one or is a sink
+        Set<Node> driving = new HashSet<>();
+        Set<Node> driven = new HashSet<>();
+        for (PIP pip : clk.getPIPs()) {
+            driving.add(pip.isReversed() ? pip.getEndNode() : pip.getStartNode());
+            driven.add(pip.isReversed() ? pip.getStartNode() : pip.getEndNode());
+        }
+        for (SitePinInst spi : clk.getPins()) {
+            driving.add(spi.getConnectedNode());
+        }
+        for (Node node : driven) {
+            Assertions.assertTrue(driving.contains(node), "Antenna " + node);
         }
     }
 

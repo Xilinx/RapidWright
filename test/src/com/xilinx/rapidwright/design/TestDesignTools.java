@@ -3528,6 +3528,25 @@ public class TestDesignTools {
         }
     }
 
+    /**
+     * Two flip-flop-site gates in one Versal SLICE: routing the CE of the first one through the
+     * CE IMR adds a routethru cell to the site, which must not break the iteration over its cells.
+     */
+    @Test
+    public void testCreateCeClkOfRoutethruFFToVCCTwoCellsInSite() {
+        Design design = new Design("testCreateCeClkOfRoutethruFFToVCCTwoCellsInSite", "xcvp1202");
+        Cell and = design.createAndPlaceCell("and", Unisim.AND2B1L, "SLICE_X64Y105/AFF");
+        Cell or = design.createAndPlaceCell("or", Unisim.OR2L, "SLICE_X64Y105/BFF");
+
+        DesignTools.createCeClkOfRoutethruFFToVCC(design);
+
+        SiteInst si = and.getSiteInst();
+        Assertions.assertSame(si, or.getSiteInst());
+        Assertions.assertTrue(si.getSitePinInst("CKEN1").getNet().isVCCNet());
+        Assertions.assertTrue(si.getSitePinInst("CLK").getNet().isVCCNet());
+        Assertions.assertTrue(si.getNetFromSiteWire("FF_CLK_MOD_CLK_OUT").isGNDNet());
+    }
+
     @Test
     public void testFullyUnplaceCell() {
         Design d = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");

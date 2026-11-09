@@ -4239,7 +4239,8 @@ public class DesignTools {
             if (!Utils.isSLICE(si)) {
                 continue;
             }
-            for (Cell cell : si.getCells()) {
+            // Routing the site may add routethru cells to it (e.g. on the CE IMR BEL of a Versal SLICE)
+            for (Cell cell : new ArrayList<>(si.getCells())) {
                 BEL bel = cell.getBEL();
                 if (bel == null || !bel.isFF() || bel.isAnyIMR()) {
                     continue;

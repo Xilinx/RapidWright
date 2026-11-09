@@ -147,17 +147,19 @@ public class Connection implements Comparable<Connection>{
 
         if (isCrossSLR()) {
             // Equivalently, ensure that cross-SLR connections are at least as high as a SLL;
-            // if necessary, expand the sink side of the bounding box
-            short heightMinusSLL = (short) ((yMaxBB - yMinBB - 1) - routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
+            // if necessary, expand the sink side of the bounding box.
+            // The bounding box excludes its edges (see RouteNode.isInConnectionBoundingBox()), so an SLL
+            // from row y to row y + SLL length fits only if yMinBB < y and y + SLL length < yMaxBB
+            short heightMinusSLL = (short) ((yMaxBB - yMinBB - 2) - routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
             if (heightMinusSLL < 0) {
                 if (sourceRnode.getEndTileYCoordinate() <= sinkRnode.getEndTileYCoordinate()) {
                     // Upwards
-                    short newYMaxBB = (short) (yMin + routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES + 1);
+                    short newYMaxBB = (short) (Math.max(yMin, yMinBB + 1) + routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES + 1);
                     assert(newYMaxBB > yMaxBB);
                     yMaxBB = newYMaxBB;
                 } else {
                     // Downwards
-                    short newYMinBB = (short) (yMax - routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - 1);
+                    short newYMinBB = (short) (Math.min(yMax, yMaxBB - 1) - routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - 1);
                     assert(newYMinBB < yMinBB);
                     yMinBB = newYMinBB;
                 }

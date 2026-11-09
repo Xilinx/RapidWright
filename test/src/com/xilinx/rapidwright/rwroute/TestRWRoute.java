@@ -519,6 +519,23 @@ public class TestRWRoute {
     }
 
     @ParameterizedTest
+    @CsvSource({
+            // xcvp1902 has no CLE_BC_CORE tiles: the BNODEs/CNODEs/CTRL wires of its CLE pairs are hosted
+            // by SLL2 tiles; it also has mirrored SLRs, each with its own tile coordinates
+            "SLICE_S0X100Y100,AQ,SLICE_S0X104Y110,A1,186",
+            "SLICE_S1X100Y100,AQ,SLICE_S1X104Y110,A1,186",      // Mirrored SLR
+            "SLICE_S2X300Y500,AQ,SLICE_S2X310Y520,A1,277",
+            "SLICE_S3X300Y500,AQ,SLICE_S3X290Y480,A1,47",
+            "SLICE_S0X100Y100,AQ,SLICE_S0X101Y100,CKEN1,35",    // CTRL sink in an SLL2 tile
+            "SLICE_S1X201Y301,AQ,SLICE_S1X200Y300,CKEN2,129",
+    })
+    public void testSingleConnectionXcvp1902(String srcSiteName, String srcPinName,
+                                             String dstSiteName, String dstPinName,
+                                             long nodesPoppedLimit) {
+        testSingleConnectionHelper("xcvp1902", srcSiteName, srcPinName, dstSiteName, dstPinName, nodesPoppedLimit);
+    }
+
+    @ParameterizedTest
     @EnumSource(Series.class)
     public void testRWRouteDeviceSupport(Series series) {
         for (Part part : PartNameTools.getAllParts(series)) {
@@ -627,7 +644,11 @@ public class TestRWRoute {
             "xcvu3p,IOB_X0Y47,I,SLICE_X77Y122,FX,100",
 
             // 240 CLB height SLR, no LAG tiles on Y0 (since HBM on bottom edge)
-            "xcu50,SLICE_X38Y239,AQ,SLICE_X38Y240,A1,100"
+            "xcu50,SLICE_X38Y239,AQ,SLICE_X38Y240,A1,100",
+
+            // SLR crossing whose bounding box, before the SLL height check, is exactly one row too
+            // short to hold an SLL strictly inside it
+            "xcvu13p,SLICE_X117Y218,D_O,SLICE_X116Y250,CX,200"
     })
     public void testSingleConnection(String partName,
                                      String srcSiteName, String srcPinName,
@@ -1142,5 +1163,30 @@ public class TestRWRoute {
         // far outside the bounding box of any connection that a sink near the buffer could
         // create. Reaching the buffer is not necessary here: this test only requires that such
         // routing be preserved, not extended.
+    }
+
+    @Test
+    public void testSinksSharingINTNode() {
+        // The same input of the two BITSLICE_CONTROLs of a byte of the XIPHY is fed from a single INT tile node:
+        // the connections to both sinks share it
+        Design design = new Design("shared_sink", "xcvu3p-ffvc1517-2-e");
+        Device device = design.getDevice();
+        Cell ff = design.createAndPlaceCell("ff", Unisim.FDRE, "SLICE_X35Y23/GFF");
+        Net net = design.createNet("riu_addr");
+        net.connect(ff, "Q");
+        List<SitePinInst> sinks = new ArrayList<>();
+        for (String site : new String[] {"BITSLICE_CONTROL_X0Y6", "BITSLICE_CONTROL_X0Y7"}) {
+            SiteInst si = design.createSiteInst(device.getSite(site));
+            sinks.add(net.createPin("CLB2RIU_ADDR2", si));
+        }
+        Node intNode = RouterHelper.projectInputPinToINTNode(sinks.get(0));
+        Assertions.assertNotNull(intNode);
+        Assertions.assertEquals(intNode, RouterHelper.projectInputPinToINTNode(sinks.get(1)));
+
+        RWRoute.routeDesignFullNonTimingDriven(design);
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(net));
+        for (SitePinInst sink : sinks) {
+            Assertions.assertTrue(sink.isRouted(), sink.toString());
+        }
     }
 }
