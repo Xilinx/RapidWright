@@ -2327,7 +2327,16 @@ public class RWRoute {
                     preservedNet == connection.getNet());
 
             if (childRNode.isTarget()) {
-                if (childRNode.getType().isAnyExclusiveSink()) {
+                if (state.driversMarked && !isValidSink(connection, childRNode)) {
+                    // A marked driver of the sinks (see setFinishCosts()): isPushableSinkDriver() made the checks below
+                    // that do not depend on its parent on marking it; make the one that does. (The search ends only
+                    // when a target is popped, so there is no early termination to decide.)
+                    RouteNodeType childType = childRNode.getType();
+                    if (!childType.isAnyExclusiveSink() && childType != RouteNodeType.SUPER_LONG_LINE &&
+                            !routingGraph.isAccessible(childRNode, rnode, connection)) {
+                        continue;
+                    }
+                } else if (childRNode.getType().isAnyExclusiveSink()) {
                     // This sink must be exclusively reserved for this connection already
                     assert((childRNode == connection.getSinkRnode() && !connection.hasAltSinks()) ||
                            // Or be an exclusive BOUNCE sink for a different connection on the same net

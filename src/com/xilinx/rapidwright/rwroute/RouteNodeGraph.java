@@ -2472,7 +2472,9 @@ public class RouteNodeGraph {
     }
 
     public boolean isAccessible(RouteNode childRnode, RouteNode parentRnode, Connection connection) {
-        assert(!childRnode.isTarget());
+        // Not one of the connection's sinks (but possibly a marked driver of them; see RWRoute.setFinishCosts())
+        assert(!childRnode.isTarget() || (childRnode != connection.getSinkRnode() &&
+                !connection.getAltSinkRnodes().contains(childRnode)));
         assert(parentRnode != null || (childRnode.getType().isAnyLocal() &&
                 (!isVersal || childRnode.getIntentCode() != IntentCode.NODE_PINFEED)));
 
