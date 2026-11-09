@@ -44,6 +44,7 @@ import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.util.CompactStringMap;
 
 /**
  * Represent a logical cell in an EDIF netlist.  Can
@@ -57,13 +58,51 @@ public class EDIFCell extends EDIFPropertyObject {
 
     private EDIFLibrary library;
 
-    private Map<String, EDIFCellInst> instances;
+    // Name-keyed maps without per-entry objects: instances, nets and ports derive their keys from
+    // the values (an object must be removed before it is renamed, then added back), while the
+    // internal port map stores its keys (port inst names) alongside the nets
+    private InstanceMap instances;
 
-    private Map<String, EDIFNet> nets;
+    private NetMap nets;
 
-    private Map<String, EDIFPort> ports;
+    private PortMap ports;
 
-    private Map<String, EDIFNet> internalPortMap;
+    private CompactStringMap<EDIFNet> internalPortMap;
+
+    // One final class per map type, so that the JIT compiler can inline keyOf() into lookups
+    private static final class InstanceMap extends CompactStringMap<EDIFCellInst> {
+        InstanceMap() {
+            super(true);
+        }
+
+        @Override
+        protected String keyOf(EDIFCellInst value) {
+            return value.getName();
+        }
+    }
+
+    private static final class NetMap extends CompactStringMap<EDIFNet> {
+        NetMap() {
+            super(true);
+        }
+
+        @Override
+        protected String keyOf(EDIFNet value) {
+            return value.getName();
+        }
+    }
+
+    private static final class PortMap extends CompactStringMap<EDIFPort> {
+        PortMap() {
+            super(true);
+        }
+
+        /** Ports are keyed by bus name, keeping the open bracket of a bus, see {@link #addPort(EDIFPort)} */
+        @Override
+        protected String keyOf(EDIFPort value) {
+            return value.getBusName(true);
+        }
+    }
 
     private EDIFName view = DEFAULT_VIEW;
 
@@ -198,7 +237,7 @@ public class EDIFCell extends EDIFPropertyObject {
      * @return The instance added to the cell.
      */
     public EDIFCellInst addCellInst(EDIFCellInst instance) {
-        if (instances == null) instances = getNewMap();
+        if (instances == null) instances = new InstanceMap();
         instance.setParentCell(this);
         EDIFCellInst collision = instances.put(instance.getName(), instance);
         if (collision != null && instance != collision) {
@@ -217,8 +256,12 @@ public class EDIFCell extends EDIFPropertyObject {
      * @return The instance added to the cell.
      */
     public EDIFCellInst addCellInstUniqueName(EDIFCellInst instance) {
-        if (instances == null) instances = getNewMap();
+        if (instances == null) instances = new InstanceMap();
         instance.setParentCell(this);
+        if (instances.get(instance.getName()) == instance) {
+            // Already in this cell: renaming it in place would desynchronize the instance map
+            return instance;
+        }
         while (instances.containsKey(instance.getName())) {
             instance.setName(instance.getName() + "_" + getLibrary().getNetlist().nameSpaceUniqueCount++);
         }
@@ -238,7 +281,7 @@ public class EDIFCell extends EDIFPropertyObject {
      * @return The net that was added.
      */
     public EDIFNet addNet(EDIFNet net) {
-        if (nets == null) nets = getNewMap();
+        if (nets == null) nets = new NetMap();
         net.setParentCell(this);
         EDIFNet collision = nets.put(net.getName(), net);
         if (collision != null && net != collision) {
@@ -280,7 +323,7 @@ public class EDIFCell extends EDIFPropertyObject {
      * @return The port that was added.
      */
     public EDIFPort addPort(EDIFPort port) {
-        if (ports == null) ports = getNewMap();
+        if (ports == null) ports = new PortMap();
         port.setParentCell(this);
         EDIFPort collision = ports.put(port.getBusName(true), port);
         if (collision != null && port != collision) {
@@ -497,7 +540,7 @@ public class EDIFCell extends EDIFPropertyObject {
      * @param internalNet  The net inside this cell to match with the port ref name.
      */
     public void addInternalPortMapEntry(String portInstName, EDIFNet internalNet) {
-        if (internalPortMap == null) internalPortMap = getNewMap();
+        if (internalPortMap == null) internalPortMap = new CompactStringMap<>();
         internalPortMap.put(portInstName, internalNet);
     }
 
@@ -822,33 +865,34 @@ public class EDIFCell extends EDIFPropertyObject {
         return null;
     }
 
+    /**
+     * Sorts the port instances of all nets and cell instances of this cell, after a batch of
+     * deferred-sort additions (see {@link EDIFNet#addPortInst(EDIFPortInst, boolean)}). This also
+     * trims their unused capacity.
+     */
     public void sortEDIFPortInstLists() {
         for (EDIFNet net : getNets()) {
-            EDIFPortInstList list = net.getEDIFPortInstList();
-            if (list != null) list.reSortList();
+            net.sortPortInsts();
         }
         for (EDIFCellInst inst : getCellInsts()) {
-            EDIFPortInstList list = inst.getEDIFPortInstList();
-            if (list != null) list.reSortList();
+            inst.sortPortInsts();
         }
     }
 
     /**
-     * Trims the backing capacity of all {@link EDIFPortInstList} objects on the
-     * nets and cell instances of this cell down to their current size. The lists
-     * are built via incremental {@link java.util.ArrayList} insertion (which
-     * leaves unused capacity slack), so calling this after a netlist is fully
+     * Trims the backing capacity of the port instance storage of all nets and
+     * cell instances of this cell down to their current size. The arrays are
+     * built via incremental insertion (which leaves unused capacity slack),
+     * so calling this after a netlist is fully
      * loaded reclaims that slack. This is purely a memory optimization and does
      * not change the contents of any list.
      */
     public void trimEDIFPortInstLists() {
         for (EDIFNet net : getNets()) {
-            EDIFPortInstList list = net.getEDIFPortInstList();
-            if (list != null) list.trimToSize();
+            net.trimPortInsts();
         }
         for (EDIFCellInst inst : getCellInsts()) {
-            EDIFPortInstList list = inst.getEDIFPortInstList();
-            if (list != null) list.trimToSize();
+            inst.trimPortInsts();
         }
     }
 

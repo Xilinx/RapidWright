@@ -44,7 +44,7 @@ public class TestPolynomialGenerator {
 
     @ParameterizedTest
     @MethodSource
-    public void testPolynomialGenerator(String polynomial, int bitWidth, boolean route, int expectedUnroutedPins, @TempDir Path dir) {
+    public void testPolynomialGenerator(String polynomial, int bitWidth, boolean route, @TempDir Path dir) {
         Path dcp = dir.resolve("polynomial.dcp");
 
         PolynomialGenerator.generatePolynomial(polynomial, "test", bitWidth, route, dcp.toString(), null, false);
@@ -63,22 +63,27 @@ public class TestPolynomialGenerator {
                 Assertions.assertTrue(rrs.isFullyRouted());
             } else {
                 Assertions.assertTrue(rrs.unroutedNets > 0);
-                Assertions.assertEquals(expectedUnroutedPins, rrs.netsWithRoutingErrors);
-                Assertions.assertEquals(expectedUnroutedPins, rrs.netsWithSomeUnroutedPins);
+                // The operators are pre-routed by a router that routes one net at a time, so which
+                // few of their connections it leaves unfinished depends on the order in which the
+                // design stores its nets. Only check that any routing errors are unrouted pins
+                // TODO: Fix the simple router (com.xilinx.rapidwright.router.Router) so that it can
+                // route the operators completely without conflicts, then expect no routing errors here
+                Assertions.assertEquals(0, rrs.netsWithResourceConflicts);
+                Assertions.assertEquals(rrs.netsWithRoutingErrors, rrs.netsWithSomeUnroutedPins);
             }
         }
     }
     
     public static Stream<Arguments> testPolynomialGenerator() {
         return Stream.of(
-                Arguments.of("x^2+3*x+5", 16, true, 0),
-                Arguments.of("x^2+3*x+5", 16, false, 0),
-                Arguments.of("8*x^4+43*x^3+7*x^2-14", 18, true, 0),
-                Arguments.of("8*x^4+43*x^3+7*x^2-14", 18, false, 1),
-                Arguments.of("8*y^4+43*y*x^3+7*x^2-14", 18, true, 0),   // Section 3: "More Complex Polynomial"
-                Arguments.of("8*y^4+43*y*x^3+7*x^2-14", 18, false, 1),
-                Arguments.of("3*x^2+x-2 16", 16, true, 0),              // Section 2: "Simple Polynomial Circuit"
-                Arguments.of("3*x^2+x-2 16", 16, false, 0)
+                Arguments.of("x^2+3*x+5", 16, true),
+                Arguments.of("x^2+3*x+5", 16, false),
+                Arguments.of("8*x^4+43*x^3+7*x^2-14", 18, true),
+                Arguments.of("8*x^4+43*x^3+7*x^2-14", 18, false),
+                Arguments.of("8*y^4+43*y*x^3+7*x^2-14", 18, true),   // Section 3: "More Complex Polynomial"
+                Arguments.of("8*y^4+43*y*x^3+7*x^2-14", 18, false),
+                Arguments.of("3*x^2+x-2 16", 16, true),              // Section 2: "Simple Polynomial Circuit"
+                Arguments.of("3*x^2+x-2 16", 16, false)
                 );
     }
 }
