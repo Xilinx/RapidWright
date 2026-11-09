@@ -283,7 +283,17 @@ public class UltraScaleClockRouting {
         Set<RouteNode> startingPoints = new HashSet<>();
         startingPoints.add(centroidDistNode);
         assert(centroidDistNode.getParent() == null);
+        // The clock regions of a row share its horizontal distribution (driven through the row
+        // buffers of the vertical distribution column): feed them all from the same vertical
+        // distribution node, as a second one (e.g. the segment that an earlier route continues
+        // down or up through) would drive the same row buffer from another input
+        Map<Integer, RouteNode> rowToVdist = new HashMap<>();
         nextClockRegion: for (ClockRegion cr : clockRegions) {
+            RouteNode rowVdist = rowToVdist.get(cr.getRow());
+            if (rowVdist != null) {
+                crToVdist.put(cr, rowVdist);
+                continue;
+            }
             q.clear();
             visited.clear();
             q.addAll(startingPoints);
@@ -309,6 +319,7 @@ public class UltraScaleClockRouting {
                     RouteNode currBase = new RouteNode(currNode);
                     currBase.setParent(null);
                     crToVdist.put(cr, currBase);
+                    rowToVdist.put(cr.getRow(), currBase);
                     continue nextClockRegion;
                 }
                 for (Wire w : curr.getWireConnections()) {
@@ -339,6 +350,12 @@ public class UltraScaleClockRouting {
         List<RouteNode> distLines = new ArrayList<>();
         Queue<RouteNode> q = new LinkedList<>();
         Set<PIP> allPIPs = new HashSet<>();
+        // Nodes already driven by this clock, so that a path joining the existing routing does not
+        // drive a node a second time
+        Set<Node> driven = new HashSet<>();
+        for (PIP pip : clk.getPIPs()) {
+            driven.add(pip.isReversed() ? pip.getStartNode() : pip.getEndNode());
+        }
         nextClockRegion: for (Entry<ClockRegion,RouteNode> e : crMap.entrySet()) {
             q.clear();
             RouteNode vertDistLine = e.getValue();
@@ -351,6 +368,10 @@ public class UltraScaleClockRouting {
                 if (targetCR.equals(curr.getTile().getClockRegion()) && c == IntentCode.NODE_GLOBAL_HDISTR) {
                     List<PIP> pips = curr.getPIPsBackToSource();
                     for (PIP pip : pips) {
+                        if (!driven.add(pip.isReversed() ? pip.getStartNode() : pip.getEndNode())) {
+                            // Reached the routing of an earlier clock region: branch off it
+                            break;
+                        }
                         allPIPs.add(pip);
                         NodeStatus status = getNodeStatus.apply(pip.getStartNode());
                         if (status == NodeStatus.INUSE) {
