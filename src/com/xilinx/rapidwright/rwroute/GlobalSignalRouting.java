@@ -478,8 +478,15 @@ public class GlobalSignalRouting {
                 // clock tree, not through a leaf clock buffer of their clock region
                 offFabricClkSinks.add(pin);
             } else if (Utils.isPS(si)) {
-                // PS clock input will be driven by East CR neighbor
-                clockRegions.add(cr.getNeighborClockRegion(0, 1));
+                if (cr == null) {
+                    // The PS8 tile of an UltraScale+ device is outside the clock regions: its clock inputs are
+                    // reached through a leaf clock buffer of the clock region of their INT tile
+                    cr = getClockRegionOfSink(pin);
+                    if (cr != null) clockRegions.add(cr);
+                } else {
+                    // PS clock input will be driven by East CR neighbor
+                    clockRegions.add(cr.getNeighborClockRegion(0, 1));
+                }
             } else if (Utils.isNOC(si)) {
                 // NOC sites might also need to look at neighbors for LCB 
                 clockRegions.add(cr);
@@ -577,6 +584,23 @@ public class GlobalSignalRouting {
     }
 
     /**
+     * Gets the clock region of a sink pin: that of its tile or, for a tile outside the clock regions (e.g. the PS8
+     * tile of an UltraScale+ device), that of the INT tile through which it is reached.
+     * @param pin The sink pin.
+     * @return The clock region of the sink pin, or null if there is none.
+     */
+    private static ClockRegion getClockRegionOfSink(SitePinInst pin) {
+        ClockRegion cr = pin.getTile().getClockRegion();
+        if (cr == null) {
+            Node intNode = RouterHelper.projectInputPinToINTNode(pin);
+            if (intNode != null) {
+                cr = intNode.getTile().getClockRegion();
+            }
+        }
+        return cr;
+    }
+
+    /**
      * Finds the centroid clock region of a clock net.
      * @param clk The clock net of a design.
      * @param device The device of the design.
@@ -586,7 +610,8 @@ public class GlobalSignalRouting {
         HashSet<Point> sitePinInstTilePoints = new HashSet<>();
         for (SitePinInst spi : clk.getPins()) {
             if (spi.isOutPin()) continue;
-            ClockRegion c = spi.getTile().getClockRegion();
+            ClockRegion c = getClockRegionOfSink(spi);
+            if (c == null) continue;
             sitePinInstTilePoints.add(new Point(c.getColumn(),c.getRow()));
         }
         Point center = SmallestEnclosingCircle.getCenterPoint(sitePinInstTilePoints);
