@@ -2015,8 +2015,13 @@ public class RWRoute {
             if (rnode.isTarget()) {
                 if (state.driversMarked && !isValidSink(connection, rnode)) {
                     // A driver of the sinks (see setFinishCosts()), whose lower bound included the exact cost of its
-                    // cheapest own sink: finish at its cheapest own sink not yet pushed (see finishAtSinkDriver())
-                    rnode = finishAtSinkDriver(state, rnode);
+                    // cheapest own sink: finish at its cheapest own sink not yet pushed (see finishAtSinkDriver()), or
+                    // skip this driver if there is none
+                    RouteNode sink = finishAtSinkDriver(state, rnode);
+                    if (sink == null) {
+                        continue;
+                    }
+                    rnode = sink;
                 }
                 break;
             }
@@ -2066,17 +2071,19 @@ public class RWRoute {
      * finishing at a sink of exactly the same cost.)
      * @param state State from the connection that is being routed.
      * @param driver The driver that has been popped.
-     * @return That sink, popped, or null if none (with the queue emptied, as for a search that fails).
+     * @return That sink, popped, or null if none, leaving the queue as it was. That would take a driver of the sinks
+     * that setFinishCosts() did not consider (e.g. one missing from RouteNodeGraph.getSinkDriverWires()'s tables) to
+     * have pushed all of this driver's own sinks: they are then still queued, and the search goes on without it.
      */
     private RouteNode finishAtSinkDriver(ConnectionState state, RouteNode driver) {
-        PriorityQueue<RouteNode> queue = state.queue;
-        nodesPushed.addAndGet(queue.size());
-        queue.clear();
         RouteNode sinkRnode = getCheapestTargetChild(state, driver);
         assert(sinkRnode != null);
         if (sinkRnode == null) {
             return null;
         }
+        PriorityQueue<RouteNode> queue = state.queue;
+        nodesPushed.addAndGet(queue.size());
+        queue.clear();
         evaluateCostAndPush(state, driver, config.isTimingDriven() && DelayEstimatorBase.isLong(driver), sinkRnode);
         RouteNode popped = queue.poll();
         assert(popped == sinkRnode);
