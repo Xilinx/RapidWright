@@ -529,6 +529,51 @@ public class TestGlobalSignalRouting {
         }
     }
 
+    /**
+     * Versal clocks whose clock regions do not overlap may share a routing track: the clock regions of
+     * all the clocks using a track must be kept, so that a later clock overlapping any of them avoids it.
+     */
+    @Test
+    public void testVersalClocksSharingRoutingTrack() {
+        Design design = new Design("versal_shared_track", "xcvc1902-vsva2197-2MP-e-S");
+        Device device = design.getDevice();
+        Set<Node> used = new HashSet<>();
+        Map<Integer, Set<ClockRegion>> usedRoutingTracks = new HashMap<>();
+        // Clocks 0 and 1 (in clock regions X1Y1 and X9Y1) can share a track; clock 2 overlaps clock 0
+        String[][] sourceAndSinkSites = {
+                {"BUFGCE_X1Y0", "SLICE_X44Y62"},
+                {"BUFGCE_X9Y0", "SLICE_X332Y79"},
+                {"BUFGCE_X1Y1", "SLICE_X46Y64"}
+        };
+        List<ClockRegion> sinkClockRegions = new ArrayList<>();
+        for (int i = 0; i < sourceAndSinkSites.length; i++) {
+            Net clk = design.createNet("clk" + i);
+            Cell bufgce = design.createAndPlaceCell("bufgce" + i, Unisim.BUFGCE, sourceAndSinkSites[i][0] + "/BUFCE");
+            clk.connect(bufgce, "O");
+            Cell ff = design.createAndPlaceCell("ff" + i, Unisim.FDRE, sourceAndSinkSites[i][1] + "/AFF");
+            clk.connect(ff, "C");
+            sinkClockRegions.add(ff.getTile().getClockRegion());
+
+            GlobalSignalRouting.symmetricClkRouting(clk, device,
+                    (n) -> used.contains(n) ? NodeStatus.UNAVAILABLE : NodeStatus.AVAILABLE,
+                    usedRoutingTracks);
+            for (PIP pip : clk.getPIPs()) {
+                used.add(pip.getStartNode());
+                used.add(pip.getEndNode());
+            }
+            Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        }
+        Assertions.assertNotEquals(sinkClockRegions.get(0), sinkClockRegions.get(1));
+        Assertions.assertEquals(sinkClockRegions.get(0), sinkClockRegions.get(2));
+
+        // Clocks 0 and 1 share a track that keeps both of their clock regions; clock 2 uses another track
+        Assertions.assertEquals(2, usedRoutingTracks.size());
+        Set<ClockRegion> sharedTrackClockRegions = new HashSet<>(sinkClockRegions.subList(0, 2));
+        Assertions.assertTrue(usedRoutingTracks.containsValue(sharedTrackClockRegions), usedRoutingTracks.toString());
+        Assertions.assertTrue(usedRoutingTracks.containsValue(new HashSet<>(sinkClockRegions.subList(2, 3))),
+                usedRoutingTracks.toString());
+    }
+
     private static Cell createBUFGCE(Design design, EDIFCell parent, String name, Site location) {
         // TODO - An improved version of this method is coming in ArrayBuilder
         Cell bufgce = design.createAndPlaceCell(parent, name, Unisim.BUFGCE, location, location.getBEL("BUFCE"));
