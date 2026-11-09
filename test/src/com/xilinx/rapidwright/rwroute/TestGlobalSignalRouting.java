@@ -443,6 +443,61 @@ public class TestGlobalSignalRouting {
         }
     }
 
+    @ParameterizedTest
+    @CsvSource({
+            "CLKFBIN,''",
+            "CLKIN1,SLICE_X50Y30 SLICE_X50Y100",
+            // The only flip-flop above the centroid: no downward branch of the clock tree
+            "CLKIN1,SLICE_X50Y250"
+    })
+    public void testSymmetricClkRoutingUltraScalePlusMMCMInput(String mmcmPinName, String flipFlopSites) {
+        // A clock driving the clock input or the feedback clock input of an MMCM: such an input is reached from
+        // the horizontal distribution through the clock muxes of the CMT tile, not from an INT tile through a
+        // leaf clock buffer
+        Design design = new Design("us_clk_mmcm_input", "xcvu3p");
+        Device device = design.getDevice();
+        Net clk = design.createNet("clk");
+        Net vcc = design.getVccNet();
+        Net gnd = design.getGndNet();
+        Cell bufgce = design.createAndPlaceCell("bufgceInst", Unisim.BUFGCE, "BUFGCE_X0Y0/BUFCE");
+        clk.connect(bufgce, "O");
+        Cell mmcm = design.createAndPlaceCell("mmcmInst", Unisim.MMCME4_ADV, "MMCM_X0Y0/MMCM");
+        clk.connect(mmcm, mmcmPinName);
+        int i = 0;
+        for (String site : flipFlopSites.split(" ")) {
+            if (site.isEmpty()) continue;
+            Cell ff = design.createAndPlaceCell("ff" + i++, Unisim.FDRE, site + "/AFF");
+            clk.connect(ff, "C");
+            vcc.connect(ff, "CE");
+            gnd.connect(ff, "D");
+            gnd.connect(ff, "R");
+        }
+        design.routeSites();
+        SitePinInst mmcmPin = mmcm.getSiteInst().getSitePinInst(mmcmPinName);
+        Assertions.assertNotNull(mmcmPin);
+        Assertions.assertEquals(clk, mmcmPin.getNet());
+
+        GlobalSignalRouting.symmetricClkRouting(clk, device, (n) -> NodeStatus.AVAILABLE, new HashMap<>());
+
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        for (SitePinInst spi : clk.getPins()) {
+            Assertions.assertTrue(spi.isRouted(), spi.toString());
+        }
+        // No dangling routing (an antenna): each node driven by the clock drives another one or is a sink
+        Set<Node> driving = new HashSet<>();
+        Set<Node> driven = new HashSet<>();
+        for (PIP pip : clk.getPIPs()) {
+            driving.add(pip.isReversed() ? pip.getEndNode() : pip.getStartNode());
+            driven.add(pip.isReversed() ? pip.getStartNode() : pip.getEndNode());
+        }
+        for (SitePinInst spi : clk.getPins()) {
+            driving.add(spi.getConnectedNode());
+        }
+        for (Node node : driven) {
+            Assertions.assertTrue(driving.contains(node), "Antenna " + node);
+        }
+    }
+
     private static Cell createBUFGCE(Design design, EDIFCell parent, String name, Site location) {
         // TODO - An improved version of this method is coming in ArrayBuilder
         Cell bufgce = design.createAndPlaceCell(parent, name, Unisim.BUFGCE, location, location.getBEL("BUFCE"));

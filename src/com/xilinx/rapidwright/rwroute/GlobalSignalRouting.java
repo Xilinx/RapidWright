@@ -222,7 +222,25 @@ public class GlobalSignalRouting {
         // Clock routing on UltraScale/UltraScale+ devices
         assert(device.getSeries() == Series.UltraScale || device.getSeries() == Series.UltraScalePlus);
 
-        Set<ClockRegion> clockRegions = getFabricClockRegionsOfNet(clk).getFirst();
+        // Sinks not fed from an INT tile (e.g. the CLKIN1 or CLKFBIN input of an MMCM, reached from the horizontal
+        // distribution through the clock muxes of its CMT tile) are not reached through a leaf clock buffer:
+        // they are routed from the clock tree of the other sinks, or straight from the source if there are none
+        List<SitePinInst> lcbPins = new ArrayList<>();
+        List<SitePinInst> distributionPins = new ArrayList<>();
+        for (SitePinInst p : clk.getPins()) {
+            if (p.isOutPin()) continue;
+            if (RouterHelper.projectInputPinToINTNode(p) == null) {
+                distributionPins.add(p);
+            } else {
+                lcbPins.add(p);
+            }
+        }
+        if (lcbPins.isEmpty() && !distributionPins.isEmpty()) {
+            VersalClockRouting.routeNonLCBPins(clk, distributionPins, getNodeStatus);
+            return;
+        }
+
+        Set<ClockRegion> clockRegions = getFabricClockRegionsOfPins(lcbPins).getFirst();
 
         ClockRegion centroid = findCentroid(clk, device);
         List<ClockRegion> upClockRegions = new ArrayList<>();
@@ -234,13 +252,17 @@ public class GlobalSignalRouting {
         RouteNode centroidHRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
 
         RouteNode vrouteUp = null;
-        RouteNode vrouteDown;
+        RouteNode vrouteDown = null;
         // Two VROUTEs going up and down
         ClockRegion aboveCentroid = upClockRegions.isEmpty() ? null : centroid.getNeighborClockRegion(1, 0);
         if (aboveCentroid != null) {
             vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
         }
-        vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
+        // (no downward branch when no leaf clock buffer sink is at or below the centroid, which the sinks
+        // routed from the distribution, e.g. MMCM inputs, can leave)
+        if (!downClockRegions.isEmpty()) {
+            vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
+        }
 
         List<RouteNode> upDownDistLines = new ArrayList<>();
         if (aboveCentroid != null) {
@@ -248,13 +270,19 @@ public class GlobalSignalRouting {
             if (upLines != null) upDownDistLines.addAll(upLines);
         }
 
-        List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
-        if (downLines != null) upDownDistLines.addAll(downLines);
+        if (!downClockRegions.isEmpty()) {
+            List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
+            if (downLines != null) upDownDistLines.addAll(downLines);
+        }
 
-        Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(clk.getPins(), getNodeStatus);
+        Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(lcbPins, getNodeStatus);
         UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
 
         UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, getNodeStatus);
+
+        if (!distributionPins.isEmpty()) {
+            VersalClockRouting.routeNonLCBPins(clk, distributionPins, getNodeStatus);
+        }
     }
 
     private static void symmetricClockRoutingVersal(Net clk, Device device,
@@ -464,9 +492,13 @@ public class GlobalSignalRouting {
      * @return A list of clock regions of the net's sink pins.
      */
     private static Pair<Set<ClockRegion>, List<SitePinInst>> getFabricClockRegionsOfNet(Net clk) {
+        return getFabricClockRegionsOfPins(clk.getPins());
+    }
+
+    private static Pair<Set<ClockRegion>, List<SitePinInst>> getFabricClockRegionsOfPins(List<SitePinInst> pins) {
         Set<ClockRegion> clockRegions = new HashSet<>();
         List<SitePinInst> offFabricClkSinks = new ArrayList<>();
-        for (SitePinInst pin : clk.getPins()) {
+        for (SitePinInst pin : pins) {
             if (pin.isOutPin()) continue;
             Tile t = pin.getTile();
             ClockRegion cr = t.getClockRegion();
