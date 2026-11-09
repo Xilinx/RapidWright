@@ -503,7 +503,8 @@ public class RouteNodeGraph {
             assert(isVersal);
 
             // Find an INT tile adjacent to each type of tile hosting CLE [BC]NODEs (CLE_BC_CORE, SLL, SLL2), since
-            // Versal devices may contain AIEs on their northern edge
+            // Versal devices may contain AIEs on their northern edge. Some devices (e.g. xcvp1902, where all such tiles
+            // are SLL2) have no CLE_BC_CORE tiles at all.
             intTilesToExamine = new ArrayList<>(BC_NODE_TILE_TYPES.size());
             for (TileTypeEnum bcTileType : BC_NODE_TILE_TYPES) {
                 Tile tile = getIntTileBeside(device, bcTileType);
@@ -511,7 +512,10 @@ public class RouteNodeGraph {
                     intTilesToExamine.add(tile);
                 }
             }
-            assert(!intTilesToExamine.isEmpty());
+            if (intTilesToExamine.isEmpty()) {
+                throw new RuntimeException("ERROR: No INT tile beside a tile of type " + BC_NODE_TILE_TYPES +
+                        " found on device " + device.getName());
+            }
 
             intTileIntentCodeCareSet = EnumSet.of(
                     IntentCode.NODE_IMUX,
@@ -2222,9 +2226,7 @@ public class RouteNodeGraph {
         allowedTileEnums.addAll(Utils.getLagunaTileTypes());
 
         // Versal only: include tiles hosting BNODE/CNODEs
-        allowedTileEnums.add(TileTypeEnum.CLE_BC_CORE);
-        allowedTileEnums.add(TileTypeEnum.SLL);
-        allowedTileEnums.add(TileTypeEnum.SLL2);
+        allowedTileEnums.addAll(BC_NODE_TILE_TYPES);
         allowedTileEnums.add(TileTypeEnum.INTF_LOCF_TL_TILE);
         allowedTileEnums.add(TileTypeEnum.INTF_LOCF_TR_TILE);
         allowedTileEnums.add(TileTypeEnum.INTF_LOCF_BL_TILE);

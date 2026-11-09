@@ -726,7 +726,18 @@ public class RWRoute {
 
                 RouteNode sinkRnode = routingGraph.getOrCreate(sinkINTNode);
                 RouteNodeType sinkType = sinkRnode.getType();
-                assert(sinkType.isAnyLocal());
+                // Several sink pins can be fed through the same INT tile node (e.g. the same input of the two
+                // BITSLICE_CONTROLs of a byte of an UltraScale XIPHY): the connections to them share it
+                boolean sharedSink = sinkType.isAnyExclusiveSink();
+                if (sharedSink && sinkRnode.countConnectionsOfUser(netWrapper) == 0) {
+                    List<Net> others = new ArrayList<>();
+                    for (NetWrapper other : sinkRnode.getUsersConnectionCounts().keySet()) {
+                        others.add(other.getNet());
+                    }
+                    throw new RuntimeException("ERROR: Sink " + sink + " of net " + net + " is reached through " +
+                            sinkINTNode + ", already the sink node of net(s) " + others);
+                }
+                assert(sharedSink || sinkType.isAnyLocal());
                 connection.setSinkRnode(sinkRnode);
 
                 if (sinkINTNode.getTile() != sink.getTile()) {
@@ -741,7 +752,8 @@ public class RWRoute {
 
                 // Where appropriate, allow this LUT input to be swapped onto some of its LUT's other input pins
                 char lutLetter = sink.getName().charAt(0);
-                int swappablePins = (lutPinSwapping && sink.isLUTInputPin()) ? getSwappableLutPins(sink) : 0;
+                int swappablePins = (lutPinSwapping && sink.isLUTInputPin() && !sharedSink)
+                        ? getSwappableLutPins(sink) : 0;
                 Site site = sink.getSite();
                 for (int i = 1; i <= LUTTools.MAX_LUT_SIZE; i++) {
                     if ((swappablePins & lutPinBit(i)) == 0) {
@@ -775,7 +787,7 @@ public class RWRoute {
                     connection.addAltSinkRnode(altSinkRnode);
                 }
 
-                if (!connection.hasAltSinks()) {
+                if (!connection.hasAltSinks() && !sharedSink) {
                     // Since this connection only has a single sink target, make it exclusive
                     // (it keeps the half of the INT tile that it is on)
                     assert(sinkType != RouteNodeType.LOCAL_RESERVED);

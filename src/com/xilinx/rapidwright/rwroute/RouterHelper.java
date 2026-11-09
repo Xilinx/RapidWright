@@ -216,11 +216,13 @@ public class RouterHelper {
         final boolean isLagunaRXD = Utils.isLaguna(sink.getTile().getTileTypeEnum());
         assert(!isLagunaRXD || input.getName().startsWith("RXD"));
 
-        int watchdog = 40;
+        int watchdog = 100;
 
         // Starting from the SPI's connected node, perform an uphill breadth-first search
         Queue<Node> queue = new ArrayDeque<>();
         queue.add(sink);
+        Set<Node> visited = new HashSet<>();
+        visited.add(sink);
         while (!queue.isEmpty() && watchdog >= 0) {
             Node node = queue.poll();
             watchdog--;
@@ -236,6 +238,17 @@ public class RouterHelper {
                     continue;
                 }
                 if (uphillTileType != sinkTileType && Utils.isClocking(uphillTileType)) {
+                    continue;
+                }
+                IntentCode uphillIntentCode = uphill.getIntentCode();
+                if (uphillIntentCode.isUltraScaleClocking() || uphillIntentCode.isVersalClocking() ||
+                        uphill.isTiedToVcc()) {
+                    // Global clock routing and VCC do not lead back to an INT tile; skip them so that they do
+                    // not exhaust the search (e.g. for the CLK_IN of a BUFGCE in a CMT tile, which is fed by
+                    // many clock routing tracks and MMCM/PLL outputs besides its inputs from the fabric)
+                    continue;
+                }
+                if (!visited.add(uphill)) {
                     continue;
                 }
                 queue.add(uphill);

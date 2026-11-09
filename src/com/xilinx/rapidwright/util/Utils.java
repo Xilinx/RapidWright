@@ -365,7 +365,7 @@ public class Utils{
             //TileTypeEnum.INT_R_SLV,
             //TileTypeEnum.INT_R_SLV_FLY,
             TileTypeEnum.SLL,               // Versal
-            TileTypeEnum.SLL2               // Versal (xcvp1902)
+            TileTypeEnum.SLL2               // Versal (e.g. xcvp1902)
         );
 
         urams = EnumSet.of(
