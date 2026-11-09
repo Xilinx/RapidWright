@@ -40,7 +40,6 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
-import java.util.function.Function;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.PartNameTools;
@@ -70,15 +69,10 @@ public class EDIFCell extends EDIFPropertyObject {
 
     private CompactStringMap<EDIFNet> internalPortMap;
 
-    private static final Function<EDIFCellInst, String> INST_KEY = EDIFCellInst::getName;
-    private static final Function<EDIFNet, String> NET_KEY = EDIFNet::getName;
-    /** Ports are keyed by bus name, keeping the open bracket of a bus, see {@link #addPort(EDIFPort)} */
-    private static final Function<EDIFPort, String> PORT_KEY = p -> p.getBusName(true);
-
     // One final class per map type, so that the JIT compiler can inline keyOf() into lookups
     private static final class InstanceMap extends CompactStringMap<EDIFCellInst> {
         InstanceMap() {
-            super(INST_KEY);
+            super(true);
         }
 
         @Override
@@ -89,7 +83,7 @@ public class EDIFCell extends EDIFPropertyObject {
 
     private static final class NetMap extends CompactStringMap<EDIFNet> {
         NetMap() {
-            super(NET_KEY);
+            super(true);
         }
 
         @Override
@@ -100,25 +94,14 @@ public class EDIFCell extends EDIFPropertyObject {
 
     private static final class PortMap extends CompactStringMap<EDIFPort> {
         PortMap() {
-            super(PORT_KEY);
+            super(true);
         }
 
+        /** Ports are keyed by bus name, keeping the open bracket of a bus, see {@link #addPort(EDIFPort)} */
         @Override
         protected String keyOf(EDIFPort value) {
             return value.getBusName(true);
         }
-    }
-
-    private static InstanceMap newInstanceMap() {
-        return new InstanceMap();
-    }
-
-    private static NetMap newNetMap() {
-        return new NetMap();
-    }
-
-    private static PortMap newPortMap() {
-        return new PortMap();
     }
 
     private EDIFName view = DEFAULT_VIEW;
@@ -254,7 +237,7 @@ public class EDIFCell extends EDIFPropertyObject {
      * @return The instance added to the cell.
      */
     public EDIFCellInst addCellInst(EDIFCellInst instance) {
-        if (instances == null) instances = newInstanceMap();
+        if (instances == null) instances = new InstanceMap();
         instance.setParentCell(this);
         EDIFCellInst collision = instances.put(instance.getName(), instance);
         if (collision != null && instance != collision) {
@@ -273,7 +256,7 @@ public class EDIFCell extends EDIFPropertyObject {
      * @return The instance added to the cell.
      */
     public EDIFCellInst addCellInstUniqueName(EDIFCellInst instance) {
-        if (instances == null) instances = newInstanceMap();
+        if (instances == null) instances = new InstanceMap();
         instance.setParentCell(this);
         if (instances.get(instance.getName()) == instance) {
             // Already in this cell: renaming it in place would desynchronize the instance map
@@ -298,7 +281,7 @@ public class EDIFCell extends EDIFPropertyObject {
      * @return The net that was added.
      */
     public EDIFNet addNet(EDIFNet net) {
-        if (nets == null) nets = newNetMap();
+        if (nets == null) nets = new NetMap();
         net.setParentCell(this);
         EDIFNet collision = nets.put(net.getName(), net);
         if (collision != null && net != collision) {
@@ -340,7 +323,7 @@ public class EDIFCell extends EDIFPropertyObject {
      * @return The port that was added.
      */
     public EDIFPort addPort(EDIFPort port) {
-        if (ports == null) ports = newPortMap();
+        if (ports == null) ports = new PortMap();
         port.setParentCell(this);
         EDIFPort collision = ports.put(port.getBusName(true), port);
         if (collision != null && port != collision) {

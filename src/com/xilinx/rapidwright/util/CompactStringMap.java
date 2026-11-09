@@ -94,9 +94,6 @@ public class CompactStringMap<V> implements Map<String, V> {
     private int used;
     private int modCount;
 
-    /** Number of derived-key maps that switched to keyed mode (diagnostics) */
-    private static volatile long keyedSwitches;
-
     /**
      * Creates an empty map in keyed mode (parallel key and value arrays).
      */
@@ -113,6 +110,20 @@ public class CompactStringMap<V> implements Map<String, V> {
         this.keyFn = Objects.requireNonNull(keyFn);
     }
 
+    /** Key function of a derived-key map whose subclass overrides {@link #keyOf(Object)} */
+    private static final Function<Object, String> KEY_OF_OVERRIDDEN = v -> {
+        throw new UnsupportedOperationException("keyOf() is not overridden");
+    };
+
+    /**
+     * Creates an empty map for a subclass that overrides {@link #keyOf(Object)} (without a key
+     * function), in derived-key mode if derivedKeys is true, else in keyed mode.
+     * @param derivedKeys True for derived-key mode, with keys given by the subclass's keyOf().
+     */
+    protected CompactStringMap(boolean derivedKeys) {
+        this.keyFn = derivedKeys ? KEY_OF_OVERRIDDEN : null;
+    }
+
     /**
      * Creates an empty map in derived-key mode with room for the expected number of entries.
      * @param keyFn See {@link #CompactStringMap(Function)}.
@@ -125,8 +136,9 @@ public class CompactStringMap<V> implements Map<String, V> {
 
     /**
      * Gets the key of a value in derived-key mode. By default this applies the key function; a subclass
-     * may override it with the same function written directly, which lets the JIT compiler inline it
-     * into lookups (a key function field is a megamorphic call when maps of several types are used).
+     * may instead override it (see {@link #CompactStringMap(boolean)}), which lets the JIT compiler
+     * inline it into lookups (a key function field is a megamorphic call when maps of several types
+     * are used).
      * @param value A value of this map (not null).
      * @return The value's key.
      */
@@ -139,14 +151,6 @@ public class CompactStringMap<V> implements Map<String, V> {
      */
     public boolean isKeyed() {
         return keyFn == null || keys != null;
-    }
-
-    /**
-     * @return The number of derived-key maps (in this JVM) that switched to keyed mode because an
-     * entry was put under a key other than the value's derived key, or with a null value.
-     */
-    public static long getKeyedSwitchCount() {
-        return keyedSwitches;
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -428,7 +432,6 @@ public class CompactStringMap<V> implements Map<String, V> {
             }
             keys = ks;
         }
-        keyedSwitches++;
     }
 
     @Override
