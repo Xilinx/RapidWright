@@ -112,7 +112,7 @@ public class UltraScaleClockRouting {
 
     /**
      * Routes a clock buffer's output onto a routing track, along it to the centroid clock region, then onto the
-     * vertical routing tracks going down into the centroid and, if needed, up into the clock region above it, and
+     * vertical routing tracks going down into the centroid and up into the clock region above it (each if needed), and
      * from each of these onto a vertical distribution track. Routing tracks keep their index, so the track nearest
      * to the buffer can be blocked further on by another clock: a track is only accepted once all of these have
      * been reached, otherwise its PIPs are removed and the next track is tried.
@@ -120,12 +120,14 @@ public class UltraScaleClockRouting {
      * @param centroid The centroid clock region.
      * @param aboveCentroid The clock region above the centroid, or null if no clock region above the centroid
      *                      is to be reached.
+     * @param down True if the centroid and the clock regions below it are to be reached.
      * @param getNodeStatus Lambda giving the status of a node, to avoid nodes used by other nets, or null.
-     * @return The vertical distribution tracks reached going down and going up (the latter null if aboveCentroid
-     * is null), or null if they could not be reached.
+     * @return The vertical distribution tracks reached going down and going up (the former null if down is false,
+     * the latter null if aboveCentroid is null), or null if they could not be reached.
      */
     public static Pair<RouteNode, RouteNode> routeBUFGToVerticalDistributionLines(Net clk, ClockRegion centroid,
                                                                                   ClockRegion aboveCentroid,
+                                                                                  boolean down,
                                                                                   Function<Node, NodeStatus> getNodeStatus) {
         List<PIP> pipsBefore = new ArrayList<>(clk.getPIPs());
         Set<Node> blockedTracks = new HashSet<>();
@@ -145,10 +147,13 @@ public class UltraScaleClockRouting {
                     distLineUp = (vrouteUp == null) ? null :
                             transitionCentroidToVerticalDistributionLine(clk, vrouteUp, false, status);
                 }
-                RouteNode vrouteDown = routeToCentroid(clk, centroidHRouteNode, centroid, true, false, status);
-                RouteNode distLineDown = (vrouteDown == null) ? null :
-                        transitionCentroidToVerticalDistributionLine(clk, vrouteDown, true, status);
-                if (distLineDown != null && (aboveCentroid == null || distLineUp != null)) {
+                RouteNode distLineDown = null;
+                if (down) {
+                    RouteNode vrouteDown = routeToCentroid(clk, centroidHRouteNode, centroid, true, false, status);
+                    distLineDown = (vrouteDown == null) ? null :
+                            transitionCentroidToVerticalDistributionLine(clk, vrouteDown, true, status);
+                }
+                if ((!down || distLineDown != null) && (aboveCentroid == null || distLineUp != null)) {
                     return new Pair<>(distLineDown, distLineUp);
                 }
             }
@@ -393,7 +398,17 @@ public class UltraScaleClockRouting {
         Set<RouteNode> startingPoints = new HashSet<>();
         startingPoints.add(centroidDistNode);
         assert(centroidDistNode.getParent() == null);
+        // The clock regions of a row share its horizontal distribution (driven through the row
+        // buffers of the vertical distribution column): feed them all from the same vertical
+        // distribution node, as a second one (e.g. the segment that an earlier route continues
+        // down or up through) would drive the same row buffer from another input
+        Map<Integer, RouteNode> rowToVdist = new HashMap<>();
         nextClockRegion: for (ClockRegion cr : clockRegions) {
+            RouteNode rowVdist = rowToVdist.get(cr.getRow());
+            if (rowVdist != null) {
+                crToVdist.put(cr, rowVdist);
+                continue;
+            }
             q.clear();
             visited.clear();
             q.addAll(startingPoints);
@@ -419,6 +434,7 @@ public class UltraScaleClockRouting {
                     RouteNode currBase = new RouteNode(currNode);
                     currBase.setParent(null);
                     crToVdist.put(cr, currBase);
+                    rowToVdist.put(cr.getRow(), currBase);
                     continue nextClockRegion;
                 }
                 for (Wire w : curr.getWireConnections()) {
@@ -450,6 +466,12 @@ public class UltraScaleClockRouting {
         List<RouteNode> distLines = new ArrayList<>();
         Queue<RouteNode> q = new LinkedList<>();
         Set<PIP> allPIPs = new HashSet<>();
+        // Nodes already driven by this clock, so that a path joining the existing routing does not
+        // drive a node a second time
+        Set<Node> driven = new HashSet<>();
+        for (PIP pip : clk.getPIPs()) {
+            driven.add(pip.isReversed() ? pip.getStartNode() : pip.getEndNode());
+        }
         nextClockRegion: for (Entry<ClockRegion,RouteNode> e : crMap.entrySet()) {
             q.clear();
             RouteNode vertDistLine = e.getValue();
@@ -462,6 +484,10 @@ public class UltraScaleClockRouting {
                 if (targetCR.equals(curr.getTile().getClockRegion()) && c == IntentCode.NODE_GLOBAL_HDISTR) {
                     List<PIP> pips = curr.getPIPsBackToSource();
                     for (PIP pip : pips) {
+                        if (!driven.add(pip.isReversed() ? pip.getStartNode() : pip.getEndNode())) {
+                            // Reached the routing of an earlier clock region: branch off it
+                            break;
+                        }
                         allPIPs.add(pip);
                         NodeStatus status = getNodeStatus.apply(pip.getStartNode());
                         if (status == NodeStatus.INUSE) {

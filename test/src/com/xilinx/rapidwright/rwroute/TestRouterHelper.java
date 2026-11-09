@@ -85,6 +85,8 @@ public class TestRouterHelper {
     @CsvSource({
             "xcvu3p,MMCM_X0Y0,PSEN,INT_X36Y56/IMUX_W0",
             "xcvu3p,BUFGCE_X0Y58,CLK_IN,INT_X36Y151/IMUX_W34",
+            // CLK_IN is also fed by many MMCM/PLL outputs and clock routing tracks of its CMT tile
+            "xcku9p-ffve900-2-e,BUFGCE_X0Y72,CLK_IN,INT_X65Y211/IMUX_E24",
             "xcvp1002,MMCM_X2Y0,PSEN,INT_X27Y0/IMUX_B_W24"
     })
     public void testProjectInputPinToINTNode(String partName, String siteName, String pinName, String nodeAsString) {
