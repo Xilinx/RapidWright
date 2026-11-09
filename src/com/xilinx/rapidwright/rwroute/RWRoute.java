@@ -2372,7 +2372,7 @@ public class RWRoute {
                                 childRNode.getIntentCode() == IntentCode.NODE_SLL_INPUT ||
                                 (routingGraph.isVersal && (childType.isLocalLeadingToSLL() ||
                                         (childRNode.getIntentCode() == IntentCode.NODE_CLE_BNODE &&
-                                         childRNode.getTile().getTileTypeEnum() == TileTypeEnum.SLL))));
+                                         RouteNodeGraph.isSllTileType(childRNode.getTile().getTileTypeEnum())))));
                         break;
                     case NON_LOCAL_LEADING_TO_SLL: // UltraScale/UltraScale+ only
                     case NON_LOCAL:

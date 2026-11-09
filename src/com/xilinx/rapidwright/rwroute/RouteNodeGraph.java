@@ -426,21 +426,33 @@ public class RouteNodeGraph {
         Arrays.fill(slrFirstIntY, Integer.MAX_VALUE);
         Arrays.fill(slrLastIntY, Integer.MIN_VALUE);
         Tile[][] intTiles = device.getTilesByRootName("INT");
+        // Whether some row of INT tiles has tiles of more than one SLR: on xcvp1902, whose four SLRs each have their own
+        // tile coordinates, intYToSLRIndex only gives one of the SLRs of each row
+        boolean slrsShareRows = false;
         for (int y = 0; y < intTiles.length; y++) {
             Tile[] intTilesAtY = intTiles[y];
+            int rowSLR = -1;
             for (Tile tile : intTilesAtY) {
                 if (tile != null) {
                     int slr = tile.getSLR().getId();
-                    intYToSLRIndex[y] = slr;
-                    slrFirstIntY[slr] = Math.min(slrFirstIntY[slr], y);
-                    slrLastIntY[slr] = Math.max(slrLastIntY[slr], y);
-                    break;
+                    if (rowSLR == -1) {
+                        rowSLR = slr;
+                        intYToSLRIndex[y] = slr;
+                        slrFirstIntY[slr] = Math.min(slrFirstIntY[slr], y);
+                        slrLastIntY[slr] = Math.max(slrLastIntY[slr], y);
+                        if (device.getNumOfSLRs() == 1) {
+                            break;
+                        }
+                    } else if (slr != rowSLR) {
+                        slrsShareRows = true;
+                        break;
+                    }
                 }
             }
         }
         for (int slr = 1; slr < slrFirstIntY.length; slr++) {
             // SLR indices are expected to increase with Y
-            assert(slrFirstIntY[slr] > slrFirstIntY[slr - 1]);
+            assert(slrsShareRows || slrFirstIntY[slr] > slrFirstIntY[slr - 1]);
         }
 
         Series series = device.getSeries();
@@ -490,21 +502,19 @@ public class RouteNodeGraph {
         } else {
             assert(isVersal);
 
-            // Find an INT tile adjacent to a CLE_BC_CORE tile since Versal devices may contain AIEs on their northern edge,
-            // and one adjacent to each type of SLL tile (which host the BNODEs/CNODEs of their CLE pair instead).
-            // Some devices (e.g. xcvp1902, where all such tiles are SLL2) have no CLE_BC_CORE tiles at all.
-            intTilesToExamine = new ArrayList<>(2);
-            for (TileTypeEnum bcType : versalBCTileTypes) {
-                Tile bcTile = device.getArbitraryTileOfType(bcType);
-                if (bcTile != null) {
-                    Tile tile = bcTile.getTileNeighbor(2, 0);
-                    assert(tile.getTileTypeEnum() == TileTypeEnum.INT);
+            // Find an INT tile adjacent to each type of tile hosting CLE [BC]NODEs (CLE_BC_CORE, SLL, SLL2), since
+            // Versal devices may contain AIEs on their northern edge. Some devices (e.g. xcvp1902, where all such tiles
+            // are SLL2) have no CLE_BC_CORE tiles at all.
+            intTilesToExamine = new ArrayList<>(BC_NODE_TILE_TYPES.size());
+            for (TileTypeEnum bcTileType : BC_NODE_TILE_TYPES) {
+                Tile tile = getIntTileBeside(device, bcTileType);
+                if (tile != null) {
                     intTilesToExamine.add(tile);
                 }
             }
             if (intTilesToExamine.isEmpty()) {
-                throw new RuntimeException("ERROR: No tile of type " + versalBCTileTypes + " found on device " +
-                        device.getName());
+                throw new RuntimeException("ERROR: No INT tile beside a tile of type " + BC_NODE_TILE_TYPES +
+                        " found on device " + device.getName());
             }
 
             intTileIntentCodeCareSet = EnumSet.of(
@@ -726,11 +736,11 @@ public class RouteNodeGraph {
         }
 
         if (isVersal) {
-            // CTRL_[LR]_B* pins in CLE_BC_CORE (and SLL) tiles are reachable from the [BC]NODEs serving the INT tiles
+            // CTRL_[LR]_B* pins in CLE_BC_CORE (and SLL/SLL2) tiles are reachable from the [BC]NODEs serving the INT tiles
             // on both sides, but each feeds a CLE core tile on one side only: CTRL_L_B* feeds the CLE_W_CORE beside
             // the east side of the INT tile to the west, CTRL_R_B* the CLE_E_CORE beside the west side of the INT tile
             // to the east (with RouteNodeInfo placing both pins at their CLE core tile)
-            for (TileTypeEnum tte : Arrays.asList(TileTypeEnum.CLE_BC_CORE, TileTypeEnum.SLL)) {
+            for (TileTypeEnum tte : BC_NODE_TILE_TYPES) {
                 Tile tile = device.getArbitraryTileOfType(tte);
                 if (tile == null) continue;
                 for (int wireIndex = 0; wireIndex < tile.getWireCount(); wireIndex++) {
@@ -1999,7 +2009,7 @@ public class RouteNodeGraph {
     protected int getHighestBaseWireIndex(Tile tile, int startWireIndex) {
         return highestBaseWireIndex.compute(tile.getTileTypeEnum(), (tte, highestBaseWire) -> {
             if (highestBaseWire == null || highestBaseWire <= startWireIndex) {
-                final boolean isSLLType = versalSLLTileTypes.contains(tte); // Versal only
+                final boolean isSLLType = isSllTileType(tte); // Versal only
                 // Check all wires in tile to find the index of the last base wire
                 int lastBaseWire = startWireIndex;
                 for (int i = lastBaseWire + 1; i < tile.getWireCount(); i++) {
@@ -2156,15 +2166,58 @@ public class RouteNodeGraph {
         return nets != null && nets[wireIndex] != null;
     }
 
-    /** Versal tile types hosting the BNODEs/CNODEs (and CTRL wires) of a CLE pair */
-    private static final Set<TileTypeEnum> versalBCTileTypes = EnumSet.of(
-            TileTypeEnum.CLE_BC_CORE,
-            TileTypeEnum.SLL,
-            TileTypeEnum.SLL2   // e.g. xcvp1902
-    );
+    /**
+     * Versal tile types hosting CLE [BC]NODEs and CTRL pins: CLE_BC_CORE, SLL (beside the SLL columns of devices with
+     * several SLRs) and SLL2 (every such tile on xcvp1902, which has no CLE_BC_CORE tiles). CLE_BC_CORE_MX is not
+     * included.
+     */
+    static final List<TileTypeEnum> BC_NODE_TILE_TYPES = Collections.unmodifiableList(Arrays.asList(
+            TileTypeEnum.CLE_BC_CORE, TileTypeEnum.SLL, TileTypeEnum.SLL2));
 
-    /** Versal tile types hosting SLLs */
-    private static final Set<TileTypeEnum> versalSLLTileTypes = EnumSet.of(TileTypeEnum.SLL, TileTypeEnum.SLL2);
+    /**
+     * Checks if a tile type is a Versal SLL tile: SLL, or SLL2 (xcvp1902). Both host super long lines, CLE [BC]NODEs
+     * and CTRL pins.
+     * @param tileTypeEnum Tile type in question.
+     * @return True if so.
+     */
+    public static boolean isSllTileType(TileTypeEnum tileTypeEnum) {
+        return tileTypeEnum == TileTypeEnum.SLL || tileTypeEnum == TileTypeEnum.SLL2;
+    }
+
+    /**
+     * Finds an INT tile two columns away from a tile of the given type (with a CLE core tile between them), on either
+     * side, trying an arbitrary tile of that type first.
+     * @param device Device in question.
+     * @param tileTypeEnum Tile type (one of {@link #BC_NODE_TILE_TYPES}).
+     * @return That INT tile, or null if the device has no tile of that type beside one.
+     */
+    private static Tile getIntTileBeside(Device device, TileTypeEnum tileTypeEnum) {
+        Tile tile = device.getArbitraryTileOfType(tileTypeEnum);
+        if (tile == null) {
+            return null;
+        }
+        Tile intTile = getIntTileBeside(tile);
+        if (intTile != null) {
+            return intTile;
+        }
+        // The arbitrary tile can be at the edge of the device (e.g. an SLL2 tile on xcvp1902)
+        for (Tile t : device.getAllTiles()) {
+            if (t.getTileTypeEnum() == tileTypeEnum && (intTile = getIntTileBeside(t)) != null) {
+                return intTile;
+            }
+        }
+        return null;
+    }
+
+    private static Tile getIntTileBeside(Tile tile) {
+        for (int dx : new int[]{2, -2}) {
+            Tile neighbor = tile.getTileNeighbor(dx, 0);
+            if (neighbor != null && neighbor.getTileTypeEnum() == TileTypeEnum.INT) {
+                return neighbor;
+            }
+        }
+        return null;
+    }
 
     private static final Set<TileTypeEnum> allowedTileEnums;
     static {
@@ -2173,7 +2226,7 @@ public class RouteNodeGraph {
         allowedTileEnums.addAll(Utils.getLagunaTileTypes());
 
         // Versal only: include tiles hosting BNODE/CNODEs
-        allowedTileEnums.addAll(versalBCTileTypes);
+        allowedTileEnums.addAll(BC_NODE_TILE_TYPES);
         allowedTileEnums.add(TileTypeEnum.INTF_LOCF_TL_TILE);
         allowedTileEnums.add(TileTypeEnum.INTF_LOCF_TR_TILE);
         allowedTileEnums.add(TileTypeEnum.INTF_LOCF_BL_TILE);

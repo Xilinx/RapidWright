@@ -253,6 +253,15 @@ public class TestRouteNodeInfo {
             "xcv80,INTF_ROCF_TR_TILE_X21Y431",
             "xcv80,INTF_ROCF_TL_TILE_X22Y431",
             "xcv80,INTF_ROCF_BR_TILE_X114Y461",
+            // xcvp1902 has no CLE_BC_CORE tiles: its [BC]NODEs and CTRL pins are in SLL2 tiles, each between two INT
+            // tiles. SLL2_S0X93Y207 is between INT_S0X92Y207 and INT_S0X93Y207, SLL2_1_S0X93Y207 between
+            // INT_S0X93Y207 and INT_S0X94Y207. In SLR2 tile X coordinates decrease eastward: SLL2_1_S2X16Y306 is
+            // between INT_S2X17Y306 (to its west) and INT_S2X16Y306, SLL2_S2X17Y306 between INT_S2X18Y306 and
+            // INT_S2X17Y306
+            "xcvp1902,SLL2_S0X93Y207",
+            "xcvp1902,SLL2_1_S0X93Y207",
+            "xcvp1902,SLL2_1_S2X16Y306",
+            "xcvp1902,SLL2_S2X17Y306",
     })
     public void testVersalHalfTileBesideInt(String partName, String tileName) {
         Design design = new Design("test", partName);
@@ -326,6 +335,11 @@ public class TestRouteNodeInfo {
             "xcv80,SLL_X114Y461",
             // SLL_X16Y335 is between INT_X16Y335 and INT_X17Y335
             "xcv80,SLL_X16Y335",
+            // xcvp1902's SLL2 tiles (see testVersalHalfTileBesideInt()): SLL2_1_S0X93Y207 is between INT_S0X93Y207
+            // and INT_S0X94Y207; in SLR2, whose tile X coordinates decrease eastward, SLL2_1_S2X16Y306 is between
+            // INT_S2X17Y306 (to its west) and INT_S2X16Y306
+            "xcvp1902,SLL2_1_S0X93Y207",
+            "xcvp1902,SLL2_1_S2X16Y306",
     })
     public void testVersalSllNodesOnBothSides(String partName, String tileName) {
         Design design = new Design("test", partName);
@@ -385,5 +399,61 @@ public class TestRouteNodeInfo {
         }
         Assertions.assertTrue(numSllInputs >= 4, "Only " + numSllInputs + " SLL inputs found");
         Assertions.assertTrue(numSllData >= 1, "Only " + numSllData + " super long lines found");
+    }
+
+    /**
+     * Check, across a sample of the SLL and SLL2 tiles of a device (every SLR), that every CLE [BC]NODE in them is
+     * placed at the INT tile half of all the INODEs that it drives: an SLL tile is between two INT tiles and serves
+     * both, so half of its [BC]NODEs drive the INT tile on one side and half the other; and, on xcvp1902, SLR2 and
+     * SLR3 have tile X coordinates that decrease eastward.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "xcv80,7",
+            "xcvp1902,101",
+    })
+    public void testVersalBCNodesInSllTilesAtTheirINodes(String partName, int tileStep) {
+        Design design = new Design("test", partName);
+        Device device = design.getDevice();
+        RouteNodeGraph routingGraph = new RouteNodeGraph(design, new RWRouteConfig(new String[]{}));
+        int numTiles = 0;
+        int numBCNodes = 0;
+        Set<Integer> slrs = new HashSet<>();
+        Set<Integer> dxs = new HashSet<>();
+        for (Tile tile : device.getAllTiles()) {
+            if (!RouteNodeGraph.isSllTileType(tile.getTileTypeEnum()) || (numTiles++ % tileStep) != 0) {
+                continue;
+            }
+            for (int wireIndex = 0; wireIndex < tile.getWireCount(); wireIndex++) {
+                IntentCode ic = tile.getWireIntentCode(wireIndex);
+                if (ic != IntentCode.NODE_CLE_BNODE && ic != IntentCode.NODE_CLE_CNODE) {
+                    continue;
+                }
+                Node node = Node.getNode(tile, wireIndex);
+                if (node == null || node.getTile() != tile || node.getWireIndex() != wireIndex) {
+                    // Not the base wire of this node
+                    continue;
+                }
+                RouteNodeInfo info = RouteNodeInfo.get(node, routingGraph);
+                int numInodes = 0;
+                for (Node downhill : node.getAllDownhillNodes()) {
+                    if (downhill.getIntentCode() != IntentCode.NODE_INODE) {
+                        continue;
+                    }
+                    RouteNodeInfo inode = RouteNodeInfo.get(downhill, routingGraph);
+                    Assertions.assertEquals(inode.endHalfTileXCoordinate, info.endHalfTileXCoordinate, node + " -> " + downhill);
+                    Assertions.assertEquals(inode.endTileYCoordinate, info.endTileYCoordinate, node + " -> " + downhill);
+                    dxs.add(downhill.getTile().getTileXCoordinate() - tile.getTileXCoordinate());
+                    numInodes++;
+                }
+                Assertions.assertTrue(numInodes > 0, node.toString());
+                slrs.add(tile.getSLR().getId());
+                numBCNodes++;
+            }
+        }
+        Assertions.assertEquals(device.getNumOfSLRs(), slrs.size());
+        // The INT tiles on both sides, i.e. not all at the SLL tile's own X coordinate
+        Assertions.assertTrue(dxs.size() >= 2, dxs.toString());
+        Assertions.assertTrue(numBCNodes >= 1000, "Only " + numBCNodes + " [BC]NODEs found");
     }
 }

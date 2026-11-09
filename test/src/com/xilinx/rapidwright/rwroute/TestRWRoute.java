@@ -965,6 +965,13 @@ public class TestRWRoute {
             "xcv80,SLICE_X53Y406.AQ,SLICE_X55Y331.A5",                     // 1,-75; bound 26.1
             "xcv80,SLICE_X53Y406.A_O,SLICE_X55Y331.A5",                    // 1,-75; bound 26.1
             "xcv80,SLICE_X53Y406.AQ,SLICE_X61Y331.A5",                     // 4,-75; bound 26.9
+            // Versal (xcvp1902, whose [BC]NODEs and CTRL pins are in SLL2 tiles): in SLR0, SLICE_S0X318 (CLE_E_CORE_S0X93)
+            // on the west half of INT_S0X93, SLICE_S0X316 (CLE_W_CORE_S0X92) on the east half of INT_S0X92, with
+            // SLL2_S0X93Y207 between them; in SLR2, whose tile X coordinates decrease eastward, SLICE_S2X54
+            // (CLE_E_CORE_S2X17) on the west half of INT_S2X17
+            "xcvp1902,SLICE_S0X318Y203.A_O,SLICE_S0X316Y203.A5",           // -1,0; bound 1.2
+            "xcvp1902,SLICE_S0X318Y203.AQ,SLICE_S0X318Y190.A4",            // 0,-13; bound 5.0
+            "xcvp1902,SLICE_S2X54Y302.AQ,SLICE_S2X54Y289.A4",              // 0,-13; bound 5.0
     })
     public void testCostWithinLowerBoundNonTimingDriven(String partName, String srcSitePin, String dstSitePin) {
         PartialRouter rwroute = routeSingleConnection(partName, srcSitePin, dstSitePin);
@@ -1393,12 +1400,12 @@ public class TestRWRoute {
     @CsvSource({
             // xcvp1902 has no CLE_BC_CORE tiles: the BNODEs/CNODEs/CTRL wires of its CLE pairs are hosted
             // by SLL2 tiles; it also has mirrored SLRs, each with its own tile coordinates
-            "SLICE_S0X100Y100,AQ,SLICE_S0X104Y110,A1,186",
-            "SLICE_S1X100Y100,AQ,SLICE_S1X104Y110,A1,186",      // Mirrored SLR
-            "SLICE_S2X300Y500,AQ,SLICE_S2X310Y520,A1,277",
-            "SLICE_S3X300Y500,AQ,SLICE_S3X290Y480,A1,47",
+            "SLICE_S0X100Y100,AQ,SLICE_S0X104Y110,A1,100",
+            "SLICE_S1X100Y100,AQ,SLICE_S1X104Y110,A1,100",      // Mirrored SLR
+            "SLICE_S2X300Y500,AQ,SLICE_S2X310Y520,A1,200",
+            "SLICE_S3X300Y500,AQ,SLICE_S3X290Y480,A1,100",
             "SLICE_S0X100Y100,AQ,SLICE_S0X101Y100,CKEN1,35",    // CTRL sink in an SLL2 tile
-            "SLICE_S1X201Y301,AQ,SLICE_S1X200Y300,CKEN2,129",
+            "SLICE_S1X201Y301,AQ,SLICE_S1X200Y300,CKEN2,100",
     })
     public void testSingleConnectionXcvp1902(String srcSiteName, String srcPinName,
                                              String dstSiteName, String dstPinName,
