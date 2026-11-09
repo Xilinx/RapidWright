@@ -140,10 +140,11 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
     /**
      * Gets the least delay, per INT tile of its nominal length, of any single, double, quad or long in the given
      * orientation: its delay (as calcNodeGroupDelay() gives it) were every tile it spans to add the least distance
-     * that any tile adds for its type.
+     * that any tile adds for its type. A type whose distance table has fewer than two entries (no tile to add a
+     * distance) is not considered.
      *
      * @param orientation T.Orientation.HORIZONTAL or T.Orientation.VERTICAL
-     * @return that least delay in ps per INT tile
+     * @return that least delay in ps per INT tile, or 0 if no type is considered
      */
     public float getMinDelayPerTile(T.Orientation orientation) {
         float minDelayPerTile = Float.MAX_VALUE;
@@ -152,6 +153,9 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
                 continue;
             }
             List<Short> dArray = distArrays.get(orientation).get(ng.type());
+            if (dArray.size() < 2) {
+                continue;
+            }
             int minDist = Integer.MAX_VALUE;
             for (int i = 1; i < dArray.size(); i++) {
                 minDist = Math.min(minDist, dArray.get(i) - dArray.get(i - 1));
@@ -163,7 +167,7 @@ public class DelayEstimatorBase<T extends InterconnectInfo> implements java.io.S
             short delay = (short) (k0 + k1 * l + k2 * ng.length() * minDist);
             minDelayPerTile = Math.min(minDelayPerTile, (float) delay / ng.length());
         }
-        return minDelayPerTile;
+        return (minDelayPerTile == Float.MAX_VALUE) ? 0 : minDelayPerTile;
     }
 
     /**
