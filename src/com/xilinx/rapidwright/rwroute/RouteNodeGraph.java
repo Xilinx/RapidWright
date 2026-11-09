@@ -736,6 +736,7 @@ public class RouteNodeGraph {
     /** Versal tile types hosting the BNODEs/CNODEs (and CTRL wires) of a CLE pair */
     private static final Set<TileTypeEnum> versalBCTileTypes = EnumSet.of(
             TileTypeEnum.CLE_BC_CORE,
+            TileTypeEnum.CLE_BC_CORE_MX,    // e.g. xcvc1902
             TileTypeEnum.SLL,
             TileTypeEnum.SLL2   // e.g. xcvp1902
     );
@@ -1033,7 +1034,7 @@ public class RouteNodeGraph {
         assert(childTileType == TileTypeEnum.INT ||
                 (isVersal && EnumSet.of(TileTypeEnum.INTF_LOCF_TR_TILE, TileTypeEnum.INTF_LOCF_BR_TILE, TileTypeEnum.INTF_ROCF_TR_TILE, TileTypeEnum.INTF_ROCF_BR_TILE,
                                         TileTypeEnum.INTF_LOCF_TL_TILE, TileTypeEnum.INTF_LOCF_BL_TILE, TileTypeEnum.INTF_ROCF_TL_TILE, TileTypeEnum.INTF_ROCF_BL_TILE,
-                                      TileTypeEnum.CLE_BC_CORE, TileTypeEnum.SLL, TileTypeEnum.SLL2)
+                                      TileTypeEnum.CLE_BC_CORE, TileTypeEnum.CLE_BC_CORE_MX, TileTypeEnum.SLL, TileTypeEnum.SLL2)
                        .contains(childTileType)) ||
                 (isVersal && Utils.isCLB(childTileType) && parentRnode.getIntentCode() == IntentCode.NODE_SLL_OUTPUT && childRnode.getIntentCode() == IntentCode.NODE_PINFEED) ||
                 // Allow NODE_PINFEEDs in RCLK tiles that are preserved (belonging to a partially routed net)
