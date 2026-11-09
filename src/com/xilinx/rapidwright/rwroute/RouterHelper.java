@@ -701,7 +701,8 @@ public class RouterHelper {
             return Collections.emptyList(); // for pins without additional projected int_node
         }
         if (source.getAllDownhillNodes().contains(sink)) {
-            return Arrays.asList(sink, source);
+            // Modifiable: RouteFixer rewrites the nodes of every connection of a net it fixes
+            return new ArrayList<>(Arrays.asList(sink, source));
         }
         NodeWithPrev sourcer = new NodeWithPrev(source);
         sourcer.setPrev(null);

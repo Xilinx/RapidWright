@@ -210,6 +210,7 @@ public class NetTools {
     public static List<NodeTree> getNodeTrees(Net net, Function<Node, Boolean> filter) {
         List<NodeTree> subtrees = new ArrayList<>();
         Map<Node, NodeTree> nodeMap = new HashMap<>();
+        Set<Node> drivenNodes = new HashSet<>();
         for (PIP pip : net.getPIPs()) {
             if (pip.isEndWireNull()) {
                 continue;
@@ -222,15 +223,13 @@ public class NetTools {
 
             boolean isReversed = pip.isReversed();
             NodeTree startNode = nodeMap.computeIfAbsent(isReversed ? end : start, NodeTree::new);
-            NodeTree endNode = nodeMap.compute(isReversed ? start : end, (k, v) -> {
-                if (v == null) {
-                    v = new NodeTree(k);
-                } else {
-                    // This node already exists in our map thus must be multiply-driven
-                    v.multiplyDriven = true;
-                }
-                return v;
-            });
+            Node drivenNode = isReversed ? start : end;
+            NodeTree endNode = nodeMap.computeIfAbsent(drivenNode, NodeTree::new);
+            if (!drivenNodes.add(drivenNode)) {
+                // This node is already driven by another PIP thus must be multiply-driven (it may also already
+                // exist in our map as the start of a PIP visited earlier, since PIPs are in no particular order)
+                endNode.multiplyDriven = true;
+            }
             startNode.addFanout(endNode);
             if (!pip.isBidirectional()) {
                 if ((net.getType() == NetType.GND && startNode.isTiedToGnd()) ||

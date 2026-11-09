@@ -258,6 +258,32 @@ public class TestNetTools {
     }
 
     @Test
+    public void testGetRouteTreesPIPsInReverseOrder() {
+        // The PIPs of a net are in no particular order: a node that is the start of a PIP visited before the
+        // one driving it is not multiply-driven
+        Design design = new Design("top", "xcvu3p");
+        Net net = design.createNet("net");
+        net.createPin("A_O", design.createSiteInst("SLICE_X13Y235"));
+        Device device = design.getDevice();
+        List<Node> nodes = Arrays.stream(("CLEM_X9Y235/CLE_CLE_M_SITE_0_A_O INT_X9Y235/INODE_W_1_FT1 " +
+                "INT_X9Y235/BOUNCE_W_0_FT1 INT_X9Y234/INT_NODE_IMUX_55_INT_OUT1 INT_X9Y234/BYPASS_W10").split(" "))
+                .map(device::getNode).collect(Collectors.toList());
+        for (int i = nodes.size() - 1; i > 0; i--) {
+            net.addPIP(PIP.getArbitraryPIP(nodes.get(i - 1), nodes.get(i)));
+        }
+
+        List<NetTools.NodeTree> trees = NetTools.getNodeTrees(net);
+        Assertions.assertEquals(1, trees.size());
+        NetTools.NodeTree node = trees.get(0);
+        for (Node expected : nodes) {
+            Assertions.assertEquals(expected, node);
+            Assertions.assertFalse(node.multiplyDriven, expected.toString());
+            node = node.fanouts.isEmpty() ? null : node.fanouts.get(0);
+        }
+        Assertions.assertNull(node);
+    }
+
+    @Test
     public void testFindClockRootVRoute() {
         Design design = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
         Net clkNet = design.getNet("base_mb_i/clk_wiz_1/inst/clk_out1");
