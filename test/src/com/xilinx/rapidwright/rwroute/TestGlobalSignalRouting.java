@@ -245,18 +245,23 @@ public class TestGlobalSignalRouting {
         }
     }
 
+    /**
+     * Whether the slice output is a static source, checked separately for GND and for VCC, which must agree.
+     */
     private static boolean isStaticSource(Design design, Site site, String sitePinName) {
         Node node = site.getConnectedNode(sitePinName);
         Assertions.assertEquals(IntentCode.NODE_CLE_OUTPUT, node.getIntentCode());
-        for (NetType type : Arrays.asList(NetType.GND, NetType.VCC)) {
-            SitePin sitePin = GlobalSignalRouting.getStaticSourceSitePin(design, node, type);
-            if (sitePin == null) {
-                return false;
+        SitePin gndSitePin = GlobalSignalRouting.getStaticSourceSitePin(design, node, NetType.GND);
+        SitePin vccSitePin = GlobalSignalRouting.getStaticSourceSitePin(design, node, NetType.VCC);
+        Assertions.assertEquals(gndSitePin != null, vccSitePin != null,
+                sitePinName + ": GND source " + gndSitePin + ", VCC source " + vccSitePin);
+        for (SitePin sitePin : Arrays.asList(gndSitePin, vccSitePin)) {
+            if (sitePin != null) {
+                Assertions.assertEquals(site, sitePin.getSite());
+                Assertions.assertEquals(sitePinName, sitePin.getPinName());
             }
-            Assertions.assertEquals(site, sitePin.getSite());
-            Assertions.assertEquals(sitePinName, sitePin.getPinName());
         }
-        return true;
+        return gndSitePin != null;
     }
 
     @ParameterizedTest
