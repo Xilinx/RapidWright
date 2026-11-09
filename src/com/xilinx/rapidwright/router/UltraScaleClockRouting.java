@@ -472,11 +472,16 @@ public class UltraScaleClockRouting {
         for (PIP pip : clk.getPIPs()) {
             driven.add(pip.isReversed() ? pip.getStartNode() : pip.getEndNode());
         }
+        // Wires already queued for the current clock region: clock distribution wires are linked both ways, so
+        // without this an unreachable target would be searched for indefinitely
+        Set<RouteNode> visited = new HashSet<>();
         nextClockRegion: for (Entry<ClockRegion,RouteNode> e : crMap.entrySet()) {
             q.clear();
+            visited.clear();
             RouteNode vertDistLine = e.getValue();
             assert(vertDistLine.getParent() == null);
             q.add(vertDistLine);
+            visited.add(vertDistLine);
             ClockRegion targetCR = e.getKey();
             while (!q.isEmpty()) {
                 RouteNode curr = q.poll();
@@ -502,7 +507,9 @@ public class UltraScaleClockRouting {
                 for (Wire w : curr.getWireConnections()) {
                     if (!w.getIntentCode().isUltraScaleClocking()) continue;
                     if (isUnavailable(w, getNodeStatus)) continue;
-                    q.add(new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1));
+                    RouteNode rn = new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1);
+                    if (!visited.add(rn)) continue;
+                    q.add(rn);
                 }
             }
             throw new RuntimeException("ERROR: Couldn't route to distribution line in clock region " + targetCR);

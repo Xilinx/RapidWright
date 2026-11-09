@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -582,6 +583,29 @@ public class TestGlobalSignalRouting {
             }
             Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk), "Blocked " + blocked);
         }
+    }
+
+    @Test
+    public void testSymmetricClkRoutingUnreachableDistributionLine() {
+        // Every horizontal distribution node of a sink's clock region is used by other nets: routing must fail
+        // rather than search the clock distribution network, whose wires are linked both ways, indefinitely
+        Design design = new Design("unreachable", "xcku9p-ffve900-2-e");
+        Net clk = design.createNet("clk");
+        clk.connect(design.createAndPlaceCell("bufgce", Unisim.BUFGCE, "BUFGCE_HDIO_X0Y2/BUFCE"), "O");
+        int i = 0;
+        for (int y : new int[]{275, 247, 230, 380}) {
+            clk.connect(design.createAndPlaceCell("ff" + i++, Unisim.FDRE, "SLICE_X32Y" + y + "/AFF"), "C");
+        }
+        ClockRegion blocked = design.getDevice().getSite("SLICE_X32Y380").getTile().getClockRegion();
+
+        RuntimeException e = Assertions.assertTimeoutPreemptively(Duration.ofSeconds(60), () ->
+                Assertions.assertThrows(RuntimeException.class, () ->
+                        GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(),
+                                (n) -> n.getIntentCode() == IntentCode.NODE_GLOBAL_HDISTR &&
+                                        blocked.equals(n.getTile().getClockRegion()) ?
+                                        NodeStatus.UNAVAILABLE : NodeStatus.AVAILABLE,
+                                new HashMap<>())));
+        Assertions.assertEquals("ERROR: Couldn't route to distribution line in clock region " + blocked, e.getMessage());
     }
 
     private static Cell createBUFGCE(Design design, EDIFCell parent, String name, Site location) {
