@@ -211,6 +211,13 @@ public class NetTools {
         List<NodeTree> subtrees = new ArrayList<>();
         Map<Node, NodeTree> nodeMap = new HashMap<>();
         Set<Node> drivenNodes = new HashSet<>();
+        // The node of an output site pin is already driven by its site pin: a PIP driving it too (a routing loop
+        // back into a source) makes it multiply-driven
+        for (SitePinInst spi : net.getPins()) {
+            if (spi.isOutPin()) {
+                drivenNodes.add(spi.getConnectedNode());
+            }
+        }
         for (PIP pip : net.getPIPs()) {
             if (pip.isEndWireNull()) {
                 continue;

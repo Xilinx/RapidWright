@@ -5447,7 +5447,10 @@ public class DesignTools {
                 continue;
             }
             queue.add(node);
-            assert(!node.multiplyDriven);
+            if (node.multiplyDriven) {
+                // A routing loop leads back into this source: do not visit it again
+                multiplyDrivenNodesVisited.add(node);
+            }
         }
         while (!queue.isEmpty()) {
             NetTools.NodeTree node = queue.poll();
