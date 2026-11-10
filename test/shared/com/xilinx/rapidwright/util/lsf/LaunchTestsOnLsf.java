@@ -94,7 +94,7 @@ import org.xml.sax.SAXException;
 public class LaunchTestsOnLsf {
 
     /** System property naming a file of estimated test durations, as written to {@value #DURATIONS_FILE} */
-    public static final String DURATIONS_IN_PROPERTY = "rapidwright.test.durationsIn";
+    public static final String DURATIONS_IN_PROPERTY = TestShardFilter.DURATIONS_IN_PROPERTY;
 
     /** Measured durations of the regular tests, written to the working directory */
     public static final String DURATIONS_FILE = "test-durations.txt";

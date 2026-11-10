@@ -45,10 +45,10 @@ import org.junit.platform.launcher.TestPlan;
  * {@link TestShardFilter} to balance the CI shards.
  *
  * Enabled by the system property {@value #DURATIONS_FILE_PROPERTY}, set to the file to write
- * (Gradle: -PrecordTestDurations writes build/test-durations/testJava.txt). To refresh the
- * estimates, run all tests without sharding (CI's slowest configuration is single-threaded), e.g.
- * <pre>./gradlew testJava -PlimitToSingleProc=single-threaded -PrecordTestDurations</pre>
- * and copy the file over test/resources{@value TestShardFilter#DURATIONS_RESOURCE}.
+ * (Gradle: -PrecordTestDurations writes build/test-durations/testJava.txt). Every CI shard records
+ * the durations of its tests; the build workflow merges them into a "test-durations" artifact,
+ * and later runs balance their shards with the one from the latest run of master (passed on with
+ * -PtestDurations=file, see {@link TestShardFilter#DURATIONS_IN_PROPERTY}).
  */
 public class TestDurationsListener implements TestExecutionListener {
 
