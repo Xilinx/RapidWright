@@ -471,6 +471,7 @@ public class UltraScaleClockRouting {
      */
     public static void routeLCBsToSinks(Net clk, Map<RouteNode, List<SitePinInst>> lcbMappings,
                                         Function<Node, NodeStatus> getNodeStatus) {
+        Design design = clk.getDesign();
         Set<Wire> used = new HashSet<>();
         Set<Wire> visited = new HashSet<>();
         Queue<RouteNode> q = new LinkedList<>();
@@ -484,7 +485,6 @@ public class UltraScaleClockRouting {
 
             nextPin: for (SitePinInst sink : e.getValue()) {
                 RouteNode target = sink.getRouteNode();
-                Design design = sink.getSiteInst().getDesign();
                 q.clear();
                 q.add(lcb);
 
