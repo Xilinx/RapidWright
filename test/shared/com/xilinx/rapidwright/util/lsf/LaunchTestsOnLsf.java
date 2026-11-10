@@ -46,6 +46,9 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+
 import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.ShardAssignment;
 import com.xilinx.rapidwright.support.TestShardFilter;
@@ -70,6 +73,7 @@ import org.junit.platform.launcher.TestIdentifier;
 import org.junit.platform.launcher.TestPlan;
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.core.LauncherFactory;
+import org.xml.sax.SAXException;
 
 /**
  * JUnit test runner that creates LSF Jobs for individual tests.
@@ -114,16 +118,28 @@ public class LaunchTestsOnLsf {
 
     private static final String JOB_DURATIONS_FILE = "durations.txt";
 
+    /** An LSF job that remembers when it was submitted */
+    private static class TimedLsfJob extends LSFJob {
+        /** Time (ms) just before submission, or -1 if not submitted */
+        long submitTime = -1;
+
+        @Override
+        public long launchJob() {
+            submitTime = System.currentTimeMillis();
+            return super.launchJob();
+        }
+    }
+
     /** A job and what it runs */
     private static class TestJob {
-        final LSFJob job;
+        final TimedLsfJob job;
         /** Unique id of the LSF test it runs, or null for a job running regular tests */
         final String testId;
         /** For jobs running regular tests: the test classes and method keys, and their estimated seconds */
         final List<String> units;
         final double estimatedSeconds;
 
-        TestJob(LSFJob job, String testId, List<String> units, double estimatedSeconds) {
+        TestJob(TimedLsfJob job, String testId, List<String> units, double estimatedSeconds) {
             this.job = job;
             this.testId = testId;
             this.units = units;
@@ -307,11 +323,24 @@ public class LaunchTestsOnLsf {
         if (durationsIn == null || durationsIn.isEmpty()) {
             return new HashMap<>();
         }
-        Map<String, Double> durations = TestShardFilter.readDurations(Paths.get(durationsIn));
+        Map<String, Double> durations = readDurationsOrWarn(Paths.get(durationsIn));
         if (durations.isEmpty()) {
             System.err.println("WARNING: no estimated test durations in " + durationsIn + ", running one job per class");
         }
         return durations;
+    }
+
+    /**
+     * @return The durations in the given file; none, with a warning, if it is malformed (e.g. cut short when its job
+     *         was killed).
+     */
+    private static Map<String, Double> readDurationsOrWarn(Path path) {
+        try {
+            return TestShardFilter.readDurations(path);
+        } catch (RuntimeException e) {
+            System.err.println("WARNING: ignoring malformed test durations in " + path + ": " + e);
+            return new HashMap<>();
+        }
     }
 
     private static String quote(String s) {
@@ -348,7 +377,7 @@ public class LaunchTestsOnLsf {
             String dir = String.format("regularTests-%03d", i + 1);
             FileTools.makeDirs(dir);
             Files.write(Paths.get(dir, UNITS_FILE), units, StandardCharsets.UTF_8);
-            LSFJob job = new LSFJob();
+            TimedLsfJob job = new TimedLsfJob();
             job.setRunDir(dir);
             job.setRapidWrightCommand(RunTest.class, LargeTest.DEFAULT_MAX_MEMORY_GB * 1024, true,
                     quote(testsJar.toString()) + " \"\" " + quote(UNITS_FILE) + " " + quote(JOB_DURATIONS_FILE));
@@ -363,7 +392,7 @@ public class LaunchTestsOnLsf {
 
         getLsfTests(ids).forEach(pair -> {
             int memMB = pair.getSecond()*1024;
-            LSFJob job = new LSFJob();
+            TimedLsfJob job = new TimedLsfJob();
             job.setRunDir(toJobDir(pair.getFirst()));
             job.setRapidWrightCommand(RunTest.class, memMB, true,
                     quote(testsJar.toString()) + " " + quote(pair.getFirst()));
@@ -373,11 +402,10 @@ public class LaunchTestsOnLsf {
         });
 
         //Don't impose more limits on parallelism than what LSF allows us
-        long submitTime = System.currentTimeMillis();
         boolean success = jq.runAllToCompletion(Integer.MAX_VALUE);
 
         writeDurations(testJobs, durations, classMethods);
-        writeJobTimes(testJobs, submitTime);
+        writeJobTimes(testJobs);
 
         if (!success) {
             StringBuilder sb = new StringBuilder();
@@ -397,7 +425,7 @@ public class LaunchTestsOnLsf {
                         : "Execution failed, no log was generated";
                 if (testJob.testId != null) {
                     perTestMessages.put(testJob.testId, log);
-                } else if (!hasXmlReport(job.getRunDir())) {
+                } else if (!hasValidXmlReports(job.getRunDir())) {
                     // The job did not get to write its report, so report each of its tests as failed
                     for (String unit : testJob.units) {
                         for (String id : unitIds.getOrDefault(unit, Collections.emptyList())) {
@@ -412,9 +440,30 @@ public class LaunchTestsOnLsf {
         }
     }
 
-    private static boolean hasXmlReport(String dir) {
+    /**
+     * Checks the JUnit XML reports of a job. Reports that cannot be parsed (e.g. cut short when the job was killed)
+     * are renamed so that CI does not read them.
+     * @return True if the job wrote reports and all of them can be parsed.
+     */
+    private static boolean hasValidXmlReports(String dir) {
         File[] files = new File(dir).listFiles((d, name) -> name.startsWith("TEST-") && name.endsWith(".xml"));
-        return files != null && files.length > 0;
+        if (files == null || files.length == 0) {
+            return false;
+        }
+        boolean valid = true;
+        for (File file : files) {
+            try {
+                DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file);
+            } catch (ParserConfigurationException | SAXException | IOException e) {
+                System.err.println("WARNING: malformed test report " + file + ": " + e);
+                File renamed = new File(file.getPath() + ".malformed");
+                if (!file.renameTo(renamed)) {
+                    System.err.println("WARNING: could not rename " + file + " to " + renamed);
+                }
+                valid = false;
+            }
+        }
+        return valid;
     }
 
     /**
@@ -426,7 +475,7 @@ public class LaunchTestsOnLsf {
         Map<String, Double> measured = new TreeMap<>();
         for (TestJob testJob : testJobs) {
             if (testJob.testId == null) {
-                measured.putAll(TestShardFilter.readDurations(Paths.get(testJob.job.getRunDir(), JOB_DURATIONS_FILE)));
+                measured.putAll(readDurationsOrWarn(Paths.get(testJob.job.getRunDir(), JOB_DURATIONS_FILE)));
             }
         }
         for (List<String> methods : classMethods.values()) {
@@ -469,13 +518,14 @@ public class LaunchTestsOnLsf {
      * Writes how long each job waited for LSF and ran to {@value #JOBS_FILE}, and prints the slowest jobs.
      * Times are measured by the test runner in each job, so they exclude JVM startup.
      */
-    private static void writeJobTimes(List<TestJob> testJobs, long submitTime) {
+    private static void writeJobTimes(List<TestJob> testJobs) {
         List<String> lines = new ArrayList<>();
         lines.add("dir,job,estimated_s,pending_s,run_s,successful,tests");
         List<Pair<Double, String>> slowest = new ArrayList<>();
         for (TestJob testJob : testJobs) {
             long[] times = readRunTimes(testJob.job.getRunDir());
-            double pending = times[0] < 0 ? -1 : (times[0] - submitTime) / 1000.0;
+            long submitTime = testJob.job.submitTime;
+            double pending = times[0] < 0 || submitTime < 0 ? -1 : (times[0] - submitTime) / 1000.0;
             double run = times[0] < 0 || times[1] < 0 ? -1 : (times[1] - times[0]) / 1000.0;
             String tests = testJob.testId != null ? testJob.testId : String.join(" ", testJob.units);
             lines.add(String.format(Locale.ROOT, "%s,%d,%.0f,%.0f,%.0f,%b,\"%s\"", testJob.job.getRunDir(),
