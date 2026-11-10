@@ -24,9 +24,11 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,9 +46,7 @@ import org.junit.platform.launcher.PostDiscoveryFilter;
  *
  * Enabled by the system property {@value #SHARD_PROPERTY}, set to "i/n" to run shard i (1-based)
  * of n (Gradle: -PtestShard=i/n). Every shard discovers all tests and computes the same
- * assignment: test classes are assigned whole, except classes whose estimated duration exceeds a
- * quarter of a shard's share, which are split into their test methods. These units are assigned,
- * longest first, to the shard with the least estimated duration so far.
+ * assignment (see {@link ShardAssignment}).
  *
  * Estimated durations come from {@value #DURATIONS_RESOURCE} (see {@link TestDurationsListener}
  * for how to regenerate it). Test methods missing from it count as
@@ -58,18 +58,14 @@ public class TestShardFilter implements PostDiscoveryFilter {
 
     public static final String DURATIONS_RESOURCE = "/com/xilinx/rapidwright/support/test-durations.txt";
 
-    public static final double DEFAULT_METHOD_SECONDS = 1.0;
-
-    /** Classes estimated to take longer than this fraction of a shard's share are split into methods */
-    private static final double SPLIT_CLASS_FRACTION_OF_SHARD = 0.25;
+    public static final double DEFAULT_METHOD_SECONDS = ShardAssignment.DEFAULT_METHOD_SECONDS;
 
     private final int shard;
     private final int numShards;
 
-    /** The root the assignment below was computed for, and the shard of each unit (class or method key) */
+    /** The root the assignment below was computed for */
     private TestDescriptor assignedRoot;
-    private final Map<String, Integer> unitShards = new HashMap<>();
-    private final Map<String, Boolean> splitClasses = new HashMap<>();
+    private ShardAssignment assignment;
 
     public TestShardFilter() {
         String value = System.getProperty(SHARD_PROPERTY);
@@ -101,7 +97,7 @@ public class TestShardFilter implements PostDiscoveryFilter {
      * @return The test method source of this descriptor, if it is a test method (or test template/factory)
      *         rather than one invocation of a test template.
      */
-    static Optional<MethodSource> getTestMethodSource(TestDescriptor descriptor) {
+    public static Optional<MethodSource> getTestMethodSource(TestDescriptor descriptor) {
         Optional<TestSource> source = descriptor.getSource();
         if (!source.isPresent() || !(source.get() instanceof MethodSource)) {
             return Optional.empty();
@@ -116,7 +112,7 @@ public class TestShardFilter implements PostDiscoveryFilter {
     /**
      * @return The outermost test class containing this descriptor (to keep nested classes with it).
      */
-    private static Optional<String> getTopLevelClassName(TestDescriptor descriptor) {
+    public static Optional<String> getTopLevelClassName(TestDescriptor descriptor) {
         String className = null;
         for (TestDescriptor d = descriptor; d != null; d = d.getParent().orElse(null)) {
             Optional<TestSource> source = d.getSource();
@@ -128,11 +124,28 @@ public class TestShardFilter implements PostDiscoveryFilter {
     }
 
     static Map<String, Double> readDurations() {
-        Map<String, Double> durations = new HashMap<>();
         InputStream in = TestShardFilter.class.getResourceAsStream(DURATIONS_RESOURCE);
-        if (in == null) {
-            return durations;
+        return in == null ? new HashMap<>() : readDurations(in);
+    }
+
+    /**
+     * Reads estimated test durations, as written by {@link TestDurationsListener}.
+     * @param path The file to read.
+     * @return Seconds per method key, empty if the file does not exist.
+     */
+    public static Map<String, Double> readDurations(Path path) {
+        if (!Files.exists(path)) {
+            return new HashMap<>();
         }
+        try {
+            return readDurations(Files.newInputStream(path));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static Map<String, Double> readDurations(InputStream in) {
+        Map<String, Double> durations = new HashMap<>();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
@@ -163,59 +176,21 @@ public class TestShardFilter implements PostDiscoveryFilter {
         }
     }
 
-    private void assignShards(TestDescriptor root) {
-        unitShards.clear();
-        splitClasses.clear();
-        Map<String, Double> durations = readDurations();
+    /**
+     * @return The test methods of each top-level test class under this descriptor, as method keys.
+     */
+    public static Map<String, List<String>> collectTestMethods(TestDescriptor root) {
         Map<String, List<String>> classMethods = new HashMap<>();
         collectTestMethods(root, classMethods);
+        return classMethods;
+    }
 
-        Map<String, Double> classSeconds = new HashMap<>();
-        double totalSeconds = 0;
-        for (Map.Entry<String, List<String>> e : classMethods.entrySet()) {
-            double seconds = 0;
-            for (String method : e.getValue()) {
-                seconds += durations.getOrDefault(method, DEFAULT_METHOD_SECONDS);
-            }
-            classSeconds.put(e.getKey(), seconds);
-            totalSeconds += seconds;
-        }
-
-        // Units to assign: whole classes, or the methods of the longest classes
-        double splitSeconds = SPLIT_CLASS_FRACTION_OF_SHARD * totalSeconds / numShards;
-        Map<String, Double> units = new HashMap<>();
-        for (Map.Entry<String, List<String>> e : classMethods.entrySet()) {
-            boolean split = classSeconds.get(e.getKey()) > splitSeconds;
-            splitClasses.put(e.getKey(), split);
-            if (!split) {
-                units.put(e.getKey(), classSeconds.get(e.getKey()));
-                continue;
-            }
-            for (String method : e.getValue()) {
-                units.merge(method, durations.getOrDefault(method, DEFAULT_METHOD_SECONDS), Double::sum);
-            }
-        }
-
-        // Longest first (ties by name, so that every shard computes the same assignment)
-        List<Map.Entry<String, Double>> sorted = new ArrayList<>(units.entrySet());
-        sorted.sort(Comparator.<Map.Entry<String, Double>>comparingDouble(Map.Entry::getValue).reversed()
-                .thenComparing(Map.Entry::getKey));
-        double[] shardSeconds = new double[numShards];
-        int[] shardUnits = new int[numShards];
-        for (Map.Entry<String, Double> unit : sorted) {
-            int best = 0;
-            for (int i = 1; i < numShards; i++) {
-                if (shardSeconds[i] < shardSeconds[best]) {
-                    best = i;
-                }
-            }
-            shardSeconds[best] += unit.getValue();
-            shardUnits[best]++;
-            unitShards.put(unit.getKey(), best + 1);
-        }
+    private void assignShards(TestDescriptor root) {
+        assignment = ShardAssignment.assign(collectTestMethods(root), readDurations(), numShards);
         assignedRoot = root;
         System.out.printf("Test shard %d/%d: %d of %d classes/methods, estimated %.0f s of %.0f s%n",
-                shard, numShards, shardUnits[shard - 1], units.size(), shardSeconds[shard - 1], totalSeconds);
+                shard, numShards, assignment.shardUnits[shard - 1], assignment.unitShards.size(),
+                assignment.shardSeconds[shard - 1], assignment.totalSeconds);
     }
 
     @Override
@@ -235,8 +210,8 @@ public class TestShardFilter implements PostDiscoveryFilter {
         if (root != assignedRoot) {
             assignShards(root);
         }
-        String unit = splitClasses.getOrDefault(className.get(), false) ? getMethodKey(source.get()) : className.get();
-        int unitShard = unitShards.getOrDefault(unit, 1);
+        String unit = assignment.getUnit(className.get(), getMethodKey(source.get()));
+        int unitShard = assignment.unitShards.getOrDefault(unit, 1);
         return unitShard == shard
                 ? FilterResult.included("In shard " + shard + "/" + numShards)
                 : FilterResult.excluded("In shard " + unitShard + "/" + numShards);

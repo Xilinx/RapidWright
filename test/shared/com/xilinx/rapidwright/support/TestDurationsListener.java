@@ -54,7 +54,21 @@ public class TestDurationsListener implements TestExecutionListener {
 
     public static final String DURATIONS_FILE_PROPERTY = "rapidwright.test.durationsFile";
 
-    private final String durationsFile = System.getProperty(DURATIONS_FILE_PROPERTY);
+    private final String durationsFile;
+
+    /**
+     * Writes durations to the file given by the system property {@value #DURATIONS_FILE_PROPERTY}, if set.
+     */
+    public TestDurationsListener() {
+        this(System.getProperty(DURATIONS_FILE_PROPERTY));
+    }
+
+    /**
+     * @param durationsFile The file to write durations to, or null to record nothing.
+     */
+    public TestDurationsListener(String durationsFile) {
+        this.durationsFile = durationsFile;
+    }
 
     private final Map<String, Long> startNanos = new ConcurrentHashMap<>();
 
