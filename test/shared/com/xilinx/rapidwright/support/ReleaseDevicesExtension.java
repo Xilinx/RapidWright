@@ -20,7 +20,6 @@
 
 package com.xilinx.rapidwright.support;
 
-import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryPoolMXBean;
 import java.lang.management.MemoryType;
@@ -42,40 +41,20 @@ import com.xilinx.rapidwright.device.Device;
  * old generation still holds more than {@link #MAX_HEAP_FRACTION} of the heap after a garbage
  * collection. Later tests then reload the devices they need. Measuring the occupancy after a
  * collection (rather than the current heap usage, which includes garbage), and waiting for
- * another such collection after each release, avoids clearing the cache, and reloading the same
- * devices, after every test.
+ * that measurement to be refreshed by another collection after each release, avoids clearing the
+ * cache, and reloading the same devices, after every test.
  */
 public class ReleaseDevicesExtension implements AfterEachCallback, AfterAllCallback {
 
     /** Fraction of the maximum heap above which the device cache is cleared */
     private static final double MAX_HEAP_FRACTION = 0.4;
 
-    /** Old generation collection count when the device cache was last cleared */
-    private static long collectionsAtLastRelease = -1;
+    /** Retained heap measured when the device cache was last cleared */
+    private static long retainedAtLastRelease = -1;
 
     private static boolean isOldGenPool(MemoryPoolMXBean pool) {
         String name = pool.getName();
         return pool.getType() == MemoryType.HEAP && (name.contains("Old Gen") || name.contains("Tenured"));
-    }
-
-    private static boolean isOldGenPool(String poolName) {
-        return poolName.contains("Old Gen") || poolName.contains("Tenured");
-    }
-
-    /**
-     * @return The number of garbage collections that collected (part of) the old generation.
-     */
-    private static long getOldGenCollectionCount() {
-        long count = 0;
-        for (GarbageCollectorMXBean gc : ManagementFactory.getGarbageCollectorMXBeans()) {
-            for (String poolName : gc.getMemoryPoolNames()) {
-                if (isOldGenPool(poolName)) {
-                    count += Math.max(0, gc.getCollectionCount());
-                    break;
-                }
-            }
-        }
-        return count;
     }
 
     /**
@@ -101,14 +80,16 @@ public class ReleaseDevicesExtension implements AfterEachCallback, AfterAllCallb
     }
 
     private static synchronized void releaseDevicesIfHeapIsFilling() {
-        long collections = getOldGenCollectionCount();
-        if (collections == collectionsAtLastRelease) {
-            // The retained size predates the last release, so it says nothing about the cache now
+        long retained = getRetainedHeapBytes();
+        if (retained == retainedAtLastRelease) {
+            // No collection has measured the old generation since the last release (e.g. G1 only
+            // measures it in mixed and full collections, not in young ones), so this measurement
+            // predates the release and says nothing about the cache now
             return;
         }
-        if (getRetainedHeapBytes() > MAX_HEAP_FRACTION * Runtime.getRuntime().maxMemory()) {
+        if (retained > MAX_HEAP_FRACTION * Runtime.getRuntime().maxMemory()) {
             Device.releaseDeviceReferences();
-            collectionsAtLastRelease = collections;
+            retainedAtLastRelease = retained;
         }
     }
 
