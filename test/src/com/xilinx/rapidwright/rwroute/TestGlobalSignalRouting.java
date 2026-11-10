@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -500,6 +501,115 @@ public class TestGlobalSignalRouting {
         for (Node node : driven) {
             Assertions.assertTrue(driving.contains(node), "Antenna " + node);
         }
+    }
+
+    @Test
+    public void testSymmetricClkRoutingSharedClockBufferMuxes() {
+        // The two BUFGCE_HDIOs of a RCLK_HDIO tile reach the clock routing tracks through the same muxes: the
+        // second clock must avoid the tracks of the first one
+        Design design = new Design("hdio_clks", "xcku9p-ffve900-2-e");
+        Net vcc = design.getVccNet();
+        Net gnd = design.getGndNet();
+        List<Net> clks = new ArrayList<>();
+        int i = 0;
+        for (String bufgce : new String[]{"BUFGCE_HDIO_X0Y2", "BUFGCE_HDIO_X0Y3"}) {
+            Net clk = design.createNet("clk" + clks.size());
+            clk.connect(design.createAndPlaceCell("bufgce" + clks.size(), Unisim.BUFGCE, bufgce + "/BUFCE"), "O");
+            for (int y : new int[]{275, 247, 230, 380}) {
+                String slice = "SLICE_X" + (32 + clks.size()) + "Y" + y;
+                Cell ff = design.createAndPlaceCell("ff" + i++, Unisim.FDRE, slice + "/AFF");
+                clk.connect(ff, "C");
+                vcc.connect(ff, "CE");
+                gnd.connect(ff, "D");
+                gnd.connect(ff, "R");
+            }
+            clks.add(clk);
+        }
+        design.routeSites();
+
+        // Simulate the preserve method
+        Map<Node, Net> used = new HashMap<>();
+        for (Net clk : clks) {
+            GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(),
+                    (n) -> used.containsKey(n) && used.get(n) != clk ? NodeStatus.UNAVAILABLE : NodeStatus.AVAILABLE,
+                    new HashMap<>());
+            for (PIP pip : clk.getPIPs()) {
+                for (Node node : Arrays.asList(pip.getStartNode(), pip.getEndNode())) {
+                    Net other = used.putIfAbsent(node, clk);
+                    Assertions.assertTrue(other == null || other == clk, "Node " + node + " used by " + other + " and " + clk);
+                }
+            }
+            Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        }
+    }
+
+    @Test
+    public void testSymmetricClkRoutingBlockedBeyondCentroid() {
+        // Routing tracks keep their index: a track that reaches the centroid can still be blocked by another clock
+        // further on, on the vertical routing track up to the clock region above the centroid or on the vertical
+        // distribution track that the vertical routing tracks transition onto. Block each of these nodes in turn
+        // (as another clock would) and check that the clock is routed on another track instead
+        Design design = new Design("blocked", "xcku9p-ffve900-2-e");
+        Net vcc = design.getVccNet();
+        Net gnd = design.getGndNet();
+        Net clk = design.createNet("clk");
+        clk.connect(design.createAndPlaceCell("bufgce", Unisim.BUFGCE, "BUFGCE_HDIO_X0Y2/BUFCE"), "O");
+        int i = 0;
+        for (int y : new int[]{275, 247, 230, 380}) {
+            Cell ff = design.createAndPlaceCell("ff" + i++, Unisim.FDRE, "SLICE_X32Y" + y + "/AFF");
+            clk.connect(ff, "C");
+            vcc.connect(ff, "CE");
+            gnd.connect(ff, "D");
+            gnd.connect(ff, "R");
+        }
+        design.routeSites();
+
+        GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), (n) -> NodeStatus.AVAILABLE, new HashMap<>());
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        Set<Node> nodesToBlock = new HashSet<>();
+        for (PIP pip : clk.getPIPs()) {
+            IntentCode startIntent = pip.getStartNode().getIntentCode();
+            IntentCode endIntent = pip.getEndNode().getIntentCode();
+            if (endIntent == IntentCode.NODE_GLOBAL_VROUTE ||
+                    (startIntent == IntentCode.NODE_GLOBAL_VROUTE && endIntent == IntentCode.NODE_GLOBAL_VDISTR)) {
+                nodesToBlock.add(pip.getEndNode());
+            }
+        }
+        Assertions.assertFalse(nodesToBlock.isEmpty());
+
+        for (Node blocked : nodesToBlock) {
+            clk.unroute();
+            GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(),
+                    (n) -> n.equals(blocked) ? NodeStatus.UNAVAILABLE : NodeStatus.AVAILABLE, new HashMap<>());
+            for (PIP pip : clk.getPIPs()) {
+                Assertions.assertNotEquals(blocked, pip.getStartNode(), pip.toString());
+                Assertions.assertNotEquals(blocked, pip.getEndNode(), pip.toString());
+            }
+            Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk), "Blocked " + blocked);
+        }
+    }
+
+    @Test
+    public void testSymmetricClkRoutingUnreachableDistributionLine() {
+        // Every horizontal distribution node of a sink's clock region is used by other nets: routing must fail
+        // rather than search the clock distribution network, whose wires are linked both ways, indefinitely
+        Design design = new Design("unreachable", "xcku9p-ffve900-2-e");
+        Net clk = design.createNet("clk");
+        clk.connect(design.createAndPlaceCell("bufgce", Unisim.BUFGCE, "BUFGCE_HDIO_X0Y2/BUFCE"), "O");
+        int i = 0;
+        for (int y : new int[]{275, 247, 230, 380}) {
+            clk.connect(design.createAndPlaceCell("ff" + i++, Unisim.FDRE, "SLICE_X32Y" + y + "/AFF"), "C");
+        }
+        ClockRegion blocked = design.getDevice().getSite("SLICE_X32Y380").getTile().getClockRegion();
+
+        RuntimeException e = Assertions.assertTimeoutPreemptively(Duration.ofSeconds(60), () ->
+                Assertions.assertThrows(RuntimeException.class, () ->
+                        GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(),
+                                (n) -> n.getIntentCode() == IntentCode.NODE_GLOBAL_HDISTR &&
+                                        blocked.equals(n.getTile().getClockRegion()) ?
+                                        NodeStatus.UNAVAILABLE : NodeStatus.AVAILABLE,
+                                new HashMap<>())));
+        Assertions.assertEquals("ERROR: Couldn't route to distribution line in clock region " + blocked, e.getMessage());
     }
 
     private static Cell createBUFGCE(Design design, EDIFCell parent, String name, Site location) {
