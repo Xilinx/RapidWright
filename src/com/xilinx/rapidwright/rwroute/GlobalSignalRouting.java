@@ -802,12 +802,17 @@ public class GlobalSignalRouting {
                             tileTypeEnum != TileTypeEnum.BLI_CLE_BOT_CORE &&
                             tileTypeEnum != TileTypeEnum.BLI_CLE_BOT_CORE_MY);
                     for (Node uphillNode : node.getAllUphillNodes()) {
-                        if (routeThruHelper.isRouteThru(uphillNode, node) && notIriRoutethru) {
-                            // An IO buffer input is reached from the fabric through routethrus onto
-                            // dedicated nodes (e.g. Versal XPIO OP_M/OP_S: XPHY D*->O0*, OPFF D1->Q;
-                            // UltraScale+ HPIO OP: XIPHY bitslice TX): allow those if the site is free
-                            if (!ioSink || intentCode != IntentCode.NODE_DEDICATED ||
-                                    !isDedicatedRouteThruAvailable(design, uphillNode, node)) {
+                        if (routeThruHelper.isRouteThru(uphillNode, node)) {
+                            if (notIriRoutethru) {
+                                // An IO buffer input is reached from the fabric through routethrus onto
+                                // dedicated nodes (e.g. Versal XPIO OP_M/OP_S: XPHY D*->O0*, OPFF D1->Q;
+                                // UltraScale+ HPIO OP: XIPHY bitslice TX): allow those if the site is free
+                                if (!ioSink || intentCode != IntentCode.NODE_DEDICATED ||
+                                        !isRouteThruAvailable(design, currNet, uphillNode, node)) {
+                                    continue;
+                                }
+                            } else if (!isRouteThruAvailable(design, currNet, uphillNode, node)) {
+                                // IRI routethrus are allowed, but only through a free site
                                 continue;
                             }
                         }
@@ -988,26 +993,32 @@ public class GlobalSignalRouting {
     }
 
     /**
-     * Checks if a routethru PIP leading to a dedicated node (e.g. through an XPIO site) is free:
-     * neither of its site pins is used by a net and no cell occupies a BEL driven by its input
-     * pin. Unlike {@link RouteThruHelper#isRouteThruPIPAvailable(Design, PIP)},
-     * <LOCKED> placeholder cells (which mark the BELs of a routethru in a routed design and remain
-     * after unrouting) do not block it.
+     * Checks if a routethru PIP (e.g. through an XPIO site, or an IRI_QUAD or BLI site on Versal) is free for
+     * a net: neither of its site pins is used by another net and no cell occupies a BEL driven by its input
+     * pin. Unlike {@link RouteThruHelper#isRouteThruPIPAvailable(Design, PIP)}, the site wires of a routethru
+     * that the net itself used (which unrouting the net leaves in place) and <LOCKED> placeholder cells (which
+     * mark the BELs of a routethru in a routed design and remain after unrouting) do not block it.
      * @param design The design.
+     * @param net The net to be routed through the routethru.
      * @param head The routethru's start node.
      * @param tail The routethru's end node.
      * @return True if the routethru can be used.
      */
-    private static boolean isDedicatedRouteThruAvailable(Design design, Node head, Node tail) {
+    private static boolean isRouteThruAvailable(Design design, Net net, Node head, Node tail) {
         SitePin inPin = head.getSitePin();
         SitePin outPin = tail.getSitePin();
-        if (!RouteThruHelper.isRouteThruSitePinAvailable(design, inPin) ||
-                !RouteThruHelper.isRouteThruSitePinAvailable(design, outPin)) {
+        if (inPin == null || outPin == null) {
             return false;
         }
         SiteInst si = design.getSiteInstFromSite(inPin.getSite());
         if (si == null) {
             return true;
+        }
+        for (SitePin sitePin : Arrays.asList(inPin, outPin)) {
+            Net siteWireNet = si.getNetFromSiteWire(sitePin.getBELPin().getSiteWireName());
+            if (siteWireNet != null && siteWireNet != net) {
+                return false;
+            }
         }
         for (BELPin sink : inPin.getBELPin().getSiteConns()) {
             Cell cell = si.getCell(sink.getBEL());
