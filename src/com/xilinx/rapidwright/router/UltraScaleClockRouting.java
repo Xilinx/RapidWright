@@ -178,7 +178,7 @@ public class UltraScaleClockRouting {
                 }
             }
             clk.setPIPs(new ArrayList<>(pipsBefore));
-            if (getNodeStatus == null || track == null) {
+            if (track == null) {
                 break;
             }
             blockedTracks.add(track);
