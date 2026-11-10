@@ -217,6 +217,10 @@ task testLsf(type: JavaExec) {
   mainClass = "com.xilinx.rapidwright.util.lsf.LaunchTestsOnLsf"
   workingDir = file("build/test-lsf")
   args project.tasks.findByName('testJar').getArchiveFile().get()
+  // Estimated test durations (e.g. build/test-lsf/test-durations.txt kept from an earlier run), to balance the jobs
+  if (project.hasProperty('lsfTestDurations')) {
+    systemProperty 'rapidwright.test.durationsIn', file(project.property('lsfTestDurations')).absolutePath
+  }
   doFirst {
     project.mkdir(workingDir)
   }
