@@ -503,7 +503,7 @@ public class RouteNodeGraph {
         } else {
             assert(isVersal);
 
-            // Find an INT tile adjacent to each type of tile hosting CLE [BC]NODEs (CLE_BC_CORE, SLL, SLL2), since
+            // Find an INT tile adjacent to each type of tile hosting CLE [BC]NODEs (see BC_NODE_TILE_TYPES), since
             // Versal devices may contain AIEs on their northern edge. Some devices (e.g. xcvp1902, where all such tiles
             // are SLL2) have no CLE_BC_CORE tiles at all.
             intTilesToExamine = new ArrayList<>(BC_NODE_TILE_TYPES.size());
@@ -737,7 +737,7 @@ public class RouteNodeGraph {
         }
 
         if (isVersal) {
-            // CTRL_[LR]_B* pins in CLE_BC_CORE (and SLL/SLL2) tiles are reachable from the [BC]NODEs serving the INT tiles
+            // CTRL_[LR]_B* pins in BC_NODE_TILE_TYPES tiles are reachable from the [BC]NODEs serving the INT tiles
             // on both sides, but each feeds a CLE core tile on one side only: CTRL_L_B* feeds the CLE_W_CORE beside
             // the east side of the INT tile to the west, CTRL_R_B* the CLE_E_CORE beside the west side of the INT tile
             // to the east (with RouteNodeInfo placing both pins at their CLE core tile)
@@ -2189,12 +2189,13 @@ public class RouteNodeGraph {
     }
 
     /**
-     * Versal tile types hosting CLE [BC]NODEs and CTRL pins: CLE_BC_CORE, SLL (beside the SLL columns of devices with
-     * several SLRs) and SLL2 (every such tile on xcvp1902, which has no CLE_BC_CORE tiles). CLE_BC_CORE_MX is not
-     * included.
+     * Versal tile types hosting CLE [BC]NODEs and CTRL pins: CLE_BC_CORE, CLE_BC_CORE_MX (a variant of it, e.g. at the
+     * bottom edge of the fabric on xcvc1902, whose CTRL wires reach the CE, CLK and RST inputs of the IRI_QUAD sites
+     * there), SLL (beside the SLL columns of devices with several SLRs) and SLL2 (every such tile on xcvp1902, which
+     * has no CLE_BC_CORE tiles).
      */
     static final List<TileTypeEnum> BC_NODE_TILE_TYPES = Collections.unmodifiableList(Arrays.asList(
-            TileTypeEnum.CLE_BC_CORE, TileTypeEnum.SLL, TileTypeEnum.SLL2));
+            TileTypeEnum.CLE_BC_CORE, TileTypeEnum.CLE_BC_CORE_MX, TileTypeEnum.SLL, TileTypeEnum.SLL2));
 
     /**
      * Checks if a tile type is a Versal SLL tile: SLL, or SLL2 (xcvp1902). Both host super long lines, CLE [BC]NODEs
@@ -2556,7 +2557,7 @@ public class RouteNodeGraph {
                 (!isVersal && Utils.isLaguna(childTileType) && type.isLocalLeadingToSLL()) ||
                 (isVersal && EnumSet.of(TileTypeEnum.INTF_LOCF_TR_TILE, TileTypeEnum.INTF_LOCF_BR_TILE, TileTypeEnum.INTF_ROCF_TR_TILE, TileTypeEnum.INTF_ROCF_BR_TILE,
                                         TileTypeEnum.INTF_LOCF_TL_TILE, TileTypeEnum.INTF_LOCF_BL_TILE, TileTypeEnum.INTF_ROCF_TL_TILE, TileTypeEnum.INTF_ROCF_BL_TILE,
-                                      TileTypeEnum.CLE_BC_CORE, TileTypeEnum.SLL, TileTypeEnum.SLL2)
+                                      TileTypeEnum.CLE_BC_CORE, TileTypeEnum.CLE_BC_CORE_MX, TileTypeEnum.SLL, TileTypeEnum.SLL2)
                        .contains(childTileType)) ||
                 (isVersal && Utils.isCLB(childTileType) && parentRnode != null && parentRnode.getIntentCode() == IntentCode.NODE_SLL_OUTPUT && childRnode.getIntentCode() == IntentCode.NODE_PINFEED) ||
                 // Allow NODE_PINFEEDs in RCLK tiles that are preserved (belonging to a partially routed net)

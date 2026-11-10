@@ -308,6 +308,11 @@ public class GlobalSignalRouting {
         }
         SitePinInst source = clk.getSource();
         SiteTypeEnum sourceTypeEnum = source.getSiteTypeEnum();
+        if (sourceTypeEnum == SiteTypeEnum.BUFGCTRL || sourceTypeEnum == SiteTypeEnum.BUFGCE_DIV) {
+            // BUFGCTRL and BUFGCE_DIV sites are in the same clock tiles as the BUFGCE sites and their
+            // outputs reach the horizontal routing tracks in the same way: route them as BUFGCE sources
+            sourceTypeEnum = SiteTypeEnum.BUFGCE;
+        }
         // In US/US+ clock routing, we use two VROUTE nodes to reach the clock regions above and below the centroid.
         // However, we can see that Vivado only uses one VROUTE node in the centroid clock region for Versal clock routing,
         // and reach the above and below clock regions by VDISTR nodes.

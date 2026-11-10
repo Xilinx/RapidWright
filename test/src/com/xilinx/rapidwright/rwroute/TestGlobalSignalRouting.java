@@ -697,4 +697,52 @@ public class TestGlobalSignalRouting {
             n = driver.get(n);
         }
     }
+
+    /**
+     * Clocks driven by BUFGCTRL and BUFGCE_DIV sites, which share the clock tiles of the BUFGCE sites
+     * at the bottom of the device. The BUFGCTRL clocks also drive an input of a neighboring BUFGCTRL,
+     * which must be reached straight from the output of the source (a cascade within the clock tile).
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "BUFGCTRL_X0Y0,BUFGCTRL_X0Y1,I1",
+            "BUFGCTRL_X4Y1,BUFGCTRL_X4Y0,I0",
+            "BUFGCE_DIV_X4Y0,,"
+    })
+    public void testVersalBUFGCTRLAndBUFGCEDIVClockSource(String sourceSiteName, String cascadeSiteName,
+                                                          String cascadePinName) {
+        Design design = new Design("versal_bufgctrl_clk", "xcvc1902-vsva2197-2MP-e-S");
+        Device device = design.getDevice();
+        Net clk = design.createNet("clk");
+        // A top-level port stands in for the logical driver of the clock
+        clk.getLogicalNet().createPortInst(design.getTopEDIFCell().createPort(clk.getName(),
+                EDIFDirection.INPUT, 1));
+        int i = 0;
+        for (String loc : new String[] {"SLICE_X66Y68", "SLICE_X332Y79", "SLICE_X22Y203", "SLICE_X148Y284"}) {
+            Cell ff = design.createAndPlaceCell("ff" + i++, Unisim.FDRE, loc + "/AFF");
+            clk.connect(ff, "C");
+        }
+        design.routeSites();
+        SitePinInst source = clk.createPin("O", design.createSiteInst(device.getSite(sourceSiteName)));
+        SitePinInst cascadePin = null;
+        if (cascadeSiteName != null) {
+            cascadePin = clk.createPin(cascadePinName, design.createSiteInst(device.getSite(cascadeSiteName)));
+        }
+
+        GlobalSignalRouting.symmetricClkRouting(clk, device, (n) -> NodeStatus.AVAILABLE, new HashMap<>());
+
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        Assertions.assertNotNull(clk.getLogicalNet().getProperty("CLOCK_ROOT"));
+        if (cascadePin != null) {
+            Assertions.assertTrue(cascadePin.isRouted());
+            List<Node> outputNodes = source.getConnectedNode().getAllDownhillNodes();
+            List<Node> cascadeNodes = cascadePin.getConnectedNode().getAllUphillNodes();
+            Assertions.assertEquals(1, outputNodes.size());
+            Assertions.assertEquals(1, cascadeNodes.size());
+            Node outputNode = outputNodes.get(0);
+            Node cascadeNode = cascadeNodes.get(0);
+            Assertions.assertTrue(clk.getPIPs().stream().anyMatch((pip) -> pip.getStartNode().equals(outputNode)
+                    && pip.getEndNode().equals(cascadeNode)));
+        }
+    }
 }

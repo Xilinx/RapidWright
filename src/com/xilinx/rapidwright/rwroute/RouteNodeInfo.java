@@ -171,7 +171,7 @@ public class RouteNodeInfo {
         IntentCode baseIntentCode = node.getIntentCode();
         TileTypeEnum endTileType;
         if (baseIntentCode == IntentCode.NODE_CLE_CTRL) {
-            // Versal CTRL_[LR]_B* pins (in CLE_BC_CORE, SLL or SLL2 tiles) end at the CLE core tile that they serve,
+            // Versal CTRL_[LR]_B* pins (in RouteNodeGraph.BC_NODE_TILE_TYPES tiles) end at the CLE core tile that they serve,
             // which has the same X coordinate as the INT tile that it is beside (see
             // RouteNodeGraph.TileTypeInfo.eastSideWires)
             assert(RouteNodeGraph.BC_NODE_TILE_TYPES.contains(baseTileType));
