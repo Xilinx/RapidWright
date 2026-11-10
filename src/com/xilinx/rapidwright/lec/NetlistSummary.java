@@ -125,7 +125,8 @@ public class NetlistSummary {
                 putUnique(coneLiterals, TerminalKey.forPin(instName, pinName), lit);
             }
             putUnique(terminals, instName.isEmpty() ? typeName : instName,
-                    TerminalAttributes.of(typeName, flat.getInst(instId), foldedPins));
+                    TerminalAttributes.of(typeName, flat.getInst(instId), foldedPins,
+                            flat.getKeyProperty()));
         }
     }
 

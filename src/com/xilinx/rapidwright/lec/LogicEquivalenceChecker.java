@@ -237,7 +237,7 @@ public class LogicEquivalenceChecker {
                         + "recognised part; clock pin identification will rely on pin names and "
                         + "implicit pin tie values will default to ground.");
             }
-            FlatNetlist flat = FlatNetlist.build(netlist, log);
+            FlatNetlist flat = FlatNetlist.build(netlist, log, config.getKeyProperty());
             Connectivity conn = ConnectivityBuilder.build(flat, log);
             CellClassifier classifier = new CellClassifier(series, config, log);
             NetlistStats stats = NetlistStats.collect(label, flat, conn, classifier, log);

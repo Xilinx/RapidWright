@@ -63,6 +63,11 @@
  * <li>{@code --allow-inconclusive} downgrades undecided cones to a warning.</li>
  * <li>{@code --strict-black-boxes} stops assuming that same-typed black boxes,
  * such as encrypted IP, compute the same function.</li>
+ * <li>{@code --key-property <name>} matches instances that a transform moved:
+ * an instance carrying that property, or below an instance that does, is named
+ * by the property's value in place of the path above it. A wrong or stale value
+ * cannot make different logic pass; it leaves a terminal unmatched or a cone
+ * refuted, and two terminals claiming one name stop the run.</li>
  * <li>{@code --sat-timeout} and {@code --sat-budget} bound the solver. Cones
  * beyond {@code --sat-max-support} inputs or {@code --sat-max-nodes} nodes are
  * attempted last, smallest first, with whatever budget remains; raise
@@ -180,8 +185,9 @@
  * <li>Tristate is cut rather than modelled: buffers that can drive high
  * impedance are opaque terminals.</li>
  * <li>Terminals are identified by full hierarchical path, so a terminal moved
- * to a different hierarchical block is reported as one missing and one
- * added.</li>
+ * to a different hierarchical block is reported as one missing and one added,
+ * unless the transform records the original path and
+ * {@code --key-property} names that property.</li>
  * </ul>
  */
 package com.xilinx.rapidwright.lec;
