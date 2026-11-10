@@ -170,9 +170,9 @@ public class RouterHelper {
         // Only block clocking tiles if source is not in a clock tile
         final boolean blockClocking = !Utils.isClocking(source.getTile().getTileTypeEnum());
 
-        // Laguna crossings from the output of the TX flop
-        final boolean isLagunaTXQ = Utils.isLaguna(source.getTile().getTileTypeEnum());
-        assert(!isLagunaTXQ || output.getName().startsWith("TXQ"));
+        // Laguna crossings from the output of the TX flop (TXQ*; the RX flop's output, RXQ*, is in the Laguna tile too)
+        final boolean isLagunaTXQ = Utils.isLaguna(source.getTile().getTileTypeEnum()) &&
+                output.getName().startsWith("TXQ");
 
         // Starting from the SPI's connected node, perform a downhill breadth-first search
         Queue<Node> queue = new ArrayDeque<>();

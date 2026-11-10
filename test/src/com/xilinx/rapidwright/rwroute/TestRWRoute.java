@@ -2529,4 +2529,65 @@ public class TestRWRoute {
             Assertions.assertTrue(sink.isRouted(), sink.toString());
         }
     }
+
+    @ParameterizedTest
+    @CsvSource({
+            // Laguna RX and TX flop outputs (UltraScale+, UltraScale)
+            "xcvu9p,LAGUNA_X0Y718.RXQ0,LAG_LAG,false",
+            "xcvu9p,LAGUNA_X0Y598.TXQ0,LAG_LAG,false",
+            "xcvu440,LAGUNA_X0Y718.RXQ0,LAGUNA_TILE,false",
+            "xcvu440,LAGUNA_X0Y598.TXQ0,LAGUNA_TILE,false",
+            // HDIO inputs (Spartan UltraScale+; Versal AI Edge, Premium and Gen 2)
+            "xcsu35p,HDIOLOGIC_M_X1Y63.IPFFM_BYPASS,INT_INTF_RIGHT_TERM_HDIO_FT,true",
+            "xcve2302,IOB_X13Y3.RXOUT_M,INTF_HDIO_LOCF_BR_TILE,true",
+            "xcvp1902,IOB_S1X15Y3.RXOUT_M,INTF_HDIO_LOCF_BR_TILE,true",
+            "xc2ve3858,IOB_X15Y38.RXOUT_M,INTF_HDIO_ROCF_BR_TILE,true",
+            // SLICE outputs (Versal Gen 2)
+            "xc2ve3858,SLICE_X2Y375.AQ,CLE_E_VR_CORE,false",
+            "xc2ve3858,SLICE_X0Y375.AQ,CLE_W_VR_CORE,true",
+    })
+    public void testSourceSideKnown(String partName, String srcSitePin, TileTypeEnum tileType, boolean east) {
+        // Each source is projected onto a node of a tile type beside the given side of its INT tile, which RWRoute
+        // must know (see RouteNodeGraph.SITE_TILE_TYPE_ON_EAST_SIDE), and is routed from non-timing-driven
+        Design design = new Design("top", partName);
+        Net net = design.createNet("net");
+        String[] src = srcSitePin.split("\\.");
+        SitePinInst source = net.createPin(src[1], design.createSiteInst(src[0]));
+        Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
+        Assertions.assertNotNull(sourceINTNode);
+        Assertions.assertEquals(tileType, sourceINTNode.getTile().getTileTypeEnum(), sourceINTNode.toString());
+        Assertions.assertEquals(east, RouteNodeGraph.SITE_TILE_TYPE_ON_EAST_SIDE.get(tileType));
+
+        // Sink: the SLICEL (other than the source's own) nearest to the source's projection
+        Site sinkSite = getNearestSLICELs(design, source, 2).stream()
+                .filter((s) -> s != source.getSite()).findFirst().get();
+        SitePinInst sink = net.createPin("A4", design.createSiteInst(sinkSite));
+        PartialRouter.routeDesignPartialNonTimingDriven(design, Collections.singletonList(sink), false);
+        assertAllPinsRouted(net);
+    }
+
+    @Test
+    public void testSourceOfUnknownSideWarnsOnce() {
+        // A leaf clock buffer's output (which only the clock router routes from) is projected onto a node of an RCLK
+        // tile, whose side is unknown: it is taken to be west, with a warning printed only once for that tile type
+        Design design = new Design("top", "xcvu3p");
+        RouteNodeGraph routingGraph = new RouteNodeGraph(design, new RWRouteConfig(new String[] {"--nonTimingDriven"}));
+        Node node = design.getDevice().getNode("RCLK_INT_L_X0Y269/CLK_LEAF_SITES_0_CLK_LEAF");
+        Assertions.assertNotNull(node);
+
+        ByteArrayOutputStream capture = new ByteArrayOutputStream();
+        PrintStream originalOut = System.out;
+        try {
+            System.setOut(new PrintStream(capture, true));
+            Assertions.assertFalse(routingGraph.checkSourceSideKnown(node));
+            Assertions.assertFalse(routingGraph.checkSourceSideKnown(node));
+        } finally {
+            System.setOut(originalOut);
+        }
+        String output = capture.toString();
+        System.out.print(output);
+        Assertions.assertEquals(1, output.split("WARNING: Side of source node", -1).length - 1, output);
+        Assertions.assertTrue(output.contains(node.toString()), output);
+        Assertions.assertFalse(routingGraph.isEastSideWire(TileTypeEnum.RCLK_INT_L, node.getWireIndex()));
+    }
 }

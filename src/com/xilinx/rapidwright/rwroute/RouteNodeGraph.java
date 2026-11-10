@@ -284,15 +284,22 @@ public class RouteNodeGraph {
 
     /**
      * Side of their INT tile (true for east) that tiles of these types are beside, and so that the nodes in them that
-     * RWRoute routes from (CLE outputs, and the INT_INTERFACE_* / INT_INTF_* / INTF_* / BLI_CLE_* nodes that all other
-     * site outputs are projected onto; see RouterHelper.projectOutputPinToINTNode()) enter that INT tile on, and drive
-     * nodes on (other than UltraScale INT_NODE_QUAD_LONG_* / QLND*, which serve both sides): as found for every such
-     * node on xcku040, xcvu3p, xcvu9p, xcu50 and xczu7ev, and in samples of each type on xcku115, xcvu440, xcvu095,
-     * xcvu13p, xczu9eg, xcu250, xcvu37p, xcvc1902 and xcv80. Neither the suffix of a type's name (CLEM_R and CLE_M_R
-     * are beside the west side) nor, on Versal, the LOGIC_OUTS_[EW]* wire in the node (most CLE_W_CORE outputs on
-     * xcv80 contain a LOGIC_OUTS_W*) always says which. Every node of these types is placed on that side (see
-     * isEastSideWire()). A net's source of a tile type that is not listed here, and that has no east-side wires of its
-     * own, is an error (see checkSourceSideKnown()).
+     * RWRoute routes from (CLE outputs, and the INT_INTERFACE_* / INT_INTF_* / INTF_* / BLI_CLE_* / Laguna nodes that
+     * all other site outputs are projected onto; see RouterHelper.projectOutputPinToINTNode()) enter that INT tile on,
+     * and drive nodes on (other than UltraScale INT_NODE_QUAD_LONG_* / QLND*, which serve both sides): as found for
+     * every such node on xcku040, xcvu3p, xcvu9p, xcu50 and xczu7ev, and in samples of each type on xcku115, xcvu440,
+     * xcvu095, xcvu13p, xczu9eg, xcu250, xcvu37p, xcvc1902 and xcv80; and, for every such node of every type here,
+     * from both the sides of the INT nodes that it drives and the LOGIC_OUTS_[EW]* wire in it, on xcsu35p, xcvu9p,
+     * xcvu440, xcku115, xcve2302, xcvp1902 and xc2ve3858. Neither the suffix of a type's name (CLEM_R and CLE_M_R are
+     * beside the west side) nor, on Versal, the LOGIC_OUTS_[EW]* wire in the node (most CLE_W_CORE outputs on xcv80
+     * contain a LOGIC_OUTS_W*) always says which. Every node of these types is placed on that side (see
+     * isEastSideWire()). Every site output (other than of leaf clock buffers, which only the clock router routes from)
+     * is projected onto a node whose side is known on xcku035, xcku040, xcku060, xcku115, xcvu080, xcvu095, xcvu440
+     * (UltraScale); xcau10p, xcau15p, xcku9p, xcsu35p, xck26, xczu1cg, xczu3eg, xczu4ev, xczu7ev, xczu9eg, xcvu3p,
+     * xcvu5p, xcvu7p, xcvu9p, xcvu13p, xcvu19p, xcu50, xcu250, xcvu37p (UltraScale+); xcvc1502, xcvc1902, xcvc2802,
+     * xcve2002, xcve2302, xcvm2152, xcvp1002, xcvp1202, xcvp1502, xcvp1802, xcvp1902, xcv80 and xc2ve3858 (Versal).
+     * A net's source of a tile type that is not listed here, and that has no east-side wires of its own, is placed on
+     * the west side, with a warning (see checkSourceSideKnown()).
      */
     protected static final Map<TileTypeEnum, Boolean> SITE_TILE_TYPE_ON_EAST_SIDE = new EnumMap<>(TileTypeEnum.class);
     static {
@@ -301,7 +308,7 @@ public class RouteNodeGraph {
                 TileTypeEnum.CLEL_R,
                 // UltraScale+
                 TileTypeEnum.INT_INTF_R, TileTypeEnum.INT_INTF_R_PCIE4, TileTypeEnum.INT_INTF_R_TERM_GT,
-                TileTypeEnum.INT_INTF_RIGHT_TERM_IO,
+                TileTypeEnum.INT_INTF_RIGHT_TERM_IO, TileTypeEnum.INT_INTF_RIGHT_TERM_HDIO_FT,
                 // UltraScale
                 TileTypeEnum.INT_INTERFACE_R, TileTypeEnum.INT_INTERFACE_PCIE_R, TileTypeEnum.INT_INTERFACE_GT_R,
                 // Versal
@@ -311,7 +318,10 @@ public class RouteNodeGraph {
                 TileTypeEnum.INTF_GT_TR_TILE, TileTypeEnum.INTF_GT_BR_TILE,
                 TileTypeEnum.INTF_HB_LOCF_TR_TILE, TileTypeEnum.INTF_HB_LOCF_BR_TILE,
                 TileTypeEnum.INTF_HB_ROCF_TR_TILE, TileTypeEnum.INTF_HB_ROCF_BR_TILE,
-                TileTypeEnum.INTF_HDIO_LOCF_TR_TILE, TileTypeEnum.INTF_HDIO_ROCF_TR_TILE)) {
+                TileTypeEnum.INTF_HDIO_LOCF_TR_TILE, TileTypeEnum.INTF_HDIO_LOCF_BR_TILE,
+                TileTypeEnum.INTF_HDIO_ROCF_TR_TILE, TileTypeEnum.INTF_HDIO_ROCF_BR_TILE,
+                // Versal Gen 2
+                TileTypeEnum.CLE_W_VR_CORE)) {
             SITE_TILE_TYPE_ON_EAST_SIDE.put(tte, true);
         }
         for (TileTypeEnum tte : EnumSet.of(
@@ -322,10 +332,15 @@ public class RouteNodeGraph {
                 TileTypeEnum.INT_INTF_L, TileTypeEnum.INT_INTF_L_CMT, TileTypeEnum.INT_INTF_L_IO,
                 TileTypeEnum.INT_INTF_L_PCIE4, TileTypeEnum.INT_INTF_L_TERM_GT,
                 TileTypeEnum.INT_INTF_LEFT_TERM_IO_FT, TileTypeEnum.INT_INTF_LEFT_TERM_PSS,
+                // UltraScale+ Laguna (onto whose nodes RX and TX flop outputs, RXQ* and TXQ*, are projected), beside
+                // the west side of the INT tile to their east
+                TileTypeEnum.LAG_LAG,
                 // UltraScale
                 TileTypeEnum.CLE_M, TileTypeEnum.CLE_M_R,
                 TileTypeEnum.INT_INTERFACE_L, TileTypeEnum.INT_INTERFACE_PCIE_L,
                 TileTypeEnum.INT_INT_INTERFACE_XIPHY_FT, TileTypeEnum.INT_INT_INTERFACE_GT_LEFT_FT,
+                // UltraScale Laguna (as for UltraScale+, but beside the INT tile with the same X coordinate)
+                TileTypeEnum.LAGUNA_TILE,
                 // Versal
                 TileTypeEnum.CLE_E_CORE, TileTypeEnum.BLI_CLE_BOT_CORE_MY, TileTypeEnum.BLI_CLE_TOP_CORE_MY,
                 TileTypeEnum.INTF_LOCF_TL_TILE, TileTypeEnum.INTF_LOCF_BL_TILE,
@@ -335,10 +350,18 @@ public class RouteNodeGraph {
                 TileTypeEnum.INTF_HB_ROCF_TL_TILE, TileTypeEnum.INTF_HB_ROCF_BL_TILE,
                 TileTypeEnum.INTF_HDIO_LOCF_TL_TILE, TileTypeEnum.INTF_HDIO_ROCF_TL_TILE,
                 TileTypeEnum.INTF_CFRM_TL_TILE, TileTypeEnum.INTF_CFRM_BL_TILE,
-                TileTypeEnum.INTF_PSS_TL_TILE, TileTypeEnum.INTF_PSS_BL_TILE)) {
+                TileTypeEnum.INTF_PSS_TL_TILE, TileTypeEnum.INTF_PSS_BL_TILE,
+                // Versal Gen 2
+                TileTypeEnum.CLE_E_VR_CORE)) {
             SITE_TILE_TYPE_ON_EAST_SIDE.put(tte, false);
         }
     }
+
+    /**
+     * Tile types of source nodes whose side is unknown that have already been warned about (see
+     * {@link #checkSourceSideKnown(Node)}).
+     */
+    private final Set<TileTypeEnum> sourceTileTypesOfUnknownSide = EnumSet.noneOf(TileTypeEnum.class);
 
     /** Flag for whether design targets the Versal series */
     protected final boolean isVersal;
@@ -1908,21 +1931,25 @@ public class RouteNodeGraph {
      * Checks that the side of its INT tile that a node RWRoute routes from (a net's source or alternate source, as
      * projected by RouterHelper.projectOutputPinToINTNode()) is on is known to {@link #isEastSideWire(TileTypeEnum, int)}:
      * that its tile type is listed in {@link #SITE_TILE_TYPE_ON_EAST_SIDE}, or has east-side wires of its own (e.g.
-     * INT). Otherwise the node would be placed on the west side, whichever side it is on.
+     * INT). Otherwise the node is placed on the west side, whichever side it is on, which only makes the estimates
+     * of the distance from it less accurate: print a warning, once per tile type.
      * @param sourceNode The projected source node.
-     * @throws RuntimeException If it is not known.
+     * @return True if its side is known.
      */
-    public void checkSourceSideKnown(Node sourceNode) {
+    public boolean checkSourceSideKnown(Node sourceNode) {
         final TileTypeEnum tileTypeEnum = sourceNode.getTile().getTileTypeEnum();
         if (SITE_TILE_TYPE_ON_EAST_SIDE.containsKey(tileTypeEnum)) {
-            return;
+            return true;
         }
         final TileTypeInfo info = getTileTypeInfo(tileTypeEnum);
         if (info != null && info.eastSideWires != null) {
-            return;
+            return true;
         }
-        throw new RuntimeException("ERROR: Side of source node " + sourceNode + " unknown: add its tile type " +
-                tileTypeEnum + " to RouteNodeGraph.SITE_TILE_TYPE_ON_EAST_SIDE");
+        if (sourceTileTypesOfUnknownSide.add(tileTypeEnum)) {
+            System.out.println("WARNING: Side of source node " + sourceNode + " unknown, so taken to be west: add " +
+                    "its tile type " + tileTypeEnum + " to RouteNodeGraph.SITE_TILE_TYPE_ON_EAST_SIDE");
+        }
+        return false;
     }
 
     /**
