@@ -47,6 +47,7 @@ import com.xilinx.rapidwright.util.Pair;
  */
 public class TimingAndWirelengthReport{
     private Design design;
+    /** In half INT tiles (see {@link RouteNodeInfo#halfTileWirelength}) */
     private long wirelength;
     private long usedNodes;
     private int numWireNetsToRoute;
@@ -79,7 +80,7 @@ public class TimingAndWirelengthReport{
 
         System.out.println();
         System.out.println("Total nodes: " + usedNodes);
-        System.out.println("Total wirelength: " + wirelength);
+        System.out.printf("Total wirelength: %.1f\n", wirelength / 2.0);
         RWRoute.printNodeTypeUsageAndWirelength(true, nodeTypeUsage, nodeTypeLength, design.getSeries());
     }
 
@@ -97,7 +98,7 @@ public class TimingAndWirelengthReport{
                     continue;
                 }
                 usedNodes++;
-                int wl = RouteNode.getLength(node);
+                int wl = RouteNodeInfo.get(node, null).halfTileWirelength;
                 wirelength += wl;
                 RouterHelper.addNodeTypeLengthToMap(node, wl, nodeTypeUsage, nodeTypeLength);
             }
