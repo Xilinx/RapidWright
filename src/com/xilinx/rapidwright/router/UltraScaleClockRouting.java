@@ -51,6 +51,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
 import java.util.Set;
+import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -129,6 +130,22 @@ public class UltraScaleClockRouting {
                                                                                   ClockRegion aboveCentroid,
                                                                                   boolean down,
                                                                                   Function<Node, NodeStatus> getNodeStatus) {
+        return routeBUFGToVerticalDistributionLines(clk, centroid, aboveCentroid, down, getNodeStatus,
+                (downUp, status) -> true);
+    }
+
+    /**
+     * Same as {@link #routeBUFGToVerticalDistributionLines(Net, ClockRegion, ClockRegion, boolean, Function)},
+     * except that a track is only accepted once the given function also succeeded in routing on from the vertical
+     * distribution tracks reached (e.g. to the horizontal distribution tracks of the clock regions to reach,
+     * which also keep the track's index).
+     * @param distribute Routes on from the vertical distribution tracks reached (going down, going up), with the
+     *                   given node status lambda (which also excludes the tracks already given up), adding the
+     *                   PIPs to the clock net; returns false if it could not, to try the next track.
+     */
+    private static Pair<RouteNode, RouteNode> routeBUFGToVerticalDistributionLines(Net clk, ClockRegion centroid,
+            ClockRegion aboveCentroid, boolean down, Function<Node, NodeStatus> getNodeStatus,
+            BiPredicate<Pair<RouteNode, RouteNode>, Function<Node, NodeStatus>> distribute) {
         List<PIP> pipsBefore = new ArrayList<>(clk.getPIPs());
         Set<Node> blockedTracks = new HashSet<>();
         Function<Node, NodeStatus> status = (n) -> blockedTracks.contains(n) ? NodeStatus.UNAVAILABLE :
@@ -154,18 +171,68 @@ public class UltraScaleClockRouting {
                             transitionCentroidToVerticalDistributionLine(clk, vrouteDown, true, status);
                 }
                 if ((!down || distLineDown != null) && (aboveCentroid == null || distLineUp != null)) {
-                    return new Pair<>(distLineDown, distLineUp);
+                    Pair<RouteNode, RouteNode> downUp = new Pair<>(distLineDown, distLineUp);
+                    if (distribute.test(downUp, status)) {
+                        return downUp;
+                    }
                 }
             }
-            if (getNodeStatus == null || track == null) {
+            clk.setPIPs(new ArrayList<>(pipsBefore));
+            if (track == null) {
                 break;
             }
-            clk.setPIPs(new ArrayList<>(pipsBefore));
             blockedTracks.add(track);
         }
         return null;
     }
 
+    /**
+     * Routes a clock buffer's output through a clock root in the centroid clock region (see
+     * {@link #routeBUFGToVerticalDistributionLines(Net, ClockRegion, ClockRegion, boolean, Function)}) and the
+     * horizontal distribution tracks of the given clock regions to the given leaf clock buffers (LCBs). A routing
+     * track is only accepted once all of these have been reached (the distribution tracks keep the track's index,
+     * so they can be used by another clock in some of the clock regions), otherwise its PIPs are removed and the
+     * next track is tried.
+     * @param clk The clock net, whose source is the buffer output.
+     * @param centroid The centroid clock region.
+     * @param upClockRegions The clock regions above the centroid clock region to reach.
+     * @param downClockRegions The other clock regions to reach (the centroid clock region and those below it); if
+     *                         empty, the clock is not routed down from the centroid.
+     * @param lcbTargets The LCBs to reach, in these clock regions.
+     * @param getNodeStatus Lambda giving the status of a node, to avoid nodes used by other nets, or null.
+     * @return true, if the LCBs were reached, false otherwise (no PIPs added).
+     */
+    public static boolean routeBUFGToLCBs(Net clk, ClockRegion centroid, Collection<ClockRegion> upClockRegions,
+                                          Collection<ClockRegion> downClockRegions, Set<RouteNode> lcbTargets,
+                                          Function<Node, NodeStatus> getNodeStatus) {
+        ClockRegion aboveCentroid = upClockRegions.isEmpty() ? null : centroid.getNeighborClockRegion(1, 0);
+        if (!upClockRegions.isEmpty() && aboveCentroid == null) {
+            return false;
+        }
+        boolean down = !downClockRegions.isEmpty();
+        Pair<RouteNode, RouteNode> downUp = routeBUFGToVerticalDistributionLines(clk, centroid, aboveCentroid,
+                down, getNodeStatus, (distLinesDownUp, status) -> {
+                    List<RouteNode> distLines = new ArrayList<>();
+                    if (aboveCentroid != null) {
+                        List<RouteNode> upLines = routeVerticalDistributionToHorizontalDistributionLines(clk,
+                                distLinesDownUp.getSecond(), upClockRegions, status);
+                        if (upLines == null) {
+                            return false;
+                        }
+                        distLines.addAll(upLines);
+                    }
+                    if (down) {
+                        List<RouteNode> downLines = routeVerticalDistributionToHorizontalDistributionLines(clk,
+                                distLinesDownUp.getFirst(), downClockRegions, status);
+                        if (downLines == null) {
+                            return false;
+                        }
+                        distLines.addAll(downLines);
+                    }
+                    return routeToLCBs(clk, getStartingPoints(distLines), lcbTargets, status, false);
+                });
+        return downUp != null;
+    }
     /**
      * Routes a clock from a routing track to a transition point called the centroid
      * where the clock fans out and transitions from clock routing tracks to clock distribution
@@ -390,6 +457,14 @@ public class UltraScaleClockRouting {
                                                                                        RouteNode centroidDistNode,
                                                                                        Collection<ClockRegion> clockRegions,
                                                                                        Function<Node, NodeStatus> getNodeStatus) {
+        return routeCentroidToVerticalDistributionLines(clk, centroidDistNode, clockRegions, getNodeStatus, true);
+    }
+
+    private static Map<ClockRegion, RouteNode> routeCentroidToVerticalDistributionLines(Net clk,
+                                                                                        RouteNode centroidDistNode,
+                                                                                        Collection<ClockRegion> clockRegions,
+                                                                                        Function<Node, NodeStatus> getNodeStatus,
+                                                                                        boolean throwIfUnroutable) {
         Map<ClockRegion, RouteNode> crToVdist = new HashMap<>();
         centroidDistNode.setParent(null);
         Queue<RouteNode> q = RouteNode.createPriorityQueue();
@@ -446,6 +521,9 @@ public class UltraScaleClockRouting {
                     q.add(rn);
                 }
             }
+            if (!throwIfUnroutable) {
+                return null;
+            }
             throw new RuntimeException("ERROR: Couldn't route to distribution line in clock region " + cr);
         }
         clk.getPIPs().addAll(allPIPs);
@@ -463,6 +541,13 @@ public class UltraScaleClockRouting {
     public static List<RouteNode> routeVerticalToHorizontalDistributionLines(Net clk,
                                                                              Map<ClockRegion,RouteNode> crMap,
                                                                              Function<Node, NodeStatus> getNodeStatus) {
+        return routeVerticalToHorizontalDistributionLines(clk, crMap, getNodeStatus, true);
+    }
+
+    private static List<RouteNode> routeVerticalToHorizontalDistributionLines(Net clk,
+                                                                              Map<ClockRegion,RouteNode> crMap,
+                                                                              Function<Node, NodeStatus> getNodeStatus,
+                                                                              boolean throwIfUnroutable) {
         List<RouteNode> distLines = new ArrayList<>();
         Queue<RouteNode> q = new LinkedList<>();
         Set<PIP> allPIPs = new HashSet<>();
@@ -512,6 +597,9 @@ public class UltraScaleClockRouting {
                     q.add(rn);
                 }
             }
+            if (!throwIfUnroutable) {
+                return null;
+            }
             throw new RuntimeException("ERROR: Couldn't route to distribution line in clock region " + targetCR);
         }
         clk.getPIPs().addAll(allPIPs);
@@ -539,6 +627,11 @@ public class UltraScaleClockRouting {
     }
 
     public static void routeToLCBs(Net clk, Map<ClockRegion, Set<RouteNode>> startingPoints, Set<RouteNode> lcbTargets) {
+        routeToLCBs(clk, startingPoints, lcbTargets, null, true);
+    }
+
+    private static boolean routeToLCBs(Net clk, Map<ClockRegion, Set<RouteNode>> startingPoints, Set<RouteNode> lcbTargets,
+                                       Function<Node, NodeStatus> getNodeStatus, boolean throwIfUnroutable) {
         Queue<RouteNode> q = RouteNode.createPriorityQueue();
         Set<PIP> allPIPs = new HashSet<>();
         HashSet<RouteNode> visited = new HashSet<>();
@@ -575,6 +668,7 @@ public class UltraScaleClockRouting {
                         if (p == null) continue;
                         if (p.getSite().getSiteTypeEnum() != SiteTypeEnum.BUFCE_LEAF) continue;
                     }
+                    if (isUnavailable(w, getNodeStatus)) continue;
                     RouteNode rn = new RouteNode(w.getTile(), w.getWireIndex(), curr, curr.getLevel()+1);
                     if (visited.contains(rn)) continue;
                     if (rn.getWireName().endsWith("_CLK_CASC_OUT")) continue;
@@ -582,9 +676,13 @@ public class UltraScaleClockRouting {
                     q.add(rn);
                 }
             }
+            if (!throwIfUnroutable) {
+                return false;
+            }
             throw new RuntimeException("ERROR: Couldn't route to leaf clock buffer " + lcb);
         }
         clk.getPIPs().addAll(allPIPs);
+        return true;
     }
 
     /**
@@ -681,6 +779,23 @@ public class UltraScaleClockRouting {
         Map<ClockRegion, RouteNode> vertDistLines = routeCentroidToVerticalDistributionLines(clk, centroidDistNode, clockRegions, getNodeStatus);
 
         return routeVerticalToHorizontalDistributionLines(clk, vertDistLines, getNodeStatus);
+    }
+
+    /**
+     * Routes from a vertical distribution track to the horizontal distribution tracks of the given clock regions.
+     * @return The horizontal distribution tracks reached, or null if one could not be reached (no PIPs added).
+     */
+    private static List<RouteNode> routeVerticalDistributionToHorizontalDistributionLines(Net clk, RouteNode vdistr,
+            Collection<ClockRegion> clockRegions, Function<Node, NodeStatus> getNodeStatus) {
+        List<PIP> pipsBefore = new ArrayList<>(clk.getPIPs());
+        Map<ClockRegion, RouteNode> vertDistLines = routeCentroidToVerticalDistributionLines(clk, vdistr, clockRegions,
+                getNodeStatus, false);
+        List<RouteNode> distLines = (vertDistLines == null) ? null :
+                routeVerticalToHorizontalDistributionLines(clk, vertDistLines, getNodeStatus, false);
+        if (distLines == null) {
+            clk.setPIPs(pipsBefore);
+        }
+        return distLines;
     }
 
     /**

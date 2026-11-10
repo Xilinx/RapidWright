@@ -244,39 +244,31 @@ public class GlobalSignalRouting {
 
         Set<ClockRegion> clockRegions = getFabricClockRegionsOfPins(lcbPins).getFirst();
 
-        ClockRegion centroid = findCentroid(clk, device);
-        List<ClockRegion> upClockRegions = new ArrayList<>();
-        List<ClockRegion> downClockRegions = new ArrayList<>();
-        // divides clock regions into two groups
-        divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
+        Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(lcbPins, getNodeStatus);
 
-        // Two VROUTEs going up and down, each onto a vertical distribution track. Avoid the routing tracks of
-        // clocks already routed (e.g. when two clock buffers share the muxes onto the routing tracks, as the
-        // BUFGCE_HDIOs of a RCLK_HDIO tile do). There is no downward branch when no leaf clock buffer sink is at
-        // or below the centroid, which the sinks routed from the distribution (e.g. MMCM inputs) can leave.
-        ClockRegion aboveCentroid = upClockRegions.isEmpty() ? null : centroid.getNeighborClockRegion(1, 0);
-        boolean down = !downClockRegions.isEmpty();
-        Pair<RouteNode, RouteNode> distLinesDownUp = UltraScaleClockRouting.routeBUFGToVerticalDistributionLines(clk,
-                centroid, aboveCentroid, down, getNodeStatus);
-        if (distLinesDownUp == null) {
+        ClockRegion centroid = findCentroid(clk, device);
+        // Route through a clock root in the centroid clock region and the horizontal distribution tracks of the
+        // sinks' clock regions to the leaf clock buffers, avoiding the tracks of clocks already routed (e.g. when
+        // two clock buffers share the muxes onto the routing tracks, as the BUFGCE_HDIOs of a RCLK_HDIO tile do).
+        // There is no downward branch when no leaf clock buffer sink is at or below the clock root, which the
+        // sinks routed from the distribution (e.g. MMCM inputs) can leave. Should the centroid not be reachable
+        // from the clock buffer (the routing tracks turn from horizontal to vertical only once, and some clock
+        // regions have no clock routing) or all its tracks be blocked, try the nearest other clock regions
+        boolean routed = false;
+        for (ClockRegion root : getClockRootCandidates(centroid)) {
+            List<ClockRegion> upClockRegions = new ArrayList<>();
+            List<ClockRegion> downClockRegions = new ArrayList<>();
+            // divides clock regions into two groups
+            divideClockRegions(clockRegions, root, upClockRegions, downClockRegions);
+            routed = UltraScaleClockRouting.routeBUFGToLCBs(clk, root, upClockRegions, downClockRegions,
+                    lcbMappings.keySet(), getNodeStatus);
+            if (routed) {
+                break;
+            }
+        }
+        if (!routed) {
             throw new RuntimeException("ERROR: Unable to route clock " + clk + " to its centroid clock region " + centroid);
         }
-        RouteNode distLineDown = distLinesDownUp.getFirst();
-        RouteNode distLineUp = distLinesDownUp.getSecond();
-
-        List<RouteNode> upDownDistLines = new ArrayList<>();
-        if (aboveCentroid != null) {
-            List<RouteNode> upLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, distLineUp, upClockRegions, false, getNodeStatus);
-            if (upLines != null) upDownDistLines.addAll(upLines);
-        }
-
-        if (down) {
-            List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, distLineDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
-            if (downLines != null) upDownDistLines.addAll(downLines);
-        }
-
-        Map<RouteNode, List<SitePinInst>> lcbMappings = getLCBPinMappings(lcbPins, getNodeStatus);
-        UltraScaleClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings.keySet());
 
         UltraScaleClockRouting.routeLCBsToSinks(clk, lcbMappings, getNodeStatus);
 
@@ -624,6 +616,34 @@ public class GlobalSignalRouting {
             tileHeight = Math.abs(lowerLeft.getRow() - upperLeft.getRow());
         }
         return tileHeight > MIN_CR_HEIGHT_FOR_CENTROID_ELIGIBILITY;
+    }
+
+    /** Maximum number of clock regions tried as the clock root of an UltraScale clock. */
+    private static final int MAX_CLOCK_ROOT_CANDIDATES = 9;
+
+    /**
+     * Gets the clock regions to try as the clock root of an UltraScale clock: the centroid clock region first,
+     * then the nearest other clock regions eligible as a centroid (fewest rows away first, as the root's row
+     * splits the clock tree into its upper and lower halves).
+     * @param centroid The centroid clock region.
+     * @return The clock regions to try, in order.
+     */
+    private static List<ClockRegion> getClockRootCandidates(ClockRegion centroid) {
+        Device device = centroid.getDevice();
+        List<ClockRegion> candidates = new ArrayList<>();
+        for (int row = 0; row < device.getNumOfClockRegionRows(); row++) {
+            for (int col = 0; col < device.getNumOfClockRegionsColumns(); col++) {
+                ClockRegion cr = device.getClockRegion(row, col);
+                if (cr != null && cr != centroid && cr.getApproximateCenter() != null && centroidEligible(cr)) {
+                    candidates.add(cr);
+                }
+            }
+        }
+        candidates.sort(Comparator.comparingInt((ClockRegion cr) -> Math.abs(cr.getRow() - centroid.getRow())
+                        + Math.abs(cr.getColumn() - centroid.getColumn()))
+                .thenComparingInt((cr) -> Math.abs(cr.getRow() - centroid.getRow())));
+        candidates.add(0, centroid);
+        return candidates.subList(0, Math.min(candidates.size(), MAX_CLOCK_ROOT_CANDIDATES));
     }
 
     /**
