@@ -685,6 +685,9 @@ public class RWRoute {
 
         SitePinInst source = net.getSource();
         Node sourceINTNode = RouterHelper.projectOutputPinToINTNode(source);
+        if (sourceINTNode != null) {
+            routingGraph.checkSourceSideKnown(sourceINTNode);
+        }
 
         RouteNode sourceINTRnode = null;
         int indirect = 0;

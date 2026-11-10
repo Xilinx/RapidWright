@@ -168,6 +168,7 @@ public class NetWrapper{
                 noAltSourceFound = true;
                 return null;
             }
+            routingGraph.checkSourceSideKnown(altSourceNode);
 
             if (routingGraph.isPreserved(altSourceNode)) {
                 noAltSourceFound = true;

@@ -291,7 +291,8 @@ public class RouteNodeGraph {
      * xcvu13p, xczu9eg, xcu250, xcvu37p, xcvc1902 and xcv80. Neither the suffix of a type's name (CLEM_R and CLE_M_R
      * are beside the west side) nor, on Versal, the LOGIC_OUTS_[EW]* wire in the node (most CLE_W_CORE outputs on
      * xcv80 contain a LOGIC_OUTS_W*) always says which. Every node of these types is placed on that side (see
-     * isEastSideWire()).
+     * isEastSideWire()). A net's source of a tile type that is not listed here, and that has no east-side wires of its
+     * own, is an error (see checkSourceSideKnown()).
      */
     protected static final Map<TileTypeEnum, Boolean> SITE_TILE_TYPE_ON_EAST_SIDE = new EnumMap<>(TileTypeEnum.class);
     static {
@@ -1901,6 +1902,27 @@ public class RouteNodeGraph {
             return siteTileOnEastSide;
         }
         return isWireIn(tileTypeEnum, wireIndex, info -> info.eastSideWires);
+    }
+
+    /**
+     * Checks that the side of its INT tile that a node RWRoute routes from (a net's source or alternate source, as
+     * projected by RouterHelper.projectOutputPinToINTNode()) is on is known to {@link #isEastSideWire(TileTypeEnum, int)}:
+     * that its tile type is listed in {@link #SITE_TILE_TYPE_ON_EAST_SIDE}, or has east-side wires of its own (e.g.
+     * INT). Otherwise the node would be placed on the west side, whichever side it is on.
+     * @param sourceNode The projected source node.
+     * @throws RuntimeException If it is not known.
+     */
+    public void checkSourceSideKnown(Node sourceNode) {
+        final TileTypeEnum tileTypeEnum = sourceNode.getTile().getTileTypeEnum();
+        if (SITE_TILE_TYPE_ON_EAST_SIDE.containsKey(tileTypeEnum)) {
+            return;
+        }
+        final TileTypeInfo info = getTileTypeInfo(tileTypeEnum);
+        if (info != null && info.eastSideWires != null) {
+            return;
+        }
+        throw new RuntimeException("ERROR: Side of source node " + sourceNode + " unknown: add its tile type " +
+                tileTypeEnum + " to RouteNodeGraph.SITE_TILE_TYPE_ON_EAST_SIDE");
     }
 
     /**
