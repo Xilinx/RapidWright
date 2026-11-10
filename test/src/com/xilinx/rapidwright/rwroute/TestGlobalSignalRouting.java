@@ -52,6 +52,7 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
@@ -557,6 +558,50 @@ public class TestGlobalSignalRouting {
         }
         Assertions.assertTrue(routethrus.contains("BITSLICE_RX_TX_X0Y128/TX_D0->BITSLICE_RX_TX_X0Y128/TX_Q"), routethrus.toString());
         Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(gndNet));
+    }
+
+    /**
+     * The routethrus onto the dedicated nodes that lead to an IO output buffer's input are only used if they are
+     * free: with another net on the site wire of the routethru's input pin, or with a cell other than a
+     * &lt;LOCKED&gt; placeholder on the BEL that this pin drives, the routethru is not used. These routethrus are
+     * the only path from the fabric to the buffer's input, which is therefore left unrouted.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "xcvc1902-vsva2197-2MP-e-S,IOB_X24Y1/IOB_S,OP_S,XPIOLOGIC_X23Y1,OPFFS_D1,true",
+            "xcvc1902-vsva2197-2MP-e-S,IOB_X24Y1/IOB_S,OP_S,XPIOLOGIC_X23Y1,OPFFS_D1,false",
+            "xcvc1902-vsva2197-2MP-e-S,IOB_X24Y1/IOB_S,OP_S,XPHY_X23Y0,D3_0_,true",
+            "xcvc1902-vsva2197-2MP-e-S,IOB_X24Y1/IOB_S,OP_S,XPHY_X23Y0,D3_0_,false",
+            "xcvu3p,IOB_X0Y128/OUTBUF,OP,BITSLICE_RX_TX_X0Y128,TX_D0,true",
+            "xcvu3p,IOB_X0Y128/OUTBUF,OP,BITSLICE_RX_TX_X0Y128,TX_D0,false",
+    })
+    public void testRouteStaticNetToIoOutputBufferSkipsUsedRouteThru(String partName, String obufLocation,
+                                                                    String obufPinName, String routeThruSiteName,
+                                                                    String routeThruInPinName, boolean cellNotNet) {
+        Design design = new Design("io_const_used_routethru", partName);
+        Cell obuf = design.createAndPlaceCell("obuf", Unisim.OBUF, obufLocation);
+        Net gndNet = design.getGndNet();
+        SitePinInst obufPin = gndNet.createPin(obufPinName, obuf.getSiteInst());
+
+        Site routeThruSite = design.getDevice().getSite(routeThruSiteName);
+        SiteInst si = design.createSiteInst(routeThruSite);
+        BELPin routeThruInPin = new SitePin(routeThruSite, routeThruInPinName).getBELPin();
+        if (cellNotNet) {
+            BEL bel = routeThruInPin.getSiteConns().get(0).getBEL();
+            si.addCell(new Cell("user", bel));
+        } else {
+            si.routeIntraSiteNet(design.createNet("user"), routeThruInPin, routeThruInPin);
+        }
+
+        List<SitePinInst> gndPins = new ArrayList<>(gndNet.getPins());
+        RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
+        GlobalSignalRouting.routeStaticNet(gndPins, (n) -> getNodeState(design, NetType.GND, n), design, routeThruHelper);
+
+        Node routeThruInNode = routeThruSite.getConnectedNode(routeThruInPinName);
+        for (PIP pip : gndNet.getPIPs()) {
+            Assertions.assertNotEquals(routeThruInNode, pip.getStartNode(), pip.toString());
+        }
+        Assertions.assertFalse(obufPin.isRouted());
     }
 
     /**
