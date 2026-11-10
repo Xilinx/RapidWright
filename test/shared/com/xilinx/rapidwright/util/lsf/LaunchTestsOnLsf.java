@@ -198,6 +198,20 @@ public class LaunchTestsOnLsf {
     }
 
     /**
+     * @return The test method this test belongs to: the outermost node with a method source, so that the invocations
+     *         of a test template and the dynamic tests of a test factory belong to their method.
+     */
+    private static Optional<TestIdentifier> getTestMethod(TestIdentifier ti, Map<String, TestIdentifier> ids) {
+        TestIdentifier method = null;
+        for (TestIdentifier t = ti; t != null; t = t.getParentId().map(ids::get).orElse(null)) {
+            if (hasMethodSource(t)) {
+                method = t;
+            }
+        }
+        return Optional.ofNullable(method);
+    }
+
+    /**
      * @return The outermost test class containing this test (to keep nested classes with it), if any.
      */
     private static Optional<String> getTopLevelClassName(TestIdentifier ti, Map<String, TestIdentifier> ids) {
@@ -212,8 +226,8 @@ public class LaunchTestsOnLsf {
     }
 
     /**
-     * @return The test methods that are not LSF tests, as method keys, by top-level test class, and the unique IDs
-     *         of each such method (for reporting). Classes without any such method (e.g. disabled ones) are included
+     * @return The test methods that are not LSF tests, as method keys, by top-level test class; and in unitIds, the
+     *         unique IDs of the tests of each method key and class (for reporting). Classes without any such method (e.g. disabled ones) are included
      *         with no methods, so that they are still reported, unless all their tests are LSF tests.
      */
     private static Map<String, List<String>> getRegularTestMethods(Map<String, TestIdentifier> ids,
@@ -230,14 +244,17 @@ public class LaunchTestsOnLsf {
                 continue;
             }
             Set<String> methods = classMethods.computeIfAbsent(className.get(), k -> new TreeSet<>());
-            // Only the test method itself, not each invocation of a test template
-            if (!hasMethodSource(ti) || hasMethodSource(ti.getParentId().map(ids::get).orElse(null))) {
+            Optional<TestIdentifier> method = getTestMethod(ti, ids);
+            if (!method.isPresent()) {
                 continue;
             }
-            String methodKey = TestShardFilter.getMethodKey((MethodSource) ti.getSource().get());
+            String methodKey = TestShardFilter.getMethodKey((MethodSource) method.get().getSource().get());
             methods.add(methodKey);
-            unitIds.computeIfAbsent(methodKey, k -> new ArrayList<>()).add(ti.getUniqueId());
-            unitIds.computeIfAbsent(className.get(), k -> new ArrayList<>()).add(ti.getUniqueId());
+            // Report each test, including each invocation of a test template and each dynamic test
+            if (ti.isTest()) {
+                unitIds.computeIfAbsent(methodKey, k -> new ArrayList<>()).add(ti.getUniqueId());
+                unitIds.computeIfAbsent(className.get(), k -> new ArrayList<>()).add(ti.getUniqueId());
+            }
         }
         Map<String, List<String>> result = new TreeMap<>();
         classMethods.forEach((c, m) -> {
@@ -282,11 +299,29 @@ public class LaunchTestsOnLsf {
         return jobs;
     }
 
+    /**
+     * @return The estimated durations given by {@value #DURATIONS_IN_PROPERTY}, or none if it is not set.
+     */
+    private static Map<String, Double> readEstimatedDurations() {
+        String durationsIn = System.getProperty(DURATIONS_IN_PROPERTY);
+        if (durationsIn == null || durationsIn.isEmpty()) {
+            return new HashMap<>();
+        }
+        Map<String, Double> durations = TestShardFilter.readDurations(Paths.get(durationsIn));
+        if (durations.isEmpty()) {
+            System.err.println("WARNING: no estimated test durations in " + durationsIn + ", running one job per class");
+        }
+        return durations;
+    }
+
     private static String quote(String s) {
         return '"' + s + '"';
     }
 
     public static void main(String[] args) throws IOException {
+        // Read the estimates first: they may be the durations file of the previous run in this working dir
+        Map<String, Double> durations = readEstimatedDurations();
+
         //Testcases may have been removed since the last run, delete all to be sure
         if (!FileTools.deleteFolderContents(".")) {
             throw new RuntimeException("could not empty working dir");
@@ -300,9 +335,6 @@ public class LaunchTestsOnLsf {
         TestPlan testPlan = launcher.discover(request);
         Map<String, TestIdentifier> ids = enumerateTests(launcher, testPlan);
 
-        String durationsIn = System.getProperty(DURATIONS_IN_PROPERTY);
-        Map<String, Double> durations = durationsIn == null || durationsIn.isEmpty()
-                ? new HashMap<>() : TestShardFilter.readDurations(Paths.get(durationsIn));
         Map<String, List<String>> unitIds = new HashMap<>();
         Map<String, List<String>> classMethods = getRegularTestMethods(ids, unitIds);
 
