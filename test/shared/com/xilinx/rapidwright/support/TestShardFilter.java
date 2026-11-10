@@ -28,6 +28,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -48,15 +49,19 @@ import org.junit.platform.launcher.PostDiscoveryFilter;
  * of n (Gradle: -PtestShard=i/n). Every shard discovers all tests and computes the same
  * assignment (see {@link ShardAssignment}).
  *
- * Estimated durations come from {@value #DURATIONS_RESOURCE} (see {@link TestDurationsListener}
- * for how to regenerate it). Test methods missing from it count as
- * {@value #DEFAULT_METHOD_SECONDS} s, so new tests still run, in some shard.
+ * Estimated durations are read from the file named by the system property
+ * {@value #DURATIONS_IN_PROPERTY} (Gradle: -PtestDurations=file), as written by
+ * {@link TestDurationsListener}; CI passes on the durations recorded by the latest run of master.
+ * Test methods missing from it (or all of them, without the file) count as
+ * {@value #DEFAULT_METHOD_SECONDS} s, so every test still runs, in exactly one shard: the
+ * durations only affect how evenly the tests are split.
  */
 public class TestShardFilter implements PostDiscoveryFilter {
 
     public static final String SHARD_PROPERTY = "rapidwright.test.shard";
 
-    public static final String DURATIONS_RESOURCE = "/com/xilinx/rapidwright/support/test-durations.txt";
+    /** System property naming the file of estimated test durations to balance the shards with */
+    public static final String DURATIONS_IN_PROPERTY = "rapidwright.test.durationsIn";
 
     public static final double DEFAULT_METHOD_SECONDS = ShardAssignment.DEFAULT_METHOD_SECONDS;
 
@@ -123,9 +128,13 @@ public class TestShardFilter implements PostDiscoveryFilter {
         return Optional.ofNullable(className);
     }
 
+    /**
+     * @return The estimated test durations from the file named by {@value #DURATIONS_IN_PROPERTY},
+     *         or none if it is not set or the file does not exist.
+     */
     static Map<String, Double> readDurations() {
-        InputStream in = TestShardFilter.class.getResourceAsStream(DURATIONS_RESOURCE);
-        return in == null ? new HashMap<>() : readDurations(in);
+        String durationsIn = System.getProperty(DURATIONS_IN_PROPERTY);
+        return durationsIn == null || durationsIn.isEmpty() ? new HashMap<>() : readDurations(Paths.get(durationsIn));
     }
 
     /**
@@ -186,11 +195,13 @@ public class TestShardFilter implements PostDiscoveryFilter {
     }
 
     private void assignShards(TestDescriptor root) {
-        assignment = ShardAssignment.assign(collectTestMethods(root), readDurations(), numShards);
+        Map<String, Double> durations = readDurations();
+        assignment = ShardAssignment.assign(collectTestMethods(root), durations, numShards);
         assignedRoot = root;
-        System.out.printf("Test shard %d/%d: %d of %d classes/methods, estimated %.0f s of %.0f s%n",
+        System.out.printf("Test shard %d/%d: %d of %d classes/methods, estimated %.0f s of %.0f s"
+                + " (from %d recorded test durations)%n",
                 shard, numShards, assignment.shardUnits[shard - 1], assignment.unitShards.size(),
-                assignment.shardSeconds[shard - 1], assignment.totalSeconds);
+                assignment.shardSeconds[shard - 1], assignment.totalSeconds, durations.size());
     }
 
     @Override

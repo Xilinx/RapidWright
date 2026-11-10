@@ -102,6 +102,13 @@ task testJava(type:Test) {
   if (project.hasProperty('testShard')) {
     systemProperty("rapidwright.test.shard", project.property('testShard'))
   }
+  // Estimated test durations (-PtestDurations=file, as recorded below), to balance the shards
+  if (project.hasProperty('testDurations')) {
+    def testDurations = file(project.property('testDurations'))
+    systemProperty("rapidwright.test.durationsIn", testDurations.absolutePath)
+    // Its contents decide which tests a shard runs (a file collection, as the file may not exist)
+    inputs.files(testDurations).withPropertyName('testDurations')
+  }
   // Record how long each test method takes, to balance the shards (see TestDurationsListener)
   if (project.hasProperty('recordTestDurations')) {
     systemProperty("rapidwright.test.durationsFile",
