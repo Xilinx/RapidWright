@@ -1974,7 +1974,8 @@ public class TestRWRoute {
      * @param blockedPins LUT input site pins (e.g. "SLICE_X40Y61/A1") to make unreachable while routing, so that
      *                    connections to them must be swapped onto another pin.
      * @return Map from each LUT input sink pin (before swapping, e.g. "SLICE_X40Y61/A1") to the pins
-     *         (e.g. "A1") its connection may be routed to (itself included).
+     *         (e.g. "A1") its connection may be routed to: itself, and those it may be swapped onto other than
+     *         blocked ones.
      */
     public static Map<String, Set<String>> routeLutPinSwapping(Design design, boolean timingDriven,
                                                                String... blockedPins) {
@@ -1997,11 +1998,13 @@ public class TestRWRoute {
                 : new String[] {"--nonTimingDriven", "--lutPinSwapping"});
         RWRoute router = new RWRoute(design, config) {
             @Override
-            protected NetWrapper createNetWrapperAndConnections(Net net) {
-                NetWrapper netWrapper = super.createNetWrapperAndConnections(net);
-                for (Connection connection : netWrapper.getConnections()) {
+            protected void determineRoutingTargets() {
+                // Once the alternate sinks are final: none preserved for another net, such as the blocker
+                // (whose preservation is asynchronous), nor used by another net
+                super.determineRoutingTargets();
+                for (Connection connection : indirectConnections) {
                     SitePinInst sink = connection.getSink();
-                    if (connection.isDirect() || !sink.isLUTInputPin()) {
+                    if (!sink.isLUTInputPin()) {
                         continue;
                     }
                     Set<String> pins = new TreeSet<>();
@@ -2011,7 +2014,6 @@ public class TestRWRoute {
                     }
                     candidates.put(sink.getSite().getName() + "/" + sink.getName(), pins);
                 }
-                return netWrapper;
             }
         };
         RWRoute.routeDesign(router);
@@ -2138,9 +2140,12 @@ public class TestRWRoute {
         Map<String, Set<String>> candidates = routeLutPinSwapping(design, false, "SLICE_X40Y61/A1");
 
         Set<String> a1a4 = new HashSet<>(Arrays.asList("A1", "A2", "A3", "A4"));
+        Set<String> a2a4 = new HashSet<>(Arrays.asList("A2", "A3", "A4"));
         Set<String> a5a6 = new HashSet<>(Arrays.asList("A5", "A6"));
-        for (int i = 1; i <= 3; i++) {
-            Assertions.assertEquals(a1a4, candidates.get("SLICE_X40Y61/A" + i));
+        // The blocked A1 is offered to no other input
+        Assertions.assertEquals(a1a4, candidates.get("SLICE_X40Y61/A1"));
+        for (int i = 2; i <= 3; i++) {
+            Assertions.assertEquals(a2a4, candidates.get("SLICE_X40Y61/A" + i));
         }
         Assertions.assertEquals(a5a6, candidates.get("SLICE_X40Y61/A5"));
         Assertions.assertEquals(a5a6, candidates.get("SLICE_X40Y61/A6"));
@@ -2178,7 +2183,9 @@ public class TestRWRoute {
 
         Set<String> a1a4 = new HashSet<>(Arrays.asList("A1", "A2", "A3", "A4"));
         for (int i = 1; i <= (lut6OutputO5 ? 4 : 3); i++) {
-            Assertions.assertEquals(a1a4, candidates.get("SLICE_X40Y61/A" + i));
+            // The blocked A1 (if so) is offered to no other input
+            Assertions.assertEquals(lut6OutputO5 || i == 1 ? a1a4 : new HashSet<>(Arrays.asList("A2", "A3", "A4")),
+                    candidates.get("SLICE_X40Y61/A" + i));
         }
         Assertions.assertEquals(lut6OutputO5 ? new HashSet<>(Arrays.asList("A5", "A6")) : Collections.singleton("A5"),
                 candidates.get("SLICE_X40Y61/A5"));
@@ -2215,9 +2222,10 @@ public class TestRWRoute {
 
         Cell cell = design.getCell(lut5Only ? "lut5" : "lut6");
         if (lut5Only) {
-            Set<String> a1a4 = new HashSet<>(Arrays.asList("A1", "A2", "A3", "A4"));
-            Assertions.assertEquals(a1a4, candidates.get("SLICE_X40Y61/A1"));
-            Assertions.assertEquals(a1a4, candidates.get("SLICE_X40Y61/A2"));
+            // The blocked A1 is offered to no other input
+            Assertions.assertEquals(new HashSet<>(Arrays.asList("A1", "A2", "A3", "A4")),
+                    candidates.get("SLICE_X40Y61/A1"));
+            Assertions.assertEquals(new HashSet<>(Arrays.asList("A2", "A3", "A4")), candidates.get("SLICE_X40Y61/A2"));
             Assertions.assertEquals(new HashSet<>(Arrays.asList("A5", "A6")), candidates.get("SLICE_X40Y61/A5"));
             String i0 = cell.getPhysicalPinMapping("I0");
             String i1 = cell.getPhysicalPinMapping("I1");
@@ -2227,9 +2235,10 @@ public class TestRWRoute {
             Assertions.assertEquals("A6", cell.getPhysicalPinMapping("I2"));
             assertVersalLaneLegal(null, cell);
         } else {
-            Set<String> all = new HashSet<>(Arrays.asList("A1", "A2", "A3", "A4", "A5", "A6"));
+            // Each of the blocked A1-A3 is offered to no other input
             for (int i = 1; i <= 3; i++) {
-                Assertions.assertEquals(all, candidates.get("SLICE_X40Y61/A" + i));
+                Assertions.assertEquals(new HashSet<>(Arrays.asList("A" + i, "A4", "A5", "A6")),
+                        candidates.get("SLICE_X40Y61/A" + i));
             }
             Set<String> pins = new HashSet<>();
             for (int i = 0; i < 3; i++) {
@@ -2238,6 +2247,36 @@ public class TestRWRoute {
             Assertions.assertEquals(new HashSet<>(Arrays.asList("A4", "A5", "A6")), pins);
             assertVersalLaneLegal(cell, null);
         }
+    }
+
+    /**
+     * Tests LUT pin swapping on Versal when an alternate sink is preserved for another net only after the
+     * connection's alternate sinks were computed (as when that net's preservation, which is asynchronous, completes
+     * late): a lone 5LUT cell's input on A5, whose only alternate is A6, loses it, so it must get an exclusive sink
+     * on A5 and be routed there.
+     */
+    @Test
+    public void testVersalLutPinSwappingAltSinkPreservedLate() {
+        Design design = createLutLaneDesign("xcvc1902", "SLICE_X40Y61", 'A', null, "LUT1 O=I0 e@A5", false);
+        Net other = design.createNet("other");
+        Node a6IMUX = design.getDevice().getSite("SLICE_X40Y61").getConnectedNode("A6").getAllUphillNodes().get(0);
+        RWRouteConfig config = new RWRouteConfig(new String[] {"--nonTimingDriven", "--lutPinSwapping"});
+        RWRoute router = new RWRoute(design, config) {
+            @Override
+            protected NetWrapper createNetWrapperAndConnections(Net net) {
+                NetWrapper netWrapper = super.createNetWrapperAndConnections(net);
+                for (Connection connection : netWrapper.getConnections()) {
+                    if (connection.getSink().getName().equals("A5")) {
+                        Assertions.assertEquals(1, connection.getAltSinkRnodes().size());
+                        routingGraph.preserve(a6IMUX, other);
+                    }
+                }
+                return netWrapper;
+            }
+        };
+        RWRoute.routeDesign(router);
+        assertAllPinsRouted(design);
+        Assertions.assertEquals("A5", design.getCell("lut5").getPhysicalPinMapping("I0"));
     }
 
     /**
@@ -2264,9 +2303,12 @@ public class TestRWRoute {
         Cell lut5Cell = design.getCell("lut5");
         Assertions.assertEquals("CASC", lut6.getPhysicalPinMapping("I0"));
         if (lut5Used) {
-            Set<String> a1a4 = new HashSet<>(Arrays.asList("B1", "B2", "B3", "B4"));
-            for (int i = 1; i <= 3; i++) {
-                Assertions.assertEquals(a1a4, candidates.get("SLICE_X40Y61/B" + i));
+            // The blocked B1 is offered to no other input
+            Assertions.assertEquals(new HashSet<>(Arrays.asList("B1", "B2", "B3", "B4")),
+                    candidates.get("SLICE_X40Y61/B1"));
+            for (int i = 2; i <= 3; i++) {
+                Assertions.assertEquals(new HashSet<>(Arrays.asList("B2", "B3", "B4")),
+                        candidates.get("SLICE_X40Y61/B" + i));
             }
             // (The 5LUT cell's input on A3 is its I1 when it uses CASC, its I0 otherwise)
             String lut5Pin = lut5.equals("both") ? "I1" : "I0";
@@ -2280,9 +2322,9 @@ public class TestRWRoute {
                 Assertions.assertEquals("A5", lut5Cell.getPhysicalPinMapping("I1"));
             }
         } else {
-            Set<String> noA5 = new HashSet<>(Arrays.asList("B1", "B2", "B3", "B4", "B6"));
-            Assertions.assertEquals(noA5, candidates.get("SLICE_X40Y61/B1"));
-            Assertions.assertEquals(noA5, candidates.get("SLICE_X40Y61/B2"));
+            // Never B5; and each of the blocked B1-B3 is offered to no other input
+            Assertions.assertEquals(new HashSet<>(Arrays.asList("B1", "B4", "B6")), candidates.get("SLICE_X40Y61/B1"));
+            Assertions.assertEquals(new HashSet<>(Arrays.asList("B2", "B4", "B6")), candidates.get("SLICE_X40Y61/B2"));
             Assertions.assertEquals(new HashSet<>(Arrays.asList("A4", "A6")),
                     new HashSet<>(Arrays.asList(lut6.getPhysicalPinMapping("I1"), lut6.getPhysicalPinMapping("I2"))));
         }
@@ -2308,9 +2350,7 @@ public class TestRWRoute {
         RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--lutPinSwapping"});
 
         Assertions.assertFalse(design.getModifiedNets().isEmpty());
-        for (Net net : design.getModifiedNets()) {
-            assertAllPinsRouted(net);
-        }
+        assertModifiedNetsRouted(design);
         long swapped = before.entrySet().stream().filter((e) -> !e.getValue().equals(getInputPinMappings(e.getKey())))
                 .count();
         Assertions.assertTrue(swapped > 0);
