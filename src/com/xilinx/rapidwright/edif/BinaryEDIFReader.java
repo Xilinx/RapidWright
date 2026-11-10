@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -212,7 +212,8 @@ public class BinaryEDIFReader {
     }
 
     /**
-     * Reads a binary EDIF (.bedf) file and creates a new EDIFNetlist object.
+     * Reads a binary EDIF (.bedf) file and creates a new EDIFNetlist object. Its macros are expanded
+     * (see {@link EDIFNetlist#expandMacroUnisims()}) if its part is known.
      * @param path Name of the file to read
      * @return The newly created netlist populated from the binary EDIF file
      * @see BinaryEDIFWriter#writeBinaryEDIF(Path, EDIFNetlist)
@@ -243,6 +244,9 @@ public class BinaryEDIFReader {
                 netlist.addComment(is.readString());
             }
             readEDIFDesign(is, strings, netlist);
+            // Netlists are written with their macros as they are in memory, which is expanded, but
+            // they may have been written collapsed
+            netlist.expandMacroUnisims();
             return netlist;
         }
     }

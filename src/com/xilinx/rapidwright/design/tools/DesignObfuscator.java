@@ -1,6 +1,6 @@
 /*
  *
- * Copyright (c) 2025, Advanced Micro Devices, Inc.
+ * Copyright (c) 2025-2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, AMD Advanced Research and Development.
@@ -172,7 +172,7 @@ public class DesignObfuscator {
      * @return The flattened, obfuscated design
      */
     public Design obfuscateDesign(Design d) {
-        // Flatten netlist first to remove all hierarchy (design macros are collapsed)
+        // Flatten netlist first to remove all hierarchy (design macros are leaf cells)
         EDIFNetlist flatNetlist = EDIFTools.createFlatNetlist(d.getNetlist(), d.getPartName());
         macros = Design.getMacroPrimitives(d.getSeries());
         
@@ -184,12 +184,19 @@ public class DesignObfuscator {
 
         for (EDIFCellInst inst : flatNetlist.getTopCell().getCellInsts()) {
             String obfuscatedName = hash(inst.getName());
-            EDIFCellInst oInst = new EDIFCellInst(obfuscatedName, inst.getCellType(), obfuscatedTop);
-            oInst.setPropertiesMap(inst.createDuplicatePropertiesMap());
-            obfuscatedTop.addCellInst(oInst);
-            if (!obfuscatedPrimLib.containsCell(inst.getCellType())) {
-                obfuscatedPrimLib.addCell(inst.getCellType());
+            EDIFCell cellType = inst.getCellType();
+            EDIFCell oCellType = obfuscatedPrimLib.getCell(cellType.getName());
+            if (oCellType == null) {
+                if (cellType.getLibrary().isHDIPrimitivesLibrary()) {
+                    // Copies an expanded macro along with the primitives it expands into
+                    obfuscatedNetlist.copyCellAndSubCells(cellType);
+                    oCellType = obfuscatedPrimLib.getCell(cellType.getName());
+                } else {
+                    oCellType = obfuscatedPrimLib.addCell(cellType);
+                }
             }
+            EDIFCellInst oInst = new EDIFCellInst(obfuscatedName, oCellType, obfuscatedTop);
+            oInst.setPropertiesMap(inst.createDuplicatePropertiesMap());
         }
         
         for (EDIFPort port : flatNetlist.getTopCell().getPorts()) {
@@ -220,8 +227,8 @@ public class DesignObfuscator {
             }
         }
         
-        // We need to re-expand the macros for proper placement and routing
-        // representation
+        // Macros need to be expanded for proper placement and routing representation (those
+        // copied from the flat netlist already are)
         obfuscatedNetlist.expandMacroUnisims(d.getSeries());
 
         // Create a clean new design, copy over some flags

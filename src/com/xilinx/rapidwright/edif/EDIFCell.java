@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -555,6 +556,31 @@ public class EDIFCell extends EDIFPropertyObject {
         return internalPortMap.remove(portInstName);
     }
 
+    /**
+     * Gives this leaf cell its own copies of its ports if it shares them with another cell, as a
+     * shallow copy does (see {@link #EDIFCell(EDIFLibrary, EDIFCell)}), so that contents can be
+     * added to it without modifying the other cell. Port instances that refer to the shared ports
+     * are not updated.
+     * @return A map from each shared port to its copy, or null if the cell's ports were its own.
+     */
+    Map<EDIFPort, EDIFPort> unshareLeafCellPorts() {
+        if (!isLeafCellOrBlackBox()) {
+            throw new IllegalStateException("Cell " + getName() + " is not a leaf cell");
+        }
+        if (ports == null || ports.values().stream().allMatch(p -> p.getParentCell() == this)) {
+            return null;
+        }
+        PortMap sharedPorts = ports;
+        ports = null;
+        // A leaf cell has no nets, so any internal port map it has is shared with the other cell
+        internalPortMap = null;
+        Map<EDIFPort, EDIFPort> copies = new IdentityHashMap<>();
+        for (EDIFPort port : sharedPorts.values()) {
+            copies.put(port, addPort(new EDIFPort(port)));
+        }
+        return copies;
+    }
+
     public Map<String, EDIFNet> getInternalNetMap() {
         if (internalPortMap == null) return Collections.emptyMap();
         return internalPortMap;
@@ -744,9 +770,40 @@ public class EDIFCell extends EDIFPropertyObject {
     public static final byte[] EXPORT_CONST_CELL_END = "   )\n".getBytes(StandardCharsets.UTF_8);
     public static final byte[] EXPORT_CONST_PROP_INDENT = "           ".getBytes(StandardCharsets.UTF_8);
 
+    /**
+     * Writes this cell as EDIF, as it is (see {@link #exportEDIF(OutputStream, EDIFWriteLegalNameCache, boolean,
+     * EDIFCollapsedView)}).
+     * <p>
+     * Netlists are not written with this method, but with the 4-argument one, so overriding this method has no
+     * effect when a netlist is written: override that one instead.
+     * @param os The stream to write to.
+     * @param cache The cache of legal EDIF names.
+     * @param stable If true, the contents of this cell are written in sorted order.
+     */
     public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException {
+        exportEDIF(os, cache, stable, null);
+    }
+
+    /**
+     * Writes this cell as EDIF, as it is in the given view of the netlist with its macros collapsed.
+     * @param os The stream to write to.
+     * @param cache The cache of legal EDIF names.
+     * @param stable If true, the contents of this cell are written in sorted order.
+     * @param collapsedView The view of the netlist with its macros collapsed, or null to write this
+     *                      cell as it is. Netlists are written with this method (see
+     *                      {@link EDIFNetlist#exportEDIF(OutputStream, boolean)}), so it is this
+     *                      method, and not the 3-argument one, that a subclass must override to change
+     *                      how its cells are written as part of a netlist.
+     */
+    public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable,
+            EDIFCollapsedView collapsedView) throws IOException {
         os.write(EXPORT_CONST_CELL_BEGIN);
-        exportEDIFName(os, cache);
+        if (collapsedView == null) {
+            exportEDIFName(os, cache);
+        } else {
+            String name = collapsedView.getName(this);
+            exportSomeEDIFName(os, name, cache.getEDIFRename(name));
+        }
         os.write(EXPORT_CONST_CELLTYPE);
         view.exportEDIFName(os, cache);
         os.write(EXPORT_CONST_VIEWTYPE);
@@ -754,10 +811,10 @@ public class EDIFCell extends EDIFPropertyObject {
             port.exportEDIF(os, cache, stable);
         }
         os.write(EXPORT_CONST_INTERFACE_END); // Interface end
-        if (hasContents()) {
+        if (hasContents() && (collapsedView == null || !collapsedView.isCollapsed(this))) {
             os.write(EXPORT_CONST_CONTENTS);
             for (EDIFCellInst i : EDIFTools.sortIfStable(getCellInsts(), stable)) {
-                i.exportEDIF(os, cache, stable);
+                i.exportEDIF(os, cache, stable, collapsedView);
             }
             for (EDIFNet n : EDIFTools.sortIfStable(getNets(), stable)) {
                 n.exportEDIF(os, cache, stable);

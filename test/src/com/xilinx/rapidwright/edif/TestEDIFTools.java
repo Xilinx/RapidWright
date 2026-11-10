@@ -1,7 +1,7 @@
 
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Jakob Wenzel, Xilinx Research Labs.
@@ -29,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -366,13 +367,17 @@ public class TestEDIFTools {
     @Test
     public void testCreateFlatNetlist() {
         Design d = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        int leaves = d.getNetlist().getAllLeafHierCellInstances().size();
         EDIFNetlist flatNetlist = EDIFTools.createFlatNetlist(d.getNetlist(), d.getPartName());
         Assertions.assertTrue(flatNetlist.getHierCellInstFromName("your_program").getCellType().isLeafCellOrBlackBox());
         Assertions.assertEquals(445, flatNetlist.getAllLeafHierCellInstances().size());
-        flatNetlist.collapseMacroUnisims(d.getDevice().getSeries());
-        Assertions.assertEquals(321, flatNetlist.getAllLeafHierCellInstances().size());
-        boolean includeBlackBoxes = true;
-        Assertions.assertEquals(322, flatNetlist.getAllLeafHierCellInstances(includeBlackBoxes).size());
+        // The flat top cell instantiates primitives (with macros as primitives) and black boxes
+        Collection<EDIFCellInst> flatInsts = flatNetlist.getTopCell().getCellInsts();
+        Assertions.assertEquals(321, flatInsts.stream()
+                .filter(i -> i.getCellType().getLibrary().isHDIPrimitivesLibrary()).count());
+        Assertions.assertEquals(322, flatInsts.size());
+        // The netlist that was flattened keeps its macros expanded
+        Assertions.assertEquals(leaves, d.getNetlist().getAllLeafHierCellInstances().size());
     }
 
     /**
