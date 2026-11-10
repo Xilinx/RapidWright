@@ -770,6 +770,16 @@ public class EDIFCell extends EDIFPropertyObject {
     public static final byte[] EXPORT_CONST_CELL_END = "   )\n".getBytes(StandardCharsets.UTF_8);
     public static final byte[] EXPORT_CONST_PROP_INDENT = "           ".getBytes(StandardCharsets.UTF_8);
 
+    /**
+     * Writes this cell as EDIF, as it is (see {@link #exportEDIF(OutputStream, EDIFWriteLegalNameCache, boolean,
+     * EDIFCollapsedView)}).
+     * <p>
+     * Netlists are not written with this method, but with the 4-argument one, so overriding this method has no
+     * effect when a netlist is written: override that one instead.
+     * @param os The stream to write to.
+     * @param cache The cache of legal EDIF names.
+     * @param stable If true, the contents of this cell are written in sorted order.
+     */
     public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException {
         exportEDIF(os, cache, stable, null);
     }
@@ -781,7 +791,9 @@ public class EDIFCell extends EDIFPropertyObject {
      * @param stable If true, the contents of this cell are written in sorted order.
      * @param collapsedView The view of the netlist with its macros collapsed, or null to write this
      *                      cell as it is. Netlists are written with this method (see
-     *                      {@link EDIFNetlist#exportEDIF(OutputStream, boolean)}).
+     *                      {@link EDIFNetlist#exportEDIF(OutputStream, boolean)}), so it is this
+     *                      method, and not the 3-argument one, that a subclass must override to change
+     *                      how its cells are written as part of a netlist.
      */
     public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable,
             EDIFCollapsedView collapsedView) throws IOException {

@@ -26,17 +26,13 @@
  */
 package com.xilinx.rapidwright.design.blocks;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Queue;
 import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 
 /**
@@ -92,7 +88,10 @@ public enum UtilizationType {
 
         int[] lutCounts = new int[7];
 
-        for (EDIFCellInst i : getPrimitiveInstances(design.getNetlist())) {
+        // Macros count as the primitive they are, rather than as the primitives they expand into
+        EDIFNetlist netlist = design.getNetlist();
+        for (EDIFHierCellInst i : netlist.getAllLeafDescendants(netlist.getTopHierCellInst(),
+                (cell) -> cell.getLibrary().isHDIPrimitivesLibrary())) {
             String type = i.getCellType().getName();
             switch (type) {
             case "LUT1":
@@ -198,28 +197,5 @@ public enum UtilizationType {
         map.put(CLB_REGS, map.getOrDefault(REGS_AS_FFS, 0) + map.getOrDefault(REGS_AS_LATCHES, 0));
         map.put(BRAMS, map.getOrDefault(RAMB36S_FIFOS, 0) + (map.getOrDefault(RAMB18S, 0) / 2));
         return map;
-    }
-
-    /**
-     * Gets every instance of a primitive in the netlist, once for each time it is in the hierarchy,
-     * with macros as primitives rather than the primitives they expand into.
-     * @param netlist The netlist.
-     * @return The instances of primitives (cells of the primitives library).
-     */
-    private static List<EDIFCellInst> getPrimitiveInstances(EDIFNetlist netlist) {
-        List<EDIFCellInst> insts = new ArrayList<>();
-        Queue<EDIFCellInst> toProcess = new ArrayDeque<>();
-        toProcess.add(netlist.getTopCellInst());
-        while (!toProcess.isEmpty()) {
-            EDIFCellInst curr = toProcess.poll();
-            for (EDIFCellInst child : curr.getCellType().getCellInsts()) {
-                if (child.getCellType().getLibrary().isHDIPrimitivesLibrary()) {
-                    insts.add(child);
-                } else {
-                    toProcess.add(child);
-                }
-            }
-        }
-        return insts;
     }
 }

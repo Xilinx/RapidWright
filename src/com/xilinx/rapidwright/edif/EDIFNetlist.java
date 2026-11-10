@@ -1116,6 +1116,11 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
+     * Write this netlist as EDIF to the given stream, which is closed afterwards. If the stream is that of a DCP being
+     * written (a {@link ParallelDCPOutput}), the EDIF is written and compressed in pieces (see
+     * {@link #exportEDIFPieces(ParallelDCPOutput, boolean)}), in parallel if parallel processing is enabled, that the
+     * stream adds to the DCP in order, each as soon as it is done; otherwise, it is written on this thread. Macros
+     * are written collapsed (see {@link EDIFCollapsedView}), without modifying the netlist.
      * @param out The stream to write to.
      * @param stable If true, the output is the same each time for the same netlist: the date is fixed, and libraries,
      *               cells, their contents and properties are written in sorted order. Except when written in pieces:
@@ -1635,15 +1640,27 @@ public class EDIFNetlist extends EDIFName {
      *         found.
      */
     public List<EDIFHierCellInst> getAllLeafDescendants(EDIFHierCellInst instance, boolean includeBlackBoxes) {
-        List<EDIFHierCellInst> leafCells = new ArrayList<>();
+        return getAllLeafDescendants(instance,
+                (cell) -> cell.isPrimitive() || (includeBlackBoxes && cell.isLeafCellOrBlackBox()));
+    }
 
+    /**
+     * Searches all lower levels of hierarchy to find the descendants of the given instance whose cell
+     * type the given predicate takes as a leaf. The descendants of such leaves are not searched.
+     *
+     * @param instance The instance to start searching from.
+     * @param isLeaf   Whether an instance of the given cell type is a leaf.
+     * @return A list of the leaf cell instances.
+     */
+    public List<EDIFHierCellInst> getAllLeafDescendants(EDIFHierCellInst instance, Predicate<EDIFCell> isLeaf) {
+        List<EDIFHierCellInst> leafCells = new ArrayList<>();
 
         Queue<EDIFHierCellInst> toProcess = new LinkedList<EDIFHierCellInst>();
         toProcess.add(instance);
 
         while (!toProcess.isEmpty()) {
             EDIFHierCellInst curr = toProcess.poll();
-            if (curr.getCellType().isPrimitive() || (includeBlackBoxes && curr.getCellType().isLeafCellOrBlackBox())) {
+            if (isLeaf.test(curr.getCellType())) {
                 leafCells.add(curr);
             } else {
                 curr.addChildren(toProcess);
@@ -2378,11 +2395,55 @@ public class EDIFNetlist extends EDIFName {
         expandMacroExceptions(macros, netlistPrims, seriesMacroExpandExceptionMap);
 
         // Expanding in place, rather than replacing each macro primitive with an expanded copy,
-        // leaves the instances of them as they are, so they need not be visited
+        // leaves the instances of them as they are, so they need not be visited. Except those of a
+        // macro primitive that shares its ports with another cell, which gets its own first
+        unshareMacroPorts(macros, netlistPrims);
         for (EDIFCell cell : new ArrayList<>(netlistPrims.getCells())) {
             EDIFCell macro = macros.getCell(cell.getName());
             if (macro != null) {
                 expandMacroCell(cell, macro, macros, netlistPrims, seriesMacroExpandExceptionMap);
+            }
+        }
+    }
+
+    /**
+     * Gives each macro primitive of this netlist that is yet to be expanded, and that shares its
+     * ports with another cell (as a shallow copy of a unisim cell does, such as one added with
+     * {@code EDIFLibrary.addCell(Design.getUnisimCell(...))}), its own copies of them, so that it can
+     * be expanded in place without modifying that other cell. The instances of such primitives are
+     * remapped to their new ports in a single pass over the netlist, and only if there are any.
+     * Primitives added to the primitives library while expanding are copies with their own ports.
+     */
+    private void unshareMacroPorts(EDIFLibrary macros, EDIFLibrary netlistPrims) {
+        Set<EDIFCell> unshared = Collections.newSetFromMap(new IdentityHashMap<>());
+        Map<EDIFPort, EDIFPort> portCopies = new IdentityHashMap<>();
+        for (EDIFCell cell : netlistPrims.getCells()) {
+            EDIFCell macro = macros.getCell(cell.getName());
+            if (macro == null || !cell.isLeafCellOrBlackBox() || macro.isLeafCellOrBlackBox()) {
+                continue;
+            }
+            Map<EDIFPort, EDIFPort> copies = cell.unshareLeafCellPorts();
+            if (copies != null) {
+                unshared.add(cell);
+                portCopies.putAll(copies);
+            }
+        }
+        if (unshared.isEmpty()) {
+            return;
+        }
+        for (EDIFLibrary lib : getLibraries()) {
+            for (EDIFCell cell : lib.getCells()) {
+                for (EDIFCellInst inst : cell.getCellInsts()) {
+                    if (!unshared.contains(inst.getCellType())) {
+                        continue;
+                    }
+                    for (EDIFPortInst portInst : inst.getPortInsts()) {
+                        EDIFPort port = portCopies.get(portInst.getPort());
+                        if (port != null) {
+                            portInst.setPort(port);
+                        }
+                    }
+                }
             }
         }
     }
@@ -2395,11 +2456,29 @@ public class EDIFNetlist extends EDIFName {
      */
     private void expandMacroExceptions(EDIFLibrary macros, EDIFLibrary netlistPrims,
             Map<String, Pair<String, EnumSet<IOStandard>>> seriesMacroExpandExceptionMap) {
-        // Only primitives that are instantiated need their instances found
-        List<EDIFCell> exceptionCells = new ArrayList<>();
+        List<EDIFCell> candidates = new ArrayList<>();
         for (String cellName : seriesMacroExpandExceptionMap.keySet()) {
             EDIFCell cell = netlistPrims.getCell(cellName);
             if (cell != null && cell.getNonHierInstantiationCount() > 0) {
+                candidates.add(cell);
+            }
+        }
+        if (candidates.isEmpty()) {
+            return;
+        }
+        // Only primitives instantiated outside the primitives library (that is, not only inside
+        // macros, which are not retargeted) need their instances found, by visiting the netlist
+        Map<EDIFCell, Integer> countsInPrims = new IdentityHashMap<>();
+        for (EDIFCell cell : netlistPrims.getCells()) {
+            for (EDIFCellInst inst : cell.getCellInsts()) {
+                if (candidates.contains(inst.getCellType())) {
+                    countsInPrims.merge(inst.getCellType(), 1, Integer::sum);
+                }
+            }
+        }
+        List<EDIFCell> exceptionCells = new ArrayList<>();
+        for (EDIFCell cell : candidates) {
+            if (cell.getNonHierInstantiationCount() > countsInPrims.getOrDefault(cell, 0)) {
                 exceptionCells.add(cell);
             }
         }
@@ -2491,13 +2570,6 @@ public class EDIFNetlist extends EDIFName {
             // Already expanded, or a primitive that only appears inside macros
             return;
         }
-        Map<EDIFPort, EDIFPort> portCopies = cell.unshareLeafCellPorts();
-        if (portCopies != null) {
-            // The cell shared its ports with another cell, as a shallow copy of a unisim cell (such as
-            // EDIFLibrary.addCell(Design.getUnisimCell(...))) does. It now has its own, so that it can be
-            // filled without modifying the other cell: its instances must refer to them instead
-            remapPortInsts(cell, portCopies);
-        }
         for (EDIFPort port : macro.getPorts()) {
             getOrAddPort(cell, port);
         }
@@ -2543,28 +2615,6 @@ public class EDIFNetlist extends EDIFName {
                                 seriesMacroExpandExceptionMap);
                     }
                     child.setCellType(newChildType);
-                }
-            }
-        }
-    }
-
-    /**
-     * Makes the port instances of each instance of the given cell in this netlist that refer to a
-     * port in the given map refer to the port it maps to instead.
-     */
-    private void remapPortInsts(EDIFCell cellType, Map<EDIFPort, EDIFPort> portMap) {
-        for (EDIFLibrary lib : getLibraries()) {
-            for (EDIFCell cell : lib.getCells()) {
-                for (EDIFCellInst inst : cell.getCellInsts()) {
-                    if (inst.getCellType() != cellType) {
-                        continue;
-                    }
-                    for (EDIFPortInst portInst : inst.getPortInsts()) {
-                        EDIFPort port = portMap.get(portInst.getPort());
-                        if (port != null) {
-                            portInst.setPort(port);
-                        }
-                    }
                 }
             }
         }

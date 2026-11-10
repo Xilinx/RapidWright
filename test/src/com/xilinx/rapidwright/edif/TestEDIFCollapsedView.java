@@ -39,6 +39,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IOStandard;
+import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.interchange.LogNetlistReader;
 import com.xilinx.rapidwright.interchange.LogNetlistWriter;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
@@ -277,6 +278,25 @@ public class TestEDIFCollapsedView {
         EDIFCell flatIbuf = flat.getTopCell().getCellInst("ibuf").getCellType();
         Assertions.assertNotSame(ibuf, flatIbuf);
         Assertions.assertNotNull(flatIbuf.getCellInst("IBUFCTRL_INST"));
+    }
+
+    @Test
+    public void testCreateNewNetlistFromCellInstRoundTripsExpanded(@TempDir Path dir) {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("top");
+        EDIFTools.ensureCorrectPartInEDIF(netlist, Device.AWS_F1);
+        EDIFCell sub = new EDIFCell(netlist.getWorkLibrary(), "sub");
+        sub.createChildCellInst("ibuf", netlist.getHDIPrimitive(Unisim.IBUF));
+        EDIFCellInst subInst = netlist.getTopCell().createChildCellInst("sub_inst", sub);
+        netlist.expandMacroUnisims(PartNameTools.getPart(Device.AWS_F1).getSeries());
+
+        // A netlist of the instance names the part of its source, so that reading what is written of it (with its
+        // macros collapsed) expands them again
+        EDIFNetlist subNetlist = EDIFTools.createNewNetlist(subInst);
+        Assertions.assertEquals(EDIFTools.getPartName(netlist), EDIFTools.getPartName(subNetlist));
+        Path edif = dir.resolve("sub.edf");
+        subNetlist.exportEDIF(edif);
+        EDIFNetlist read = EDIFTools.readEdifFile(edif);
+        Assertions.assertNotNull(read.getTopCell().getCellInst("ibuf").getCellType().getCellInst("IBUFCTRL_INST"));
     }
 
     @Test

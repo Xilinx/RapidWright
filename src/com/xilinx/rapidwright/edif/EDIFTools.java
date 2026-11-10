@@ -1325,6 +1325,12 @@ public class EDIFTools {
         EDIFDesign eDesign = new EDIFDesign(cellInst.getName());
         n.setDesign(eDesign);
         EDIFCell topCell = cellInst.getCellType();
+        // Name the part of the source netlist, as Vivado does in the EDIF of a cell: macros are written
+        // collapsed, and are only expanded again when the EDIF is read if it names its part
+        String partName = topCell.getNetlist() == null ? null : getPartName(topCell.getNetlist());
+        if (partName != null) {
+            eDesign.addProperty(EDIF_PART_PROP, partName);
+        }
         n.copyCellAndSubCells(topCell);
         eDesign.setTopCell(n.getLibrary(topCell.getLibrary().getName()).getCell(topCell.getName()));
         // If we have more than the primitives and work library, lets order the libraries in the same way
@@ -1812,18 +1818,8 @@ public class EDIFTools {
         EDIFLibrary work = flatNetlist.getWorkLibrary();
 
         // Find all leaf cell instances, with macros (any cell of the primitives library) as leaves
-        List<EDIFHierCellInst> leaves = new ArrayList<>();
-        Queue<EDIFHierCellInst> toProcess = new LinkedList<>();
-        netlist.getTopHierCellInst().addChildren(toProcess);
-        while (!toProcess.isEmpty()) {
-            EDIFHierCellInst inst = toProcess.poll();
-            EDIFCell type = inst.getCellType();
-            if (type.getLibrary().isHDIPrimitivesLibrary() || type.isLeafCellOrBlackBox()) {
-                leaves.add(inst);
-            } else {
-                inst.addChildren(toProcess);
-            }
-        }
+        List<EDIFHierCellInst> leaves = netlist.getAllLeafDescendants(netlist.getTopHierCellInst(),
+                (type) -> type.getLibrary().isHDIPrimitivesLibrary() || type.isLeafCellOrBlackBox());
 
         // Copy all leaf cell instances except VCC/GND, with macros copied expanded. The cells they
         // are copied with are found by identity, as other cells (such as black boxes from different
