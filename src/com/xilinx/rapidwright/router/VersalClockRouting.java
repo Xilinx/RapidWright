@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -298,12 +299,51 @@ public class VersalClockRouting {
                     + " while routing clock " + clk + ", skew will be suboptimal.");
         }
 
+        // The vertical distribution trees may not provide a path for every clock region of
+        // the range (e.g. for some clock region rows of multi-SLR devices): route those clock
+        // regions after the others, straight to a vertical distribution line of their own, and
+        // from any node of the distribution routed so far below the clock root
+        Map<ClockRegion, List<Pair<IntentCode, ClockRegion>>> distrPaths = new HashMap<>();
+        List<ClockRegion> spineCRsWithoutPath = new ArrayList<>();
+        // Only route to the vertical distribution lines of the clock region rows with sinks:
+        // those of the other rows would be left dangling
+        Set<Integer> rowsWithSinks = new HashSet<>();
+        for (ClockRegion cr : clockRegions) {
+            rowsWithSinks.add(cr.getInstanceY());
+        }
         for (ClockRegion cr : verticalSpineCRs) {
+            if (!rowsWithSinks.contains(cr.getInstanceY())) {
+                continue;
+            }
+            List<Pair<IntentCode, ClockRegion>> distrPath = getVDistrPath(clkTree, cr);
+            if (distrPath.isEmpty()) {
+                distrPath = getVDistrPath(null, cr);
+                spineCRsWithoutPath.add(cr);
+            }
+            distrPaths.put(cr, distrPath);
+        }
+        List<ClockRegion> spineCRsInRoutingOrder = new ArrayList<>(distrPaths.keySet());
+        spineCRsInRoutingOrder.sort(Comparator.comparingInt(ClockRegion::getInstanceY));
+        spineCRsInRoutingOrder.removeAll(spineCRsWithoutPath);
+        spineCRsInRoutingOrder.addAll(spineCRsWithoutPath);
+        Set<Node> distrNodes = new HashSet<>();
+
+        for (ClockRegion cr : spineCRsInRoutingOrder) {
             q.clear();
             visited.clear();
-            q.add(clockRootNode);
+            if (spineCRsWithoutPath.contains(cr) && !distrNodes.isEmpty()) {
+                // Branch off the vertical distribution already routed, below the clock root: starting from the
+                // VROUTE again could transition onto the vertical distribution a second time
+                for (Node n : distrNodes) {
+                    if (!n.equals(vroute)) {
+                        q.add(new NodeWithPrevAndCost(n));
+                    }
+                }
+            } else {
+                q.add(clockRootNode);
+            }
 
-            List<Pair<IntentCode, ClockRegion>> distrPath = getVDistrPath(clkTree, cr);
+            List<Pair<IntentCode, ClockRegion>> distrPath = distrPaths.get(cr);
             nextDistrLevel: for (Pair<IntentCode, ClockRegion> target : distrPath) {
                 IntentCode targetIC = target.getFirst();
                 ClockRegion targetCR = target.getSecond();
@@ -320,7 +360,9 @@ public class VersalClockRouting {
                         q.clear();
                         visited.clear();
                         q.add(curr);
-                        allPIPs.addAll(RouterHelper.getPIPsFromNodes(curr.getPrevPath()));
+                        List<Node> path = curr.getPrevPath();
+                        allPIPs.addAll(RouterHelper.getPIPsFromNodes(path));
+                        distrNodes.addAll(path);
                         if (targetIC == IntentCode.NODE_GLOBAL_VDISTR) {
                             crToVdist.put(cr, curr);
                         }
@@ -348,6 +390,10 @@ public class VersalClockRouting {
             if (!crToVdist.containsKey(cr)) {
                 ClockRegion correspondingCR = device.getClockRegion(cr.getRow(), x);
                 Node vNode = crToVdist.get(correspondingCR);
+                if (vNode == null) {
+                    throw new RuntimeException("ERROR: No vertical distribution line routed in clock region "
+                            + correspondingCR + " for clock region " + cr + " of clock " + clk);
+                }
                 crToVdist.put(cr, vNode);
             }
         }

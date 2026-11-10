@@ -25,6 +25,7 @@ package com.xilinx.rapidwright.rwroute;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -62,6 +63,7 @@ import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFTools;
@@ -590,6 +592,84 @@ public class TestGlobalSignalRouting {
         }
     }
 
+    /**
+     * A clock spanning the clock regions of three SLRs of a multi-SLR Versal device, for which
+     * the vertical distribution trees lack paths for some clock region rows: those must still
+     * get a vertical distribution line.
+     */
+    @Test
+    public void testVersalClockRoutingMultiSLRMissingVDistrPaths() {
+        Design design = new Design("versal_clk_multi_slr", "xcvp1802-lsvc4072-2MP-e-S");
+        EDIFCell top = design.getTopEDIFCell();
+        Device device = design.getDevice();
+        Net vcc = design.getVccNet();
+
+        Net clkIn = design.createNet("clkIn");
+        clkIn.getLogicalNet().createPortInst(top.createPort(clkIn.getName(), EDIFDirection.INPUT, 1));
+        Net clk = design.createNet("clk");
+        Cell bufgce = createBUFGCE(design, top, "bufgce", device.getSite("BUFGCE_X12Y23"));
+        clkIn.connect(bufgce, "I");
+        clk.connect(bufgce, "O");
+        vcc.connect(bufgce, "CE");
+
+        // One flip-flop in each of these clock regions (rows 2 to 11, in SLRs 0 to 3)
+        Set<String> clockRegions = new HashSet<>(Arrays.asList("X5Y5", "X5Y8", "X5Y11", "X7Y2", "X7Y3",
+                "X6Y3", "X5Y3"));
+        int i = 0;
+        for (Site site : device.getAllSitesOfType(SiteTypeEnum.SLICEL)) {
+            if (clockRegions.remove(site.getTile().getClockRegion().getName())) {
+                Cell ff = design.createAndPlaceCell("ff" + i++, Unisim.FDRE, site.getName() + "/AFF");
+                clk.connect(ff, "C");
+            }
+        }
+        Assertions.assertTrue(clockRegions.isEmpty(), clockRegions.toString());
+        design.routeSites();
+
+        GlobalSignalRouting.symmetricClkRouting(clk, device, (n) -> NodeStatus.AVAILABLE, new HashMap<>());
+
+        Map<Node, PIP> driver = new HashMap<>();
+        Set<Node> starts = new HashSet<>();
+        for (PIP pip : clk.getPIPs()) {
+            Node end = pip.isReversed() ? pip.getStartNode() : pip.getEndNode();
+            PIP other = driver.put(end, pip);
+            Assertions.assertNull(other, "Node " + end + " driven by " + pip + " and " + other);
+            starts.add(pip.isReversed() ? pip.getEndNode() : pip.getStartNode());
+        }
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        Set<Node> sinkNodes = new HashSet<>();
+        for (SitePinInst spi : clk.getPins()) {
+            Assertions.assertTrue(spi.isOutPin() || spi.isRouted(), spi.toString());
+            sinkNodes.add(spi.getConnectedNode());
+        }
+        // No dangling routing (e.g. to the vertical distribution of clock region rows without sinks)
+        for (Node end : driver.keySet()) {
+            Assertions.assertTrue(starts.contains(end) || sinkNodes.contains(end), "Dangling node " + end);
+        }
+        // A single clock root: one transition from the vertical routing, through clock muxes, onto the vertical
+        // distribution
+        Map<Node, List<Node>> fanouts = new HashMap<>();
+        for (PIP pip : driver.values()) {
+            Node start = pip.isReversed() ? pip.getEndNode() : pip.getStartNode();
+            fanouts.computeIfAbsent(start, (k) -> new ArrayList<>()).add(pip.isReversed() ? pip.getStartNode() : pip.getEndNode());
+        }
+        List<Node> roots = new ArrayList<>();
+        for (Map.Entry<Node, List<Node>> e : fanouts.entrySet()) {
+            if (e.getKey().getIntentCode() != IntentCode.NODE_GLOBAL_VROUTE) {
+                continue;
+            }
+            for (Node n : e.getValue()) {
+                Node mux = n;
+                while (mux.getIntentCode() == IntentCode.NODE_GLOBAL_GCLK && fanouts.getOrDefault(mux, Collections.emptyList()).size() == 1) {
+                    mux = fanouts.get(mux).get(0);
+                }
+                if (mux.getIntentCode().name().startsWith("NODE_GLOBAL_VDISTR")) {
+                    roots.add(n);
+                }
+            }
+        }
+        Assertions.assertEquals(1, roots.size(), roots.toString());
+    }
+  
     /**
      * Clocks driving the clock inputs of hard blocks on xcvc1902 that are not reached from a leaf
      * clock buffer (LCB) of their own clock region: the APB3CLK input of a GTY_QUAD (through a
