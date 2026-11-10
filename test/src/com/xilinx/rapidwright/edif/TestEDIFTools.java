@@ -375,6 +375,47 @@ public class TestEDIFTools {
         Assertions.assertEquals(322, flatNetlist.getAllLeafHierCellInstances(includeBlackBoxes).size());
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"logic", "work"})
+    public void testCreateFlatNetlistLibraryReferences(String libraryName, @TempDir Path dir)
+            throws Exception {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("top");
+        EDIFLibrary lib = netlist.getLibrary(libraryName);
+        if (lib == null) {
+            lib = netlist.addLibrary(new EDIFLibrary(libraryName));
+        }
+        EDIFCell sink = new EDIFCell(lib, "sink");
+        sink.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCell top = netlist.getTopCell();
+        EDIFNet net = top.createNet("n");
+        net.createPortInst(top.createPort("A", EDIFDirection.INPUT, 1));
+        for (String name : new String[] {"u", "v"}) {
+            net.createPortInst("I", top.createChildCellInst(name, sink));
+        }
+
+        EDIFNetlist flatNetlist = EDIFTools.createFlatNetlist(netlist, "xc7a35tcpg236-1");
+        EDIFCell flatType = flatNetlist.getWorkLibrary().getCell("sink");
+        for (EDIFCellInst inst : flatNetlist.getTopCell().getCellInsts()) {
+            if (inst.getCellName().equals("sink")) {
+                Assertions.assertSame(flatType, inst.getCellType());
+            }
+        }
+        Assertions.assertSame(lib, sink.getLibrary());
+
+        Path output = dir.resolve("flat.edf");
+        flatNetlist.exportEDIF(output, true);
+        try (EDIFParser parser = new EDIFParser(output)) {
+            EDIFCell reloadedTop = parser.parseEDIFNetlist().getTopCell();
+            EDIFNet reloadedNet = reloadedTop.getNet("n");
+            Assertions.assertEquals(3, reloadedNet.getPortInsts().size());
+            Assertions.assertSame(reloadedNet, reloadedTop.getInternalNet("A"));
+            for (String name : new String[] {"u", "v"}) {
+                Assertions.assertSame(reloadedNet,
+                        reloadedTop.getCellInst(name).getPortInst("I").getNet());
+            }
+        }
+    }
+
     /**
      * In the provided directory, it will create 3 files: (1) <name>.dcp, (2)
      * <name>.edf, (3) dummy.edn. This is to simulate a DCP that contains encrypted
