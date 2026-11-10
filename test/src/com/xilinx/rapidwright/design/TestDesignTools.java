@@ -53,6 +53,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
@@ -2683,6 +2684,27 @@ public class TestDesignTools {
     }
 
     @Test
+    public void testGetPortInstsFromSitePinInstUnconnectedLogicalPin() {
+        Device device = Device.getDevice("xcvu3p");
+        Design design = new Design("design", device.getName());
+
+        Cell ff1 = design.createAndPlaceCell("ff1", Unisim.FDRE, "SLICE_X0Y0/AFF");
+        Cell ff2 = design.createAndPlaceCell("ff2", Unisim.FDRE, "SLICE_X0Y0/AFF2");
+        SiteInst si = ff1.getSiteInst();
+        Net net = design.createNet("net");
+        SitePinInst spi = net.createPin("A6", si);
+        new EDIFPortInst(ff1.getEDIFCellInst().getPort("D"), null, ff1.getEDIFCellInst());
+        // ff2's D is mapped to its BEL pin but has no port instance in the netlist
+        Assertions.assertNotNull(ff2.getPhysicalPinMapping("D"));
+        Assertions.assertNull(ff2.getEDIFCellInst().getPortInst("D"));
+
+        Assertions.assertTrue(si.routeIntraSiteNet(net, spi.getBELPin(), ff1.getBEL().getPin("D")));
+        Assertions.assertTrue(si.routeIntraSiteNet(net, spi.getBELPin(), ff2.getBEL().getPin("D")));
+
+        Assertions.assertEquals("[ff1/D]", DesignTools.getPortInstsFromSitePinInst(spi).toString());
+    }
+
+    @Test
     public void testCalculateUtilization() {
         Design design = RapidWrightDCP.loadDCP("bnn.dcp");
 
@@ -2809,6 +2831,25 @@ public class TestDesignTools {
             Assertions.assertNotNull(srSpi);
             Assertions.assertEquals(vcc, srSpi.getNet());
         }
+    }
+
+    @Test
+    public void testCreateCeSrRstPinsToVCCUnplacedCell() {
+        Design design = new Design("test", "xcvu3p");
+        Cell placed = design.createAndPlaceCell("ff", Unisim.FDRE, "SLICE_X0Y0/AFF");
+        // A flip-flop (and a block RAM) in the design but not placed: nothing to tie, no failure
+        Cell unplaced = design.createCell("ff_unplaced", Unisim.FDRE);
+        design.createCell("ram_unplaced", Unisim.RAMB36E2);
+        Assertions.assertNull(unplaced.getSiteInst());
+        Assertions.assertTrue(design.getCells().contains(unplaced));
+
+        DesignTools.createPossiblePinsToStaticNets(design);
+
+        Pair<String, String> sitePinNames = DesignTools.belTypeSitePinNameMapping.get(Series.UltraScalePlus)
+                .get(placed.getBEL().getBELType());
+        SiteInst si = placed.getSiteInst();
+        Assertions.assertEquals(design.getVccNet(), si.getSitePinInst(sitePinNames.getFirst()).getNet());
+        Assertions.assertEquals(design.getVccNet(), si.getSitePinInst(sitePinNames.getSecond()).getNet());
     }
 
     @Test
@@ -3400,6 +3441,25 @@ public class TestDesignTools {
         }
     }
 
+    /**
+     * Two flip-flop-site gates in one Versal SLICE: routing the CE of the first one through the
+     * CE IMR adds a routethru cell to the site, which must not break the iteration over its cells.
+     */
+    @Test
+    public void testCreateCeClkOfRoutethruFFToVCCTwoCellsInSite() {
+        Design design = new Design("testCreateCeClkOfRoutethruFFToVCCTwoCellsInSite", "xcvp1202");
+        Cell and = design.createAndPlaceCell("and", Unisim.AND2B1L, "SLICE_X64Y105/AFF");
+        Cell or = design.createAndPlaceCell("or", Unisim.OR2L, "SLICE_X64Y105/BFF");
+
+        DesignTools.createCeClkOfRoutethruFFToVCC(design);
+
+        SiteInst si = and.getSiteInst();
+        Assertions.assertSame(si, or.getSiteInst());
+        Assertions.assertTrue(si.getSitePinInst("CKEN1").getNet().isVCCNet());
+        Assertions.assertTrue(si.getSitePinInst("CLK").getNet().isVCCNet());
+        Assertions.assertTrue(si.getNetFromSiteWire("FF_CLK_MOD_CLK_OUT").isGNDNet());
+    }
+
     @Test
     public void testFullyUnplaceCell() {
         Design d = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
@@ -3502,5 +3562,28 @@ public class TestDesignTools {
         DesignTools.fullyUnplaceCell(ram, null);
 
         Assertions.assertFalse(ram.isPlaced());
+    }
+
+    /**
+     * A Versal XPHY cell without a logical cell (as for one inside encrypted IP) is skipped, rather than throwing a
+     * NullPointerException.
+     */
+    @Test
+    public void testUpdateVersalXPHYPinsForDMCWithoutLogicalCell() {
+        Design design = new Design("test", "xcvc1902-vsva2197-2MP-e-S");
+        Site site = design.getDevice().getAllSitesOfType(SiteTypeEnum.XPHY)[0];
+        Cell cell = design.createAndPlaceCell("xphy", Unisim.XPHY, site.getName() + "/XPHY");
+        Assertions.assertNotNull(cell.getEDIFHierCellInst());
+        // No logical cell, as for a cell inside encrypted IP
+        design.getTopEDIFCell().removeCellInst("xphy");
+        cell.setEDIFHierCellInst(null);
+        cell.setType("XPHY");
+        Assertions.assertNull(cell.getEDIFHierCellInst());
+        Assertions.assertEquals("XPHY", cell.getType());
+
+        DesignTools.updateVersalXPHYPinsForDMC(design);
+
+        Assertions.assertSame(cell, design.getCell("xphy"));
+        Assertions.assertTrue(cell.isPlaced());
     }
 }

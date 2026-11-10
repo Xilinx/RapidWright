@@ -216,11 +216,13 @@ public class RouterHelper {
         final boolean isLagunaRXD = Utils.isLaguna(sink.getTile().getTileTypeEnum());
         assert(!isLagunaRXD || input.getName().startsWith("RXD"));
 
-        int watchdog = 40;
+        int watchdog = 100;
 
         // Starting from the SPI's connected node, perform an uphill breadth-first search
         Queue<Node> queue = new ArrayDeque<>();
         queue.add(sink);
+        Set<Node> visited = new HashSet<>();
+        visited.add(sink);
         while (!queue.isEmpty() && watchdog >= 0) {
             Node node = queue.poll();
             watchdog--;
@@ -236,6 +238,17 @@ public class RouterHelper {
                     continue;
                 }
                 if (uphillTileType != sinkTileType && Utils.isClocking(uphillTileType)) {
+                    continue;
+                }
+                IntentCode uphillIntentCode = uphill.getIntentCode();
+                if (uphillIntentCode.isUltraScaleClocking() || uphillIntentCode.isVersalClocking() ||
+                        uphill.isTiedToVcc()) {
+                    // Global clock routing and VCC do not lead back to an INT tile; skip them so that they do
+                    // not exhaust the search (e.g. for the CLK_IN of a BUFGCE in a CMT tile, which is fed by
+                    // many clock routing tracks and MMCM/PLL outputs besides its inputs from the fabric)
+                    continue;
+                }
+                if (!visited.add(uphill)) {
                     continue;
                 }
                 queue.add(uphill);
@@ -631,6 +644,54 @@ public class RouterHelper {
         return 0;
     }
 
+    /** Maximum number of nodes after the source node on a dedicated path (see {@link #isDedicatedConnection}). */
+    private static final int MAX_DEDICATED_PATH_LENGTH = 3;
+
+    /**
+     * Checks whether an input pin is driven by an output pin through dedicated resources only, i.e. a short
+     * path that does not enter an INT tile, such as from a global clock-capable IOB input to a clock buffer
+     * of its bank or CMT. Such a connection is best routed directly (as Vivado does) rather than projected
+     * onto INT tiles and routed through the fabric, where several clock buffers can share a single input
+     * (e.g. the BUFGCE_HDIOs of a RCLK_HDIO tile).
+     * @param source The output pin.
+     * @param sink The input pin.
+     * @return true, if the sink pin's node can be reached from the source pin's node through at most
+     * {@value #MAX_DEDICATED_PATH_LENGTH} nodes, none in an INT tile.
+     */
+    public static boolean isDedicatedConnection(SitePinInst source, SitePinInst sink) {
+        Node sourceNode = source.getConnectedNode();
+        Node sinkNode = sink.getConnectedNode();
+        if (sourceNode == null || sinkNode == null ||
+                Utils.isInterConnect(sourceNode.getTile().getTileTypeEnum()) ||
+                Utils.isInterConnect(sinkNode.getTile().getTileTypeEnum())) {
+            return false;
+        }
+        // As findPathBetweenNodes() does, only cross clocking tiles if the source or sink is in one
+        final boolean blockClocking = !Utils.isClocking(sourceNode.getTile().getTileTypeEnum()) &&
+                !Utils.isClocking(sinkNode.getTile().getTileTypeEnum());
+        List<Node> level = Collections.singletonList(sourceNode);
+        Set<Node> visited = new HashSet<>(level);
+        for (int length = 1; length <= MAX_DEDICATED_PATH_LENGTH && !level.isEmpty(); length++) {
+            List<Node> nextLevel = new ArrayList<>();
+            for (Node node : level) {
+                for (Node downhill : node.getAllDownhillNodes()) {
+                    if (downhill.equals(sinkNode)) {
+                        return true;
+                    }
+                    TileTypeEnum tileType = downhill.getTile().getTileTypeEnum();
+                    if (Utils.isInterConnect(tileType) || (blockClocking && Utils.isClocking(tileType))) {
+                        continue;
+                    }
+                    if (visited.add(downhill)) {
+                        nextLevel.add(downhill);
+                    }
+                }
+            }
+            level = nextLevel;
+        }
+        return false;
+    }
+
     /**
      * Routes and assigns nodes to a direct connection, e.g. carry chain connections and connections between cascaded BRAMs.
      * @param directConnection The target direct connection.
@@ -653,7 +714,8 @@ public class RouterHelper {
             return Collections.emptyList(); // for pins without additional projected int_node
         }
         if (source.getAllDownhillNodes().contains(sink)) {
-            return Arrays.asList(sink, source);
+            // Modifiable: RouteFixer rewrites the nodes of every connection of a net it fixes
+            return new ArrayList<>(Arrays.asList(sink, source));
         }
         NodeWithPrev sourcer = new NodeWithPrev(source);
         sourcer.setPrev(null);

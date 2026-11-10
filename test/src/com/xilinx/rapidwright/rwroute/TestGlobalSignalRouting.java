@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.rwroute;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -30,6 +31,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
@@ -38,6 +41,7 @@ import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.design.Cell;
@@ -50,6 +54,7 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.device.BEL;
+import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
@@ -245,6 +250,68 @@ public class TestGlobalSignalRouting {
         }
     }
 
+    /**
+     * Whether the slice output is a static source, checked separately for GND and for VCC, which must agree.
+     */
+    private static boolean isStaticSource(Design design, Site site, String sitePinName) {
+        Node node = site.getConnectedNode(sitePinName);
+        Assertions.assertEquals(IntentCode.NODE_CLE_OUTPUT, node.getIntentCode());
+        SitePin gndSitePin = GlobalSignalRouting.getStaticSourceSitePin(design, node, NetType.GND);
+        SitePin vccSitePin = GlobalSignalRouting.getStaticSourceSitePin(design, node, NetType.VCC);
+        Assertions.assertEquals(gndSitePin != null, vccSitePin != null,
+                sitePinName + ": GND source " + gndSitePin + ", VCC source " + vccSitePin);
+        for (SitePin sitePin : Arrays.asList(gndSitePin, vccSitePin)) {
+            if (sitePin != null) {
+                Assertions.assertEquals(site, sitePin.getSite());
+                Assertions.assertEquals(sitePinName, sitePin.getPinName());
+            }
+        }
+        return gndSitePin != null;
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"SLICE_X44Y62" /* SLICEL */, "SLICE_X45Y62" /* SLICEM */})
+    public void testVersalStaticSourceSkipsSliceOutputOfUsedFF(String siteName) {
+        Design design = new Design("versal_static_source_ff", "xcvc1902-vsva2197-2MP-e-S");
+        Site site = design.getDevice().getSite(siteName);
+        SiteInst si = design.createSiteInst(site);
+        Assertions.assertTrue(isStaticSource(design, site, "AQ"));
+        Assertions.assertTrue(isStaticSource(design, site, "A_O"));
+
+        // FDRE on AFF with D from AX through the BYP input of FFMUXA1 and Q unconnected:
+        // the AQ site wire carries no net, but OUTMUXA1 must still be able to select AFF.Q
+        Cell ff = design.createAndPlaceCell("ff", Unisim.FDRE, siteName + "/AFF");
+        Net d = design.createNet("d");
+        si.routeIntraSiteNet(d, si.getBELPin("AX", "AX"), si.getBELPin("AX_IMR", "D"));
+        si.routeIntraSiteNet(d, si.getBELPin("AX_IMR", "Q"), ff.getBEL().getPin("D"));
+        Assertions.assertEquals(d, si.getNetFromSiteWire("FFMUXA1_OUT1"));
+        Assertions.assertNull(si.getNetFromSiteWire("AQ"));
+
+        Assertions.assertFalse(isStaticSource(design, site, "AQ"));
+        // The A LUTs remain unused, so A_O is still a valid source, as are the other letters
+        Assertions.assertTrue(isStaticSource(design, site, "A_O"));
+        Assertions.assertTrue(isStaticSource(design, site, "BQ"));
+        Assertions.assertTrue(isStaticSource(design, site, "B_O"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"SLICE_X44Y62" /* SLICEL */, "SLICE_X45Y62" /* SLICEM */})
+    public void testVersalStaticSourceSkipsSliceOutputOfUsed5LUT(String siteName) {
+        Design design = new Design("versal_static_source_lut5", "xcvc1902-vsva2197-2MP-e-S");
+        Site site = design.getDevice().getSite(siteName);
+        SiteInst si = design.createSiteInst(site);
+
+        // Only the 5LUT is used: its O5 output needs A6 to be held high, so the 6LUT's O6
+        // output (A_O, also reaching AQ through FFMUXA1 and OUTMUXA1) is not a free constant
+        design.createAndPlaceCell("lut", Unisim.LUT2, siteName + "/A5LUT");
+        Assertions.assertNull(si.getCell("A6LUT"));
+
+        Assertions.assertFalse(isStaticSource(design, site, "A_O"));
+        Assertions.assertFalse(isStaticSource(design, site, "AQ"));
+        Assertions.assertTrue(isStaticSource(design, site, "B_O"));
+        Assertions.assertTrue(isStaticSource(design, site, "BQ"));
+    }
+
     // This is a minimized testcase from the result of GlobalSignalRouter
     @ParameterizedTest
     @CsvSource({
@@ -336,6 +403,54 @@ public class TestGlobalSignalRouting {
     }
 
     @Test
+    public void testSymmetricClkRoutingPS8ClockInputs() {
+        // The PS8 tile of an UltraScale+ device is outside the clock regions: its clock inputs are reached through
+        // leaf clock buffers of the clock regions of their INT tiles
+        Design design = new Design("ps8_clk", "xczu3eg-sfvc784-2-e");
+        Device device = design.getDevice();
+        Net clk = design.createNet("clk");
+        clk.connect(design.createAndPlaceCell("bufgce", Unisim.BUFGCE, "BUFGCE_X0Y2/BUFCE"), "O");
+        SiteInst ps8 = design.createSiteInst(device.getSite("PS8_X0Y0"));
+        Assertions.assertNull(ps8.getTile().getClockRegion());
+        List<SitePinInst> sinks = new ArrayList<>();
+        for (String pin : new String[]{"PL_GP0_CLOCKIN", "PL_GP2_CLOCKIN"}) {
+            sinks.add(clk.createPin(pin, ps8));
+        }
+
+        GlobalSignalRouting.symmetricClkRouting(clk, device, (n) -> NodeStatus.AVAILABLE, new HashMap<>());
+
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        for (SitePinInst sink : sinks) {
+            Assertions.assertTrue(sink.isRouted(), sink.toString());
+        }
+    }
+
+    @Test
+    public void testSymmetricClkRoutingBitsliceFifoClk() {
+        // The CLB2PHY_FIFO_CLK input of an UltraScale+ BITSLICE_RX_TX is only reached from its INT tile node through
+        // a route-thru of a site of the XIPHY_BYTE tile (as Vivado routes it)
+        Design design = new Design("bitslice_fifo_clk", "xcvu3p-ffvc1517-2-e");
+        Device device = design.getDevice();
+        Net clk = design.createNet("clk");
+        clk.connect(design.createAndPlaceCell("bufgce", Unisim.BUFGCE, "BUFGCE_X0Y21/BUFCE"), "O");
+        Cell ff = design.createAndPlaceCell("ff", Unisim.FDRE, "SLICE_X55Y30/AFF");
+        clk.connect(ff, "C");
+        design.getVccNet().connect(ff, "CE");
+        design.getGndNet().connect(ff, "D");
+        design.getGndNet().connect(ff, "R");
+        SiteInst bitslice = design.createSiteInst(device.getSite("BITSLICE_RX_TX_X0Y23"));
+        SitePinInst fifoClk = clk.createPin("CLB2PHY_FIFO_CLK", bitslice);
+        design.routeSites();
+
+        GlobalSignalRouting.symmetricClkRouting(clk, device, (n) -> NodeStatus.AVAILABLE, new HashMap<>());
+
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        Assertions.assertTrue(fifoClk.isRouted());
+        Assertions.assertTrue(clk.getPIPs().stream().anyMatch((pip) -> pip.isRouteThru() &&
+                pip.getTile() == fifoClk.getTile()));
+    }
+
+    @Test
     public void testSymmetricClkRouting() {
         Design design = RapidWrightDCP.loadDCP("two_clk_check_NetTools.dcp");
         design.unrouteDesign();
@@ -366,6 +481,112 @@ public class TestGlobalSignalRouting {
             Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
         } else {
             System.err.println("WARNING: vivado not on PATH");
+        }
+    }
+
+    @Test
+    public void testSymmetricClkRoutingUltraScalePlusMultiSLR() {
+        // A clock spanning most of the clock region rows of a 4-SLR device, with two clock
+        // regions per row: each row buffer of the vertical distribution column must be driven
+        // only once, even when a row is also passed through to reach the rows beyond it
+        Design design = new Design("us_clk_multi_slr", "xcvu13p-fsga2577-1-i");
+        Device device = design.getDevice();
+        Net clk = design.createNet("clk");
+        Net vcc = design.getVccNet();
+        Net gnd = design.getGndNet();
+        Cell bufgce = design.createAndPlaceCell("bufgceInst", Unisim.BUFGCE, "BUFGCE_X0Y120/BUFCE");
+        clk.connect(bufgce, "O");
+
+        // One flip-flop in each of 17 clock regions spanning rows 2 to 12 (SLRs 0 to 3); the order
+        // matters, as it determines the order in which the clock regions are routed
+        String[] sinkSites = {"SLICE_X117Y570", "SLICE_X114Y575", "SLICE_X116Y621", "SLICE_X113Y724",
+                "SLICE_X117Y720", "SLICE_X116Y717", "SLICE_X116Y489", "SLICE_X116Y352", "SLICE_X118Y352",
+                "SLICE_X113Y183", "SLICE_X117Y183", "SLICE_X117Y166", "SLICE_X110Y163", "SLICE_X117Y240",
+                "SLICE_X116Y298", "SLICE_X116Y361", "SLICE_X117Y369"};
+        int i = 0;
+        for (String site : sinkSites) {
+            Cell ff = design.createAndPlaceCell("ff" + i++, Unisim.FDRE, site + "/AFF");
+            clk.connect(ff, "C");
+            vcc.connect(ff, "CE");
+            gnd.connect(ff, "D");
+            gnd.connect(ff, "R");
+        }
+        design.routeSites();
+
+        GlobalSignalRouting.symmetricClkRouting(clk, device, (n) -> NodeStatus.AVAILABLE, new HashMap<>());
+
+        Map<Node, PIP> driver = new HashMap<>();
+        Set<Node> starts = new HashSet<>();
+        for (PIP pip : clk.getPIPs()) {
+            Node start = pip.isReversed() ? pip.getEndNode() : pip.getStartNode();
+            Node end = pip.isReversed() ? pip.getStartNode() : pip.getEndNode();
+            starts.add(start);
+            PIP other = driver.put(end, pip);
+            Assertions.assertNull(other, "Node " + end + " driven by " + pip + " and " + other);
+        }
+        // No undriven routing (an island) other than at the clock source
+        Node source = clk.getSource().getConnectedNode();
+        for (Node start : starts) {
+            Assertions.assertTrue(start.equals(source) || driver.containsKey(start), "Undriven node " + start);
+        }
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        for (SitePinInst spi : clk.getPins()) {
+            Assertions.assertTrue(spi.isRouted(), spi.toString());
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "CLKFBIN,''",
+            "CLKIN1,SLICE_X50Y30 SLICE_X50Y100",
+            // The only flip-flop above the centroid: no downward branch of the clock tree
+            "CLKIN1,SLICE_X50Y250"
+    })
+    public void testSymmetricClkRoutingUltraScalePlusMMCMInput(String mmcmPinName, String flipFlopSites) {
+        // A clock driving the clock input or the feedback clock input of an MMCM: such an input is reached from
+        // the horizontal distribution through the clock muxes of the CMT tile, not from an INT tile through a
+        // leaf clock buffer
+        Design design = new Design("us_clk_mmcm_input", "xcvu3p");
+        Device device = design.getDevice();
+        Net clk = design.createNet("clk");
+        Net vcc = design.getVccNet();
+        Net gnd = design.getGndNet();
+        Cell bufgce = design.createAndPlaceCell("bufgceInst", Unisim.BUFGCE, "BUFGCE_X0Y0/BUFCE");
+        clk.connect(bufgce, "O");
+        Cell mmcm = design.createAndPlaceCell("mmcmInst", Unisim.MMCME4_ADV, "MMCM_X0Y0/MMCM");
+        clk.connect(mmcm, mmcmPinName);
+        int i = 0;
+        for (String site : flipFlopSites.split(" ")) {
+            if (site.isEmpty()) continue;
+            Cell ff = design.createAndPlaceCell("ff" + i++, Unisim.FDRE, site + "/AFF");
+            clk.connect(ff, "C");
+            vcc.connect(ff, "CE");
+            gnd.connect(ff, "D");
+            gnd.connect(ff, "R");
+        }
+        design.routeSites();
+        SitePinInst mmcmPin = mmcm.getSiteInst().getSitePinInst(mmcmPinName);
+        Assertions.assertNotNull(mmcmPin);
+        Assertions.assertEquals(clk, mmcmPin.getNet());
+
+        GlobalSignalRouting.symmetricClkRouting(clk, device, (n) -> NodeStatus.AVAILABLE, new HashMap<>());
+
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        for (SitePinInst spi : clk.getPins()) {
+            Assertions.assertTrue(spi.isRouted(), spi.toString());
+        }
+        // No dangling routing (an antenna): each node driven by the clock drives another one or is a sink
+        Set<Node> driving = new HashSet<>();
+        Set<Node> driven = new HashSet<>();
+        for (PIP pip : clk.getPIPs()) {
+            driving.add(pip.isReversed() ? pip.getEndNode() : pip.getStartNode());
+            driven.add(pip.isReversed() ? pip.getStartNode() : pip.getEndNode());
+        }
+        for (SitePinInst spi : clk.getPins()) {
+            driving.add(spi.getConnectedNode());
+        }
+        for (Node node : driven) {
+            Assertions.assertTrue(driving.contains(node), "Antenna " + node);
         }
     }
 
@@ -515,6 +736,31 @@ public class TestGlobalSignalRouting {
         Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
     }
 
+    @Test
+    public void testSymmetricClkRoutingUnreachableDistributionLine() {
+        // Every horizontal distribution node of the clock region row of a sink is used by other nets (the nodes
+        // of the neighboring clock regions of the row can reach it too): routing must fail rather than search the
+        // clock distribution network, whose wires are linked both ways, indefinitely
+        Design design = new Design("unreachable", "xcku9p-ffve900-2-e");
+        Net clk = design.createNet("clk");
+        clk.connect(design.createAndPlaceCell("bufgce", Unisim.BUFGCE, "BUFGCE_HDIO_X0Y2/BUFCE"), "O");
+        int i = 0;
+        for (int y : new int[]{275, 247, 230, 380}) {
+            clk.connect(design.createAndPlaceCell("ff" + i++, Unisim.FDRE, "SLICE_X32Y" + y + "/AFF"), "C");
+        }
+        ClockRegion blocked = design.getDevice().getSite("SLICE_X32Y380").getTile().getClockRegion();
+
+        RuntimeException e = Assertions.assertTimeoutPreemptively(Duration.ofSeconds(60), () ->
+                Assertions.assertThrows(RuntimeException.class, () ->
+                        GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(),
+                                (n) -> n.getIntentCode() == IntentCode.NODE_GLOBAL_HDISTR &&
+                                        n.getTile().getClockRegion() != null &&
+                                        n.getTile().getClockRegion().getRow() == blocked.getRow() ?
+                                        NodeStatus.UNAVAILABLE : NodeStatus.AVAILABLE,
+                                new HashMap<>())));
+        Assertions.assertTrue(e.getMessage().startsWith("ERROR: Unable to route clock " + clk), e.getMessage());
+    }
+
     private static Cell createBUFGCE(Design design, EDIFCell parent, String name, Site location) {
         // TODO - An improved version of this method is coming in ArrayBuilder
         Cell bufgce = design.createAndPlaceCell(parent, name, Unisim.BUFGCE, location, location.getBEL("BUFCE"));
@@ -638,5 +884,293 @@ public class TestGlobalSignalRouting {
         Assertions.assertTrue(foundVDistrInX3Y2);
 
         VivadoToolsHelper.assertFullyRouted(d);
+    }
+
+    /**
+     * An XPIO output buffer with a constant input: its OP_S site pin is on a dedicated node that is
+     * only reached from the fabric through routethrus of the XPIO logic (OPFF D1->Q) and XPHY
+     * (D*->O0*) sites, optionally marked by &lt;LOCKED&gt; cells as left by unrouting a routed design.
+     */
+    @ParameterizedTest
+    @CsvSource({"GND,false", "GND,true", "VCC,false", "VCC,true"})
+    public void testRouteStaticNetToVersalXpioOutputBuffer(NetType netType, boolean lockedRoutethruCell) {
+        Design design = new Design("versal_xpio_const", "xcvc1902-vsva2197-2MP-e-S");
+        Cell obuf = design.createAndPlaceCell("obuf", Unisim.OBUF, "IOB_X24Y1/IOB_S");
+        Net staticNet = design.getStaticNet(netType);
+        SitePinInst opS = staticNet.createPin("OP_S", obuf.getSiteInst());
+        Assertions.assertEquals(IntentCode.NODE_DEDICATED, opS.getConnectedNode().getIntentCode());
+        if (lockedRoutethruCell) {
+            Site xpioLogic = design.getDevice().getSite("XPIOLOGIC_X23Y1");
+            SiteInst si = design.createSiteInst(xpioLogic);
+            si.addCell(new Cell(Cell.LOCKED, xpioLogic.getBEL("OPFF_SLAVE")));
+        }
+
+        List<SitePinInst> staticPins = new ArrayList<>(staticNet.getPins());
+        RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
+        GlobalSignalRouting.routeStaticNet(staticPins, (n) -> getNodeState(design, netType, n), design, routeThruHelper);
+
+        Assertions.assertTrue(opS.isRouted());
+        // GND is driven from a LUT output (a new source pin), VCC from a VCC tie-off of an INT tile (no pin)
+        Assertions.assertEquals(netType == NetType.GND ? 1 : 0, staticNet.getPins().stream().filter(SitePinInst::isOutPin).count());
+        Set<String> routethrus = new HashSet<>();
+        for (PIP pip : staticNet.getPIPs()) {
+            if (pip.isRouteThru()) {
+                routethrus.add(pip.getStartWireName() + "->" + pip.getEndWireName());
+            }
+        }
+        Assertions.assertTrue(routethrus.contains("XPIO_LOGICPAIR_1_OPFFS_D1_PIN->XPIO_LOGICPAIR_1_OPFFS_Q_PIN"), routethrus.toString());
+        Assertions.assertTrue(routethrus.contains("XPHY_CORE_3_D3_0__PIN->XPHY_CORE_3_O0_3__PIN"), routethrus.toString());
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(staticNet));
+    }
+
+    /**
+     * An UltraScale+ HPIOB output buffer with a constant input: its OP site pin is only reached
+     * from the fabric through a TX routethru of the XIPHY BITSLICE_RX_TX site.
+     */
+    @ParameterizedTest
+    @EnumSource(value = NetType.class, names = {"GND", "VCC"})
+    public void testRouteStaticNetToUltraScalePlusHpioOutputBuffer(NetType netType) {
+        Design design = new Design("usplus_hpio_const", "xcvu3p");
+        Cell obuf = design.createAndPlaceCell("obuf", Unisim.OBUF, "IOB_X0Y128/OUTBUF");
+        Net staticNet = design.getStaticNet(netType);
+        SitePinInst op = staticNet.createPin("OP", obuf.getSiteInst());
+
+        List<SitePinInst> staticPins = new ArrayList<>(staticNet.getPins());
+        RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
+        GlobalSignalRouting.routeStaticNet(staticPins, (n) -> getNodeState(design, netType, n), design, routeThruHelper);
+
+        Assertions.assertTrue(op.isRouted());
+        // GND is driven from a LUT output (a new source pin), VCC from a VCC tie-off of an INT tile (no pin)
+        Assertions.assertEquals(netType == NetType.GND ? 1 : 0, staticNet.getPins().stream().filter(SitePinInst::isOutPin).count());
+        Set<String> routethrus = new HashSet<>();
+        for (PIP pip : staticNet.getPIPs()) {
+            if (pip.isRouteThru()) {
+                routethrus.add(pip.getStartWire().getSitePin() + "->" + pip.getEndWire().getSitePin());
+            }
+        }
+        Assertions.assertTrue(routethrus.contains("BITSLICE_RX_TX_X0Y128/TX_D0->BITSLICE_RX_TX_X0Y128/TX_Q"), routethrus.toString());
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(staticNet));
+    }
+
+    /**
+     * The routethrus onto the dedicated nodes that lead to an IO output buffer's input are only used if they are
+     * free: with another net on the site wire of the routethru's input pin, or with a cell other than a
+     * &lt;LOCKED&gt; placeholder on the BEL that this pin drives, the routethru is not used. These routethrus are
+     * the only path from the fabric to the buffer's input, which is therefore left unrouted.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "xcvc1902-vsva2197-2MP-e-S,IOB_X24Y1/IOB_S,OP_S,XPIOLOGIC_X23Y1,OPFFS_D1,true",
+            "xcvc1902-vsva2197-2MP-e-S,IOB_X24Y1/IOB_S,OP_S,XPIOLOGIC_X23Y1,OPFFS_D1,false",
+            "xcvc1902-vsva2197-2MP-e-S,IOB_X24Y1/IOB_S,OP_S,XPHY_X23Y0,D3_0_,true",
+            "xcvc1902-vsva2197-2MP-e-S,IOB_X24Y1/IOB_S,OP_S,XPHY_X23Y0,D3_0_,false",
+            "xcvu3p,IOB_X0Y128/OUTBUF,OP,BITSLICE_RX_TX_X0Y128,TX_D0,true",
+            "xcvu3p,IOB_X0Y128/OUTBUF,OP,BITSLICE_RX_TX_X0Y128,TX_D0,false",
+    })
+    public void testRouteStaticNetToIoOutputBufferSkipsUsedRouteThru(String partName, String obufLocation,
+                                                                    String obufPinName, String routeThruSiteName,
+                                                                    String routeThruInPinName, boolean cellNotNet) {
+        Design design = new Design("io_const_used_routethru", partName);
+        Cell obuf = design.createAndPlaceCell("obuf", Unisim.OBUF, obufLocation);
+        Net gndNet = design.getGndNet();
+        SitePinInst obufPin = gndNet.createPin(obufPinName, obuf.getSiteInst());
+
+        Site routeThruSite = design.getDevice().getSite(routeThruSiteName);
+        SiteInst si = design.createSiteInst(routeThruSite);
+        BELPin routeThruInPin = new SitePin(routeThruSite, routeThruInPinName).getBELPin();
+        if (cellNotNet) {
+            BEL bel = routeThruInPin.getSiteConns().get(0).getBEL();
+            si.addCell(new Cell("user", bel));
+        } else {
+            si.routeIntraSiteNet(design.createNet("user"), routeThruInPin, routeThruInPin);
+        }
+
+        List<SitePinInst> gndPins = new ArrayList<>(gndNet.getPins());
+        RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
+        GlobalSignalRouting.routeStaticNet(gndPins, (n) -> getNodeState(design, NetType.GND, n), design, routeThruHelper);
+
+        Node routeThruInNode = routeThruSite.getConnectedNode(routeThruInPinName);
+        for (PIP pip : gndNet.getPIPs()) {
+            Assertions.assertNotEquals(routeThruInNode, pip.getStartNode(), pip.toString());
+        }
+        Assertions.assertFalse(obufPin.isRouted());
+    }
+
+    /**
+     * A routed design's static source pin remains on its SiteInst when RWRoute removes all output
+     * pins from the static net before rerouting it (see RWRoute.addStaticNetRoutingTargets()):
+     * rerouting must add that same pin back to the net exactly once and mark it routed.
+     */
+    @Test
+    public void testRouteStaticNetReattachesExistingSourcePin() {
+        Design design = new Design("static_source", "xcvu3p");
+        Device device = design.getDevice();
+        Net gndNet = design.getGndNet();
+        SitePinInst sink = gndNet.createPin("A1", design.createSiteInst(device.getSite("SLICE_X0Y0")));
+        // As in RWRoute, only the static net's sink pins are preserved
+        Node sinkNode = sink.getConnectedNode();
+        Function<Node, NodeStatus> nodeStatus = (n) -> n.equals(sinkNode) ? NodeStatus.INUSE : NodeStatus.AVAILABLE;
+        Function<Net, List<SitePinInst>> outPins = (net) -> net.getPins().stream()
+                .filter(SitePinInst::isOutPin).collect(Collectors.toList());
+        RouteThruHelper routeThruHelper = new RouteThruHelper(device);
+
+        // Find the LUT output used as the GND source ...
+        GlobalSignalRouting.routeStaticNet(new ArrayList<>(gndNet.getSinkPins()), nodeStatus, design, routeThruHelper);
+        List<SitePinInst> sources = outPins.apply(gndNet);
+        Assertions.assertEquals(1, sources.size());
+        Site sourceSite = sources.get(0).getSite();
+        String sourcePinName = sources.get(0).getName();
+        gndNet.unroute();
+        gndNet.removePin(sources.get(0));
+        sources.get(0).detachSiteInst();
+
+        // ... and route again with that site used by the design, as in a routed design
+        if (design.getSiteInstFromSite(sourceSite) == null) {
+            design.createSiteInst(sourceSite);
+        }
+        GlobalSignalRouting.routeStaticNet(new ArrayList<>(gndNet.getSinkPins()), nodeStatus, design, routeThruHelper);
+        SitePinInst source = design.getSiteInstFromSite(sourceSite).getSitePinInst(sourcePinName);
+        Assertions.assertNotNull(source);
+        Assertions.assertEquals(Arrays.asList(source), outPins.apply(gndNet));
+
+        // RWRoute.addStaticNetRoutingTargets() removes the source pin from the net, but it stays
+        // on its SiteInst
+        List<SitePinInst> sinks = gndNet.getSinkPins();
+        gndNet.unroute();
+        gndNet.setPins(sinks);
+        Assertions.assertEquals(Arrays.asList(sink), gndNet.getPins());
+        Assertions.assertSame(gndNet, source.getNet());
+        Assertions.assertFalse(source.isRouted());
+
+        GlobalSignalRouting.routeStaticNet(new ArrayList<>(sinks), nodeStatus, design, routeThruHelper);
+        Assertions.assertTrue(sink.isRouted());
+        List<SitePinInst> restored = outPins.apply(gndNet);
+        Assertions.assertEquals(1, restored.size());
+        Assertions.assertSame(source, restored.get(0));
+        Assertions.assertSame(source, design.getSiteInstFromSite(sourceSite).getSitePinInst(sourcePinName));
+        Assertions.assertTrue(source.isRouted());
+    }
+  
+    /**
+     * A BUFGCE driving the input of a second BUFGCE: the cascaded input must be
+     * routed through the global clock network rather than from a leaf clock buffer,
+     * and the second clock spans the top clock region row, whose vertical
+     * distribution must avoid dead-end VDISTR nodes.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testVersalBUFGCECascade(boolean firstClockDrivesFabric) {
+        Design design = new Design("versal_bufgce_cascade", "xcvc1902-vsva2197-2MP-e-S");
+        EDIFCell top = design.getTopEDIFCell();
+        Device device = design.getDevice();
+        Net vcc = design.getVccNet();
+
+        Net clkIn = design.createNet("clkIn");
+        clkIn.getLogicalNet().createPortInst(top.createPort(clkIn.getName(), EDIFDirection.INPUT, 1));
+        Net clk0 = design.createNet("clk0");
+        Net clk1 = design.createNet("clk1");
+        Cell bufgce0 = createBUFGCE(design, top, "bufgce0", device.getSite("BUFGCE_X0Y23"));
+        Cell bufgce1 = createBUFGCE(design, top, "bufgce1", device.getSite("BUFGCE_X4Y0"));
+        clkIn.connect(bufgce0, "I");
+        clk0.connect(bufgce0, "O");
+        vcc.connect(bufgce0, "CE");
+        clk0.connect(bufgce1, "I");
+        clk1.connect(bufgce1, "O");
+        vcc.connect(bufgce1, "CE");
+
+        List<String> clk0Loads = firstClockDrivesFabric ? Arrays.asList("SLICE_X44Y62") : Arrays.asList();
+        List<String> clk1Loads = Arrays.asList("SLICE_X66Y68", "SLICE_X332Y79", "SLICE_X334Y185",
+                "SLICE_X22Y203", "SLICE_X258Y207", "SLICE_X334Y229", "SLICE_X148Y284");
+        int i = 0;
+        for (Net clk : Arrays.asList(clk0, clk1)) {
+            for (String loc : clk == clk0 ? clk0Loads : clk1Loads) {
+                Cell ff = design.createAndPlaceCell("ff" + i++, Unisim.FDRE, loc + "/AFF");
+                clk.connect(ff, "C");
+            }
+        }
+        design.routeSites();
+
+        SitePinInst cascadePin = bufgce1.getSiteInst().getSitePinInst("I");
+        Assertions.assertNotNull(cascadePin);
+        Assertions.assertTrue(clk0.getPins().contains(cascadePin));
+
+        Set<Node> used = new HashSet<>();
+        Map<Integer, Set<ClockRegion>> usedRoutingTracks = new HashMap<>();
+        for (Net clk : Arrays.asList(clk0, clk1)) {
+            GlobalSignalRouting.symmetricClkRouting(clk, device,
+                    (n) -> used.contains(n) ? NodeStatus.UNAVAILABLE : NodeStatus.AVAILABLE,
+                    usedRoutingTracks);
+            for (PIP pip : clk.getPIPs()) {
+                used.add(pip.getStartNode());
+                used.add(pip.getEndNode());
+            }
+            Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        }
+
+        // The cascaded input is only reached through global clock nodes
+        Node cascadeNode = cascadePin.getConnectedNode();
+        Map<Node, Node> driver = new HashMap<>();
+        for (PIP pip : clk0.getPIPs()) {
+            if (pip.isReversed()) {
+                driver.put(pip.getStartNode(), pip.getEndNode());
+            } else {
+                driver.put(pip.getEndNode(), pip.getStartNode());
+            }
+        }
+        Node sourceNode = clk0.getSource().getConnectedNode();
+        Node n = driver.get(cascadeNode);
+        while (!sourceNode.equals(n)) {
+            Assertions.assertNotNull(n);
+            Assertions.assertTrue(n.getIntentCode().name().startsWith("NODE_GLOBAL_"), n + " " + n.getIntentCode());
+            n = driver.get(n);
+        }
+    }
+
+    /**
+     * Clocks driven by BUFGCTRL and BUFGCE_DIV sites, which share the clock tiles of the BUFGCE sites
+     * at the bottom of the device. The BUFGCTRL clocks also drive an input of a neighboring BUFGCTRL,
+     * which must be reached straight from the output of the source (a cascade within the clock tile).
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "BUFGCTRL_X0Y0,BUFGCTRL_X0Y1,I1",
+            "BUFGCTRL_X4Y1,BUFGCTRL_X4Y0,I0",
+            "BUFGCE_DIV_X4Y0,,"
+    })
+    public void testVersalBUFGCTRLAndBUFGCEDIVClockSource(String sourceSiteName, String cascadeSiteName,
+                                                          String cascadePinName) {
+        Design design = new Design("versal_bufgctrl_clk", "xcvc1902-vsva2197-2MP-e-S");
+        Device device = design.getDevice();
+        Net clk = design.createNet("clk");
+        // A top-level port stands in for the logical driver of the clock
+        clk.getLogicalNet().createPortInst(design.getTopEDIFCell().createPort(clk.getName(),
+                EDIFDirection.INPUT, 1));
+        int i = 0;
+        for (String loc : new String[] {"SLICE_X66Y68", "SLICE_X332Y79", "SLICE_X22Y203", "SLICE_X148Y284"}) {
+            Cell ff = design.createAndPlaceCell("ff" + i++, Unisim.FDRE, loc + "/AFF");
+            clk.connect(ff, "C");
+        }
+        design.routeSites();
+        SitePinInst source = clk.createPin("O", design.createSiteInst(device.getSite(sourceSiteName)));
+        SitePinInst cascadePin = null;
+        if (cascadeSiteName != null) {
+            cascadePin = clk.createPin(cascadePinName, design.createSiteInst(device.getSite(cascadeSiteName)));
+        }
+
+        GlobalSignalRouting.symmetricClkRouting(clk, device, (n) -> NodeStatus.AVAILABLE, new HashMap<>());
+
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        Assertions.assertNotNull(clk.getLogicalNet().getProperty("CLOCK_ROOT"));
+        if (cascadePin != null) {
+            Assertions.assertTrue(cascadePin.isRouted());
+            List<Node> outputNodes = source.getConnectedNode().getAllDownhillNodes();
+            List<Node> cascadeNodes = cascadePin.getConnectedNode().getAllUphillNodes();
+            Assertions.assertEquals(1, outputNodes.size());
+            Assertions.assertEquals(1, cascadeNodes.size());
+            Node outputNode = outputNodes.get(0);
+            Node cascadeNode = cascadeNodes.get(0);
+            Assertions.assertTrue(clk.getPIPs().stream().anyMatch((pip) -> pip.getStartNode().equals(outputNode)
+                    && pip.getEndNode().equals(cascadeNode)));
+        }
     }
 }

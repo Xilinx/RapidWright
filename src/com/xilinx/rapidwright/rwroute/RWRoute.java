@@ -667,8 +667,11 @@ public class RWRoute {
                 }
             }
 
-            if ((sourceINTNode == null && connection.getSourceRnode() == null) || sinkINTNode == null) {
-                // Direct connection if either source or sink pin cannot be projected to INT tile
+            if ((sourceINTNode == null && connection.getSourceRnode() == null) || sinkINTNode == null ||
+                    RouterHelper.isDedicatedConnection(source, sink)) {
+                // Direct connection if either source or sink pin cannot be projected to INT tile, or if the
+                // sink is driven by the source through dedicated resources (e.g. a clock-capable input
+                // to a clock buffer) that need not, and should not, go through the fabric
                 directConnections.add(connection);
                 connection.setDirect(true);
             } else {
@@ -690,7 +693,18 @@ public class RWRoute {
 
                 RouteNode sinkRnode = routingGraph.getOrCreate(sinkINTNode);
                 RouteNodeType sinkType = sinkRnode.getType();
-                assert(sinkType.isAnyLocal());
+                // Several sink pins can be fed through the same INT tile node (e.g. the same input of the two
+                // BITSLICE_CONTROLs of a byte of an UltraScale XIPHY): the connections to them share it
+                boolean sharedSink = sinkType.isAnyExclusiveSink();
+                if (sharedSink && sinkRnode.countConnectionsOfUser(netWrapper) == 0) {
+                    List<Net> others = new ArrayList<>();
+                    for (NetWrapper other : sinkRnode.getUsersConnectionCounts().keySet()) {
+                        others.add(other.getNet());
+                    }
+                    throw new RuntimeException("ERROR: Sink " + sink + " of net " + net + " is reached through " +
+                            sinkINTNode + ", already the sink node of net(s) " + others);
+                }
+                assert(sharedSink || sinkType.isAnyLocal());
                 connection.setSinkRnode(sinkRnode);
 
                 if (sinkINTNode.getTile() != sink.getTile()) {
@@ -705,7 +719,7 @@ public class RWRoute {
 
                 // Where appropriate, allow all 6 LUT pins to be swapped to begin with
                 char lutLetter = sink.getName().charAt(0);
-                int numberOfSwappablePins = (lutPinSwapping && sink.isLUTInputPin())
+                int numberOfSwappablePins = (lutPinSwapping && sink.isLUTInputPin() && !sharedSink)
                         ? LUTTools.MAX_LUT_SIZE : 0;
                 if (numberOfSwappablePins > 0) {
                     for (Cell cell : DesignTools.getConnectedCells(sink)) {
@@ -754,7 +768,7 @@ public class RWRoute {
                     connection.addAltSinkRnode(altSinkRnode);
                 }
 
-                if (!connection.hasAltSinks()) {
+                if (!connection.hasAltSinks() && !sharedSink) {
                     // Since this connection only has a single sink target, make it exclusive
                     sinkType = sinkType.isEastLocal() ? RouteNodeType.EXCLUSIVE_SINK_EAST :
                                sinkType.isWestLocal() ? RouteNodeType.EXCLUSIVE_SINK_WEST :

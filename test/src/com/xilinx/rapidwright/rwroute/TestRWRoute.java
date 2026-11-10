@@ -28,12 +28,15 @@ import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -60,6 +63,10 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
+import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.eco.ECOTools;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
@@ -493,6 +500,36 @@ public class TestRWRoute {
     }
 
     @ParameterizedTest
+    @CsvSource({
+            // xcvp1902 has no CLE_BC_CORE tiles: the BNODEs/CNODEs/CTRL wires of its CLE pairs are hosted
+            // by SLL2 tiles; it also has mirrored SLRs, each with its own tile coordinates
+            "SLICE_S0X100Y100,AQ,SLICE_S0X104Y110,A1,186",
+            "SLICE_S1X100Y100,AQ,SLICE_S1X104Y110,A1,186",      // Mirrored SLR
+            "SLICE_S2X300Y500,AQ,SLICE_S2X310Y520,A1,277",
+            "SLICE_S3X300Y500,AQ,SLICE_S3X290Y480,A1,47",
+            "SLICE_S0X100Y100,AQ,SLICE_S0X101Y100,CKEN1,35",    // CTRL sink in an SLL2 tile
+            "SLICE_S1X201Y301,AQ,SLICE_S1X200Y300,CKEN2,129",
+    })
+    public void testSingleConnectionXcvp1902(String srcSiteName, String srcPinName,
+                                             String dstSiteName, String dstPinName,
+                                             long nodesPoppedLimit) {
+        testSingleConnectionHelper("xcvp1902", srcSiteName, srcPinName, dstSiteName, dstPinName, nodesPoppedLimit);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            // The CTRL wires of the CE/CLK/RST inputs of xcvc1902's IRI_QUAD sites (at the
+            // bottom edge of the fabric) are in CLE_BC_CORE_MX tiles
+            "SLICE_X60Y0,AQ,IRI_QUAD_X38Y12,CE0,71",
+            "SLICE_X60Y0,AQ,IRI_QUAD_X38Y12,RST,73",
+    })
+    public void testSingleConnectionXcvc1902CleBcCoreMx(String srcSiteName, String srcPinName,
+                                                        String dstSiteName, String dstPinName,
+                                                        long nodesPoppedLimit) {
+        testSingleConnectionHelper("xcvc1902", srcSiteName, srcPinName, dstSiteName, dstPinName, nodesPoppedLimit);
+    }
+
+    @ParameterizedTest
     @EnumSource(Series.class)
     public void testRWRouteDeviceSupport(Series series) {
         for (Part part : PartNameTools.getAllParts(series)) {
@@ -601,7 +638,11 @@ public class TestRWRoute {
             "xcvu3p,IOB_X0Y47,I,SLICE_X77Y122,FX,100",
 
             // 240 CLB height SLR, no LAG tiles on Y0 (since HBM on bottom edge)
-            "xcu50,SLICE_X38Y239,AQ,SLICE_X38Y240,A1,100"
+            "xcu50,SLICE_X38Y239,AQ,SLICE_X38Y240,A1,100",
+
+            // SLR crossing whose bounding box, before the SLL height check, is exactly one row too
+            // short to hold an SLL strictly inside it
+            "xcvu13p,SLICE_X117Y218,D_O,SLICE_X116Y250,CX,200"
     })
     public void testSingleConnection(String partName,
                                      String srcSiteName, String srcPinName,
@@ -611,6 +652,105 @@ public class TestRWRoute {
                 srcSiteName, srcPinName,
                 dstSiteName, dstPinName,
                 nodesPoppedLimit);
+    }
+
+    @Test
+    public void testDedicatedClockInputsSharingFabricInput() {
+        // Two clock-capable HDIO inputs, each driving a BUFGCE_HDIO of the same RCLK_HDIO tile through its
+        // dedicated path. Both BUFGCE_HDIOs can also be reached from the fabric, but only through a single
+        // shared INT input: these connections must be routed through their dedicated paths
+        Design design = new Design("top", "xcku9p-ffve900-2-e");
+        List<SitePinInst> pinsToRoute = new ArrayList<>();
+        List<Net> nets = new ArrayList<>();
+        String[][] ioAndBuffer = {{"IOB_X0Y164", "BUFGCE_HDIO_X0Y2"}, {"IOB_X0Y182", "BUFGCE_HDIO_X0Y3"}};
+        for (String[] pair : ioAndBuffer) {
+            Net net = design.createNet(pair[0] + "_I");
+            net.createPin("I", design.createSiteInst(pair[0]));
+            pinsToRoute.add(net.createPin("CLK_IN", design.createSiteInst(pair[1])));
+            nets.add(net);
+        }
+        PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute, false);
+
+        for (Net net : nets) {
+            assertAllPinsRouted(net);
+            Assertions.assertFalse(net.getPIPs().isEmpty());
+            for (PIP pip : net.getPIPs()) {
+                Assertions.assertNotEquals(TileTypeEnum.INT, pip.getTile().getTileTypeEnum(), pip.toString());
+            }
+        }
+    }
+
+    /**
+     * Creates and routes a net from a clock-capable HDIO input to both a BUFGCE_HDIO, which it drives through a
+     * dedicated path, and the AX and BX pins of the SLICEL nearest to its input's projection onto the fabric.
+     */
+    private static Net createAndRouteNetWithDedicatedClockInput(Design design) {
+        Net net = design.createNet("IOB_X0Y164_I");
+        SitePinInst source = net.createPin("I", design.createSiteInst("IOB_X0Y164"));
+        net.createPin("CLK_IN", design.createSiteInst("BUFGCE_HDIO_X0Y2"));
+        SiteInst slice = design.createSiteInst(getNearestSLICELs(design, source, 1).get(0));
+        net.createPin("AX", slice);
+        net.createPin("BX", slice);
+        PartialRouter.routeDesignPartialNonTimingDriven(design, net.getSinkPins(), false);
+        assertAllPinsRouted(net);
+        return net;
+    }
+
+    private static List<Site> getNearestSLICELs(Design design, SitePinInst source, int count) {
+        Tile intTile = RouterHelper.projectOutputPinToINTNode(source).getTile();
+        List<Site> slices = new ArrayList<>(Arrays.asList(design.getDevice().getAllSitesOfType(SiteTypeEnum.SLICEL)));
+        slices.sort(Comparator.comparingInt((s) -> s.getTile().getManhattanDistance(intTile)));
+        return slices.subList(0, count);
+    }
+
+    private static SitePinInst getSinkPin(Net net, String name) {
+        return net.getSinkPins().stream().filter((spi) -> spi.getName().equals(name)).findFirst().get();
+    }
+
+    @Test
+    public void testPartialRoutingPreservesDedicatedClockInput() {
+        // Routing another sink of a net must keep the (preserved) routing of its sink driven through a
+        // dedicated path
+        Design design = new Design("top", "xcku9p-ffve900-2-e");
+        Net net = createAndRouteNetWithDedicatedClockInput(design);
+        SitePinInst ax = getSinkPin(net, "AX");
+        DesignTools.unroutePins(net, Collections.singletonList(ax));
+        Set<PIP> preservedPIPs = new HashSet<>(net.getPIPs());
+
+        PartialRouter.routeDesignPartialNonTimingDriven(design, Collections.singletonList(ax), false);
+
+        assertAllPinsRouted(net);
+        Assertions.assertTrue(net.getPIPs().containsAll(preservedPIPs));
+    }
+
+    @Test
+    public void testUnpreserveNetWithDedicatedClockInput() {
+        // Move a sink pin from a fully routed net, with a sink driven through a dedicated path, onto another net
+        // without ripping up its routing: that routing blocks the other net's sink, so the first net gets
+        // unpreserved, which must cope with its direct connection to the clock buffer
+        Design design = new Design("top", "xcku9p-ffve900-2-e");
+        Net net = createAndRouteNetWithDedicatedClockInput(design);
+        SitePinInst bx = getSinkPin(net, "BX");
+        List<PIP> pips = new ArrayList<>(net.getPIPs());
+        Assertions.assertTrue(net.removePin(bx));
+        net.setPIPs(pips);
+        Net other = design.createNet("other");
+        other.createPin("AQ", design.createSiteInst(getNearestSLICELs(design, net.getSource(), 2).get(1)));
+        other.addPin(bx);
+
+        PartialRouter.routeDesignPartialNonTimingDriven(design, Collections.singletonList(bx), false);
+
+        Set<Node> nodes = new HashSet<>();
+        for (PIP pip : net.getPIPs()) {
+            nodes.add(pip.getStartNode());
+            nodes.add(pip.getEndNode());
+        }
+        for (PIP pip : other.getPIPs()) {
+            Assertions.assertFalse(nodes.contains(pip.getStartNode()), pip.toString());
+            Assertions.assertFalse(nodes.contains(pip.getEndNode()), pip.toString());
+        }
+        assertAllPinsRouted(net);
+        assertAllPinsRouted(other);
     }
 
     @Test
@@ -1140,5 +1280,30 @@ public class TestRWRoute {
         List<Net> order = router.getClkNetsInRoutingOrder();
         Assertions.assertEquals(3, order.size());
         Assertions.assertEquals(clks.get(1), order.get(0));
+    }
+
+    @Test
+    public void testSinksSharingINTNode() {
+        // The same input of the two BITSLICE_CONTROLs of a byte of the XIPHY is fed from a single INT tile node:
+        // the connections to both sinks share it
+        Design design = new Design("shared_sink", "xcvu3p-ffvc1517-2-e");
+        Device device = design.getDevice();
+        Cell ff = design.createAndPlaceCell("ff", Unisim.FDRE, "SLICE_X35Y23/GFF");
+        Net net = design.createNet("riu_addr");
+        net.connect(ff, "Q");
+        List<SitePinInst> sinks = new ArrayList<>();
+        for (String site : new String[] {"BITSLICE_CONTROL_X0Y6", "BITSLICE_CONTROL_X0Y7"}) {
+            SiteInst si = design.createSiteInst(device.getSite(site));
+            sinks.add(net.createPin("CLB2RIU_ADDR2", si));
+        }
+        Node intNode = RouterHelper.projectInputPinToINTNode(sinks.get(0));
+        Assertions.assertNotNull(intNode);
+        Assertions.assertEquals(intNode, RouterHelper.projectInputPinToINTNode(sinks.get(1)));
+
+        RWRoute.routeDesignFullNonTimingDriven(design);
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(net));
+        for (SitePinInst sink : sinks) {
+            Assertions.assertTrue(sink.isRouted(), sink.toString());
+        }
     }
 }
