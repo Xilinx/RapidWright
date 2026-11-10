@@ -67,7 +67,9 @@
  * an instance carrying that property, or below an instance that does, is named
  * by the property's value in place of the path above it. A wrong or stale value
  * cannot make different logic pass; it leaves a terminal unmatched or a cone
- * refuted, and two terminals claiming one name stop the run.</li>
+ * refuted, and two terminals claiming one name stop the run. The property
+ * must not be a primitive parameter such as {@code INIT}, and an empty value is
+ * refused.</li>
  * <li>{@code --sat-timeout} and {@code --sat-budget} bound the solver. Cones
  * beyond {@code --sat-max-support} inputs or {@code --sat-max-nodes} nodes are
  * attempted last, smallest first, with whatever budget remains; raise

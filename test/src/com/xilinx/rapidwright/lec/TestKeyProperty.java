@@ -133,6 +133,24 @@ public class TestKeyProperty {
         Assertions.assertThrows(LecException.class, () -> check(reference(), imp, KEY));
     }
 
+    /** An empty key would name a flip flop's pins like top level ports: refuse it. */
+    @Test
+    public void testEmptyKeyIsRejected() {
+        EDIFNetlist imp = relocated("4'hE");
+        LecNetlistFixtures.setProperty(inst(imp, "PART_1", "ff"), KEY, "");
+        Assertions.assertThrows(LecException.class, () -> check(reference(), imp, KEY));
+    }
+
+    /**
+     * A key is left out of the attribute comparison, so a parameter such as
+     * INIT must not be one, or a changed initial value would go unreported.
+     */
+    @Test
+    public void testParameterAsKeyIsRejected() {
+        Assertions.assertThrows(LecException.class,
+                () -> check(reference(), relocated("4'hE"), "INIT"));
+    }
+
     /**
      * A flip flop whose D input is constant 0, or, in the implementation, the
      * XOR of two black boxes that both claim the same key.

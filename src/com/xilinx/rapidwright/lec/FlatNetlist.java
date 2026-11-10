@@ -399,7 +399,14 @@ public class FlatNetlist {
         for (int i = instId; i != 0; i = parent[i]) {
             EDIFPropertyValue key = keyProperty == null ? null : instObj[i].getProperty(keyProperty);
             if (key != null) {
-                parts[--at] = key.getValue();
+                String origin = key.getValue();
+                if (origin == null || origin.isEmpty()) {
+                    // An empty name would make a pin's name just the pin, the
+                    // same as a top level port's.
+                    throw new LecException("Instance '" + instObj[i].getName() + "' has an empty "
+                            + keyProperty + " property, so it cannot be named by it");
+                }
+                parts[--at] = origin;
                 return String.join(EDIFTools.EDIF_HIER_SEP, Arrays.copyOfRange(parts, at, depth));
             }
             parts[--at] = instObj[i].getName();
