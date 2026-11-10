@@ -360,6 +360,21 @@ public class TestRouterHelper {
         Assertions.assertTrue(path.size() > 2);
     }
 
+    @Test
+    public void testFindPathBetweenAdjacentNodesIsModifiable() {
+        // A direct connection between adjacent nodes; RouteFixer clears and rebuilds the nodes of
+        // every connection of a net that it fixes
+        Device device = Device.getDevice("xcvp1002");
+        Node sourceNode = device.getNode("CMT_MMCM_X11Y0/CMT_MMCM_TOP_0_CLKOUT0_PIN");
+        Node sinkNode = sourceNode.getAllDownhillNodes().get(0);
+
+        List<Node> path = RouterHelper.findPathBetweenNodes(sourceNode, sinkNode);
+        Assertions.assertEquals(Arrays.asList(sinkNode, sourceNode), path);
+        path.clear();
+        path.add(sinkNode);
+        Assertions.assertEquals(1, path.size());
+    }
+
     /**
      * Checks that {@link RouterHelper#getSourceToSinkINTNodeDelays} accumulates delay in
      * source-to-sink order, rather than in {@link Net#getPIPs()} order which

@@ -24,20 +24,34 @@
 package com.xilinx.rapidwright.util.lsf;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+
 import com.xilinx.rapidwright.support.LargeTest;
+import com.xilinx.rapidwright.support.ShardAssignment;
+import com.xilinx.rapidwright.support.TestShardFilter;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Installer;
 import com.xilinx.rapidwright.util.Job;
@@ -59,13 +73,83 @@ import org.junit.platform.launcher.TestIdentifier;
 import org.junit.platform.launcher.TestPlan;
 import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
 import org.junit.platform.launcher.core.LauncherFactory;
+import org.xml.sax.SAXException;
 
 /**
  * JUnit test runner that creates LSF Jobs for individual tests.
  *
  * The working directory is cleared! Then outputs are placed there.
  */
+/**
+ * Runs the tests of a tests jar on LSF.
+ *
+ * Each test tagged {@link LargeTest} (each invocation, for parameterized tests) runs in its own job, with the memory
+ * the tag asks for. The other ("regular") tests are split between several jobs. With estimated durations (a file
+ * written by an earlier run, given by the system property {@value #DURATIONS_IN_PROPERTY}), the regular tests are
+ * split into jobs of about {@value #REGULAR_JOB_TARGET_SECONDS} s each (see {@link ShardAssignment#assign}); without,
+ * each test class runs in its own job. Each run writes the measured durations of the regular tests to
+ * {@value #DURATIONS_FILE}, and the pending and run times of every job to {@value #JOBS_FILE}, in the working
+ * directory.
+ */
 public class LaunchTestsOnLsf {
+
+    /** System property naming a file of estimated test durations, as written to {@value #DURATIONS_FILE} */
+    public static final String DURATIONS_IN_PROPERTY = TestShardFilter.DURATIONS_IN_PROPERTY;
+
+    /** Measured durations of the regular tests, written to the working directory */
+    public static final String DURATIONS_FILE = "test-durations.txt";
+
+    /** Pending and run time of each job, written to the working directory */
+    public static final String JOBS_FILE = "lsf-jobs.csv";
+
+    /** Estimated duration to aim for in each job running regular tests */
+    public static final int REGULAR_JOB_TARGET_SECONDS = 5 * 60;
+
+    /** Upper limit on the number of jobs running regular tests, when estimated durations are available */
+    public static final int MAX_REGULAR_JOBS = 32;
+
+    /**
+     * Memory reserved for each job running regular tests. Their JVM gets the default heap of
+     * {@link LargeTest#DEFAULT_MAX_MEMORY_GB}; the rest leaves room for the Vivado processes some tests start.
+     */
+    public static final int REGULAR_JOB_RESERVED_GB = 8;
+
+    private static final String UNITS_FILE = "units.txt";
+
+    private static final String JOB_DURATIONS_FILE = "durations.txt";
+
+    /** An LSF job that remembers when it was submitted */
+    private static class TimedLsfJob extends LSFJob {
+        /** Time (ms) just before submission, or -1 if not submitted */
+        long submitTime = -1;
+
+        @Override
+        public long launchJob() {
+            submitTime = System.currentTimeMillis();
+            return super.launchJob();
+        }
+    }
+
+    /** A job and what it runs */
+    private static class TestJob {
+        final TimedLsfJob job;
+        /** Unique id of the LSF test it runs, or null for a job running regular tests */
+        final String testId;
+        /** For jobs running regular tests: the test classes and method keys, and their estimated seconds */
+        final List<String> units;
+        final double estimatedSeconds;
+
+        TestJob(TimedLsfJob job, String testId, List<String> units, double estimatedSeconds) {
+            this.job = job;
+            this.testId = testId;
+            this.units = units;
+            this.estimatedSeconds = estimatedSeconds;
+        }
+
+        String describe() {
+            return testId != null ? testId : units.size() + " regular test classes/methods";
+        }
+    }
 
     private static String toJobDir(String id) {
         if (id.isEmpty()) {
@@ -74,8 +158,11 @@ public class LaunchTestsOnLsf {
         return Installer.calculateMD5OfStream(new ByteArrayInputStream(id.getBytes(StandardCharsets.UTF_8)));
     }
 
-    public static Stream<Pair<String, Integer>> discoverTests(Launcher launcher, TestPlan testPlan) {
-        //We have to do a fake test execution to enumerate dynamic tests and test template instantiations
+    /**
+     * Does a fake execution of the test plan to enumerate dynamic tests and test template invocations.
+     * @return All tests and containers, by unique ID.
+     */
+    private static Map<String, TestIdentifier> enumerateTests(Launcher launcher, TestPlan testPlan) {
         LsfInterceptor.ENABLED = true;
         Map<String, TestIdentifier> ids = new HashMap<>();
         launcher.registerTestExecutionListeners(new TestExecutionListener() {
@@ -100,20 +187,170 @@ public class LaunchTestsOnLsf {
             }
         });
         launcher.execute(testPlan);
-
-        Stream<Pair<String, Integer>> lsfTests = ids.values().stream()
-                .filter(TestIdentifier::isTest)
-                .filter(ti -> RunTest.isLsfTest(ti, ids))
-                .map(ti -> new Pair<>(ti.getUniqueId(), requireLsfMem(ti, ids)));
-
         if (ids.isEmpty()) {
             throw new RuntimeException("did not find any test?!");
         }
-
-        return Stream.concat(lsfTests, Stream.of(new Pair<>("", LargeTest.DEFAULT_MAX_MEMORY_GB)));
+        return ids;
     }
 
-    public static void main(String[] args) {
+    /**
+     * @return The tests that run in their own job (unique ID and memory in GB), followed by an empty ID standing for
+     *         all other tests.
+     */
+    public static Stream<Pair<String, Integer>> discoverTests(Launcher launcher, TestPlan testPlan) {
+        Map<String, TestIdentifier> ids = enumerateTests(launcher, testPlan);
+        return Stream.concat(getLsfTests(ids), Stream.of(new Pair<>("", LargeTest.DEFAULT_MAX_MEMORY_GB)));
+    }
+
+    private static Stream<Pair<String, Integer>> getLsfTests(Map<String, TestIdentifier> ids) {
+        return ids.values().stream()
+                .filter(TestIdentifier::isTest)
+                .filter(ti -> RunTest.isLsfTest(ti, ids))
+                .map(ti -> new Pair<>(ti.getUniqueId(), requireLsfMem(ti, ids)));
+    }
+
+    private static boolean hasMethodSource(TestIdentifier ti) {
+        return ti != null && ti.getSource().filter(s -> s instanceof MethodSource).isPresent();
+    }
+
+    /**
+     * @return The test method this test belongs to: the outermost node with a method source, so that the invocations
+     *         of a test template and the dynamic tests of a test factory belong to their method.
+     */
+    private static Optional<TestIdentifier> getTestMethod(TestIdentifier ti, Map<String, TestIdentifier> ids) {
+        TestIdentifier method = null;
+        for (TestIdentifier t = ti; t != null; t = t.getParentId().map(ids::get).orElse(null)) {
+            if (hasMethodSource(t)) {
+                method = t;
+            }
+        }
+        return Optional.ofNullable(method);
+    }
+
+    /**
+     * @return The outermost test class containing this test (to keep nested classes with it), if any.
+     */
+    private static Optional<String> getTopLevelClassName(TestIdentifier ti, Map<String, TestIdentifier> ids) {
+        String className = null;
+        for (TestIdentifier t = ti; t != null; t = t.getParentId().map(ids::get).orElse(null)) {
+            Optional<TestSource> source = t.getSource();
+            if (source.isPresent() && source.get() instanceof ClassSource) {
+                className = ((ClassSource) source.get()).getClassName();
+            }
+        }
+        return Optional.ofNullable(className);
+    }
+
+    /**
+     * @return The test methods that are not LSF tests, as method keys, by top-level test class; and in unitIds, the
+     *         unique IDs of the tests of each method key and class (for reporting). Classes without any such method (e.g. disabled ones) are included
+     *         with no methods, so that they are still reported, unless all their tests are LSF tests.
+     */
+    private static Map<String, List<String>> getRegularTestMethods(Map<String, TestIdentifier> ids,
+                                                                   Map<String, List<String>> unitIds) {
+        Map<String, Set<String>> classMethods = new TreeMap<>();
+        Set<String> classesWithLsfTests = new HashSet<>();
+        for (TestIdentifier ti : ids.values()) {
+            Optional<String> className = getTopLevelClassName(ti, ids);
+            if (!className.isPresent()) {
+                continue;
+            }
+            if (RunTest.isLsfTest(ti, ids)) {
+                classesWithLsfTests.add(className.get());
+                continue;
+            }
+            Set<String> methods = classMethods.computeIfAbsent(className.get(), k -> new TreeSet<>());
+            Optional<TestIdentifier> method = getTestMethod(ti, ids);
+            if (!method.isPresent()) {
+                continue;
+            }
+            String methodKey = TestShardFilter.getMethodKey((MethodSource) method.get().getSource().get());
+            methods.add(methodKey);
+            // Report each test, including each invocation of a test template and each dynamic test
+            if (ti.isTest()) {
+                unitIds.computeIfAbsent(methodKey, k -> new ArrayList<>()).add(ti.getUniqueId());
+                unitIds.computeIfAbsent(className.get(), k -> new ArrayList<>()).add(ti.getUniqueId());
+            }
+        }
+        Map<String, List<String>> result = new TreeMap<>();
+        classMethods.forEach((c, m) -> {
+            // Skip classes whose tests all run in their own jobs
+            if (!m.isEmpty() || !classesWithLsfTests.contains(c)) {
+                result.put(c, new ArrayList<>(m));
+            }
+        });
+        return result;
+    }
+
+    /**
+     * Splits the regular tests between jobs: by estimated durations if there are any, else one job per class.
+     * @return The test classes and method keys of each job, with its estimated seconds (or 0 if unknown).
+     */
+    private static List<Pair<List<String>, Double>> splitRegularTests(Map<String, List<String>> classMethods,
+                                                                      Map<String, Double> durations) {
+        List<Pair<List<String>, Double>> jobs = new ArrayList<>();
+        if (durations.isEmpty()) {
+            for (String className : classMethods.keySet()) {
+                jobs.add(new Pair<>(Collections.singletonList(className), 0.0));
+            }
+            return jobs;
+        }
+        double totalSeconds = 0;
+        for (List<String> methods : classMethods.values()) {
+            for (String method : methods) {
+                totalSeconds += durations.getOrDefault(method, TestShardFilter.DEFAULT_METHOD_SECONDS);
+            }
+        }
+        int numJobs = (int) Math.max(1, Math.min(MAX_REGULAR_JOBS,
+                Math.ceil(totalSeconds / REGULAR_JOB_TARGET_SECONDS)));
+        ShardAssignment assignment = ShardAssignment.assign(classMethods, durations, numJobs);
+        for (int shard = 1; shard <= numJobs; shard++) {
+            List<String> units = assignment.getUnits(shard);
+            if (!units.isEmpty()) {
+                jobs.add(new Pair<>(units, assignment.shardSeconds[shard - 1]));
+            }
+        }
+        // Longest first, so that they start first
+        jobs.sort(Comparator.comparingDouble((Pair<List<String>, Double> p) -> p.getSecond()).reversed());
+        return jobs;
+    }
+
+    /**
+     * @return The estimated durations given by {@value #DURATIONS_IN_PROPERTY}, or none if it is not set.
+     */
+    private static Map<String, Double> readEstimatedDurations() {
+        String durationsIn = System.getProperty(DURATIONS_IN_PROPERTY);
+        if (durationsIn == null || durationsIn.isEmpty()) {
+            return new HashMap<>();
+        }
+        Map<String, Double> durations = readDurationsOrWarn(Paths.get(durationsIn));
+        if (durations.isEmpty()) {
+            System.err.println("WARNING: no estimated test durations in " + durationsIn + ", running one job per class");
+        }
+        return durations;
+    }
+
+    /**
+     * @return The durations in the given file; none, with a warning, if it is malformed (e.g. cut short when its job
+     *         was killed).
+     */
+    private static Map<String, Double> readDurationsOrWarn(Path path) {
+        try {
+            return TestShardFilter.readDurations(path);
+        } catch (RuntimeException e) {
+            System.err.println("WARNING: ignoring malformed test durations in " + path + ": " + e);
+            return new HashMap<>();
+        }
+    }
+
+    private static String quote(String s) {
+        return '"' + s + '"';
+    }
+
+    public static void main(String[] args) throws IOException {
+        // Read the estimates first: they may be the durations file of the previous run in this working dir
+        Map<String, Double> durations = readEstimatedDurations();
+
         //Testcases may have been removed since the last run, delete all to be sure
         if (!FileTools.deleteFolderContents(".")) {
             throw new RuntimeException("could not empty working dir");
@@ -125,48 +362,187 @@ public class LaunchTestsOnLsf {
 
         LauncherDiscoveryRequest request = getLauncherDiscoveryRequestBuilder(testsJar).build();
         TestPlan testPlan = launcher.discover(request);
+        Map<String, TestIdentifier> ids = enumerateTests(launcher, testPlan);
+
+        Map<String, List<String>> unitIds = new HashMap<>();
+        Map<String, List<String>> classMethods = getRegularTestMethods(ids, unitIds);
 
         JobQueue jq = new JobQueue(false);
-        Map<Job, String> jobsToTests = new HashMap<>();
+        List<TestJob> testJobs = new ArrayList<>();
 
-        discoverTests(launcher, testPlan).forEach(pair -> {
+        // The regular tests first, as their jobs are usually the longest
+        List<Pair<List<String>, Double>> regularJobs = splitRegularTests(classMethods, durations);
+        for (int i = 0; i < regularJobs.size(); i++) {
+            List<String> units = regularJobs.get(i).getFirst();
+            String dir = String.format("regularTests-%03d", i + 1);
+            FileTools.makeDirs(dir);
+            Files.write(Paths.get(dir, UNITS_FILE), units, StandardCharsets.UTF_8);
+            TimedLsfJob job = new TimedLsfJob();
+            job.setRunDir(dir);
+            job.setRapidWrightCommand(RunTest.class, LargeTest.DEFAULT_MAX_MEMORY_GB * 1024, true,
+                    quote(testsJar.toString()) + " \"\" " + quote(UNITS_FILE) + " " + quote(JOB_DURATIONS_FILE));
+            job.setLsfResourceMemoryLimit(REGULAR_JOB_RESERVED_GB * 1024);
+            jq.addJob(job);
+            testJobs.add(new TestJob(job, null, units, regularJobs.get(i).getSecond()));
+        }
+        System.out.printf("Running %d regular test classes in %d jobs (%s), estimated %.0f s in total%n",
+                classMethods.size(), regularJobs.size(),
+                durations.isEmpty() ? "one per class, no estimated durations" : "balanced by estimated durations",
+                regularJobs.stream().mapToDouble(Pair::getSecond).sum());
+
+        getLsfTests(ids).forEach(pair -> {
             int memMB = pair.getSecond()*1024;
-            LSFJob job = new LSFJob();
+            TimedLsfJob job = new TimedLsfJob();
             job.setRunDir(toJobDir(pair.getFirst()));
             job.setRapidWrightCommand(RunTest.class, memMB, true,
-                    '"'+testsJar.toString()+"\" \""+pair.getFirst()+'"');
+                    quote(testsJar.toString()) + " " + quote(pair.getFirst()));
             job.setLsfResourceMemoryLimit(memMB);
             jq.addJob(job);
-            jobsToTests.put(job, pair.getFirst());
+            testJobs.add(new TestJob(job, pair.getFirst(), null, 0));
         });
 
         //Don't impose more limits on parallelism than what LSF allows us
-        if (!jq.runAllToCompletion(Integer.MAX_VALUE)) {
+        boolean success = jq.runAllToCompletion(Integer.MAX_VALUE);
+
+        writeDurations(testJobs, durations, classMethods);
+        writeJobTimes(testJobs);
+
+        if (!success) {
             StringBuilder sb = new StringBuilder();
             sb.append("LSF workers failed to execute tests:");
             Map<String, String> perTestMessages = new HashMap<>();
-            jobsToTests.forEach((job, test) -> {
-                if (!job.jobWasSuccessful()) {
-                    sb.append("\n");
-                    sb.append("Job ").append(job.getJobNumber()).append(" running in ").append(job.getRunDir());
-                    if (test.isEmpty()) {
-                        sb.append(" executing non-lsf-tests");
-                    } else {
-                        sb.append(" executing test ").append(test);
-                        Optional<List<String>> lastLogLines = job.getLastLogLines();
-                        if (lastLogLines.isPresent()) {
-                            String log = lastLogLines.get().stream().collect(Collectors.joining("\n","Execution failed. Last Lines of Log:\n",""));
-                            perTestMessages.put(test, log);
-                        } else {
-                            perTestMessages.put(test, "Execution failed, no log was generated");
+            for (TestJob testJob : testJobs) {
+                LSFJob job = testJob.job;
+                if (job.jobWasSuccessful()) {
+                    continue;
+                }
+                sb.append("\n");
+                sb.append("Job ").append(job.getJobNumber()).append(" running in ").append(job.getRunDir());
+                sb.append(" executing ").append(testJob.describe());
+                Optional<List<String>> lastLogLines = job.getLastLogLines();
+                String log = lastLogLines.isPresent()
+                        ? lastLogLines.get().stream().collect(Collectors.joining("\n","Execution failed. Last Lines of Log:\n",""))
+                        : "Execution failed, no log was generated";
+                if (testJob.testId != null) {
+                    perTestMessages.put(testJob.testId, log);
+                } else if (!hasValidXmlReports(job.getRunDir())) {
+                    // The job did not get to write its report, so report each of its tests as failed
+                    for (String unit : testJob.units) {
+                        for (String id : unitIds.getOrDefault(unit, Collections.emptyList())) {
+                            perTestMessages.put(id, log);
                         }
                     }
                 }
-            });
+            }
             StaticReportGenerator.writeMasterXmlLog(sb.toString(), perTestMessages, testPlan);
 
             System.exit(1);
         }
+    }
+
+    /**
+     * Checks the JUnit XML reports of a job. Reports that cannot be parsed (e.g. cut short when the job was killed)
+     * are renamed so that CI does not read them.
+     * @return True if the job wrote reports and all of them can be parsed.
+     */
+    private static boolean hasValidXmlReports(String dir) {
+        File[] files = new File(dir).listFiles((d, name) -> name.startsWith("TEST-") && name.endsWith(".xml"));
+        if (files == null || files.length == 0) {
+            return false;
+        }
+        boolean valid = true;
+        for (File file : files) {
+            try {
+                DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(file);
+            } catch (ParserConfigurationException | SAXException | IOException e) {
+                System.err.println("WARNING: malformed test report " + file + ": " + e);
+                File renamed = new File(file.getPath() + ".malformed");
+                if (!file.renameTo(renamed)) {
+                    System.err.println("WARNING: could not rename " + file + " to " + renamed);
+                }
+                valid = false;
+            }
+        }
+        return valid;
+    }
+
+    /**
+     * Writes the measured durations of the regular tests to {@value #DURATIONS_FILE}, keeping the earlier estimates
+     * of current tests that were not measured (e.g. because their job failed).
+     */
+    private static void writeDurations(List<TestJob> testJobs, Map<String, Double> estimates,
+                                       Map<String, List<String>> classMethods) {
+        Map<String, Double> measured = new TreeMap<>();
+        for (TestJob testJob : testJobs) {
+            if (testJob.testId == null) {
+                measured.putAll(readDurationsOrWarn(Paths.get(testJob.job.getRunDir(), JOB_DURATIONS_FILE)));
+            }
+        }
+        for (List<String> methods : classMethods.values()) {
+            for (String method : methods) {
+                if (!measured.containsKey(method) && estimates.containsKey(method)) {
+                    measured.put(method, estimates.get(method));
+                }
+            }
+        }
+        List<String> lines = new ArrayList<>();
+        lines.add("# Seconds per test method, written by " + LaunchTestsOnLsf.class.getName());
+        measured.forEach((k, v) -> lines.add(String.format(Locale.ROOT, "%.1f %s", v, k)));
+        try {
+            Files.write(Paths.get(DURATIONS_FILE), lines, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            System.err.println("WARNING: could not write " + DURATIONS_FILE + ": " + e);
+        }
+    }
+
+    private static long[] readRunTimes(String dir) {
+        long[] times = {-1, -1};
+        Path path = Paths.get(dir, RunTest.RUN_TIMES_FILE);
+        if (!Files.exists(path)) {
+            return times;
+        }
+        try {
+            for (String line : Files.readAllLines(path, StandardCharsets.UTF_8)) {
+                String[] parts = line.trim().split("\\s+");
+                if (parts.length == 2) {
+                    times[parts[0].equals("start") ? 0 : 1] = Long.parseLong(parts[1]);
+                }
+            }
+        } catch (IOException | RuntimeException e) {
+            // Leave the times unknown
+        }
+        return times;
+    }
+
+    /**
+     * Writes how long each job waited for LSF and ran to {@value #JOBS_FILE}, and prints the slowest jobs.
+     * Times are measured by the test runner in each job, so they exclude JVM startup.
+     */
+    private static void writeJobTimes(List<TestJob> testJobs) {
+        List<String> lines = new ArrayList<>();
+        lines.add("dir,job,estimated_s,pending_s,run_s,successful,tests");
+        List<Pair<Double, String>> slowest = new ArrayList<>();
+        for (TestJob testJob : testJobs) {
+            long[] times = readRunTimes(testJob.job.getRunDir());
+            long submitTime = testJob.job.submitTime;
+            double pending = times[0] < 0 || submitTime < 0 ? -1 : (times[0] - submitTime) / 1000.0;
+            double run = times[0] < 0 || times[1] < 0 ? -1 : (times[1] - times[0]) / 1000.0;
+            String tests = testJob.testId != null ? testJob.testId : String.join(" ", testJob.units);
+            lines.add(String.format(Locale.ROOT, "%s,%d,%.0f,%.0f,%.0f,%b,\"%s\"", testJob.job.getRunDir(),
+                    testJob.job.getJobNumber(), testJob.estimatedSeconds, pending, run,
+                    testJob.job.jobWasSuccessful(), tests.replace("\"", "\"\"")));
+            slowest.add(new Pair<>(Math.max(0, pending) + Math.max(0, run), String.format(Locale.ROOT,
+                    "%6.0f s pending %6.0f s running %6.0f s estimated  %s (%s)", pending, run,
+                    testJob.estimatedSeconds, testJob.job.getRunDir(), testJob.describe())));
+        }
+        try {
+            Files.write(Paths.get(JOBS_FILE), lines, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            System.err.println("WARNING: could not write " + JOBS_FILE + ": " + e);
+        }
+        slowest.sort(Comparator.comparingDouble((Pair<Double, String> p) -> p.getFirst()).reversed());
+        System.out.println("Slowest LSF jobs:");
+        slowest.stream().limit(10).forEach(p -> System.out.println("  " + p.getSecond()));
     }
 
     private static Optional<Integer> sourceToMem(TestSource ts) {

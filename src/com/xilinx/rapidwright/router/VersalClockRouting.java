@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -298,12 +299,51 @@ public class VersalClockRouting {
                     + " while routing clock " + clk + ", skew will be suboptimal.");
         }
 
+        // The vertical distribution trees may not provide a path for every clock region of
+        // the range (e.g. for some clock region rows of multi-SLR devices): route those clock
+        // regions after the others, straight to a vertical distribution line of their own, and
+        // from any node of the distribution routed so far below the clock root
+        Map<ClockRegion, List<Pair<IntentCode, ClockRegion>>> distrPaths = new HashMap<>();
+        List<ClockRegion> spineCRsWithoutPath = new ArrayList<>();
+        // Only route to the vertical distribution lines of the clock region rows with sinks:
+        // those of the other rows would be left dangling
+        Set<Integer> rowsWithSinks = new HashSet<>();
+        for (ClockRegion cr : clockRegions) {
+            rowsWithSinks.add(cr.getInstanceY());
+        }
         for (ClockRegion cr : verticalSpineCRs) {
+            if (!rowsWithSinks.contains(cr.getInstanceY())) {
+                continue;
+            }
+            List<Pair<IntentCode, ClockRegion>> distrPath = getVDistrPath(clkTree, cr);
+            if (distrPath.isEmpty()) {
+                distrPath = getVDistrPath(null, cr);
+                spineCRsWithoutPath.add(cr);
+            }
+            distrPaths.put(cr, distrPath);
+        }
+        List<ClockRegion> spineCRsInRoutingOrder = new ArrayList<>(distrPaths.keySet());
+        spineCRsInRoutingOrder.sort(Comparator.comparingInt(ClockRegion::getInstanceY));
+        spineCRsInRoutingOrder.removeAll(spineCRsWithoutPath);
+        spineCRsInRoutingOrder.addAll(spineCRsWithoutPath);
+        Set<Node> distrNodes = new HashSet<>();
+
+        for (ClockRegion cr : spineCRsInRoutingOrder) {
             q.clear();
             visited.clear();
-            q.add(clockRootNode);
+            if (spineCRsWithoutPath.contains(cr) && !distrNodes.isEmpty()) {
+                // Branch off the vertical distribution already routed, below the clock root: starting from the
+                // VROUTE again could transition onto the vertical distribution a second time
+                for (Node n : distrNodes) {
+                    if (!n.equals(vroute)) {
+                        q.add(new NodeWithPrevAndCost(n));
+                    }
+                }
+            } else {
+                q.add(clockRootNode);
+            }
 
-            List<Pair<IntentCode, ClockRegion>> distrPath = getVDistrPath(clkTree, cr);
+            List<Pair<IntentCode, ClockRegion>> distrPath = distrPaths.get(cr);
             nextDistrLevel: for (Pair<IntentCode, ClockRegion> target : distrPath) {
                 IntentCode targetIC = target.getFirst();
                 ClockRegion targetCR = target.getSecond();
@@ -320,7 +360,9 @@ public class VersalClockRouting {
                         q.clear();
                         visited.clear();
                         q.add(curr);
-                        allPIPs.addAll(RouterHelper.getPIPsFromNodes(curr.getPrevPath()));
+                        List<Node> path = curr.getPrevPath();
+                        allPIPs.addAll(RouterHelper.getPIPsFromNodes(path));
+                        distrNodes.addAll(path);
                         if (targetIC == IntentCode.NODE_GLOBAL_VDISTR) {
                             crToVdist.put(cr, curr);
                         }
@@ -348,6 +390,10 @@ public class VersalClockRouting {
             if (!crToVdist.containsKey(cr)) {
                 ClockRegion correspondingCR = device.getClockRegion(cr.getRow(), x);
                 Node vNode = crToVdist.get(correspondingCR);
+                if (vNode == null) {
+                    throw new RuntimeException("ERROR: No vertical distribution line routed in clock region "
+                            + correspondingCR + " for clock region " + cr + " of clock " + clk);
+                }
                 crToVdist.put(cr, vNode);
             }
         }
@@ -593,19 +639,21 @@ public class VersalClockRouting {
             IntentCode.NODE_INTF_CTRL,
             IntentCode.NODE_IRI,
             IntentCode.NODE_PINFEED,
-            IntentCode.NODE_GLOBAL_LEAF
+            IntentCode.NODE_GLOBAL_LEAF,
+            IntentCode.NODE_DEDICATED
         );
         Set<Node> visited = new HashSet<>();
         Queue<NodeWithPrev> q = new ArrayDeque<>();
         Predicate<Node> isNodeUnavailable = (node) -> getNodeStatus.apply(node) == NodeStatus.UNAVAILABLE;
-        RouteThruHelper routeThruHelper = new RouteThruHelper(clk.getDesign().getDevice());
+        Design design = clk.getDesign();
+        RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
 
         nextPin: for (SitePinInst p: clk.getPins()) {
             if (p.isOutPin() || p.isRouted() || Utils.isIOB(p.getSiteInst()) || isDrivenByGlobalClockNode(p)) {
                 continue;
             }
             NodeWithPrev sink = new NodeWithPrev(p.getConnectedNode());
-            ClockRegion cr = p.getTile().getClockRegion();
+            ClockRegion cr = getSinkClockRegion(sink);
             boolean crossCRSink = Utils.isPS(p.getSiteInst()) || Utils.isNOC(p.getSiteInst());
             q.clear();
             q.add(sink);
@@ -623,7 +671,8 @@ public class VersalClockRouting {
                     if (!visited.add(uphill)) {
                         continue;
                     }
-                    if (routeThruHelper.isRouteThru(uphill, curr) && curr.getIntentCode() != IntentCode.NODE_IRI) {
+                    if (routeThruHelper.isRouteThru(uphill, curr) && curr.getIntentCode() != IntentCode.NODE_IRI
+                            && !isRouteThruToDedicatedNodeAvailable(design, uphill, curr)) {
                         continue;
                     }
                     if (isNodeUnavailable.test(uphill)) {
@@ -645,6 +694,44 @@ public class VersalClockRouting {
         }
 
         return lcbMappings;
+    }
+
+    /**
+     * Gets the clock region whose leaf clock buffers (LCBs) can reach a clock sink: that of the
+     * sink's node, unless all the nodes driving it are in another clock region (the clock region
+     * of the interface tile through which a hard block is reached, e.g. that of the DCLK input of
+     * a CMT_DPLL or CMT_MMCM site on xcvc1902, which is in the clock region row below).
+     * @param sinkNode The node of the sink pin.
+     * @return The clock region of the LCBs to search for.
+     */
+    private static ClockRegion getSinkClockRegion(Node sinkNode) {
+        ClockRegion cr = sinkNode.getTile().getClockRegion();
+        ClockRegion uphillCR = null;
+        for (Node uphill : sinkNode.getAllUphillNodes()) {
+            ClockRegion ucr = uphill.getTile().getClockRegion();
+            if (ucr == null || ucr.equals(cr) || (uphillCR != null && !uphillCR.equals(ucr))) {
+                return cr;
+            }
+            uphillCR = ucr;
+        }
+        return uphillCR == null ? cr : uphillCR;
+    }
+
+    /**
+     * Checks if a routethru onto a dedicated node can be used to reach a clock sink from a leaf
+     * clock buffer, as Vivado does: e.g. the APB3CLK input of a GTY_QUAD site on xcvc1902 is only
+     * reached through the APB3CLK routethru of the neighboring XPIPE_QUAD site.
+     * @param design The design.
+     * @param head The routethru's start node.
+     * @param tail The routethru's end node.
+     * @return True if the tail is a dedicated node and the routethru is free.
+     */
+    private static boolean isRouteThruToDedicatedNodeAvailable(Design design, Node head, Node tail) {
+        if (tail.getIntentCode() != IntentCode.NODE_DEDICATED) {
+            return false;
+        }
+        PIP routethru = PIP.getArbitraryPIP(head, tail);
+        return routethru != null && RouteThruHelper.isRouteThruPIPAvailable(design, routethru);
     }
 
     /**
