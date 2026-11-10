@@ -42,6 +42,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -184,6 +185,10 @@ public class EDIFTools {
      * @return The part name or null if none was found.
      */
     public static String getPartName(EDIFNetlist edif) {
+        if (edif.getDesign() == null) {
+            // Such as an EDIF file with libraries only
+            return null;
+        }
         EDIFPropertyValue p = edif.getDesign().getPropertiesMap().get(EDIF_PART_PROP);
         if (p == null) {
             p = edif.getDesign().getPropertiesMap().get(EDIF_PART_PROP.toLowerCase());
@@ -1820,20 +1825,27 @@ public class EDIFTools {
             }
         }
 
-        // Copy all leaf cell instances except VCC/GND, with macros copied expanded
+        // Copy all leaf cell instances except VCC/GND, with macros copied expanded. The cells they
+        // are copied with are found by identity, as other cells (such as black boxes from different
+        // libraries, or the top cell) can have the same name
+        Map<EDIFCell, EDIFCell> flatTypes = new IdentityHashMap<>();
         for (EDIFHierCellInst inst : leaves) {
             EDIFCell type = inst.getCellType();
             if (type.isStaticSource()) continue;
-            boolean isPrimitive = type.getLibrary().isHDIPrimitivesLibrary();
-            EDIFLibrary lib = isPrimitive ? prims : work;
-            EDIFCell flatType = lib.getCell(type.getName());
+            EDIFCell flatType = flatTypes.get(type);
             if (flatType == null) {
-                if (isPrimitive) {
-                    flatNetlist.copyCellAndSubCells(type);
-                    flatType = lib.getCell(type.getName());
+                if (type.getLibrary().isHDIPrimitivesLibrary()) {
+                    // There is only one primitives library, so primitives are told apart by name
+                    flatType = prims.getCell(type.getName());
+                    if (flatType == null) {
+                        flatNetlist.copyCellAndSubCells(type);
+                        flatType = prims.getCell(type.getName());
+                    }
                 } else {
-                    flatType = lib.addCell(type);
+                    // A black box, which is renamed if the work library has a cell of its name
+                    flatType = work.addCellRenameDuplicates(new EDIFCell(type), "flat");
                 }
+                flatTypes.put(type, flatType);
             }
             String name = inst.getFullHierarchicalInstName();
             EDIFCellInst flatInst = flatTop.createChildCellInst(name, flatType);

@@ -921,8 +921,12 @@ class TestEDIFNetlist {
     public void testRAM32X1SExpansion(String unisim, String expected) {
         EDIFNetlist n = EDIFTools.createNewNetlist("test");
 
-        EDIFCell macro = n.getHDIPrimitivesLibrary().addCell(Design.getUnisimCell(Unisim.valueOf(unisim)));
-        n.getTopCell().createChildCellInst("inst", macro);
+        // A shallow copy of the unisim cell, which shares its ports
+        EDIFCell unisimCell = Design.getUnisimCell(Unisim.valueOf(unisim));
+        EDIFCell macro = n.getHDIPrimitivesLibrary().addCell(unisimCell);
+        EDIFCellInst macroInst = n.getTopCell().createChildCellInst("inst", macro);
+        EDIFPortInst o = n.getTopCell().createNet("o").createPortInst("O", macroInst);
+        Assertions.assertSame(unisimCell, o.getPort().getParentCell());
 
         Assertions.assertNull(n.getCellInstFromHierName("inst/SP"));
 
@@ -930,6 +934,23 @@ class TestEDIFNetlist {
         EDIFCellInst inst = n.getCellInstFromHierName("inst/SP");
         Assertions.assertNotNull(inst);
         Assertions.assertEquals(expected, inst.getProperty("IS_CLK_INVERTED").getValue());
+
+        // The macro is expanded with ports of its own, which its instance refers to
+        Assertions.assertSame(macro, macroInst.getCellType());
+        for (EDIFPort port : macro.getPorts()) {
+            Assertions.assertSame(macro, port.getParentCell(), port.getName());
+        }
+        Assertions.assertSame(macro.getPort("O"), o.getPort());
+        Assertions.assertNotNull(macro.getPort("O").getInternalNet());
+        Assertions.assertSame(macro.getPort("O").getInternalNet(), o.getInternalNet());
+
+        // The unisim cell is left as it was
+        Assertions.assertTrue(unisimCell.isLeafCellOrBlackBox());
+        Assertions.assertTrue(unisimCell.getInternalNetMap().isEmpty());
+        for (EDIFPort port : unisimCell.getPorts()) {
+            Assertions.assertSame(unisimCell, port.getParentCell(), port.getName());
+        }
+        Assertions.assertEquals(macro.getPorts().size(), unisimCell.getPorts().size());
     }
 
     @ParameterizedTest

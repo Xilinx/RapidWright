@@ -278,4 +278,66 @@ public class TestEDIFCollapsedView {
         Assertions.assertNotSame(ibuf, flatIbuf);
         Assertions.assertNotNull(flatIbuf.getCellInst("IBUFCTRL_INST"));
     }
+
+    @Test
+    public void testCreateFlatNetlistBlackBoxNameCollisions() {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("top");
+        EDIFTools.ensureCorrectPartInEDIF(netlist, Device.AWS_F1);
+        EDIFCell top = netlist.getTopCell();
+        // Black boxes in other libraries: one named as the top cell, and two with the same name
+        EDIFCell topBlackBox = new EDIFCell(netlist.addLibrary(new EDIFLibrary("lib1")), "top");
+        topBlackBox.createPort("a", EDIFDirection.INPUT, 1);
+        EDIFCell blackBox1 = new EDIFCell(netlist.getLibrary("lib1"), "bb");
+        blackBox1.createPort("b", EDIFDirection.INPUT, 1);
+        EDIFCell blackBox2 = new EDIFCell(netlist.addLibrary(new EDIFLibrary("lib2")), "bb");
+        blackBox2.createPort("c", EDIFDirection.INPUT, 1);
+        top.createChildCellInst("top_inst", topBlackBox);
+        top.createChildCellInst("bb1_inst", blackBox1);
+        top.createChildCellInst("bb1_inst2", blackBox1);
+        top.createChildCellInst("bb2_inst", blackBox2);
+
+        EDIFNetlist flat = EDIFTools.createFlatNetlist(netlist, Device.AWS_F1);
+        EDIFCell flatTop = flat.getTopCell();
+        EDIFCell flatTopBlackBox = flatTop.getCellInst("top_inst").getCellType();
+        EDIFCell flatBlackBox1 = flatTop.getCellInst("bb1_inst").getCellType();
+        EDIFCell flatBlackBox2 = flatTop.getCellInst("bb2_inst").getCellType();
+        // The top does not instantiate itself, and distinct black boxes stay distinct
+        Assertions.assertNotSame(flatTop, flatTopBlackBox);
+        Assertions.assertNotEquals("top", flatTopBlackBox.getName());
+        Assertions.assertNotNull(flatTopBlackBox.getPort("a"));
+        Assertions.assertSame(flatBlackBox1, flatTop.getCellInst("bb1_inst2").getCellType());
+        Assertions.assertNotSame(flatBlackBox1, flatBlackBox2);
+        Assertions.assertNotNull(flatBlackBox1.getPort("b"));
+        Assertions.assertNotNull(flatBlackBox2.getPort("c"));
+        for (EDIFCell cell : new EDIFCell[] {flatTopBlackBox, flatBlackBox1, flatBlackBox2}) {
+            Assertions.assertSame(cell, flat.getWorkLibrary().getCell(cell.getName()));
+        }
+    }
+
+    @Test
+    public void testReadEdifWithoutDesign(@TempDir Path dir) throws IOException {
+        // Libraries only, with no design (and so no part)
+        String text = "(edif cells\n"
+                + "  (edifVersion 2 0 0)\n"
+                + "  (edifLevel 0)\n"
+                + "  (keywordMap (keywordLevel 0))\n"
+                + "  (Library work\n"
+                + "    (edifLevel 0)\n"
+                + "    (technology (numberDefinition))\n"
+                + "    (cell sub (cellType GENERIC)\n"
+                + "      (view netlist (viewType NETLIST)\n"
+                + "        (interface (port i (direction INPUT)))\n"
+                + "      )\n"
+                + "    )\n"
+                + "  )\n"
+                + ")\n";
+        Path edif = dir.resolve("cells.edf");
+        Files.write(edif, text.getBytes(StandardCharsets.UTF_8));
+        Assertions.assertNull(parseAsIs(edif).getDesign());
+
+        EDIFNetlist netlist = EDIFTools.readEdifFile(edif);
+        Assertions.assertNull(netlist.getDesign());
+        Assertions.assertNotNull(netlist.getWorkLibrary().getCell("sub"));
+        Assertions.assertFalse(netlist.expandMacroUnisims());
+    }
 }

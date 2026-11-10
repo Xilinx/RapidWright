@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -553,6 +554,31 @@ public class EDIFCell extends EDIFPropertyObject {
     public EDIFNet removeInternalPortMapEntry(String portInstName) {
         if (internalPortMap == null) return null;
         return internalPortMap.remove(portInstName);
+    }
+
+    /**
+     * Gives this leaf cell its own copies of its ports if it shares them with another cell, as a
+     * shallow copy does (see {@link #EDIFCell(EDIFLibrary, EDIFCell)}), so that contents can be
+     * added to it without modifying the other cell. Port instances that refer to the shared ports
+     * are not updated.
+     * @return A map from each shared port to its copy, or null if the cell's ports were its own.
+     */
+    Map<EDIFPort, EDIFPort> unshareLeafCellPorts() {
+        if (!isLeafCellOrBlackBox()) {
+            throw new IllegalStateException("Cell " + getName() + " is not a leaf cell");
+        }
+        if (ports == null || ports.values().stream().allMatch(p -> p.getParentCell() == this)) {
+            return null;
+        }
+        PortMap sharedPorts = ports;
+        ports = null;
+        // A leaf cell has no nets, so any internal port map it has is shared with the other cell
+        internalPortMap = null;
+        Map<EDIFPort, EDIFPort> copies = new IdentityHashMap<>();
+        for (EDIFPort port : sharedPorts.values()) {
+            copies.put(port, addPort(new EDIFPort(port)));
+        }
+        return copies;
     }
 
     public Map<String, EDIFNet> getInternalNetMap() {

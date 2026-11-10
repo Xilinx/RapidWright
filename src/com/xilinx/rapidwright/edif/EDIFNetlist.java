@@ -2394,6 +2394,13 @@ public class EDIFNetlist extends EDIFName {
             // Already expanded, or a primitive that only appears inside macros
             return;
         }
+        Map<EDIFPort, EDIFPort> portCopies = cell.unshareLeafCellPorts();
+        if (portCopies != null) {
+            // The cell shared its ports with another cell, as a shallow copy of a unisim cell (such as
+            // EDIFLibrary.addCell(Design.getUnisimCell(...))) does. It now has its own, so that it can be
+            // filled without modifying the other cell: its instances must refer to them instead
+            remapPortInsts(cell, portCopies);
+        }
         for (EDIFPort port : macro.getPorts()) {
             getOrAddPort(cell, port);
         }
@@ -2439,6 +2446,28 @@ public class EDIFNetlist extends EDIFName {
                                 seriesMacroExpandExceptionMap);
                     }
                     child.setCellType(newChildType);
+                }
+            }
+        }
+    }
+
+    /**
+     * Makes the port instances of each instance of the given cell in this netlist that refer to a
+     * port in the given map refer to the port it maps to instead.
+     */
+    private void remapPortInsts(EDIFCell cellType, Map<EDIFPort, EDIFPort> portMap) {
+        for (EDIFLibrary lib : getLibraries()) {
+            for (EDIFCell cell : lib.getCells()) {
+                for (EDIFCellInst inst : cell.getCellInsts()) {
+                    if (inst.getCellType() != cellType) {
+                        continue;
+                    }
+                    for (EDIFPortInst portInst : inst.getPortInsts()) {
+                        EDIFPort port = portMap.get(portInst.getPort());
+                        if (port != null) {
+                            portInst.setPort(port);
+                        }
+                    }
                 }
             }
         }
