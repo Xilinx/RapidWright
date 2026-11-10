@@ -922,17 +922,17 @@ public class TestRWRoute {
     @Test
     public void testRWRouteSubstituteBlackBoxFlow(@TempDir Path dir) {
         // Load an example design, make sure RWRoute can route it
-        Path dcp = RapidWrightDCP.getPath("optical-flow.dcp");
+        Path dcp = RapidWrightDCP.getPath("bnn.dcp");
         Design design = Design.readCheckpoint(dcp);
         RWRoute.routeDesignFullNonTimingDriven(design);
         // VivadoToolsHelper.assertFullyRouted(design);
         
         // Pick a cell to blackbox
-        String instToBlackBox = "bd_0_i/hls_inst/inst/Loop_FRAMES_CP_OUTER_U0";
+        String instToBlackBox = "bd_0_i/hls_inst/inst/grp_bin_dense_fu_523";
         EDIFHierCellInst inst = design.getNetlist().getHierCellInstFromName(instToBlackBox);
         
         // Create example external library, store the guts of this netlist in external lib
-        String cellType = "bd_0_hls_inst_0_Loop_FRAMES_CP_OUTER";
+        String cellType = "bd_0_hls_inst_0_bin_dense";
         EDIFNetlist external = EDIFTools.createNewNetlist(inst.getInst());
         Path externalEDIF = dir.resolve(cellType + ".edn");
         external.exportEDIF(externalEDIF);
@@ -940,12 +940,12 @@ public class TestRWRoute {
         inst.getCellType().makePrimitive(); // makeBlackBox
         
         // Write out top EDIF that now has a black boxed cell
-        Path opticalFlowTopEDIF = dir.resolve("optical-flow.edf");
+        Path topEDIF = dir.resolve("bnn.edf");
         design.getNetlist().collapseMacroUnisims(design.getSeries());
-        design.getNetlist().exportEDIF(opticalFlowTopEDIF);
+        design.getNetlist().exportEDIF(topEDIF);
         
         // Re-load DCP with black boxed netlist
-        Design designWithBlackBox = Design.readCheckpoint(dcp, opticalFlowTopEDIF);
+        Design designWithBlackBox = Design.readCheckpoint(dcp, topEDIF);
 
         // Load external lib, set it as the netlist's external library
         EDIFNetlist externalLib = EDIFTools.readEdifFile(externalEDIF);
