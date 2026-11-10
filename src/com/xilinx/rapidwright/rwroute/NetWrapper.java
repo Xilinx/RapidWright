@@ -67,8 +67,10 @@ public class NetWrapper{
         int ySum = 0;
         int count = 0;
         boolean sourceRnodeAdded = false;
+        boolean crossSLR = false;
         for (Connection connection : connections) {
             if (connection.isDirect()) continue;
+            crossSLR |= connection.isCrossSLR();
             if (!sourceRnodeAdded) {
                 short x = connection.getSourceRnode().getEndTileXCoordinate();
                 short y = connection.getSourceRnode().getEndTileYCoordinate();
@@ -76,16 +78,6 @@ public class NetWrapper{
                 yMin = Integer.min(yMin, y);
                 xMax = Integer.max(xMax, x);
                 yMax = Integer.max(yMax, y);
-
-                if (connection.isCrossSLR()
-                        && !routingGraph.isVersal) { // FIXME: Update this for Versal
-                    // For SLR-crossing connections, ensure it contains at least one Laguna column
-                    int nextLaguna = routingGraph.nextLagunaColumn[xMin];
-                    int prevLaguna = routingGraph.prevLagunaColumn[xMax];
-                    xMin = (short) Math.min(xMin, prevLaguna);
-                    xMax = (short) Math.max(xMax, nextLaguna);
-                }
-
                 xSum += x;
                 ySum += y;
                 sourceRnodeAdded = true;
@@ -100,6 +92,16 @@ public class NetWrapper{
             xSum += x;
             ySum += y;
             count++;
+        }
+
+        if (crossSLR) {
+            // As for each connection's bounding box (see Connection.computeConnectionBoundingBox()): for nets with an
+            // SLR-crossing connection, ensure it contains at least one column from which super long lines can cross
+            // SLRs (Laguna on UltraScale/UltraScale+, SLL on Versal), and is at least as high as a super long line
+            int widenedXMin = routingGraph.getCrossingWidenedXMin(xMin, xMax);
+            xMax = routingGraph.getCrossingWidenedXMax(xMin, xMax);
+            xMin = widenedXMin;
+            yMax = Math.max(yMax, yMin + routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
         }
 
         doubleHpwl = (short) ((xMax - xMin + 1 + yMax - yMin + 1) * 2);
@@ -166,6 +168,7 @@ public class NetWrapper{
                 noAltSourceFound = true;
                 return null;
             }
+            routingGraph.checkSourceSideKnown(altSourceNode);
 
             if (routingGraph.isPreserved(altSourceNode)) {
                 noAltSourceFound = true;
@@ -189,8 +192,10 @@ public class NetWrapper{
                 continue;
             }
 
-            RouteNode driver = rnodes.get(rnodes.size() - 2);
-            for (int i = rnodes.size() - 1; i >= 0; i--) {
+            // Nodes run from the sink to the source, which has no driver (and may drive
+            // the first node of each connection's route differently)
+            RouteNode driver = rnodes.get(rnodes.size() - 1);
+            for (int i = rnodes.size() - 2; i >= 0; i--) {
                 assert(driver != null);
                 RouteNode rnode = rnodes.get(i);
                 if (rnode.isVisited(sequence)) {

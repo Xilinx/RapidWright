@@ -27,9 +27,9 @@ package com.xilinx.rapidwright.rwroute;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,6 +40,7 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetTools;
+import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Node;
@@ -67,6 +68,9 @@ public class PartialRouter extends RWRoute {
     protected Set<NetWrapper> partiallyPreservedNets;
 
     protected Map<Net, List<SitePinInst>> netToPins;
+
+    /** Connections whose routing was recovered from their net's existing routing (see setPIPsOfNets()) */
+    protected Set<Connection> recoveredConnections;
 
     protected static class RouteNodeGraphPartial extends RouteNodeGraph {
 
@@ -104,6 +108,7 @@ public class PartialRouter extends RWRoute {
         super(design, config);
         this.softPreserve = softPreserve;
         partiallyPreservedNets = new HashSet<>();
+        recoveredConnections = new HashSet<>();
         netToPins = pinsToRoute.stream()
                 .filter((spi) -> !spi.isOutPin())
                 .collect(Collectors.groupingBy(SitePinInst::getNet));
@@ -121,9 +126,29 @@ public class PartialRouter extends RWRoute {
         // routeDesignWithUserDefinedArguments() which needs to infer pinsToRoute.
     }
 
+    /**
+     * Gets the nets to time: those with pins to route, and those that never leave their site (no sink site pins,
+     * e.g. a LUT driving the flop beside it), which are never routed but lie on the timing paths of routed
+     * connections (without them, such paths would stop at, or restart from, the intra-site net). Only the latter in
+     * the sites of the former's pins are taken: any other is cut off from those paths by nets that are not timed.
+     */
     @Override
     protected Collection<Net> getTimingNets() {
-        return Collections.unmodifiableSet(netToPins.keySet());
+        Set<Net> timingNets = new LinkedHashSet<>(netToPins.keySet());
+        Set<SiteInst> siteInsts = new LinkedHashSet<>();
+        for (Net net : netToPins.keySet()) {
+            for (SitePinInst spi : net.getPins()) {
+                siteInsts.add(spi.getSiteInst());
+            }
+        }
+        for (SiteInst si : siteInsts) {
+            for (Net net : si.getNetToSiteWiresMap().keySet()) {
+                if (net.getSinkPins().isEmpty()) {
+                    timingNets.add(net);
+                }
+            }
+        }
+        return timingNets;
     }
 
     /**
@@ -148,14 +173,15 @@ public class PartialRouter extends RWRoute {
         // Presence of a prev pointer means that:
         //   (a) end node has been visited before
         //   (b) only that arc is allowed to enter this end node
+        // Note that this must not depend on whether either node has been visited by the current search: the result
+        // decides whether end is one of start's children, which RouteNode.getChildren() computes once and caches for
+        // every later search (and may compute outside of any search, e.g. for estimateDelayOfConnections(), when no
+        // node has been visited and so every node appears to have been visited by the same, non-existent, search),
+        // and whether start can drive end when end is a sink, which RWRoute.isPushableSinkDriver() asks (through
+        // RouteNodeGraph.isExcluded(), uncached) during a search, in either mode.
+        // A node already visited by the current search is skipped by exploreAndExpand() anyway.
         RouteNode prev = endRnode.getPrev();
         if (prev != null) {
-            if (endRnode.isVisited(start.getVisited())) {
-                // Visited possibly from a different arc uphill of end, or possibly from
-                // the same start -> end arc during prepareRouteConnection()
-                return false;
-            }
-
             if (prev == start && routingGraph.isPreserved(end)) {
                 // Arc matches start node and end node is preserved
                 // This implies that both start and end nodes must be preserved for the same net
@@ -498,6 +524,9 @@ public class PartialRouter extends RWRoute {
 
                     RouteNode sinkRnode = connection.getSinkRnode();
                     finishRouteConnection(connection, sinkRnode);
+                    if (connection.isRouted()) {
+                        recoveredConnections.add(connection);
+                    }
                 }
             }
         }
@@ -547,6 +576,28 @@ public class PartialRouter extends RWRoute {
 
         if (!connection.isRouted()) {
             connection.resetRoute();
+        }
+    }
+
+    /**
+     * As {@link RWRoute#setPIPsOfNets()}, which sets each net's PIPs from its connections' routing alone, and so drops
+     * the existing routing of any connection that was routed before (recovered from its net's routing) but could not
+     * be routed again: warns of each such sink.
+     */
+    @Override
+    protected void setPIPsOfNets() {
+        super.setPIPsOfNets();
+
+        int lost = 0;
+        for (Connection connection : recoveredConnections) {
+            if (!connection.isRouted()) {
+                System.out.println("WARNING: Sink " + connection.getSink() + " of net " + connection.getNet() +
+                        " was routed before but is not now; its existing routing has been removed");
+                lost++;
+            }
+        }
+        if (lost > 0) {
+            System.out.println("WARNING: " + lost + " sinks that were routed before are not now");
         }
     }
 
