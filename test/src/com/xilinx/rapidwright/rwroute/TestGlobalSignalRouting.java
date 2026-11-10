@@ -1153,6 +1153,58 @@ public class TestGlobalSignalRouting {
     }
 
     /**
+     * On Versal, a constant reaches an XPIO output buffer input from the fabric through routethrus of IRI_QUAD
+     * and BLI sites. These are only used if their site is free: with another net on the site wire of the
+     * routethru's input pin, or with a cell on the BEL that this pin drives, the routethru is not used. Each of
+     * them is on the input's only path from the fabric, which is therefore left unrouted. The static net itself
+     * on that site wire (as left by unrouting it in a routed design) does not block the routethru.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "IRI_QUAD_X28Y6,IMUX_IN8,cell",
+            "IRI_QUAD_X28Y6,IMUX_IN8,otherNet",
+            "IRI_QUAD_X28Y6,IMUX_IN8,sameNet",
+            "BLI_B_GRP2_X24Y0,INT_IMUX_B_24_,cell",
+            "BLI_B_GRP2_X24Y0,INT_IMUX_B_24_,otherNet",
+            "BLI_B_GRP2_X24Y0,INT_IMUX_B_24_,sameNet",
+    })
+    public void testRouteStaticNetSkipsUsedVersalIriRouteThru(String routeThruSiteName, String routeThruInPinName,
+                                                               String blocker) {
+        for (boolean block : new boolean[]{false, true}) {
+            Design design = new Design("versal_iri_routethru", "xcvc1902-vsva2197-2MP-e-S");
+            Cell obuf = design.createAndPlaceCell("obuf", Unisim.OBUF, "IOB_X24Y1/IOB_S");
+            Net gndNet = design.getGndNet();
+            SitePinInst opS = gndNet.createPin("OP_S", obuf.getSiteInst());
+
+            Site routeThruSite = design.getDevice().getSite(routeThruSiteName);
+            if (block) {
+                SiteInst si = design.createSiteInst(routeThruSite);
+                BELPin routeThruInPin = new SitePin(routeThruSite, routeThruInPinName).getBELPin();
+                if (blocker.equals("cell")) {
+                    si.addCell(new Cell("user", routeThruInPin.getSiteConns().get(0).getBEL()));
+                } else {
+                    Net net = blocker.equals("sameNet") ? gndNet : design.createNet("user");
+                    si.routeIntraSiteNet(net, routeThruInPin, routeThruInPin);
+                }
+            }
+
+            List<SitePinInst> gndPins = new ArrayList<>(gndNet.getPins());
+            RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
+            GlobalSignalRouting.routeStaticNet(gndPins, (n) -> getNodeState(design, NetType.GND, n), design, routeThruHelper);
+
+            Node routeThruInNode = routeThruSite.getConnectedNode(routeThruInPinName);
+            boolean usesRouteThru = gndNet.getPIPs().stream().anyMatch((pip) -> pip.isRouteThru()
+                    && pip.getStartNode().equals(routeThruInNode));
+            String routeThrus = gndNet.getPIPs().stream().filter(PIP::isRouteThru).map(PIP::toString)
+                    .collect(Collectors.joining(", "));
+            boolean blocked = block && !blocker.equals("sameNet");
+            Assertions.assertEquals(!blocked, usesRouteThru, "block=" + block + " " + routeThrus);
+            Assertions.assertEquals(!blocked, opS.isRouted(), "block=" + block + " " + routeThrus);
+            Assertions.assertEquals(blocked ? 1 : 0, DesignTools.updatePinsIsRouted(gndNet));
+        }
+    }
+
+    /**
      * A routed design's static source pin remains on its SiteInst when RWRoute removes all output
      * pins from the static net before rerouting it (see RWRoute.addStaticNetRoutingTargets()):
      * rerouting must add that same pin back to the net exactly once and mark it routed.
