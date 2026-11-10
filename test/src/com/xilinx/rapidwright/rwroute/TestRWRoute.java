@@ -31,6 +31,7 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -67,6 +68,9 @@ import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
+import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.eco.ECOTools;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
@@ -1552,6 +1556,105 @@ public class TestRWRoute {
     }
 
     @Test
+    public void testDedicatedClockInputsSharingFabricInput() {
+        // Two clock-capable HDIO inputs, each driving a BUFGCE_HDIO of the same RCLK_HDIO tile through its
+        // dedicated path. Both BUFGCE_HDIOs can also be reached from the fabric, but only through a single
+        // shared INT input: these connections must be routed through their dedicated paths
+        Design design = new Design("top", "xcku9p-ffve900-2-e");
+        List<SitePinInst> pinsToRoute = new ArrayList<>();
+        List<Net> nets = new ArrayList<>();
+        String[][] ioAndBuffer = {{"IOB_X0Y164", "BUFGCE_HDIO_X0Y2"}, {"IOB_X0Y182", "BUFGCE_HDIO_X0Y3"}};
+        for (String[] pair : ioAndBuffer) {
+            Net net = design.createNet(pair[0] + "_I");
+            net.createPin("I", design.createSiteInst(pair[0]));
+            pinsToRoute.add(net.createPin("CLK_IN", design.createSiteInst(pair[1])));
+            nets.add(net);
+        }
+        PartialRouter.routeDesignPartialNonTimingDriven(design, pinsToRoute, false);
+
+        for (Net net : nets) {
+            assertAllPinsRouted(net);
+            Assertions.assertFalse(net.getPIPs().isEmpty());
+            for (PIP pip : net.getPIPs()) {
+                Assertions.assertNotEquals(TileTypeEnum.INT, pip.getTile().getTileTypeEnum(), pip.toString());
+            }
+        }
+    }
+
+    /**
+     * Creates and routes a net from a clock-capable HDIO input to both a BUFGCE_HDIO, which it drives through a
+     * dedicated path, and the AX and BX pins of the SLICEL nearest to its input's projection onto the fabric.
+     */
+    private static Net createAndRouteNetWithDedicatedClockInput(Design design) {
+        Net net = design.createNet("IOB_X0Y164_I");
+        SitePinInst source = net.createPin("I", design.createSiteInst("IOB_X0Y164"));
+        net.createPin("CLK_IN", design.createSiteInst("BUFGCE_HDIO_X0Y2"));
+        SiteInst slice = design.createSiteInst(getNearestSLICELs(design, source, 1).get(0));
+        net.createPin("AX", slice);
+        net.createPin("BX", slice);
+        PartialRouter.routeDesignPartialNonTimingDriven(design, net.getSinkPins(), false);
+        assertAllPinsRouted(net);
+        return net;
+    }
+
+    private static List<Site> getNearestSLICELs(Design design, SitePinInst source, int count) {
+        Tile intTile = RouterHelper.projectOutputPinToINTNode(source).getTile();
+        List<Site> slices = new ArrayList<>(Arrays.asList(design.getDevice().getAllSitesOfType(SiteTypeEnum.SLICEL)));
+        slices.sort(Comparator.comparingInt((s) -> s.getTile().getManhattanDistance(intTile)));
+        return slices.subList(0, count);
+    }
+
+    private static SitePinInst getSinkPin(Net net, String name) {
+        return net.getSinkPins().stream().filter((spi) -> spi.getName().equals(name)).findFirst().get();
+    }
+
+    @Test
+    public void testPartialRoutingPreservesDedicatedClockInput() {
+        // Routing another sink of a net must keep the (preserved) routing of its sink driven through a
+        // dedicated path
+        Design design = new Design("top", "xcku9p-ffve900-2-e");
+        Net net = createAndRouteNetWithDedicatedClockInput(design);
+        SitePinInst ax = getSinkPin(net, "AX");
+        DesignTools.unroutePins(net, Collections.singletonList(ax));
+        Set<PIP> preservedPIPs = new HashSet<>(net.getPIPs());
+
+        PartialRouter.routeDesignPartialNonTimingDriven(design, Collections.singletonList(ax), false);
+
+        assertAllPinsRouted(net);
+        Assertions.assertTrue(net.getPIPs().containsAll(preservedPIPs));
+    }
+
+    @Test
+    public void testUnpreserveNetWithDedicatedClockInput() {
+        // Move a sink pin from a fully routed net, with a sink driven through a dedicated path, onto another net
+        // without ripping up its routing: that routing blocks the other net's sink, so the first net gets
+        // unpreserved, which must cope with its direct connection to the clock buffer
+        Design design = new Design("top", "xcku9p-ffve900-2-e");
+        Net net = createAndRouteNetWithDedicatedClockInput(design);
+        SitePinInst bx = getSinkPin(net, "BX");
+        List<PIP> pips = new ArrayList<>(net.getPIPs());
+        Assertions.assertTrue(net.removePin(bx));
+        net.setPIPs(pips);
+        Net other = design.createNet("other");
+        other.createPin("AQ", design.createSiteInst(getNearestSLICELs(design, net.getSource(), 2).get(1)));
+        other.addPin(bx);
+
+        PartialRouter.routeDesignPartialNonTimingDriven(design, Collections.singletonList(bx), false);
+
+        Set<Node> nodes = new HashSet<>();
+        for (PIP pip : net.getPIPs()) {
+            nodes.add(pip.getStartNode());
+            nodes.add(pip.getEndNode());
+        }
+        for (PIP pip : other.getPIPs()) {
+            Assertions.assertFalse(nodes.contains(pip.getStartNode()), pip.toString());
+            Assertions.assertFalse(nodes.contains(pip.getEndNode()), pip.toString());
+        }
+        assertAllPinsRouted(net);
+        assertAllPinsRouted(other);
+    }
+
+    @Test
     public void testDiscussion1245_20250805() {
         // Adapted from https://github.com/Xilinx/RapidWright/discussions/1245#discussioncomment-14003055
         Design test_place = new Design("test_design", "vp1202");
@@ -2251,17 +2354,17 @@ public class TestRWRoute {
     @Test
     public void testRWRouteSubstituteBlackBoxFlow(@TempDir Path dir) {
         // Load an example design, make sure RWRoute can route it
-        Path dcp = RapidWrightDCP.getPath("optical-flow.dcp");
+        Path dcp = RapidWrightDCP.getPath("bnn.dcp");
         Design design = Design.readCheckpoint(dcp);
         RWRoute.routeDesignFullNonTimingDriven(design);
         // VivadoToolsHelper.assertFullyRouted(design);
         
         // Pick a cell to blackbox
-        String instToBlackBox = "bd_0_i/hls_inst/inst/Loop_FRAMES_CP_OUTER_U0";
+        String instToBlackBox = "bd_0_i/hls_inst/inst/grp_bin_dense_fu_523";
         EDIFHierCellInst inst = design.getNetlist().getHierCellInstFromName(instToBlackBox);
         
         // Create example external library, store the guts of this netlist in external lib
-        String cellType = "bd_0_hls_inst_0_Loop_FRAMES_CP_OUTER";
+        String cellType = "bd_0_hls_inst_0_bin_dense";
         EDIFNetlist external = EDIFTools.createNewNetlist(inst.getInst());
         Path externalEDIF = dir.resolve(cellType + ".edn");
         external.exportEDIF(externalEDIF);
@@ -2269,12 +2372,12 @@ public class TestRWRoute {
         inst.getCellType().makePrimitive(); // makeBlackBox
         
         // Write out top EDIF that now has a black boxed cell
-        Path opticalFlowTopEDIF = dir.resolve("optical-flow.edf");
+        Path topEDIF = dir.resolve("bnn.edf");
         design.getNetlist().collapseMacroUnisims(design.getSeries());
-        design.getNetlist().exportEDIF(opticalFlowTopEDIF);
+        design.getNetlist().exportEDIF(topEDIF);
         
         // Re-load DCP with black boxed netlist
-        Design designWithBlackBox = Design.readCheckpoint(dcp, opticalFlowTopEDIF);
+        Design designWithBlackBox = Design.readCheckpoint(dcp, topEDIF);
 
         // Load external lib, set it as the netlist's external library
         EDIFNetlist externalLib = EDIFTools.readEdifFile(externalEDIF);
@@ -2376,6 +2479,30 @@ public class TestRWRoute {
             routethruFound |= pip.isRouteThru();
         }
         Assertions.assertEquals(expectRoutethru, routethruFound);
+    }
+
+    @Test
+    public void testClockNetsDrivenByBUFGGTRoutedFirst() {
+        // A BUFG_GT reaches a single clock routing track, fixed by its site: its clock is routed before the
+        // clocks of other buffers, which can avoid that track
+        Design design = new Design("clock_order", "xcvu3p-ffvc1517-2-e");
+        List<Net> clks = new ArrayList<>();
+        int i = 0;
+        for (String bufg : new String[] {"BUFGCE_X0Y48", "BUFG_GT_X0Y29", "BUFGCE_X0Y49"}) {
+            Net clk = design.createNet("clk" + i);
+            Unisim type = bufg.startsWith("BUFG_GT") ? Unisim.BUFG_GT : Unisim.BUFGCE;
+            clk.connect(design.createAndPlaceCell("bufg" + i, type, bufg + "/" + (type == Unisim.BUFG_GT ? "BUFG_GT" : "BUFCE")), "O");
+            Cell ff = design.createAndPlaceCell("ff" + i, Unisim.FDRE, "SLICE_X40Y" + (100 + i) + "/AFF");
+            clk.connect(ff, "C");
+            clks.add(clk);
+            i++;
+        }
+        RWRoute router = new RWRoute(design, new RWRouteConfig(new String[] {"--nonTimingDriven"}));
+        router.preprocess();
+        router.initialize();
+        List<Net> order = router.getClkNetsInRoutingOrder();
+        Assertions.assertEquals(3, order.size());
+        Assertions.assertEquals(clks.get(1), order.get(0));
     }
 
     @Test

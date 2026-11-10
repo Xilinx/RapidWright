@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -61,6 +62,7 @@ import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
@@ -520,9 +522,26 @@ public class RWRoute {
      */
     protected void routeGlobalClkNets() {
         Map<Integer, Set<ClockRegion>> usedRoutingTracks = new HashMap<>();
-        for (Net clk : clkNets) {
+        for (Net clk : getClkNetsInRoutingOrder()) {
             routeGlobalClkNet(clk, usedRoutingTracks);
         }
+    }
+
+    /**
+     * Gets the clock nets in the order in which they are routed. On UltraScale devices, the clocks driven by a
+     * BUFG_GT come first: a BUFG_GT reaches a single routing track (fixed by its site), and the distribution
+     * tracks keep the index of the routing track, so such a clock cannot avoid the tracks of the clocks already
+     * routed while other clock buffers can choose among several tracks.
+     * @return The clock nets in routing order.
+     */
+    protected List<Net> getClkNetsInRoutingOrder() {
+        Series series = design.getSeries();
+        if (series != Series.UltraScale && series != Series.UltraScalePlus) {
+            return clkNets;
+        }
+        List<Net> ordered = new ArrayList<>(clkNets);
+        ordered.sort(Comparator.comparingInt((clk) -> clk.getSource().getSiteTypeEnum() == SiteTypeEnum.BUFG_GT ? 0 : 1));
+        return ordered;
     }
 
     protected void routeGlobalClkNet(Net clk, Map<Integer, Set<ClockRegion>> usedRoutingTracks) {
@@ -706,8 +725,11 @@ public class RWRoute {
                 }
             }
 
-            if ((sourceINTNode == null && connection.getSourceRnode() == null) || sinkINTNode == null) {
-                // Direct connection if either source or sink pin cannot be projected to INT tile
+            if ((sourceINTNode == null && connection.getSourceRnode() == null) || sinkINTNode == null ||
+                    RouterHelper.isDedicatedConnection(source, sink)) {
+                // Direct connection if either source or sink pin cannot be projected to INT tile, or if the
+                // sink is driven by the source through dedicated resources (e.g. a clock-capable input
+                // to a clock buffer) that need not, and should not, go through the fabric
                 directConnections.add(connection);
                 connection.setDirect(true);
             } else {
