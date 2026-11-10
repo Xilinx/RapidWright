@@ -1,2 +1,3 @@
 com.xilinx.rapidwright.support.CheckOpenFilesExtension
+com.xilinx.rapidwright.support.ReleaseDevicesExtension
 com.xilinx.rapidwright.util.lsf.LsfInterceptor

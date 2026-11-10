@@ -9,11 +9,37 @@ env:
 
 
 jobs:
+  # Gets the test durations recorded by the latest run of master, so that every shard balances with the same ones
+  test-durations-in:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the test durations of master
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/scripts/get-test-durations.sh test-durations-in
+
+      - name: Pass on the test durations to the test shards
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-durations-in
+          path: test-durations-in
+
   build:
+    needs: test-durations-in
+    env:
+      # Number of jobs the Java tests of each configuration are split between (keep in sync with matrix.shard)
+      TEST_SHARDS: 6
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest]
         single_threaded: [multi-threaded, single-threaded]
+        shard: [1, 2, 3, 4, 5, 6]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -26,6 +52,7 @@ jobs:
           cache: 'gradle'
 
       - name: Setup Python 3.12
+        if: matrix.shard == 1
         uses: actions/setup-python@v5
         with:
           python-version: 3.12
@@ -39,34 +66,85 @@ jobs:
           key: rapidwright-clouddata-v2-${{ env.RAPIDWRIGHT_VERSION }}
 
       - name: Install Python Dependencies
+        if: matrix.shard == 1
         run: |
           pip install pytest python/
 
-      - name: Compile
-        run: ./gradlew assemble -Dorg.gradle.warning.mode=fail 
+      - name: Get the test durations to balance the shards with
+        uses: actions/download-artifact@v4
+        with:
+          name: test-durations-in
+          path: test-durations-in
 
+      - name: Compile
+        if: matrix.shard == 1
+        run: ./gradlew assemble -Dorg.gradle.warning.mode=fail
+
+      # Each shard runs a part of the Java tests (see TestShardFilter) and records their durations; the first
+      # shard also runs the Python tests
       - name: Test
-        run: ./gradlew -PlimitToSingleProc=${{ matrix.single_threaded }} test 
+        run: >
+          ./gradlew -PlimitToSingleProc=${{ matrix.single_threaded }} -PtestShard=${{ matrix.shard }}/${{ env.TEST_SHARDS }}
+          -PtestDurations=test-durations-in/test-durations-${{ matrix.single_threaded }}.txt -PrecordTestDurations
+          ${{ matrix.shard == 1 && 'test' || 'testJava' }}
+
+      - name: Upload Test Durations
+        uses: actions/upload-artifact@v4
+        with:
+          name: Test Durations ${{ matrix.single_threaded }} ${{ matrix.shard }}
+          path: build/test-durations/testJava.txt
 
       - name: Run Examples
-        if: matrix.single_threaded == 'multi-threaded'
+        if: matrix.single_threaded == 'multi-threaded' && matrix.shard == 2
         run: ./gradlew runExamples
 
       - name: Archive Java Test Report
         uses: actions/upload-artifact@v4
         if: always() && matrix.os == 'ubuntu-latest'
         with:
-          name: Java Test Report ${{ matrix.single_threaded }}
+          name: Java Test Report ${{ matrix.single_threaded }} ${{ matrix.shard }}
           path: build/reports/tests/testJava
 
       - name: Upload Test Results
         if: always() && matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: Unit Test Results ${{ matrix.single_threaded }}
+          name: Unit Test Results ${{ matrix.single_threaded }} ${{ matrix.shard }}
           path: |
             build/test-results/**/*.xml
 
       - name: Terminate Gradle to allow caching
         run: ./gradlew --stop
 
+  # A single check that passes only if every test shard passed, e.g. for branch protection rules
+  tests-passed:
+    if: always()
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check that all test shards passed
+        run: test "${{ needs.build.result }}" = "success"
+
+  # Merges the test durations recorded by all shards into the test-durations artifact, which later runs balance
+  # their shards with (see TestShardFilter)
+  test-durations:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the test durations of each shard
+        uses: actions/download-artifact@v4
+        with:
+          pattern: Test Durations *
+          path: shard-durations
+
+      - name: Merge the test durations
+        run: .github/scripts/merge-test-durations.sh shard-durations test-durations
+
+      - name: Upload the test durations
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-durations
+          path: test-durations
+          retention-days: 90
