@@ -1014,11 +1014,12 @@ public class GlobalSignalRouting {
 
     /**
      * Determines if the given {@link Node} instance can serve as our source.
+     * @param design The {@link Design} instance to use.
      * @param node The {@link Node} instance in question.
      * @param type The net type to designate the static source type.
      * @return {@link SitePin} if a valid source is found, null otherwise.
      */
-    private static SitePin getStaticSourceSitePin(Design design,
+    static SitePin getStaticSourceSitePin(Design design,
                                                   Node node,
                                                   NetType type) {
         if (node.getIntentCode() != IntentCode.NODE_CLE_OUTPUT) {
@@ -1051,12 +1052,8 @@ public class GlobalSignalRouting {
         if (isVersal) {
             sitePinName = wireName.substring(17, wireName.length() - 4);
 
-            if (si != null) {
-                char lutLetter = sitePinName.charAt(0);
-                if (si.getCell(lutLetter + "6LUT") != null) {
-                    // 6LUT is occupied
-                    return null;
-                }
+            if (si != null && !isVersalSliceOutputFree(si, sitePinName)) {
+                return null;
             }
         } else {
             if (wireName.endsWith("_O")) {
@@ -1091,5 +1088,44 @@ public class GlobalSignalRouting {
         }
 
         return new SitePin(slice, sitePinName);
+    }
+
+    /**
+     * Determines if a Versal SLICEL/SLICEM output pin ([A-H]_O or [A-H]Q) can be driven by a
+     * constant without disturbing the logic already placed in its slice.
+     * The [A-H]_O pin is driven by the 6LUT's O6 output; it is not free if either LUT of that
+     * letter is used (a used 5LUT needs A6 to be high, so O6 is not a free constant).
+     * The [A-H]Q pin is driven by OUTMUX[A-H]1, which selects either the flip-flop's Q output
+     * or the output of FFMUX[A-H]1; it is additionally not free if that flip-flop or mux is used.
+     * @param si The SiteInst of the slice.
+     * @param sitePinName The name of the site pin: [A-H]_O or [A-H]Q.
+     * @return True if no LUT, flip-flop or intra-site wire behind this site pin is in use.
+     */
+    private static boolean isVersalSliceOutputFree(SiteInst si, String sitePinName) {
+        char letter = sitePinName.charAt(0);
+        if (si.getCell(letter + "6LUT") != null || si.getCell(letter + "5LUT") != null) {
+            return false;
+        }
+        if (isSiteWireUsed(si, letter + "5LUT_O5") || isSiteWireUsed(si, letter + "6LUT_O5")) {
+            return false;
+        }
+        if (sitePinName.endsWith("Q")) {
+            if (si.getCell(letter + "FF") != null) {
+                return false;
+            }
+            if (isSiteWireUsed(si, letter + "_O") ||
+                    isSiteWireUsed(si, "FFMUX" + letter + "1_OUT1") ||
+                    isSiteWireUsed(si, letter + "FF_Q")) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isSiteWireUsed(SiteInst si, String siteWireName) {
+        Net net = si.getNetFromSiteWire(siteWireName);
+        // Vivado marks site wires of unused elements in a used site (e.g. the Q output of
+        // an empty flip-flop) with GLOBAL_USEDNET; these do not carry a signal
+        return net != null && !net.isUsedNet();
     }
 }

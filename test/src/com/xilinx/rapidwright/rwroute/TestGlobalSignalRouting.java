@@ -250,6 +250,68 @@ public class TestGlobalSignalRouting {
         }
     }
 
+    /**
+     * Whether the slice output is a static source, checked separately for GND and for VCC, which must agree.
+     */
+    private static boolean isStaticSource(Design design, Site site, String sitePinName) {
+        Node node = site.getConnectedNode(sitePinName);
+        Assertions.assertEquals(IntentCode.NODE_CLE_OUTPUT, node.getIntentCode());
+        SitePin gndSitePin = GlobalSignalRouting.getStaticSourceSitePin(design, node, NetType.GND);
+        SitePin vccSitePin = GlobalSignalRouting.getStaticSourceSitePin(design, node, NetType.VCC);
+        Assertions.assertEquals(gndSitePin != null, vccSitePin != null,
+                sitePinName + ": GND source " + gndSitePin + ", VCC source " + vccSitePin);
+        for (SitePin sitePin : Arrays.asList(gndSitePin, vccSitePin)) {
+            if (sitePin != null) {
+                Assertions.assertEquals(site, sitePin.getSite());
+                Assertions.assertEquals(sitePinName, sitePin.getPinName());
+            }
+        }
+        return gndSitePin != null;
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"SLICE_X44Y62" /* SLICEL */, "SLICE_X45Y62" /* SLICEM */})
+    public void testVersalStaticSourceSkipsSliceOutputOfUsedFF(String siteName) {
+        Design design = new Design("versal_static_source_ff", "xcvc1902-vsva2197-2MP-e-S");
+        Site site = design.getDevice().getSite(siteName);
+        SiteInst si = design.createSiteInst(site);
+        Assertions.assertTrue(isStaticSource(design, site, "AQ"));
+        Assertions.assertTrue(isStaticSource(design, site, "A_O"));
+
+        // FDRE on AFF with D from AX through the BYP input of FFMUXA1 and Q unconnected:
+        // the AQ site wire carries no net, but OUTMUXA1 must still be able to select AFF.Q
+        Cell ff = design.createAndPlaceCell("ff", Unisim.FDRE, siteName + "/AFF");
+        Net d = design.createNet("d");
+        si.routeIntraSiteNet(d, si.getBELPin("AX", "AX"), si.getBELPin("AX_IMR", "D"));
+        si.routeIntraSiteNet(d, si.getBELPin("AX_IMR", "Q"), ff.getBEL().getPin("D"));
+        Assertions.assertEquals(d, si.getNetFromSiteWire("FFMUXA1_OUT1"));
+        Assertions.assertNull(si.getNetFromSiteWire("AQ"));
+
+        Assertions.assertFalse(isStaticSource(design, site, "AQ"));
+        // The A LUTs remain unused, so A_O is still a valid source, as are the other letters
+        Assertions.assertTrue(isStaticSource(design, site, "A_O"));
+        Assertions.assertTrue(isStaticSource(design, site, "BQ"));
+        Assertions.assertTrue(isStaticSource(design, site, "B_O"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"SLICE_X44Y62" /* SLICEL */, "SLICE_X45Y62" /* SLICEM */})
+    public void testVersalStaticSourceSkipsSliceOutputOfUsed5LUT(String siteName) {
+        Design design = new Design("versal_static_source_lut5", "xcvc1902-vsva2197-2MP-e-S");
+        Site site = design.getDevice().getSite(siteName);
+        SiteInst si = design.createSiteInst(site);
+
+        // Only the 5LUT is used: its O5 output needs A6 to be held high, so the 6LUT's O6
+        // output (A_O, also reaching AQ through FFMUXA1 and OUTMUXA1) is not a free constant
+        design.createAndPlaceCell("lut", Unisim.LUT2, siteName + "/A5LUT");
+        Assertions.assertNull(si.getCell("A6LUT"));
+
+        Assertions.assertFalse(isStaticSource(design, site, "A_O"));
+        Assertions.assertFalse(isStaticSource(design, site, "AQ"));
+        Assertions.assertTrue(isStaticSource(design, site, "B_O"));
+        Assertions.assertTrue(isStaticSource(design, site, "BQ"));
+    }
+
     // This is a minimized testcase from the result of GlobalSignalRouter
     @ParameterizedTest
     @CsvSource({
