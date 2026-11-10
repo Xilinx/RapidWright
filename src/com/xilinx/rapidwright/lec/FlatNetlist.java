@@ -400,11 +400,13 @@ public class FlatNetlist {
             EDIFPropertyValue key = keyProperty == null ? null : instObj[i].getProperty(keyProperty);
             if (key != null) {
                 String origin = key.getValue();
-                if (origin == null || origin.isEmpty()) {
+                if (origin == null || origin.isEmpty()
+                        || origin.startsWith(TerminalKey.UNSTABLE_PREFIX)) {
                     // An empty name would make a pin's name just the pin, the
-                    // same as a top level port's.
-                    throw new LecException("Instance '" + instObj[i].getName() + "' has an empty "
-                            + keyProperty + " property, so it cannot be named by it");
+                    // same as a top level port's, and the unstable prefix is
+                    // reserved for the checker's own variables.
+                    throw new LecException("Instance '" + instObj[i].getName() + "' has "
+                            + keyProperty + " '" + origin + "', which cannot name an instance");
                 }
                 parts[--at] = origin;
                 return String.join(EDIFTools.EDIF_HIER_SEP, Arrays.copyOfRange(parts, at, depth));

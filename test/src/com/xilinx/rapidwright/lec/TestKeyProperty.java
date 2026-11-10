@@ -141,6 +141,15 @@ public class TestKeyProperty {
         Assertions.assertThrows(LecException.class, () -> check(reference(), imp, KEY));
     }
 
+    /** A key in the checker's reserved namespace could alias one of its own variables. */
+    @Test
+    public void testReservedPrefixKeyIsRejected() {
+        EDIFNetlist imp = relocated("4'hE");
+        LecNetlistFixtures.setProperty(inst(imp, "PART_1", "ff"), KEY,
+                TerminalKey.MULTI_DRIVER_PREFIX + "4:ff/Q4:gg");
+        Assertions.assertThrows(LecException.class, () -> check(reference(), imp, KEY));
+    }
+
     /**
      * A key is left out of the attribute comparison, so a parameter such as
      * INIT must not be one, or a changed initial value would go unreported.
