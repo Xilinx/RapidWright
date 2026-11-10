@@ -369,7 +369,7 @@ public class ConeBuilder {
         if (support == null) {
             log.warn(UNMODELED_OUTPUT, flat.getCellTypeName(owner) + "."
                     + index.getPortBitName(bit), flat.getInstName(owner));
-            int lit = unstableInput(TerminalKey.OPAQUE_PREFIX, flat.getPinName(owner, bit));
+            int lit = unstableInput(TerminalKey.OPAQUE_PREFIX, unstablePinName(owner, bit));
             litOf[pin] = lit;
             state[pin] = BLACK;
             pop();
@@ -423,7 +423,7 @@ public class ConeBuilder {
         }
         int owner = pinOwner[pin];
         int lit = unstableInput(TerminalKey.LOOP_PREFIX,
-                flat.getPinName(owner, pin - flat.getGlobalPin(owner, 0)));
+                unstablePinName(owner, pin - flat.getGlobalPin(owner, 0)));
         loopLit[pin] = lit;
         return lit;
     }
@@ -440,11 +440,21 @@ public class ConeBuilder {
             return Aig.TRUE;
         }
         int bit = pin - flat.getGlobalPin(instId, 0);
-        String name = flat.getPinName(instId, bit);
         if (classifier.isMatchedByName(role)) {
-            return aig.newInput(name, true);
+            return aig.newInput(flat.getPinName(instId, bit), true);
         }
-        return unstableInput(TerminalKey.OPAQUE_PREFIX, name);
+        return unstableInput(TerminalKey.OPAQUE_PREFIX, unstablePinName(instId, bit));
+    }
+
+    /**
+     * Names a pin for an unstable variable. A key property can give two
+     * instances the same name, and two pins sharing one unstable variable would
+     * make unrelated unknowns cancel, so with a key the name also carries the
+     * pin's unique index.
+     */
+    private String unstablePinName(int instId, int bit) {
+        String name = flat.getPinName(instId, bit);
+        return flat.getKeyProperty() == null ? name : name + "#" + flat.getGlobalPin(instId, bit);
     }
 
     /** Mints an unstable variable private to this netlist. */

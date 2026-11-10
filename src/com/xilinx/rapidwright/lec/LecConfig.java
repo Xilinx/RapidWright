@@ -83,6 +83,8 @@ public class LecConfig {
 
     private boolean classifyOnly;
 
+    private String keyProperty;
+
     private int maxReportedDiffs = 100;
 
     private int simRounds = 4;
@@ -151,6 +153,10 @@ public class LecConfig {
         parser.accepts("allow-series-mismatch", "Permit the two netlists to target different series");
         parser.accepts("strict-black-boxes", "Do not assume that same-named black boxes compute "
                 + "the same function; cones reaching one become inconclusive");
+        parser.accepts("key-property", "Identify an instance, and every instance below it, by the "
+                + "value of this property where present instead of by its hierarchical path; for "
+                + "transforms that move terminals and record their original path")
+                .withRequiredArg().describedAs("name");
         parser.accepts("expand-macros", "Expand macro primitives instead of modelling them natively");
         parser.accepts("elaborate-only", "Build cones and report statistics without comparing");
         parser.accepts("classify-only", "Report connectivity and cell classification only");
@@ -187,6 +193,7 @@ public class LecConfig {
         config.allowSeriesMismatch = options.has("allow-series-mismatch");
         config.strictBlackBoxes = options.has("strict-black-boxes");
         config.expandMacros = options.has("expand-macros");
+        config.keyProperty = (String) options.valueOf("key-property");
         config.elaborateOnly = options.has("elaborate-only");
         config.classifyOnly = options.has("classify-only");
         config.verbose = options.has("verbose");
@@ -418,5 +425,17 @@ public class LecConfig {
 
     void setClassifyOnly(boolean classifyOnly) {
         this.classifyOnly = classifyOnly;
+    }
+
+    /**
+     * @return The property whose value identifies a relocated instance, or null
+     *         to identify instances by hierarchical path.
+     */
+    public String getKeyProperty() {
+        return keyProperty;
+    }
+
+    void setKeyProperty(String keyProperty) {
+        this.keyProperty = keyProperty;
     }
 }

@@ -174,6 +174,43 @@ public class TestCellIndex {
                 "An unconnected port bit must not report a boundary net");
     }
 
+    /**
+     * A cell may legally declare a scalar and a bus with the same base name, for
+     * example a scalar {@code q} beside {@code q[3:0]}; synthesis emits this for
+     * replicated registers. Each must keep its own port bits, whichever is
+     * declared first.
+     */
+    @Test
+    public void testScalarAndBusWithSameBaseName() {
+        for (boolean scalarFirst : new boolean[] { true, false }) {
+            setUp();
+            EDIFPort scalar = null;
+            if (scalarFirst) {
+                scalar = cell.createPort("q", EDIFDirection.OUTPUT, 1);
+            }
+            EDIFPort bus = cell.createPort("q[3:0]", EDIFDirection.OUTPUT, 4);
+            if (!scalarFirst) {
+                scalar = cell.createPort("q", EDIFDirection.OUTPUT, 1);
+            }
+            EDIFNet scalarNet = cell.createNet("scalar_net");
+            EDIFPortInst scalarPin = scalarNet.createPortInst(scalar);
+            EDIFNet busNet = cell.createNet("bus_net");
+            EDIFPortInst busPin = busNet.createPortInst(bus, bus.getPortIndexFromNameIndex(2));
+
+            CellIndex index = CellIndex.get(cell);
+            Assertions.assertEquals(5, index.getPortBitCount());
+            int scalarBit = index.portBitIndex(scalarPin);
+            int busBit = index.portBitIndex(busPin);
+            Assertions.assertSame(scalar, index.getPortOfBit(scalarBit));
+            Assertions.assertSame(bus, index.getPortOfBit(busBit));
+            Assertions.assertEquals("q[2]", index.getPortBitName(busBit));
+            Assertions.assertEquals(scalarBit, index.portBitIndexOfPinName("q"));
+            Assertions.assertEquals(busBit, index.portBitIndexOfPinName("q[2]"));
+            Assertions.assertEquals(index.localNetIndex(scalarNet), index.getBoundaryNet(scalarBit));
+            Assertions.assertEquals(index.localNetIndex(busNet), index.getBoundaryNet(busBit));
+        }
+    }
+
     /** An unknown pin name must resolve to nothing rather than to bit zero. */
     @Test
     public void testUnknownPinName() {

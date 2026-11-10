@@ -103,12 +103,21 @@ public class TerminalAttributes {
      */
     public static TerminalAttributes of(String cellTypeName, EDIFCellInst inst,
             Set<String> foldedPins) {
+        return of(cellTypeName, inst, foldedPins, null);
+    }
+
+    /**
+     * As {@link #of(String, EDIFCellInst, Set)}, also excluding the key property,
+     * which records where a terminal came from rather than what it does.
+     */
+    public static TerminalAttributes of(String cellTypeName, EDIFCellInst inst,
+            Set<String> foldedPins, String keyProperty) {
         Map<String, String> properties = new TreeMap<>();
         if (inst != null && inst.getPropertiesMap() != null) {
             for (Map.Entry<String, EDIFPropertyValue> e : inst.getPropertiesMap().entrySet()) {
                 String key = e.getKey();
                 if (IGNORED.contains(key) || key.startsWith(PIN_ATTRIBUTE_PREFIX)
-                        || isFoldedInversion(key, foldedPins)) {
+                        || key.equals(keyProperty) || isFoldedInversion(key, foldedPins)) {
                     continue;
                 }
                 EDIFPropertyValue value = e.getValue();

@@ -33,6 +33,7 @@ import java.util.Map;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
 
 /**
@@ -99,9 +100,17 @@ public class FlatNetlist {
 
     private final int[] leafInstIds;
 
+    /**
+     * Instance property naming an instance's identity in place of its path, or
+     * null to identify every instance by its path. See {@link #getInstName(int)}.
+     */
+    private final String keyProperty;
+
     private FlatNetlist(EDIFNetlist netlist, int instCount, int[] parent, int[] childBase,
-            int[] cellTypeId, EDIFCellInst[] instObj, boolean[] leaf, List<EDIFCell> cellTypes) {
+            int[] cellTypeId, EDIFCellInst[] instObj, boolean[] leaf, List<EDIFCell> cellTypes,
+            String keyProperty) {
         this.netlist = netlist;
+        this.keyProperty = keyProperty;
         this.parent = parent;
         this.childBase = childBase;
         this.cellTypeId = cellTypeId;
@@ -135,6 +144,18 @@ public class FlatNetlist {
      * unbounded in principle and stack depth is not.
      */
     public static FlatNetlist build(EDIFNetlist netlist, LecLog log) {
+        return build(netlist, log, null);
+    }
+
+    /**
+     * As {@link #build(EDIFNetlist, LecLog)}, naming instances by a key property
+     * where one is present.
+     *
+     * @param keyProperty Instance property whose value, when present on an
+     *                    instance or one of its ancestors, replaces the path
+     *                    above it in that instance's name; null to use paths.
+     */
+    public static FlatNetlist build(EDIFNetlist netlist, LecLog log, String keyProperty) {
         EDIFCellInst top = netlist.getTopCellInst();
         if (top == null) {
             throw new LecException("Netlist has no top cell instance");
@@ -192,7 +213,8 @@ public class FlatNetlist {
 
         FlatNetlist flat = new FlatNetlist(netlist, count, Arrays.copyOf(parent, count),
                 Arrays.copyOf(childBase, count), Arrays.copyOf(cellTypeId, count),
-                Arrays.copyOf(instObj, count), Arrays.copyOf(leaf, count), cellTypes);
+                Arrays.copyOf(instObj, count), Arrays.copyOf(leaf, count), cellTypes,
+                keyProperty);
         if (log != null) {
             log.info("Flattened " + count + " instances (" + flat.getLeafCount() + " leaves, "
                     + cellTypes.size() + " distinct cell types, " + flat.getNetCount()
@@ -346,10 +368,21 @@ public class FlatNetlist {
         return globalPin - pinBase[getPinOwner(globalPin)];
     }
 
+    /** @return The key property this netlist was built with, or null. */
+    public String getKeyProperty() {
+        return keyProperty;
+    }
+
     /**
      * Builds the full hierarchical name of an instance by walking the parent
      * chain. The top instance's own name is not included, matching RapidWright's
      * convention that hierarchical names are relative to the top cell.
+     *
+     * With a key property, the nearest instance on the chain that carries it
+     * contributes the property's value in place of its own path, so a transform
+     * that relocates an instance (or a whole sub-hierarchy) and records where it
+     * came from is named by its original position. This is the name terminals
+     * are matched by.
      *
      * @return The hierarchical name, or the empty string for the top instance.
      */
@@ -364,6 +397,20 @@ public class FlatNetlist {
         String[] parts = new String[depth];
         int at = depth;
         for (int i = instId; i != 0; i = parent[i]) {
+            EDIFPropertyValue key = keyProperty == null ? null : instObj[i].getProperty(keyProperty);
+            if (key != null) {
+                String origin = key.getValue();
+                if (origin == null || origin.isEmpty()
+                        || origin.startsWith(TerminalKey.UNSTABLE_PREFIX)) {
+                    // An empty name would make a pin's name just the pin, the
+                    // same as a top level port's, and the unstable prefix is
+                    // reserved for the checker's own variables.
+                    throw new LecException("Instance '" + instObj[i].getName() + "' has "
+                            + keyProperty + " '" + origin + "', which cannot name an instance");
+                }
+                parts[--at] = origin;
+                return String.join(EDIFTools.EDIF_HIER_SEP, Arrays.copyOfRange(parts, at, depth));
+            }
             parts[--at] = instObj[i].getName();
         }
         return String.join(EDIFTools.EDIF_HIER_SEP, parts);
