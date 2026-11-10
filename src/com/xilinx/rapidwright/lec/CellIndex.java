@@ -114,7 +114,9 @@ public class CellIndex {
         bitWithinPort = new int[totalBits];
         int bit = 0;
         for (EDIFPort port : cell.getPorts()) {
-            portBitBase.put(port.getBusName(), bit);
+            // Keyed with the bracket kept for a bus ("x[" vs "x"): a cell may legally declare a
+            // scalar x and a bus x[63:0] side by side, and the bare bus name would collide.
+            portBitBase.put(port.getBusName(true), bit);
             for (int i = 0; i < port.getWidth(); i++) {
                 portOfBit[bit] = port;
                 bitWithinPort[bit] = i;
@@ -228,7 +230,7 @@ public class CellIndex {
         if (port == null) {
             return -1;
         }
-        Integer base = portBitBase.get(port.getBusName());
+        Integer base = portBitBase.get(port.getBusName(true));
         if (base == null) {
             return -1;
         }
@@ -253,7 +255,7 @@ public class CellIndex {
      * @return The port bit index, or -1 if unknown.
      */
     public int portBitIndexOfName(EDIFPort port, int namedIndex) {
-        Integer base = portBitBase.get(port.getBusName());
+        Integer base = portBitBase.get(port.getBusName(true));
         if (base == null) {
             return -1;
         }
@@ -280,7 +282,10 @@ public class CellIndex {
             return base == null ? -1 : base;
         }
         String busName = pinName.substring(0, bracket);
-        EDIFPort port = cell.getPort(busName);
+        EDIFPort port = cell.getPort(busName + "[");
+        if (port == null) {
+            port = cell.getPort(busName);
+        }
         if (port == null) {
             port = cell.getPortByPortInstName(pinName);
         }

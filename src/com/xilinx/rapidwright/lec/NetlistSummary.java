@@ -30,6 +30,8 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.VivadoProp;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFPort;
@@ -57,6 +59,9 @@ public class NetlistSummary {
     private final Map<String, TerminalAttributes> terminals = new TreeMap<>();
 
     private final NetlistStats stats;
+
+    /** Terminal types already checked not to have the key property as a parameter. */
+    private final Set<String> keyCheckedTypes = new TreeSet<>();
 
     private LoopReport loops = new LoopReport();
 
@@ -104,6 +109,7 @@ public class NetlistSummary {
                 continue;
             }
             String typeName = flat.getCellTypeName(instId);
+            checkKeyIsNotAParameter(typeName, flat.getKeyProperty());
             String instName = flat.getInstName(instId);
             CellIndex index = flat.getIndex(instId);
             Set<String> foldedPins = new TreeSet<>();
@@ -125,7 +131,26 @@ public class NetlistSummary {
                 putUnique(coneLiterals, TerminalKey.forPin(instName, pinName), lit);
             }
             putUnique(terminals, instName.isEmpty() ? typeName : instName,
-                    TerminalAttributes.of(typeName, flat.getInst(instId), foldedPins));
+                    TerminalAttributes.of(typeName, flat.getInst(instId), foldedPins,
+                            flat.getKeyProperty()));
+        }
+    }
+
+    /**
+     * Refuses a key property that is a parameter of a terminal's type, such as
+     * {@code INIT}. The key is left out of the attribute comparison, so it must
+     * record where a terminal came from, never what it does.
+     */
+    private void checkKeyIsNotAParameter(String typeName, String keyProperty) {
+        if (keyProperty == null || !keyCheckedTypes.add(typeName)) {
+            return;
+        }
+        for (Series s : series == null ? Series.values() : new Series[] { series }) {
+            Map<String, VivadoProp> parameters = Design.getDefaultCellProperties(s, typeName);
+            if (parameters != null && parameters.containsKey(keyProperty)) {
+                throw new LecException("Key property " + keyProperty + " is a parameter of "
+                        + typeName + ", so it cannot be used to name instances");
+            }
         }
     }
 
