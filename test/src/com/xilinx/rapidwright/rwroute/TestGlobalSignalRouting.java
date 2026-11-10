@@ -670,6 +670,82 @@ public class TestGlobalSignalRouting {
         Assertions.assertEquals(1, roots.size(), roots.toString());
     }
   
+    /**
+     * Clocks driving the clock inputs of hard blocks on xcvc1902 that are not reached from a leaf
+     * clock buffer (LCB) of their own clock region: the APB3CLK input of a GTY_QUAD (through a
+     * routethru of the neighboring XPIPE_QUAD site, from a clock driven by a BUFG_GT) and the DCLK
+     * inputs of CMT_MMCM and CMT_DPLL sites (from the LCBs of the clock region row above them).
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "BUFG_GT_X0Y30,GTY_QUAD_SINGLE_X0Y192/GTY_QUAD_SITE_0_APB3CLK_PIN,XPIPE_QUAD",
+            "BUFGCE_X4Y0,CMT_MMCM_X23Y0/CMT_MMCM_TOP_0_DCLK_PIN,",
+            "BUFGCE_X4Y0,CMT_DPLL_X37Y0/CMT_DPLL_TOP_0_DCLK_PIN,"
+    })
+    public void testVersalClockToHardBlockClockInput(String sourceSiteName, String sinkNodeName,
+                                                     String routeThruTilePrefix) {
+        Design design = new Design("versal_hard_block_clk", "xcvc1902-vsva2197-2MP-e-S");
+        Device device = design.getDevice();
+        Net clk = design.createNet("clk");
+        clk.createPin("O", design.createSiteInst(device.getSite(sourceSiteName)));
+        SitePin sinkSitePin = device.getNode(sinkNodeName).getSitePin();
+        SitePinInst sink = clk.createPin(sinkSitePin.getPinName(), design.createSiteInst(sinkSitePin.getSite()));
+
+        GlobalSignalRouting.symmetricClkRouting(clk, device, (n) -> NodeStatus.AVAILABLE, new HashMap<>());
+
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        Assertions.assertTrue(sink.isRouted());
+        if (routeThruTilePrefix != null) {
+            Assertions.assertTrue(clk.getPIPs().stream().anyMatch((pip) -> pip.isRouteThru()
+                    && pip.getTile().getName().startsWith(routeThruTilePrefix)));
+        }
+    }
+
+    /**
+     * Versal clocks whose clock regions do not overlap may share a routing track: the clock regions of
+     * all the clocks using a track must be kept, so that a later clock overlapping any of them avoids it.
+     */
+    @Test
+    public void testVersalClocksSharingRoutingTrack() {
+        Design design = new Design("versal_shared_track", "xcvc1902-vsva2197-2MP-e-S");
+        Device device = design.getDevice();
+        Set<Node> used = new HashSet<>();
+        Map<Integer, Set<ClockRegion>> usedRoutingTracks = new HashMap<>();
+        // Clocks 0 and 1 (in clock regions X1Y1 and X9Y1) can share a track; clock 2 overlaps clock 0
+        String[][] sourceAndSinkSites = {
+                {"BUFGCE_X1Y0", "SLICE_X44Y62"},
+                {"BUFGCE_X9Y0", "SLICE_X332Y79"},
+                {"BUFGCE_X1Y1", "SLICE_X46Y64"}
+        };
+        List<ClockRegion> sinkClockRegions = new ArrayList<>();
+        for (int i = 0; i < sourceAndSinkSites.length; i++) {
+            Net clk = design.createNet("clk" + i);
+            Cell bufgce = design.createAndPlaceCell("bufgce" + i, Unisim.BUFGCE, sourceAndSinkSites[i][0] + "/BUFCE");
+            clk.connect(bufgce, "O");
+            Cell ff = design.createAndPlaceCell("ff" + i, Unisim.FDRE, sourceAndSinkSites[i][1] + "/AFF");
+            clk.connect(ff, "C");
+            sinkClockRegions.add(ff.getTile().getClockRegion());
+
+            GlobalSignalRouting.symmetricClkRouting(clk, device,
+                    (n) -> used.contains(n) ? NodeStatus.UNAVAILABLE : NodeStatus.AVAILABLE,
+                    usedRoutingTracks);
+            for (PIP pip : clk.getPIPs()) {
+                used.add(pip.getStartNode());
+                used.add(pip.getEndNode());
+            }
+            Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        }
+        Assertions.assertNotEquals(sinkClockRegions.get(0), sinkClockRegions.get(1));
+        Assertions.assertEquals(sinkClockRegions.get(0), sinkClockRegions.get(2));
+
+        // Clocks 0 and 1 share a track that keeps both of their clock regions; clock 2 uses another track
+        Assertions.assertEquals(2, usedRoutingTracks.size());
+        Set<ClockRegion> sharedTrackClockRegions = new HashSet<>(sinkClockRegions.subList(0, 2));
+        Assertions.assertTrue(usedRoutingTracks.containsValue(sharedTrackClockRegions), usedRoutingTracks.toString());
+        Assertions.assertTrue(usedRoutingTracks.containsValue(new HashSet<>(sinkClockRegions.subList(2, 3))),
+                usedRoutingTracks.toString());
+    }
+  
     @Test
     public void testSymmetricClkRoutingSharedClockBufferMuxes() {
         // The two BUFGCE_HDIOs of a RCLK_HDIO tile reach the clock routing tracks through the same muxes: the
