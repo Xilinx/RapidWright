@@ -39,12 +39,14 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.function.Function;
 
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
@@ -248,30 +250,28 @@ public class GlobalSignalRouting {
         // divides clock regions into two groups
         divideClockRegions(clockRegions, centroid, upClockRegions, downClockRegions);
 
-        RouteNode clkRoutingLine = UltraScaleClockRouting.routeBUFGToNearestRoutingTrack(clk);// first HROUTE
-        RouteNode centroidHRouteNode = UltraScaleClockRouting.routeToCentroid(clk, clkRoutingLine, centroid, true, true);
-
-        RouteNode vrouteUp = null;
-        RouteNode vrouteDown = null;
-        // Two VROUTEs going up and down
+        // Two VROUTEs going up and down, each onto a vertical distribution track. Avoid the routing tracks of
+        // clocks already routed (e.g. when two clock buffers share the muxes onto the routing tracks, as the
+        // BUFGCE_HDIOs of a RCLK_HDIO tile do). There is no downward branch when no leaf clock buffer sink is at
+        // or below the centroid, which the sinks routed from the distribution (e.g. MMCM inputs) can leave.
         ClockRegion aboveCentroid = upClockRegions.isEmpty() ? null : centroid.getNeighborClockRegion(1, 0);
-        if (aboveCentroid != null) {
-            vrouteUp = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, aboveCentroid, true, false);
+        boolean down = !downClockRegions.isEmpty();
+        Pair<RouteNode, RouteNode> distLinesDownUp = UltraScaleClockRouting.routeBUFGToVerticalDistributionLines(clk,
+                centroid, aboveCentroid, down, getNodeStatus);
+        if (distLinesDownUp == null) {
+            throw new RuntimeException("ERROR: Unable to route clock " + clk + " to its centroid clock region " + centroid);
         }
-        // (no downward branch when no leaf clock buffer sink is at or below the centroid, which the sinks
-        // routed from the distribution, e.g. MMCM inputs, can leave)
-        if (!downClockRegions.isEmpty()) {
-            vrouteDown = UltraScaleClockRouting.routeToCentroid(clk, centroidHRouteNode, centroid.getNeighborClockRegion(0, 0), true, false);
-        }
+        RouteNode distLineDown = distLinesDownUp.getFirst();
+        RouteNode distLineUp = distLinesDownUp.getSecond();
 
         List<RouteNode> upDownDistLines = new ArrayList<>();
         if (aboveCentroid != null) {
-            List<RouteNode> upLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteUp, upClockRegions, false, getNodeStatus);
+            List<RouteNode> upLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, distLineUp, upClockRegions, false, getNodeStatus);
             if (upLines != null) upDownDistLines.addAll(upLines);
         }
 
-        if (!downClockRegions.isEmpty()) {
-            List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, vrouteDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
+        if (down) {
+            List<RouteNode> downLines = UltraScaleClockRouting.routeToHorizontalDistributionLines(clk, distLineDown, downClockRegions, true, getNodeStatus);//TODO this is where the antenna node shows up
             if (downLines != null) upDownDistLines.addAll(downLines);
         }
 
@@ -741,9 +741,12 @@ public class GlobalSignalRouting {
             Node node = sink.getConnectedNode();
             if (getNodeState.apply(node) != NodeStatus.INUSE) {
                 throw new RuntimeException("ERROR: Site pin " + sink + " is not available for net " + currNet);
-            } else if (node.getIntentCode() == IntentCode.NODE_DEDICATED) {
+            } else if (node.getIntentCode() == IntentCode.NODE_DEDICATED
+                    && !(Utils.isIOB(sink.getSiteInst()) && RouterHelper.projectInputPinToINTNode(sink) != null)) {
                 // Skip dedicated nodes that don't reach the INT tile
                 // e.g. XPIO_NIBBLE_SC_5_X0Y0/XPIO_IOBPAIR_5_IBUF_DISABLE_M_PIN on vp1202
+                // (except IO buffer inputs that do, e.g. the OP_M/OP_S input of an XPIO output
+                // buffer with a constant input, reached through site routethrus below)
                 assert(isVersal);
                 continue;
             }
@@ -767,13 +770,17 @@ public class GlobalSignalRouting {
                 // during trace-back. This is necessary because `null` cannot be used since `null`
                 // is what Map uses internally to indicate key is not present.
                 nextNode.put(node, INVALID_NODE);
+                // The input of an IO buffer (e.g. an output buffer with a constant input) is reached
+                // through site routethrus onto dedicated nodes and other non-INT nodes
+                boolean ioSink = Utils.isIOB(sink.getSiteInst());
+                boolean dedicatedSink = node.getIntentCode() == IntentCode.NODE_DEDICATED;
                 assert(q.isEmpty());
                 q.add(node);
                 search: while ((node = q.poll()) != null) {
                     assert(!usedRoutingNodes.contains(node));
                     assert(!node.isTied());
                     IntentCode intentCode = node.getIntentCode();
-                    assert(netType != NetType.VCC || assertIntentCodeOfPoppedNodesOnVcc.contains(intentCode));
+                    assert(netType != NetType.VCC || ioSink || assertIntentCodeOfPoppedNodesOnVcc.contains(intentCode));
 
                     SitePin sitePin = getStaticSourceSitePin(design, node, netType);
                     if (sitePin != null) {
@@ -790,7 +797,13 @@ public class GlobalSignalRouting {
                             tileTypeEnum != TileTypeEnum.BLI_CLE_BOT_CORE_MY);
                     for (Node uphillNode : node.getAllUphillNodes()) {
                         if (routeThruHelper.isRouteThru(uphillNode, node) && notIriRoutethru) {
-                            continue;
+                            // An IO buffer input is reached from the fabric through routethrus onto
+                            // dedicated nodes (e.g. Versal XPIO OP_M/OP_S: XPHY D*->O0*, OPFF D1->Q;
+                            // UltraScale+ HPIO OP: XIPHY bitslice TX): allow those if the site is free
+                            if (!ioSink || intentCode != IntentCode.NODE_DEDICATED ||
+                                    !isDedicatedRouteThruAvailable(design, uphillNode, node)) {
+                                continue;
+                            }
                         }
 
                         IntentCode uphillIntentCode = uphillNode.getIntentCode();
@@ -899,7 +912,11 @@ public class GlobalSignalRouting {
                     }
                 }
                 if (node == null) {
-                    System.err.println("ERROR: Failed to route " + currNet.getName() + " pin " + sink);
+                    if (!dedicatedSink) {
+                        System.err.println("ERROR: Failed to route " + currNet.getName() + " pin " + sink);
+                    }
+                    // (else: a dedicated IO pin that the projection reached but routing does not,
+                    // e.g. an XPIO IBUF_DISABLE_M: left unrouted, as dedicated pins always were)
                 } else {
                     // trace forward for a complete path
                     do {
@@ -924,6 +941,7 @@ public class GlobalSignalRouting {
         }
 
         assert(sitePinsToCreate.stream().distinct().count() == sitePinsToCreate.size());
+        Set<SitePinInst> netPins = null;
         for (SitePin sitePin : sitePinsToCreate) {
             Site site = sitePin.getSite();
             SiteInst si = design.getSiteInstFromSite(site);
@@ -939,6 +957,16 @@ public class GlobalSignalRouting {
                 SitePinInst spi = si.getSitePinInst(pinName);
                 if (spi != null) {
                     if (spi.getNet() == currNet) {
+                        if (netPins == null) {
+                            netPins = new HashSet<>(currNet.getPins());
+                        }
+                        if (!netPins.contains(spi)) {
+                            // A source pin left on its site by a routed design whose static net had
+                            // its output pins removed before routing (see RWRoute.addStaticNetRoutingTargets()):
+                            // add it back to the net
+                            currNet.addPin(spi, false);
+                        }
+                        spi.setRouted(true);
                         continue;
                     }
                     throw new RuntimeException("ERROR: Site pin " + spi.getSitePinName() + " cannot be attached to " +
@@ -954,12 +982,44 @@ public class GlobalSignalRouting {
     }
 
     /**
+     * Checks if a routethru PIP leading to a dedicated node (e.g. through an XPIO site) is free:
+     * neither of its site pins is used by a net and no cell occupies a BEL driven by its input
+     * pin. Unlike {@link RouteThruHelper#isRouteThruPIPAvailable(Design, PIP)},
+     * <LOCKED> placeholder cells (which mark the BELs of a routethru in a routed design and remain
+     * after unrouting) do not block it.
+     * @param design The design.
+     * @param head The routethru's start node.
+     * @param tail The routethru's end node.
+     * @return True if the routethru can be used.
+     */
+    private static boolean isDedicatedRouteThruAvailable(Design design, Node head, Node tail) {
+        SitePin inPin = head.getSitePin();
+        SitePin outPin = tail.getSitePin();
+        if (!RouteThruHelper.isRouteThruSitePinAvailable(design, inPin) ||
+                !RouteThruHelper.isRouteThruSitePinAvailable(design, outPin)) {
+            return false;
+        }
+        SiteInst si = design.getSiteInstFromSite(inPin.getSite());
+        if (si == null) {
+            return true;
+        }
+        for (BELPin sink : inPin.getBELPin().getSiteConns()) {
+            Cell cell = si.getCell(sink.getBEL());
+            if (cell != null && !cell.getName().equals(Cell.LOCKED)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * Determines if the given {@link Node} instance can serve as our source.
+     * @param design The {@link Design} instance to use.
      * @param node The {@link Node} instance in question.
      * @param type The net type to designate the static source type.
      * @return {@link SitePin} if a valid source is found, null otherwise.
      */
-    private static SitePin getStaticSourceSitePin(Design design,
+    static SitePin getStaticSourceSitePin(Design design,
                                                   Node node,
                                                   NetType type) {
         if (node.getIntentCode() != IntentCode.NODE_CLE_OUTPUT) {
@@ -992,12 +1052,8 @@ public class GlobalSignalRouting {
         if (isVersal) {
             sitePinName = wireName.substring(17, wireName.length() - 4);
 
-            if (si != null) {
-                char lutLetter = sitePinName.charAt(0);
-                if (si.getCell(lutLetter + "6LUT") != null) {
-                    // 6LUT is occupied
-                    return null;
-                }
+            if (si != null && !isVersalSliceOutputFree(si, sitePinName)) {
+                return null;
             }
         } else {
             if (wireName.endsWith("_O")) {
@@ -1032,5 +1088,44 @@ public class GlobalSignalRouting {
         }
 
         return new SitePin(slice, sitePinName);
+    }
+
+    /**
+     * Determines if a Versal SLICEL/SLICEM output pin ([A-H]_O or [A-H]Q) can be driven by a
+     * constant without disturbing the logic already placed in its slice.
+     * The [A-H]_O pin is driven by the 6LUT's O6 output; it is not free if either LUT of that
+     * letter is used (a used 5LUT needs A6 to be high, so O6 is not a free constant).
+     * The [A-H]Q pin is driven by OUTMUX[A-H]1, which selects either the flip-flop's Q output
+     * or the output of FFMUX[A-H]1; it is additionally not free if that flip-flop or mux is used.
+     * @param si The SiteInst of the slice.
+     * @param sitePinName The name of the site pin: [A-H]_O or [A-H]Q.
+     * @return True if no LUT, flip-flop or intra-site wire behind this site pin is in use.
+     */
+    private static boolean isVersalSliceOutputFree(SiteInst si, String sitePinName) {
+        char letter = sitePinName.charAt(0);
+        if (si.getCell(letter + "6LUT") != null || si.getCell(letter + "5LUT") != null) {
+            return false;
+        }
+        if (isSiteWireUsed(si, letter + "5LUT_O5") || isSiteWireUsed(si, letter + "6LUT_O5")) {
+            return false;
+        }
+        if (sitePinName.endsWith("Q")) {
+            if (si.getCell(letter + "FF") != null) {
+                return false;
+            }
+            if (isSiteWireUsed(si, letter + "_O") ||
+                    isSiteWireUsed(si, "FFMUX" + letter + "1_OUT1") ||
+                    isSiteWireUsed(si, letter + "FF_Q")) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isSiteWireUsed(SiteInst si, String siteWireName) {
+        Net net = si.getNetFromSiteWire(siteWireName);
+        // Vivado marks site wires of unused elements in a used site (e.g. the Q output of
+        // an empty flip-flop) with GLOBAL_USEDNET; these do not carry a signal
+        return net != null && !net.isUsedNet();
     }
 }
