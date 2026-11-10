@@ -39,12 +39,14 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.function.Function;
 
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
@@ -741,9 +743,12 @@ public class GlobalSignalRouting {
             Node node = sink.getConnectedNode();
             if (getNodeState.apply(node) != NodeStatus.INUSE) {
                 throw new RuntimeException("ERROR: Site pin " + sink + " is not available for net " + currNet);
-            } else if (node.getIntentCode() == IntentCode.NODE_DEDICATED) {
+            } else if (node.getIntentCode() == IntentCode.NODE_DEDICATED
+                    && !(Utils.isIOB(sink.getSiteInst()) && RouterHelper.projectInputPinToINTNode(sink) != null)) {
                 // Skip dedicated nodes that don't reach the INT tile
                 // e.g. XPIO_NIBBLE_SC_5_X0Y0/XPIO_IOBPAIR_5_IBUF_DISABLE_M_PIN on vp1202
+                // (except IO buffer inputs that do, e.g. the OP_M/OP_S input of an XPIO output
+                // buffer with a constant input, reached through site routethrus below)
                 assert(isVersal);
                 continue;
             }
@@ -767,13 +772,17 @@ public class GlobalSignalRouting {
                 // during trace-back. This is necessary because `null` cannot be used since `null`
                 // is what Map uses internally to indicate key is not present.
                 nextNode.put(node, INVALID_NODE);
+                // The input of an IO buffer (e.g. an output buffer with a constant input) is reached
+                // through site routethrus onto dedicated nodes and other non-INT nodes
+                boolean ioSink = Utils.isIOB(sink.getSiteInst());
+                boolean dedicatedSink = node.getIntentCode() == IntentCode.NODE_DEDICATED;
                 assert(q.isEmpty());
                 q.add(node);
                 search: while ((node = q.poll()) != null) {
                     assert(!usedRoutingNodes.contains(node));
                     assert(!node.isTied());
                     IntentCode intentCode = node.getIntentCode();
-                    assert(netType != NetType.VCC || assertIntentCodeOfPoppedNodesOnVcc.contains(intentCode));
+                    assert(netType != NetType.VCC || ioSink || assertIntentCodeOfPoppedNodesOnVcc.contains(intentCode));
 
                     SitePin sitePin = getStaticSourceSitePin(design, node, netType);
                     if (sitePin != null) {
@@ -790,7 +799,13 @@ public class GlobalSignalRouting {
                             tileTypeEnum != TileTypeEnum.BLI_CLE_BOT_CORE_MY);
                     for (Node uphillNode : node.getAllUphillNodes()) {
                         if (routeThruHelper.isRouteThru(uphillNode, node) && notIriRoutethru) {
-                            continue;
+                            // An IO buffer input is reached from the fabric through routethrus onto
+                            // dedicated nodes (e.g. Versal XPIO OP_M/OP_S: XPHY D*->O0*, OPFF D1->Q;
+                            // UltraScale+ HPIO OP: XIPHY bitslice TX): allow those if the site is free
+                            if (!ioSink || intentCode != IntentCode.NODE_DEDICATED ||
+                                    !isDedicatedRouteThruAvailable(design, uphillNode, node)) {
+                                continue;
+                            }
                         }
 
                         IntentCode uphillIntentCode = uphillNode.getIntentCode();
@@ -899,7 +914,11 @@ public class GlobalSignalRouting {
                     }
                 }
                 if (node == null) {
-                    System.err.println("ERROR: Failed to route " + currNet.getName() + " pin " + sink);
+                    if (!dedicatedSink) {
+                        System.err.println("ERROR: Failed to route " + currNet.getName() + " pin " + sink);
+                    }
+                    // (else: a dedicated IO pin that the projection reached but routing does not,
+                    // e.g. an XPIO IBUF_DISABLE_M: left unrouted, as dedicated pins always were)
                 } else {
                     // trace forward for a complete path
                     do {
@@ -924,6 +943,7 @@ public class GlobalSignalRouting {
         }
 
         assert(sitePinsToCreate.stream().distinct().count() == sitePinsToCreate.size());
+        Set<SitePinInst> netPins = null;
         for (SitePin sitePin : sitePinsToCreate) {
             Site site = sitePin.getSite();
             SiteInst si = design.getSiteInstFromSite(site);
@@ -939,6 +959,16 @@ public class GlobalSignalRouting {
                 SitePinInst spi = si.getSitePinInst(pinName);
                 if (spi != null) {
                     if (spi.getNet() == currNet) {
+                        if (netPins == null) {
+                            netPins = new HashSet<>(currNet.getPins());
+                        }
+                        if (!netPins.contains(spi)) {
+                            // A source pin left on its site by a routed design whose static net had
+                            // its output pins removed before routing (see RWRoute.addStaticNetRoutingTargets()):
+                            // add it back to the net
+                            currNet.addPin(spi, false);
+                        }
+                        spi.setRouted(true);
                         continue;
                     }
                     throw new RuntimeException("ERROR: Site pin " + spi.getSitePinName() + " cannot be attached to " +
@@ -951,6 +981,37 @@ public class GlobalSignalRouting {
             currNet.addPin(spi, updateSiteRouting);
             spi.setRouted(true);
         }
+    }
+
+    /**
+     * Checks if a routethru PIP leading to a dedicated node (e.g. through an XPIO site) is free:
+     * neither of its site pins is used by a net and no cell occupies a BEL driven by its input
+     * pin. Unlike {@link RouteThruHelper#isRouteThruPIPAvailable(Design, PIP)},
+     * <LOCKED> placeholder cells (which mark the BELs of a routethru in a routed design and remain
+     * after unrouting) do not block it.
+     * @param design The design.
+     * @param head The routethru's start node.
+     * @param tail The routethru's end node.
+     * @return True if the routethru can be used.
+     */
+    private static boolean isDedicatedRouteThruAvailable(Design design, Node head, Node tail) {
+        SitePin inPin = head.getSitePin();
+        SitePin outPin = tail.getSitePin();
+        if (!RouteThruHelper.isRouteThruSitePinAvailable(design, inPin) ||
+                !RouteThruHelper.isRouteThruSitePinAvailable(design, outPin)) {
+            return false;
+        }
+        SiteInst si = design.getSiteInstFromSite(inPin.getSite());
+        if (si == null) {
+            return true;
+        }
+        for (BELPin sink : inPin.getBELPin().getSiteConns()) {
+            Cell cell = si.getCell(sink.getBEL());
+            if (cell != null && !cell.getName().equals(Cell.LOCKED)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
