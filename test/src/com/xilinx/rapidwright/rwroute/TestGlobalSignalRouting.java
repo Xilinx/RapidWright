@@ -40,6 +40,7 @@ import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.design.Cell;
@@ -503,12 +504,12 @@ public class TestGlobalSignalRouting {
      * (D*->O0*) sites, optionally marked by &lt;LOCKED&gt; cells as left by unrouting a routed design.
      */
     @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    public void testRouteStaticNetToVersalXpioOutputBuffer(boolean lockedRoutethruCell) {
+    @CsvSource({"GND,false", "GND,true", "VCC,false", "VCC,true"})
+    public void testRouteStaticNetToVersalXpioOutputBuffer(NetType netType, boolean lockedRoutethruCell) {
         Design design = new Design("versal_xpio_const", "xcvc1902-vsva2197-2MP-e-S");
         Cell obuf = design.createAndPlaceCell("obuf", Unisim.OBUF, "IOB_X24Y1/IOB_S");
-        Net gndNet = design.getGndNet();
-        SitePinInst opS = gndNet.createPin("OP_S", obuf.getSiteInst());
+        Net staticNet = design.getStaticNet(netType);
+        SitePinInst opS = staticNet.createPin("OP_S", obuf.getSiteInst());
         Assertions.assertEquals(IntentCode.NODE_DEDICATED, opS.getConnectedNode().getIntentCode());
         if (lockedRoutethruCell) {
             Site xpioLogic = design.getDevice().getSite("XPIOLOGIC_X23Y1");
@@ -516,48 +517,51 @@ public class TestGlobalSignalRouting {
             si.addCell(new Cell(Cell.LOCKED, xpioLogic.getBEL("OPFF_SLAVE")));
         }
 
-        List<SitePinInst> gndPins = new ArrayList<>(gndNet.getPins());
+        List<SitePinInst> staticPins = new ArrayList<>(staticNet.getPins());
         RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
-        GlobalSignalRouting.routeStaticNet(gndPins, (n) -> getNodeState(design, NetType.GND, n), design, routeThruHelper);
+        GlobalSignalRouting.routeStaticNet(staticPins, (n) -> getNodeState(design, netType, n), design, routeThruHelper);
 
         Assertions.assertTrue(opS.isRouted());
-        Assertions.assertEquals(1, gndNet.getPins().stream().filter(SitePinInst::isOutPin).count());
+        // GND is driven from a LUT output (a new source pin), VCC from a VCC tie-off of an INT tile (no pin)
+        Assertions.assertEquals(netType == NetType.GND ? 1 : 0, staticNet.getPins().stream().filter(SitePinInst::isOutPin).count());
         Set<String> routethrus = new HashSet<>();
-        for (PIP pip : gndNet.getPIPs()) {
+        for (PIP pip : staticNet.getPIPs()) {
             if (pip.isRouteThru()) {
                 routethrus.add(pip.getStartWireName() + "->" + pip.getEndWireName());
             }
         }
         Assertions.assertTrue(routethrus.contains("XPIO_LOGICPAIR_1_OPFFS_D1_PIN->XPIO_LOGICPAIR_1_OPFFS_Q_PIN"), routethrus.toString());
         Assertions.assertTrue(routethrus.contains("XPHY_CORE_3_D3_0__PIN->XPHY_CORE_3_O0_3__PIN"), routethrus.toString());
-        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(gndNet));
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(staticNet));
     }
 
     /**
      * An UltraScale+ HPIOB output buffer with a constant input: its OP site pin is only reached
      * from the fabric through a TX routethru of the XIPHY BITSLICE_RX_TX site.
      */
-    @Test
-    public void testRouteStaticNetToUltraScalePlusHpioOutputBuffer() {
+    @ParameterizedTest
+    @EnumSource(value = NetType.class, names = {"GND", "VCC"})
+    public void testRouteStaticNetToUltraScalePlusHpioOutputBuffer(NetType netType) {
         Design design = new Design("usplus_hpio_const", "xcvu3p");
         Cell obuf = design.createAndPlaceCell("obuf", Unisim.OBUF, "IOB_X0Y128/OUTBUF");
-        Net gndNet = design.getGndNet();
-        SitePinInst op = gndNet.createPin("OP", obuf.getSiteInst());
+        Net staticNet = design.getStaticNet(netType);
+        SitePinInst op = staticNet.createPin("OP", obuf.getSiteInst());
 
-        List<SitePinInst> gndPins = new ArrayList<>(gndNet.getPins());
+        List<SitePinInst> staticPins = new ArrayList<>(staticNet.getPins());
         RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
-        GlobalSignalRouting.routeStaticNet(gndPins, (n) -> getNodeState(design, NetType.GND, n), design, routeThruHelper);
+        GlobalSignalRouting.routeStaticNet(staticPins, (n) -> getNodeState(design, netType, n), design, routeThruHelper);
 
         Assertions.assertTrue(op.isRouted());
-        Assertions.assertEquals(1, gndNet.getPins().stream().filter(SitePinInst::isOutPin).count());
+        // GND is driven from a LUT output (a new source pin), VCC from a VCC tie-off of an INT tile (no pin)
+        Assertions.assertEquals(netType == NetType.GND ? 1 : 0, staticNet.getPins().stream().filter(SitePinInst::isOutPin).count());
         Set<String> routethrus = new HashSet<>();
-        for (PIP pip : gndNet.getPIPs()) {
+        for (PIP pip : staticNet.getPIPs()) {
             if (pip.isRouteThru()) {
                 routethrus.add(pip.getStartWire().getSitePin() + "->" + pip.getEndWire().getSitePin());
             }
         }
         Assertions.assertTrue(routethrus.contains("BITSLICE_RX_TX_X0Y128/TX_D0->BITSLICE_RX_TX_X0Y128/TX_Q"), routethrus.toString());
-        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(gndNet));
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(staticNet));
     }
 
     /**
