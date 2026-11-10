@@ -10,10 +10,15 @@ env:
 
 jobs:
   build:
+    env:
+      # Number of jobs the Java tests of each configuration are split between (keep in sync with matrix.shard)
+      TEST_SHARDS: 6
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest]
         single_threaded: [multi-threaded, single-threaded]
+        shard: [1, 2, 3, 4, 5, 6]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -26,6 +31,7 @@ jobs:
           cache: 'gradle'
 
       - name: Setup Python 3.12
+        if: matrix.shard == 1
         uses: actions/setup-python@v5
         with:
           python-version: 3.12
@@ -39,34 +45,47 @@ jobs:
           key: rapidwright-clouddata-v2-${{ env.RAPIDWRIGHT_VERSION }}
 
       - name: Install Python Dependencies
+        if: matrix.shard == 1
         run: |
           pip install pytest python/
 
       - name: Compile
-        run: ./gradlew assemble -Dorg.gradle.warning.mode=fail 
+        if: matrix.shard == 1
+        run: ./gradlew assemble -Dorg.gradle.warning.mode=fail
 
+      # Each shard runs a part of the Java tests (see TestShardFilter); the first also runs the Python tests
       - name: Test
-        run: ./gradlew -PlimitToSingleProc=${{ matrix.single_threaded }} test 
+        run: >
+          ./gradlew -PlimitToSingleProc=${{ matrix.single_threaded }} -PtestShard=${{ matrix.shard }}/${{ env.TEST_SHARDS }}
+          ${{ matrix.shard == 1 && 'test' || 'testJava' }}
 
       - name: Run Examples
-        if: matrix.single_threaded == 'multi-threaded'
+        if: matrix.single_threaded == 'multi-threaded' && matrix.shard == 2
         run: ./gradlew runExamples
 
       - name: Archive Java Test Report
         uses: actions/upload-artifact@v4
         if: always() && matrix.os == 'ubuntu-latest'
         with:
-          name: Java Test Report ${{ matrix.single_threaded }}
+          name: Java Test Report ${{ matrix.single_threaded }} ${{ matrix.shard }}
           path: build/reports/tests/testJava
 
       - name: Upload Test Results
         if: always() && matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: Unit Test Results ${{ matrix.single_threaded }}
+          name: Unit Test Results ${{ matrix.single_threaded }} ${{ matrix.shard }}
           path: |
             build/test-results/**/*.xml
 
       - name: Terminate Gradle to allow caching
         run: ./gradlew --stop
 
+  # A single check that passes only if every test shard passed, e.g. for branch protection rules
+  tests-passed:
+    if: always()
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check that all test shards passed
+        run: test "${{ needs.build.result }}" = "success"

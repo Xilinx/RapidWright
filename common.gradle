@@ -97,6 +97,16 @@ task testJava(type:Test) {
 
   useJUnitPlatform()
   systemProperty("junit.jupiter.extensions.autodetection.enabled", true)
+
+  // Run only shard i of n of the tests (-PtestShard=i/n), to split them between CI machines
+  if (project.hasProperty('testShard')) {
+    systemProperty("rapidwright.test.shard", project.property('testShard'))
+  }
+  // Record how long each test method takes, to balance the shards (see TestDurationsListener)
+  if (project.hasProperty('recordTestDurations')) {
+    systemProperty("rapidwright.test.durationsFile",
+                   layout.buildDirectory.file("test-durations/testJava.txt").get().asFile.toString())
+  }
 }
 
 test {
