@@ -24,6 +24,7 @@ package com.xilinx.rapidwright.rwroute;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -552,6 +553,29 @@ public class TestGlobalSignalRouting {
         for (Node end : driver.keySet()) {
             Assertions.assertTrue(starts.contains(end) || sinkNodes.contains(end), "Dangling node " + end);
         }
+        // A single clock root: one transition from the vertical routing, through clock muxes, onto the vertical
+        // distribution
+        Map<Node, List<Node>> fanouts = new HashMap<>();
+        for (PIP pip : driver.values()) {
+            Node start = pip.isReversed() ? pip.getEndNode() : pip.getStartNode();
+            fanouts.computeIfAbsent(start, (k) -> new ArrayList<>()).add(pip.isReversed() ? pip.getStartNode() : pip.getEndNode());
+        }
+        List<Node> roots = new ArrayList<>();
+        for (Map.Entry<Node, List<Node>> e : fanouts.entrySet()) {
+            if (e.getKey().getIntentCode() != IntentCode.NODE_GLOBAL_VROUTE) {
+                continue;
+            }
+            for (Node n : e.getValue()) {
+                Node mux = n;
+                while (mux.getIntentCode() == IntentCode.NODE_GLOBAL_GCLK && fanouts.getOrDefault(mux, Collections.emptyList()).size() == 1) {
+                    mux = fanouts.get(mux).get(0);
+                }
+                if (mux.getIntentCode().name().startsWith("NODE_GLOBAL_VDISTR")) {
+                    roots.add(n);
+                }
+            }
+        }
+        Assertions.assertEquals(1, roots.size(), roots.toString());
     }
 
     private static Cell createBUFGCE(Design design, EDIFCell parent, String name, Site location) {

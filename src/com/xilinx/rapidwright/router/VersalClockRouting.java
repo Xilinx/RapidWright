@@ -302,7 +302,7 @@ public class VersalClockRouting {
         // The vertical distribution trees may not provide a path for every clock region of
         // the range (e.g. for some clock region rows of multi-SLR devices): route those clock
         // regions after the others, straight to a vertical distribution line of their own, and
-        // from any node of the distribution routed so far
+        // from any node of the distribution routed so far below the clock root
         Map<ClockRegion, List<Pair<IntentCode, ClockRegion>>> distrPaths = new HashMap<>();
         List<ClockRegion> spineCRsWithoutPath = new ArrayList<>();
         // Only route to the vertical distribution lines of the clock region rows with sinks:
@@ -331,11 +331,16 @@ public class VersalClockRouting {
         for (ClockRegion cr : spineCRsInRoutingOrder) {
             q.clear();
             visited.clear();
-            q.add(clockRootNode);
-            if (spineCRsWithoutPath.contains(cr)) {
+            if (spineCRsWithoutPath.contains(cr) && !distrNodes.isEmpty()) {
+                // Branch off the vertical distribution already routed, below the clock root: starting from the
+                // VROUTE again could transition onto the vertical distribution a second time
                 for (Node n : distrNodes) {
-                    q.add(new NodeWithPrevAndCost(n));
+                    if (!n.equals(vroute)) {
+                        q.add(new NodeWithPrevAndCost(n));
+                    }
                 }
+            } else {
+                q.add(clockRootNode);
             }
 
             List<Pair<IntentCode, ClockRegion>> distrPath = distrPaths.get(cr);
