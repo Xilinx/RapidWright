@@ -648,8 +648,11 @@ public class RWRoute {
                 }
             }
 
-            if ((sourceINTNode == null && connection.getSourceRnode() == null) || sinkINTNode == null) {
-                // Direct connection if either source or sink pin cannot be projected to INT tile
+            if ((sourceINTNode == null && connection.getSourceRnode() == null) || sinkINTNode == null ||
+                    RouterHelper.isDedicatedConnection(source, sink)) {
+                // Direct connection if either source or sink pin cannot be projected to INT tile, or if the
+                // sink is driven by the source through dedicated resources (e.g. a clock-capable input
+                // to a clock buffer) that need not, and should not, go through the fabric
                 directConnections.add(connection);
                 connection.setDirect(true);
             } else {

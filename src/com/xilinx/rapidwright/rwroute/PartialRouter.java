@@ -685,9 +685,12 @@ public class PartialRouter extends RWRoute {
             // pointer according to the PIP
             setPrevBetweenProjectedPins(netWrapper);
 
-            // Try and use prev pointers to recover the routing for each connection
+            // Try and use prev pointers to recover the routing for each indirect connection; direct
+            // connections (e.g. those through dedicated resources) are routed by routeDirectConnections()
             for (Connection connection : netWrapper.getConnections()) {
-                assert(!connection.isDirect());
+                if (connection.isDirect()) {
+                    continue;
+                }
                 RouteNode sourceRnode = connection.getSourceRnode();
                 RouteNode sinkRnode = connection.getSinkRnode();
                 assert(sourceRnode.getType() == RouteNodeType.EXCLUSIVE_SOURCE);
@@ -703,6 +706,9 @@ public class PartialRouter extends RWRoute {
                 timingManager.getTimingGraph().addNetDelayEdges(net);
                 timingManager.setTimingEdgesOfConnections(netWrapper.getConnections());
                 for (Connection netnewConnection : netWrapper.getConnections()) {
+                    if (netnewConnection.isDirect()) {
+                        continue;
+                    }
                     netnewConnection.updateRouteDelay();
                 }
             }
