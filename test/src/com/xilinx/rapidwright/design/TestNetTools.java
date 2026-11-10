@@ -22,6 +22,7 @@
 package com.xilinx.rapidwright.design;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -32,6 +33,8 @@ import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
@@ -255,6 +258,65 @@ public class TestNetTools {
                 "             INT_X9Y235/INT_NODE_IMUX_39_INT_OUT1 ( 0) INT_X9Y235/INT.BYPASS_W1->>INT_NODE_IMUX_39_INT_OUT1\n" +
                 "                       INT_X9Y235/BYPASS_W4 ( 4) INT_X9Y235/INT.INT_NODE_IMUX_39_INT_OUT1->>BYPASS_W4\n" +
                 "         }]        INT_X9Y235/INODE_W_1_FT1 ( 0) INT_X9Y235/INT.BYPASS_W4->>INODE_W_1_FT1");
+    }
+
+    @Test
+    public void testGetRouteTreesPIPsInReverseOrder() {
+        // The PIPs of a net are in no particular order: a node that is the start of a PIP visited before the
+        // one driving it is not multiply-driven
+        Design design = new Design("top", "xcvu3p");
+        Net net = design.createNet("net");
+        net.createPin("A_O", design.createSiteInst("SLICE_X13Y235"));
+        Device device = design.getDevice();
+        List<Node> nodes = Arrays.stream(("CLEM_X9Y235/CLE_CLE_M_SITE_0_A_O INT_X9Y235/INODE_W_1_FT1 " +
+                "INT_X9Y235/BOUNCE_W_0_FT1 INT_X9Y234/INT_NODE_IMUX_55_INT_OUT1 INT_X9Y234/BYPASS_W10").split(" "))
+                .map(device::getNode).collect(Collectors.toList());
+        for (int i = nodes.size() - 1; i > 0; i--) {
+            net.addPIP(PIP.getArbitraryPIP(nodes.get(i - 1), nodes.get(i)));
+        }
+
+        List<NetTools.NodeTree> trees = NetTools.getNodeTrees(net);
+        Assertions.assertEquals(1, trees.size());
+        NetTools.NodeTree node = trees.get(0);
+        for (Node expected : nodes) {
+            Assertions.assertEquals(expected, node);
+            Assertions.assertFalse(node.multiplyDriven, expected.toString());
+            node = node.fanouts.isEmpty() ? null : node.fanouts.get(0);
+        }
+        Assertions.assertNull(node);
+    }
+
+    @Test
+    public void testGetRouteTreesLoopThroughSource() {
+        // A routing loop leading back into the node of the source site pin (source -> INODE -> source)
+        Design design = new Design("top", "xcvu3p");
+        Net net = design.createNet("net");
+        SitePinInst source = net.createPin("A_O", design.createSiteInst("SLICE_X13Y235"));
+        Device device = design.getDevice();
+        Node sourceNode = source.getConnectedNode();
+        Node inode = device.getNode("INT_X9Y235/INODE_W_1_FT1");
+        net.addPIP(PIP.getArbitraryPIP(sourceNode, inode));
+        Tile intTile = inode.getTile();
+        Wire sourceWireInIntTile = Arrays.stream(sourceNode.getAllWiresInNode())
+                .filter((w) -> w.getTile() == intTile).findFirst().get();
+        PIP loop = new PIP(intTile, inode.getWireIndex(), sourceWireInIntTile.getWireIndex());
+        Assertions.assertEquals(sourceNode, loop.getEndNode());
+        net.addPIP(loop);
+
+        List<NetTools.NodeTree> trees = NetTools.getNodeTrees(net);
+        Assertions.assertEquals(1, trees.size());
+        NetTools.NodeTree root = trees.get(0);
+        Assertions.assertEquals(sourceNode, root);
+        Assertions.assertTrue(root.multiplyDriven);
+        Assertions.assertFalse(root.fanouts.get(0).multiplyDriven);
+
+        // Traversals stop at the loop
+        Assertions.assertTimeoutPreemptively(Duration.ofSeconds(30), () -> {
+            Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(net));
+            Assertions.assertNotNull(root.toString());
+            Assertions.assertNotNull(root.toTreeString());
+        });
+        Assertions.assertTrue(source.isRouted());
     }
 
     @Test

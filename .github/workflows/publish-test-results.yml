@@ -21,7 +21,7 @@ jobs:
           mkdir artifacts && cd artifacts
 
           artifacts_url=${{ github.event.workflow_run.artifacts_url }}
-          artifacts=$(gh api $artifacts_url -q '.artifacts[] | {name: .name, url: .archive_download_url}')
+          artifacts=$(gh api --paginate $artifacts_url -q '.artifacts[] | {name: .name, url: .archive_download_url}')
 
           IFS=$'\n'
           for artifact in $artifacts
