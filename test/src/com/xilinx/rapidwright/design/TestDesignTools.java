@@ -3239,10 +3239,14 @@ public class TestDesignTools {
         design.addNet(stale);
         Cell sink = design.getCell("inst/sink");
         routeLogicalPin(sink, "I0", stale);
+        // Its routing goes with it
+        PIP pip = design.getDevice().getTile("INT_X0Y0").getPIPs().get(0);
+        stale.addPIP(pip);
 
         DesignTools.makePhysNetNamesConsistent(design, true);
         Assertions.assertNull(design.getNet("old/in_i"));
         Assertions.assertSame(design.getNet("a"), getNetOnLogicalPin(sink, "I0"));
+        Assertions.assertEquals(Arrays.asList(pip), design.getNet("a").getPIPs());
     }
 
     @Test

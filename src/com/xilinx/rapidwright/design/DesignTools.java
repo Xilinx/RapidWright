@@ -4233,7 +4233,14 @@ public class DesignTools {
                 }
             }
 
-            design.movePinsToNewNetDeleteOldNet(merge.net, parentPhysNet, true);
+            if (merge.fromCellPins) {
+                // A stale net may still be routed: keep its PIPs, which moving the pins alone drops
+                if (mergeOntoNet(design, merge.net, parentPhysNet)) {
+                    removeDuplicatePIPs(parentPhysNet);
+                }
+            } else {
+                design.movePinsToNewNetDeleteOldNet(merge.net, parentPhysNet, true);
+            }
         }
     }
 
