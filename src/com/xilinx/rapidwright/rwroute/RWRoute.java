@@ -407,16 +407,14 @@ public class RWRoute {
         // Examine for all connections for this case and remove such alternate sinks.
         // A connection left with none (by either removal) gets the exclusive sink that createNetWrapperAndConnections()
         // gives a connection without any; that sink is then used, and may be an alternate sink of other connections, so
-        // repeat until no connection is left with none.
+        // repeat until no connection is left with none. (Each pass removes those made exclusive from the list in one go.)
         boolean madeExclusive;
         do {
-            madeExclusive = false;
-            for (Iterator<Connection> it = connectionsWithAltSinks.iterator(); it.hasNext(); ) {
-                Connection connection = it.next();
+            madeExclusive = connectionsWithAltSinks.removeIf((connection) -> {
                 List<RouteNode> altSinkRnodes = connection.getAltSinkRnodes();
                 altSinkRnodes.removeIf(RouteNode::isUsed);
                 if (!altSinkRnodes.isEmpty()) {
-                    continue;
+                    return false;
                 }
                 RouteNode sinkRnode = connection.getSinkRnode();
                 sinkRnode.setType(routingGraph.getExclusiveSinkType(sinkRnode));
@@ -424,9 +422,8 @@ public class RWRoute {
                 if (sinkRnode.countConnectionsOfUser(connection.getNetWrapper()) == 0) {
                     sinkRnode.incrementUser(connection.getNetWrapper());
                 }
-                it.remove();
-                madeExclusive = true;
-            }
+                return true;
+            });
         } while (madeExclusive);
     }
 
