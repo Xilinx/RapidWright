@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 
 /**
  * Keeps track of a set of {@link EDIFCell} objects
@@ -268,11 +269,21 @@ public class EDIFLibrary extends EDIFName {
      *            set may lock even then.
      */
     void addExternallyReferencedLibraries(EDIFCell cell, Set<EDIFLibrary> set) {
+        addExternallyReferencedLibraries(cell, set, UnaryOperator.identity());
+    }
+
+    /**
+     * As {@link #addExternallyReferencedLibraries(EDIFCell, Set)}, with each instance taken to be of the cell that the
+     * given function returns for its cell type (such as {@link EDIFCollapsedView#getInstanceType(EDIFCell)}).
+     */
+    void addExternallyReferencedLibraries(EDIFCell cell, Set<EDIFLibrary> set, UnaryOperator<EDIFCell> instanceType) {
         // Most instances refer to the same few libraries, so skip repeats of the last one found
         EDIFLibrary last = this;
         for (EDIFCellInst i : cell.getCellInsts()) {
-            EDIFLibrary lib = i.getCellType().getLibrary();
+            EDIFLibrary lib = instanceType.apply(i.getCellType()).getLibrary();
             if (lib != null && lib != this && lib != last) {
+                // In a ConcurrentHashMap's key set, contains() never locks, whereas add() locks the library's bin even
+                // if it is already there (from Java 9, unless it is the bin's first), so check first: most are
                 if (!set.contains(lib)) {
                     set.add(lib);
                 }
@@ -330,14 +341,26 @@ public class EDIFLibrary extends EDIFName {
     private static final byte[] EXPORT_CONST_TECHNOLOGY = "\n    (edifLevel 0)\n    (technology (numberDefinition ))\n".getBytes(StandardCharsets.UTF_8);
     private static final byte[] EXPORT_CONST_LIBRARY_END = "  )\n".getBytes(StandardCharsets.UTF_8);
 
-    void exportEDIF(List<EDIFCell> cells, OutputStream os, boolean writeHeader, boolean writeFooter, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException {
+    /**
+     * Writes the given cells of this library as EDIF.
+     * @param cells The cells to write, in order.
+     * @param os The stream to write to.
+     * @param writeHeader If true, the library's header is written before the cells.
+     * @param writeFooter If true, the library's footer is written after the cells.
+     * @param cache The cache of legal EDIF names.
+     * @param stable If true, the contents of each cell are written in sorted order.
+     * @param collapsedView The view of the netlist with its macros collapsed, which is written, or
+     *                      null to write the cells as they are.
+     */
+    void exportEDIF(List<EDIFCell> cells, OutputStream os, boolean writeHeader, boolean writeFooter,
+            EDIFWriteLegalNameCache<?> cache, boolean stable, EDIFCollapsedView collapsedView) throws IOException {
         if (writeHeader) {
             os.write(EXPORT_CONST_LIBRARY_START);
             exportEDIFName(os, cache);
             os.write(EXPORT_CONST_TECHNOLOGY);
         }
         for (EDIFCell c : cells) {
-            c.exportEDIF(os, cache, stable);
+            c.exportEDIF(os, cache, stable, collapsedView);
         }
         if (writeFooter) {
             os.write(EXPORT_CONST_LIBRARY_END);
@@ -345,7 +368,7 @@ public class EDIFLibrary extends EDIFName {
     }
 
     public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException {
-        exportEDIF(getValidCellExportOrder(stable), os, true, true, cache, stable);
+        exportEDIF(getValidCellExportOrder(stable), os, true, true, cache, stable, null);
     }
     public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache) throws IOException {
         exportEDIF(os, cache, false);

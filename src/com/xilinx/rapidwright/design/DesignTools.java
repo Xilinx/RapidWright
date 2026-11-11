@@ -972,10 +972,15 @@ public class DesignTools {
      * <p>
      * Nets are only recorded if tracking is enabled on the design before this is called, with
      * {@link Design#setTrackNetChanges(boolean)} or {@link Design#setTrackingChanges(boolean)}.
-     * Every net this touches is then recorded, and no net outside that record is altered here, so a
-     * caller that needs to operate on the result can start from {@link Design#getModifiedNets()}.
-     * That record is cumulative: it also holds any net recorded by earlier operations, until
-     * emptied with {@link Design#clearTrackedChanges()}.
+     * Every net this touches that the design still holds is then recorded, so a caller that needs
+     * to operate on the result can start from {@link Design#getModifiedNets()}. That record is
+     * cumulative: it also holds any net recorded by earlier operations, until emptied with
+     * {@link Design#clearTrackedChanges()}. A net merged away is removed from the design instead,
+     * so is not in that record; when copying originals, its routing is in
+     * {@link Design#getOriginalNetRouting()}. No other net is altered here. Likewise, a static
+     * source evicted from a site a black box's circuit is placed onto is removed, so is not in
+     * {@link Design#getModifiedSiteInsts()}: the site instance that takes its site is, and changes
+     * from the original recorded for that site in {@link Design#getOriginalSiteInsts()}.
      *
      * @param design              The top level design
      * @param blackBoxes          The 'guts' to be inserted, keyed by the hierarchical name of the
@@ -1173,7 +1178,6 @@ public class DesignTools {
         // in one batch once every site instance of every box is in. Trimming them per box instead
         // would, from the second box on, compute against static routing an earlier box had merged in
         Map<Net, Set<SitePinInst>> deferredRemovals = new HashMap<>();
-        List<SiteInst> evictedSiteInsts = new ArrayList<>();
 
         // Add placement information
         // We need to prefix all cell and net names with the hierarchicalCellName as a prefix
@@ -1183,14 +1187,44 @@ public class DesignTools {
             Net vccCell = cell.getVccNet();
             Net gndCell = cell.getGndNet();
             for (SiteInst si : cell.getSiteInsts()) {
-                for (Cell c : new ArrayList<>(si.getCells())) {
-                    c.updateName(hierarchicalCellName + "/" + c.getName());
-                    if (!c.isRoutethru())
-                        design.addCell(c);
-                    else {
-                        for (Entry<String, AltPinMapping> p : c.getAltPinMappings().entrySet()) {
-                            p.getValue().setAltCellName(hierarchicalCellName + "/" + p.getValue().getAltCellName());
+                // The names the site's cells and their alternate pin mappings carry before its other
+                // cells are renamed. Renaming a cell may also rename the routethrus and alternate pin
+                // mappings carrying its name (see Cell.updateName()), and a name changed that way is
+                // not prefixed again
+                Cell[] siteCells = si.getCells().toArray(new Cell[0]);
+                String[] oldNames = new String[siteCells.length];
+                List<AltPinMapping> altPinMappings = null;
+                List<String> oldAltCellNames = null;
+                for (int i = 0; i < siteCells.length; i++) {
+                    Cell c = siteCells[i];
+                    oldNames[i] = c.getName();
+                    if (c.isRoutethru() && c.hasAltPinMappings()) {
+                        if (altPinMappings == null) {
+                            altPinMappings = new ArrayList<>();
+                            oldAltCellNames = new ArrayList<>();
                         }
+                        for (AltPinMapping m : c.getAltPinMappings().values()) {
+                            altPinMappings.add(m);
+                            oldAltCellNames.add(m.getAltCellName());
+                        }
+                    }
+                }
+                for (Cell c : siteCells) {
+                    if (!c.isRoutethru()) {
+                        c.updateName(hierarchicalCellName + "/" + c.getName());
+                        design.addCell(c);
+                    }
+                }
+                for (int i = 0; i < siteCells.length; i++) {
+                    Cell c = siteCells[i];
+                    if (c.isRoutethru() && c.getName().equals(oldNames[i])) {
+                        c.updateName(hierarchicalCellName + "/" + oldNames[i]);
+                    }
+                }
+                for (int i = 0; altPinMappings != null && i < altPinMappings.size(); i++) {
+                    AltPinMapping m = altPinMappings.get(i);
+                    if (m.getAltCellName().equals(oldAltCellNames.get(i))) {
+                        m.setAltCellName(hierarchicalCellName + "/" + oldAltCellNames.get(i));
                     }
                 }
 
@@ -1198,24 +1232,27 @@ public class DesignTools {
                 // since the site was given to the circuit by the placer on the strength of it being free
                 SiteInst existingSi = design.getSiteInstFromSite(si.getSite());
                 if (existingSi != null) {
-                    if (!existingSi.getName().startsWith(SiteInst.STATIC_SOURCE)) {
+                    // ... or a site instance that merely locks the site's BELs, as a static shell
+                    // has for sites in the region of a reconfigurable partition. It holds nothing
+                    // else, so it is evicted just the same
+                    if (!existingSi.getName().startsWith(SiteInst.STATIC_SOURCE)
+                            && !holdsOnlyLockedPlaceholders(existingSi)) {
                         throw new RuntimeException("ERROR: Site overlap at " + existingSi.getSiteName() + " when populating blackbox '" + hierarchicalCellName + "'");
                     }
-                    // Cell is only allowed to evict STATIC_SOURCEs -- but we have to unroute all
-                    // static trees affected by its evicted output pins
+                    // Cell is otherwise only allowed to evict STATIC_SOURCEs -- but we have to
+                    // unroute all static trees affected by its evicted output pins
                     // TODO: In the future, perhaps we can port the mutually exclusive parts
                     //       of the static source into the cell SiteInst?
                     for (SitePinInst spi : existingSi.getSitePinInsts()) {
                         assert(spi.isOutPin());
-                        Net net = spi.getNet();
-                        assert(net.isStaticNet());
-                        deferredRemovals.computeIfAbsent(net, (p) -> new HashSet<>()).add(spi);
+                        assert(spi.getNet().isStaticNet());
                     }
-
-                    // TEMPORARY WORKAROUND, part 1 of 2: remember what addSiteInst() below is
-                    // about to displace. It cannot be untracked here, because batchRemoveSitePins()
-                    // at the end of this method takes its pins and marks it again
-                    evictedSiteInsts.add(existingSi);
+                    // Its pins are collected into deferredRemovals rather than taken now. Removing
+                    // it hands what the site held originally on to the site instance added below.
+                    // The design does that by site rather than by name, which matters since both are
+                    // usually named after the site
+                    boolean keepSitePinRouting = false;
+                    design.removeSiteInst(existingSi, keepSitePinRouting, deferredRemovals);
                 }
 
                 design.addSiteInst(si);
@@ -1239,20 +1276,6 @@ public class DesignTools {
         // alone. This has to happen before the routing below merges the circuits' own static pins in
         boolean preserveOtherRoutes = true;
         DesignTools.batchRemoveSitePins(deferredRemovals, preserveOtherRoutes);
-
-        // TEMPORARY WORKAROUND, part 2 of 2. addSiteInst() displaced each of these from the design,
-        // but left it in the change tracking - which marked it again just above, as its pins were
-        // taken. It is then a SiteInst that getModifiedSiteInsts() holds and getSiteInsts() does
-        // not, so whoever walks the modified set - BitGenerator, for one - reads a site the design
-        // no longer owns, alongside the live SiteInst for that same site. Two entries for one site
-        // means two writers of its configuration bits, and which one lands last depends on the
-        // iteration order of the modified set, which changes as the set grows and rehashes.
-        // The proper fix belongs in Design.addSiteInst(), which should treat displacing an
-        // existing SiteInst as a tracked removal, so that no caller has to remember to do this.
-        for (SiteInst evicted : evictedSiteInsts) {
-            design.getModifiedSiteInsts().remove(evicted);
-            design.getOriginalSiteInsts().remove(evicted.getName());
-        }
 
         // Nets that something was merged onto, and so may hold the same PIP more than once
         Set<Net> mergedOnto = new HashSet<>();
@@ -1417,6 +1440,22 @@ public class DesignTools {
 
         // As read_checkpoint -cell does, each circuit brings its constraints with it
         ConstraintTools.addBlackBoxConstraints(design, blackBoxes);
+    }
+
+    /**
+     * Checks whether a site instance holds nothing but locked placeholder cells ({@link Cell#LOCKED}):
+     * at least one of them, no other cells, no site pins and no site routing, including used site PIPs
+     * without a net.
+     *
+     * @param si The site instance.
+     * @return True if the site instance only locks its BELs.
+     */
+    private static boolean holdsOnlyLockedPlaceholders(SiteInst si) {
+        if (si.getCells().isEmpty()) return false;
+        for (Cell c : si.getCells()) {
+            if (!c.getName().endsWith(Cell.LOCKED)) return false;
+        }
+        return si.getSitePinInsts().isEmpty() && si.getSiteWireToNetMap().isEmpty() && !si.hasUsedSitePIPs();
     }
 
     /**
@@ -3528,6 +3567,10 @@ public class DesignTools {
             return null;
         }
         EDIFPortInst portInst = eci.getPortInst(logPinName);
+        if (portInst == null) {
+            // The logical pin is not connected in the netlist
+            return null;
+        }
         final EDIFNetlist netlist = targetCell.getSiteInst().getDesign().getNetlist();
         EDIFHierPortInst hierPortInst =
                 new EDIFHierPortInst(netlist.getHierCellInstFromName(targetCell.getParentHierarchicalInstName()), portInst);
@@ -4045,11 +4088,18 @@ public class DesignTools {
         final Net net;
         final Net parentPhysNet;
         final String parentNetName;
+        /** True if the parent was found from the cell pins on the net's site wires */
+        final boolean fromCellPins;
 
         PhysNetMerge(Net net, Net parentPhysNet, String parentNetName) {
+            this(net, parentPhysNet, parentNetName, false);
+        }
+
+        PhysNetMerge(Net net, Net parentPhysNet, String parentNetName, boolean fromCellPins) {
             this.net = net;
             this.parentPhysNet = parentPhysNet;
             this.parentNetName = parentNetName;
+            this.fromCellPins = fromCellPins;
         }
     }
 
@@ -4061,6 +4111,24 @@ public class DesignTools {
      * @param design Design object to be modified in-place.
      */
     public static void makePhysNetNamesConsistent(Design design) {
+        makePhysNetNamesConsistent(design, false);
+    }
+
+    /**
+     * Make all of a Design's physical Net objects consistent with its logical (EDIF) netlist, as
+     * {@link #makePhysNetNamesConsistent(Design)} does, and optionally also those whose names are
+     * not a logical net at all. Such names are left behind when the cells of a placed design are
+     * moved into a new hierarchy, and Vivado drops the placement of every site that uses a net whose
+     * name it cannot find when it reads the checkpoint.
+     * @param design Design object to be modified in-place.
+     * @param fromCellPins True to also merge each physical Net whose name is not a logical net into
+     * the parent of the logical nets of the cell pins on its site wires (or rename it after that
+     * parent), when they all have the same one; constant parents of one type count as one. A Net is
+     * left as it is if no cell pin on it has a parent, if the merge would give a net two sources, or
+     * if its name points inside a cell whose contents the netlist does not hold: a black box, an
+     * encrypted cell or a primitive.
+     */
+    public static void makePhysNetNamesConsistent(Design design, boolean fromCellPins) {
         final Map<EDIFHierNet, EDIFHierNet> netParentMap = design.getNetlist().getParentNetMap();
 
         // Static nets are lazily created; do them before going parallel
@@ -4087,7 +4155,7 @@ public class DesignTools {
             EDIFHierNet hierNet = net.getLogicalHierNet();
             if (hierNet == null) {
                 // Likely an encrypted cell
-                return null;
+                return fromCellPins ? getMergeFromCellPins(design, net, netParentMap, gndNet, vccNet) : null;
             }
             EDIFHierNet parentHierNet = netParentMap.get(hierNet);
             if (parentHierNet == null) {
@@ -4129,11 +4197,34 @@ public class DesignTools {
         // classified (so that a net that cannot be classified leaves the design unchanged). Applying them in any
         // other order would leave both the surviving Net of an alias group and the order that group's pins are
         // appended in decided by whichever thread happened to arrive first, which is enough to change the order
-        // RWRoute walks its connections in and so the routing it produces
-        for (PhysNetMerge merge : merges) {
+        // RWRoute walks its connections in and so the routing it produces. Parents found from cell pins come
+        // last, so that the logical aliases have settled which Net carries the parent's name (and its source)
+        // before the two-source check below looks at it
+        List<PhysNetMerge> ordered = merges;
+        if (fromCellPins) {
+            ordered = new ArrayList<>(merges.size());
+            for (PhysNetMerge merge : merges) {
+                if (!merge.fromCellPins) {
+                    ordered.add(merge);
+                }
+            }
+            for (PhysNetMerge merge : merges) {
+                if (merge.fromCellPins) {
+                    ordered.add(merge);
+                }
+            }
+        }
+        // Nets merged away by their cell pins, and the net each went into
+        Map<Net, Net> mergedAway = new IdentityHashMap<>();
+        for (PhysNetMerge merge : ordered) {
             Net parentPhysNet = merge.parentPhysNet;
             if (parentPhysNet == null) {
                 parentPhysNet = design.getNet(merge.parentNetName);
+                if (merge.fromCellPins && parentPhysNet != null && merge.net.getSource() != null
+                        && parentPhysNet.getSource() != null) {
+                    // Each has a source, so they cannot be the same net
+                    continue;
+                }
 
                 // Nothing to merge into yet, so this net becomes the one everything else merges into
                 if (parentPhysNet == null) {
@@ -4144,8 +4235,92 @@ public class DesignTools {
                 }
             }
 
-            design.movePinsToNewNetDeleteOldNet(merge.net, parentPhysNet, true);
+            if (merge.fromCellPins) {
+                // A stale net may still be routed: keep its PIPs, which moving the pins alone drops
+                if (mergeOntoNet(design, merge.net, parentPhysNet)) {
+                    removeDuplicatePIPs(parentPhysNet);
+                }
+                mergedAway.put(merge.net, parentPhysNet);
+            } else {
+                design.movePinsToNewNetDeleteOldNet(merge.net, parentPhysNet, true);
+            }
         }
+
+        // BEL attributes on a net merged away by its cell pins go to the net it went into
+        Map<Site, SiteConfig> belAttrs = mergedAway.isEmpty() ? null : design.getBELAttrs();
+        if (belAttrs != null) {
+            for (SiteConfig siteConfig : belAttrs.values()) {
+                for (Map<String, BELAttr> attrs : siteConfig.getBELAttributes().values()) {
+                    for (BELAttr attr : attrs.values()) {
+                        Net target = mergedAway.get(attr.getNet());
+                        if (target != null) {
+                            attr.setNet(target);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Classifies a physical Net whose name is not a logical net for
+     * {@link #makePhysNetNamesConsistent(Design, boolean)}, by the parent of the logical nets of the
+     * cell pins on its site wires.
+     * @return The merge, or null if the Net is to be left as it is.
+     */
+    private static PhysNetMerge getMergeFromCellPins(Design design, Net net,
+            Map<EDIFHierNet, EDIFHierNet> netParentMap, Net gndNet, Net vccNet) {
+        // A name reaching an instance of a cell with no contents is resolved inside that cell by
+        // Vivado, which cannot be done here
+        if (isInsideOpaqueCell(design.getNetlist(), net.getName())) {
+            return null;
+        }
+        EDIFHierNet parent = null;
+        NetType parentStaticType = null;
+        for (SiteInst si : net.getSiteInsts()) {
+            if (si.getDesign() != design) {
+                // A net taken from another design can still list that design's site instances
+                continue;
+            }
+            for (String siteWire : si.getSiteWiresFromNet(net)) {
+                for (BELPin belPin : si.getSiteWirePins(siteWire)) {
+                    Cell c = si.getCell(belPin.getBEL());
+                    if (c == null || c.isRoutethru()) {
+                        continue;
+                    }
+                    String logicalPin = c.getLogicalPinMapping(belPin.getName());
+                    EDIFHierCellInst inst = logicalPin == null ? null : c.getEDIFHierCellInst();
+                    if (inst == null) {
+                        continue;
+                    }
+                    EDIFHierPortInst portInst = inst.getPortInst(logicalPin);
+                    EDIFHierNet logical = portInst == null ? null : portInst.getHierarchicalNet();
+                    EDIFHierNet p = logical == null ? null : netParentMap.get(logical);
+                    if (p == null) {
+                        return null;
+                    }
+                    if (p.equals(parent)) {
+                        continue;
+                    }
+                    // Only for a parent not seen yet: isGND() and isVCC() scan the net's port instances
+                    NetType staticType = p.getNet().isGND() ? NetType.GND
+                            : p.getNet().isVCC() ? NetType.VCC : null;
+                    if (parent == null) {
+                        parent = p;
+                        parentStaticType = staticType;
+                    } else if (staticType == null || staticType != parentStaticType) {
+                        return null;
+                    }
+                }
+            }
+        }
+        if (parent == null) {
+            return null;
+        }
+        if (parentStaticType != null) {
+            return new PhysNetMerge(net, parentStaticType == NetType.GND ? gndNet : vccNet, null, true);
+        }
+        return new PhysNetMerge(net, null, parent.getHierarchicalNetName(), true);
     }
 
     /**
@@ -4226,7 +4401,8 @@ public class DesignTools {
             if (!Utils.isSLICE(si)) {
                 continue;
             }
-            for (Cell cell : si.getCells()) {
+            // Routing the site may add routethru cells to it (e.g. on the CE IMR BEL of a Versal SLICE)
+            for (Cell cell : new ArrayList<>(si.getCells())) {
                 BEL bel = cell.getBEL();
                 if (bel == null || !bel.isFF() || bel.isAnyIMR()) {
                     continue;
@@ -4501,6 +4677,10 @@ public class DesignTools {
                 throw new RuntimeException(series.toString());
             }
             for (Cell cell : design.getCells()) {
+                if (cell.getSiteInst() == null) {
+                    // Not placed: no site pins to tie
+                    continue;
+                }
                 if (isFlipFlopOrLatchNeedingCeSrToVcc(cell.getType())) {
                     SiteInst si = cell.getSiteInst();
                     if (!Utils.isSLICE(si)) {
@@ -5447,7 +5627,10 @@ public class DesignTools {
                 continue;
             }
             queue.add(node);
-            assert(!node.multiplyDriven);
+            if (node.multiplyDriven) {
+                // A routing loop leads back into this source: do not visit it again
+                multiplyDrivenNodesVisited.add(node);
+            }
         }
         while (!queue.isEmpty()) {
             NetTools.NodeTree node = queue.poll();
@@ -5514,20 +5697,37 @@ public class DesignTools {
         n.setEncryptedCells(netlists.stream().map(Object::toString).collect(Collectors.toList()));
     }
 
+    /**
+     * Updates the pins of the Versal XPHY cells of a design that connect to a DDR memory controller (or, for inputs,
+     * an XPLL) to use the XPHY's dedicated DMC_* BEL pins and site pins. XPHY cells without a logical cell (e.g.
+     * inside encrypted IP), and pins without a net or without a leaf driver (inputs) or load (outputs), are left as
+     * they are.
+     * @param design The design to update.
+     */
     public static void updateVersalXPHYPinsForDMC(Design design) {
         // Check for XPHY BEL pin remapping needs (DMC remappings)
         for (Cell cell : design.getCells()) {
-            String type = cell.getType();
             if (cell.getType() == null || !cell.getType().equals("XPHY"))
                 continue;
-            for (EDIFHierPortInst portInst : cell.getEDIFHierCellInst().getHierPortInsts()) {
+            EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
+            if (ehci == null) {
+                // No logical cell to read the connections from (e.g. inside encrypted IP)
+                continue;
+            }
+            for (EDIFHierPortInst portInst : ehci.getHierPortInsts()) {
+                EDIFHierNet hierNet = portInst.getHierarchicalNet();
+                if (hierNet == null) {
+                    continue;
+                }
                 if (portInst.isInput()) {
                     EDIFCell srcType = null;
-                    for (EDIFHierPortInst src : portInst.getHierarchicalNet()
-                            .getLeafHierPortInsts(true, false)) {
+                    for (EDIFHierPortInst src : hierNet.getLeafHierPortInsts(true, false)) {
                         srcType = src.getPortInst().getCellInst().getCellType();
                     }
-    
+                    if (srcType == null) {
+                        continue;
+                    }
+
                     // If we are being driven by the memory controller, switch BEL pins to DMC
                     // inputs
                     if (srcType.getName().startsWith("DDRMC") || srcType.getName().equals("XPLL")) {
@@ -5553,11 +5753,13 @@ public class DesignTools {
                 } else {
                     assert (portInst.isOutput());
                     EDIFCell snkType = null;
-                    for (EDIFHierPortInst snk : portInst.getHierarchicalNet()
-                            .getLeafHierPortInsts(false, true)) {
+                    for (EDIFHierPortInst snk : hierNet.getLeafHierPortInsts(false, true)) {
                         snkType = snk.getPortInst().getCellInst().getCellType();
                     }
-    
+                    if (snkType == null) {
+                        continue;
+                    }
+
                     // If we are driving the memory controller, make sure we use the DMC pins
                     if (snkType.getName().startsWith("DDRMC")) {
                         BELPin belPin = cell.getBELPin(portInst);

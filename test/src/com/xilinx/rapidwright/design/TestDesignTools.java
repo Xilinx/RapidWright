@@ -53,6 +53,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
@@ -64,6 +65,7 @@ import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.support.ChangeTrackingAssertions;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.Pair;
@@ -587,23 +589,20 @@ public class TestDesignTools {
         // Likewise for the site instances: all of them are new to this design. Each also needs what
         // its site is changing from, so that everything it holds counts as a difference. The sites
         // were free -- this pair of checkpoints leaves no static source in the way -- so the
-        // snapshots are blank
+        // originals are empty
         Map<String, SiteInst> originals = design.getOriginalSiteInsts();
         for (SiteInst si : incoming) {
             Assertions.assertTrue(design.getModifiedSiteInsts().contains(si), si.getName());
-            SiteInst original = originals.get(si.getName());
-            Assertions.assertNotNull(original, si.getName());
-            Assertions.assertSame(si.getSite(), original.getSite());
-            Assertions.assertTrue(original.getCells().isEmpty(), si.getName());
+            Assertions.assertSame(Design.EMPTY_ORIGINAL_SITE_INST, originals.get(si.getSiteName()),
+                    si.getName());
         }
     }
 
     /**
      * A black box may evict a static source from a site it wants, and populateBlackBox() installs
      * the circuit's own site instance there in its place. The evicted one is then gone from the
-     * design, but taking its pins marks it in the change tracking on the way out, so it would be
-     * left in getModifiedSiteInsts() alongside the live site instance that replaced it, were
-     * populateBlackBox() not to untrack it.
+     * design, and must not be left in getModifiedSiteInsts() alongside the live site instance that
+     * replaced it -- including once its pins are taken, which used to mark it again on the way out.
      *
      * Two entries for one site mean two writers of that site's configuration bits, and which of
      * them lands last depends on the iteration order of the modified set. That order changes as the
@@ -654,23 +653,22 @@ public class TestDesignTools {
         populateBlackBox(design, hierCellName, circuit, false);
 
         // It has left the design, and nothing the design has stopped holding may still be tracked
-        // as modified, nor its original kept
-        Assertions.assertNotSame(evicted, design.getSiteInstFromSite(contested));
-        Set<SiteInst> live = new HashSet<>(design.getSiteInsts());
-        for (SiteInst si : design.getModifiedSiteInsts()) {
-            Assertions.assertTrue(live.contains(si),
-                    "modified site instance is no longer in the design: " + si.getName());
-        }
+        // as modified
+        SiteInst arriving = design.getSiteInstFromSite(contested);
+        Assertions.assertNotSame(evicted, arriving);
+        Assertions.assertNull(evicted.getDesign());
+        Assertions.assertFalse(design.getSiteInsts().contains(evicted));
         Assertions.assertFalse(design.getModifiedSiteInsts().contains(evicted));
-        Assertions.assertNull(design.getOriginalSiteInsts().get(evicted.getName()));
 
-        // The invariant that actually matters to whoever walks the modified set: one entry per site
-        Map<Site, SiteInst> bySite = new HashMap<>();
-        for (SiteInst si : design.getModifiedSiteInsts()) {
-            SiteInst clash = bySite.put(si.getSite(), si);
-            Assertions.assertNull(clash, "two modified site instances on " + si.getSiteName()
-                    + ": " + si.getName() + " and " + (clash == null ? "" : clash.getName()));
-        }
+        // The site instance that took the site changes from what the site held before tracking
+        // began, which was nothing, the static source having been stood there since
+        Assertions.assertTrue(design.getModifiedSiteInsts().contains(arriving));
+        Assertions.assertSame(Design.EMPTY_ORIGINAL_SITE_INST,
+                design.getOriginalSiteInsts().get(contested.getName()));
+
+        // The invariant that actually matters to whoever walks the modified set: one entry per site,
+        // and that being the site instance the design holds there
+        ChangeTrackingAssertions.assertModifiedAreInDesign(design);
     }
 
     /**
@@ -721,6 +719,86 @@ public class TestDesignTools {
 
         Assertions.assertTrue(design.getModifiedNets().contains(inNet),
                 "the net gained a pin and no PIP, and is not recorded as modified");
+    }
+
+    /**
+     * A routethru cell carries the name of the cell it serves, and so may an alternate pin mapping.
+     * Both are given the black box's prefix once, whichever order the site's cells come in, and
+     * whether or not renaming the cell they serve already renamed them.
+     */
+    @Test
+    public void testPopulateBlackBoxRoutethruNames() {
+        Design design = new Design("shell", "xcvu3p");
+        createBlackBox(design.getTopEDIFCell(), "bb", EDIFDirection.INPUT);
+
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT);
+        Cell lut = circuit.createAndPlaceCell(circuit.getTopEDIFCell(), "lut", Unisim.LUT1,
+                "SLICE_X5Y0/A6LUT");
+        SiteInst si = lut.getSiteInst();
+        // Placed as the checkpoint reader places them, on either side of the LUT in the site
+        List<Cell> routethrus = new ArrayList<>();
+        for (String belName : new String[] {"A5LUT", "B6LUT"}) {
+            BEL bel = si.getBEL(belName);
+            Cell rt = new Cell("lut", bel);
+            rt.setRoutethru(true);
+            rt.setSiteInst(si);
+            rt.addAltPinMapping("A1", new AltPinMapping("I0", "lut", "LUT1"));
+            si.getCellMap().put(bel.getName(), rt);
+            routethrus.add(rt);
+        }
+
+        populateBlackBox(design, "bb", circuit, false);
+
+        Assertions.assertSame(lut, design.getCell("bb/lut"));
+        for (Cell rt : routethrus) {
+            Assertions.assertEquals("bb/lut", rt.getName());
+            Assertions.assertEquals("bb/lut", rt.getAltPinMappings().get("A1").getAltCellName());
+        }
+    }
+
+    /**
+     * A circuit may hold a cell whose original name is another cell's new name: "lut" and "bb/lut",
+     * filling the black box "bb". A routethru carrying "bb/lut" serves the cell renamed to
+     * "bb/bb/lut", even though "bb/lut" is by then the other cell's new name. (Renaming "lut" first
+     * collides with "bb/lut", so the cells are placed for "bb/lut" to be renamed first.)
+     */
+    @Test
+    public void testPopulateBlackBoxRoutethruNamedAfterNewName() {
+        for (String[] bels : new String[][] {{"A6LUT", "B6LUT"}, {"B6LUT", "A6LUT"}}) {
+            Design design = new Design("shell", "xcvu3p");
+            createBlackBox(design.getTopEDIFCell(), "bb", EDIFDirection.INPUT);
+
+            Design circuit = createCircuit("circuit", EDIFDirection.INPUT);
+            EDIFCell circuitTop = circuit.getTopEDIFCell();
+            EDIFCell innerType = new EDIFCell(circuitTop.getLibrary(), "innerType");
+            innerType.createCellInst("bb", circuitTop);
+            Cell lut = circuit.createAndPlaceCell(circuitTop, "lut", Unisim.LUT1, "SLICE_X5Y0/" + bels[0]);
+            Cell inner = circuit.createAndPlaceCell(innerType, "bb/lut", Unisim.LUT1, "SLICE_X5Y0/" + bels[1]);
+            SiteInst si = lut.getSiteInst();
+            Cell firstCell = null;
+            for (Cell c : si.getCells()) {
+                firstCell = c;
+                break;
+            }
+            if (firstCell != inner) {
+                continue;
+            }
+            BEL bel = si.getBEL(bels[1].replace('6', '5'));
+            Cell rt = new Cell("bb/lut", bel);
+            rt.setRoutethru(true);
+            rt.setSiteInst(si);
+            rt.addAltPinMapping("A1", new AltPinMapping("I0", "bb/lut", "LUT1"));
+            si.getCellMap().put(bel.getName(), rt);
+
+            populateBlackBox(design, "bb", circuit, false);
+
+            Assertions.assertSame(lut, design.getCell("bb/lut"));
+            Assertions.assertSame(inner, design.getCell("bb/bb/lut"));
+            Assertions.assertEquals("bb/bb/lut", rt.getName());
+            Assertions.assertEquals("bb/bb/lut", rt.getAltPinMappings().get("A1").getAltCellName());
+            return;
+        }
+        Assertions.fail("No placement has \"bb/lut\" renamed first");
     }
 
     /**
@@ -850,10 +928,11 @@ public class TestDesignTools {
      * Calls populateBlackBox() with the design tracking its changes, so that what it changed is in
      * Design#getModifiedNets() for the caller to read. Then asserts what holds for every call: that
      * it left the design's parent net map unbuilt, since it drops the map once it has changed the
-     * netlist and must not build it again; that every net recorded is one the design still holds,
-     * since a merge deletes the net it merges away, and a deleted net must not be left in the
-     * record; and that every net recorded is named after its source, so is its own parent net, but
-     * for one on a signal that nothing drives, which has none.
+     * netlist and must not build it again; that every net and site instance recorded is one the
+     * design still holds, since a merge deletes the net it merges away and an eviction removes the
+     * site instance it evicts, and neither may be left in the record; and that every net recorded
+     * is named after its source, so is its own parent net, but for one on a signal that nothing
+     * drives, which has none.
      */
     private static void populateBlackBox(Design design, Map<String, Design> blackBoxes,
             boolean keepBoundaryRouting) {
@@ -861,9 +940,9 @@ public class TestDesignTools {
         DesignTools.populateBlackBox(design, blackBoxes, keepBoundaryRouting);
         EDIFNetlist netlist = design.getNetlist();
         Assertions.assertFalse(netlist.isParentNetMapBuilt());
+        ChangeTrackingAssertions.assertModifiedAreInDesign(design);
         // Checked only now, since asking for a parent builds the map
         for (Net net : design.getModifiedNets()) {
-            Assertions.assertSame(net, design.getNet(net.getName()), net.getName());
             if (net.isStaticNet()) continue;
             EDIFHierNet hierNet = netlist.getHierNetFromName(net.getName());
             Assertions.assertNotNull(hierNet, net.getName());
@@ -2096,6 +2175,96 @@ public class TestDesignTools {
                 + " instance.", e.getMessage());
     }
 
+    /**
+     * A static shell can hold site instances in a reconfigurable partition's region that do nothing
+     * but lock the site's BELs, with placeholder cells. A circuit filling the black box has its own
+     * site instances on those sites, which must take their place. A site instance holding anything
+     * else, such as another cell or site routing without a net, or nothing at all, is still an overlap.
+     * The circuit's site instance is usually named after the site, as the locked one is, but need not
+     * be ("onlyLockedRenamed"): what the site changes from goes with the site, not the name.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"onlyLocked", "onlyLockedRenamed", "otherCell", "nullNetSitePIP", "empty"})
+    public void testPopulateBlackBoxReplacesLockedSites(String shellSite) {
+        Design design = new Design("shell", "xcvu3p");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFNet in = top.createNet("in");
+        in.createPortInst("I", createBlackBox(top, "bb", EDIFDirection.INPUT));
+        Net inNet = design.createNet("in");
+        addSourceLUT(design, top, "src", "SLICE_X0Y0", in, inNet);
+
+        Site site = design.getDevice().getSite("SLICE_X1Y0");
+        SiteInst locked = design.createSiteInst(site);
+        Assertions.assertEquals(site.getName(), locked.getName());
+        if (!shellSite.equals("empty")) {
+            for (String belName : new String[] {"A6LUT", "B6LUT", "AFF"}) {
+                locked.addCell(new Cell(Cell.LOCKED, locked.getBEL(belName)));
+            }
+        }
+        if (shellSite.equals("otherCell")) {
+            design.createAndPlaceCell(top, "other", Unisim.LUT1, site.getName() + "/C6LUT");
+        } else if (shellSite.equals("nullNetSitePIP")) {
+            locked.addSitePIP("FFMUXA1", "D6");
+            Assertions.assertTrue(locked.getSiteWireToNetMap().isEmpty());
+        }
+        // The shell is as it was read: from here on, changes to it are tracked
+        design.setTrackingChanges(true);
+        design.setCopyingOriginalSiteInsts(true);
+
+        Design circuit = createCircuit("circuit", EDIFDirection.INPUT);
+        EDIFCell circuitTop = circuit.getTopEDIFCell();
+        EDIFNet circuitIn = circuitTop.createNet("I");
+        circuitIn.createPortInst(circuitTop.getPort("I"));
+        boolean renamed = shellSite.equals("onlyLockedRenamed");
+        if (renamed) {
+            circuit.createSiteInst("incoming", site.getSiteTypeEnum(), site);
+        }
+        SitePinInst lutIn = addSinkLUT(circuit, circuitTop, "lut", site.getName(), circuitIn,
+                circuit.createNet("I"));
+        SiteInst incoming = lutIn.getSiteInst();
+        Assertions.assertEquals(renamed ? "incoming" : site.getName(), incoming.getName());
+        for (String belName : new String[] {"B6LUT", "AFF"}) {
+            incoming.addCell(new Cell(Cell.LOCKED, incoming.getBEL(belName)));
+        }
+
+        if (!shellSite.startsWith("onlyLocked")) {
+            RuntimeException e = Assertions.assertThrows(RuntimeException.class,
+                    () -> DesignTools.populateBlackBox(design, "bb", circuit));
+            Assertions.assertTrue(e.getMessage().startsWith("ERROR: Site overlap at SLICE_X1Y0"),
+                    e.getMessage());
+            return;
+        }
+
+        // Also asserts that every modified site instance is the one the design holds on its site,
+        // so that the locked one is not left in the modified set: as SiteInsts compare by name, it
+        // would otherwise stand in for the incoming one when the two share a name
+        populateBlackBox(design, "bb", circuit, false);
+
+        Assertions.assertSame(incoming, design.getSiteInstFromSite(site));
+        Assertions.assertSame(incoming, design.getSiteInst(incoming.getName()));
+        if (renamed) {
+            Assertions.assertNull(design.getSiteInst(locked.getName()));
+        }
+        Assertions.assertNull(locked.getDesign());
+        Assertions.assertTrue(design.getModifiedSiteInsts().contains(incoming));
+        Assertions.assertNotNull(design.getCell("bb/lut"));
+        Assertions.assertSame(inNet, lutIn.getNet());
+
+        // What the site changes from is the locked site instance it held, recorded under the site
+        // whatever the incoming site instance is called
+        SiteInst original = design.getOriginalSiteInsts().get(site.getName());
+        Assertions.assertNotNull(original);
+        Assertions.assertNotSame(Design.EMPTY_ORIGINAL_SITE_INST, original);
+        Assertions.assertSame(site, original.getSite());
+        Assertions.assertEquals(3, original.getCells().size());
+        for (Cell c : original.getCells()) {
+            Assertions.assertEquals(Cell.LOCKED, c.getName());
+        }
+        if (renamed) {
+            Assertions.assertNull(design.getOriginalSiteInsts().get(incoming.getName()));
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"DX", "D_I"})
     public void testGetTrimmablePIPsFromPins(String pinName) {
@@ -2683,6 +2852,27 @@ public class TestDesignTools {
     }
 
     @Test
+    public void testGetPortInstsFromSitePinInstUnconnectedLogicalPin() {
+        Device device = Device.getDevice("xcvu3p");
+        Design design = new Design("design", device.getName());
+
+        Cell ff1 = design.createAndPlaceCell("ff1", Unisim.FDRE, "SLICE_X0Y0/AFF");
+        Cell ff2 = design.createAndPlaceCell("ff2", Unisim.FDRE, "SLICE_X0Y0/AFF2");
+        SiteInst si = ff1.getSiteInst();
+        Net net = design.createNet("net");
+        SitePinInst spi = net.createPin("A6", si);
+        new EDIFPortInst(ff1.getEDIFCellInst().getPort("D"), null, ff1.getEDIFCellInst());
+        // ff2's D is mapped to its BEL pin but has no port instance in the netlist
+        Assertions.assertNotNull(ff2.getPhysicalPinMapping("D"));
+        Assertions.assertNull(ff2.getEDIFCellInst().getPortInst("D"));
+
+        Assertions.assertTrue(si.routeIntraSiteNet(net, spi.getBELPin(), ff1.getBEL().getPin("D")));
+        Assertions.assertTrue(si.routeIntraSiteNet(net, spi.getBELPin(), ff2.getBEL().getPin("D")));
+
+        Assertions.assertEquals("[ff1/D]", DesignTools.getPortInstsFromSitePinInst(spi).toString());
+    }
+
+    @Test
     public void testCalculateUtilization() {
         Design design = RapidWrightDCP.loadDCP("bnn.dcp");
 
@@ -2809,6 +2999,25 @@ public class TestDesignTools {
             Assertions.assertNotNull(srSpi);
             Assertions.assertEquals(vcc, srSpi.getNet());
         }
+    }
+
+    @Test
+    public void testCreateCeSrRstPinsToVCCUnplacedCell() {
+        Design design = new Design("test", "xcvu3p");
+        Cell placed = design.createAndPlaceCell("ff", Unisim.FDRE, "SLICE_X0Y0/AFF");
+        // A flip-flop (and a block RAM) in the design but not placed: nothing to tie, no failure
+        Cell unplaced = design.createCell("ff_unplaced", Unisim.FDRE);
+        design.createCell("ram_unplaced", Unisim.RAMB36E2);
+        Assertions.assertNull(unplaced.getSiteInst());
+        Assertions.assertTrue(design.getCells().contains(unplaced));
+
+        DesignTools.createPossiblePinsToStaticNets(design);
+
+        Pair<String, String> sitePinNames = DesignTools.belTypeSitePinNameMapping.get(Series.UltraScalePlus)
+                .get(placed.getBEL().getBELType());
+        SiteInst si = placed.getSiteInst();
+        Assertions.assertEquals(design.getVccNet(), si.getSitePinInst(sitePinNames.getFirst()).getNet());
+        Assertions.assertEquals(design.getVccNet(), si.getSitePinInst(sitePinNames.getSecond()).getNet());
     }
 
     @Test
@@ -2957,6 +3166,226 @@ public class TestDesignTools {
 
         Assertions.assertNull(design.getNet(anotherStaticNet.getName()));
         Assertions.assertEquals(Arrays.asList(spi), staticNet.getPins());
+    }
+
+    /**
+     * A design with a top-level net "a", driven by the LUT "src" into the port "I" of the instance
+     * "inst", where it continues as "in_i" into the LUT "inst/sink". The physical net carrying it,
+     * named as given, is on the site wires of the output of "src" and of the input of "inst/sink",
+     * as when the cells were moved into this hierarchy and the net kept its old name.
+     */
+    private static Design createDesignWithStaleNetName(String physNetName) {
+        Design design = new Design("top", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFCell instType = new EDIFCell(netlist.getWorkLibrary(), "instType");
+        instType.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCellInst inst = top.createChildCellInst("inst", instType);
+
+        Cell src = design.createAndPlaceCell(top, "src", Unisim.LUT1, "SLICE_X0Y0/A6LUT");
+        Cell sink = design.createAndPlaceCell(instType, "inst/sink", Unisim.LUT1, "SLICE_X1Y0/A6LUT");
+        EDIFNet a = top.createNet("a");
+        a.createPortInst("O", src.getEDIFCellInst());
+        a.createPortInst("I", inst);
+        EDIFNet inI = instType.createNet("in_i");
+        inI.createPortInst(instType.getPort("I"));
+        inI.createPortInst("I0", sink.getEDIFCellInst());
+
+        Net net = new Net(physNetName);
+        design.addNet(net);
+        routeLogicalPin(src, "O", net);
+        routeLogicalPin(sink, "I0", net);
+        return design;
+    }
+
+    private static BELPin getBELPinOfLogicalPin(Cell cell, String logicalPin) {
+        return cell.getBEL().getPin(cell.getPhysicalPinMapping(logicalPin));
+    }
+
+    /** Routes a physical net to the site wire of a cell's logical pin, instead of any net there */
+    private static void routeLogicalPin(Cell cell, String logicalPin, Net net) {
+        BELPin pin = getBELPinOfLogicalPin(cell, logicalPin);
+        cell.getSiteInst().unrouteIntraSiteNet(pin, pin);
+        Assertions.assertTrue(cell.getSiteInst().routeIntraSiteNet(net, pin, pin));
+    }
+
+    private static Net getNetOnLogicalPin(Cell cell, String logicalPin) {
+        return cell.getSiteInst().getNetFromSiteWire(getBELPinOfLogicalPin(cell, logicalPin).getSiteWireName());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testMakePhysNetNamesConsistentFromCellPins(boolean fromCellPins) {
+        // "old/a" is not a logical net; the cell pins on its site wires are on "a" and its alias "inst/in_i"
+        Design design = createDesignWithStaleNetName("old/a");
+        Net net = design.getNet("old/a");
+        DesignTools.makePhysNetNamesConsistent(design, fromCellPins);
+        if (fromCellPins) {
+            Assertions.assertSame(net, design.getNet("a"));
+            Assertions.assertNull(design.getNet("old/a"));
+        } else {
+            Assertions.assertSame(net, design.getNet("old/a"));
+            Assertions.assertNull(design.getNet("a"));
+        }
+        Assertions.assertSame(net, getNetOnLogicalPin(design.getCell("src"), "O"));
+        Assertions.assertSame(net, getNetOnLogicalPin(design.getCell("inst/sink"), "I0"));
+    }
+
+    @Test
+    public void testMakePhysNetNamesConsistentFromCellPinsMerge() {
+        // The input side carries a stale name, and the parent already has its own physical net
+        Design design = createDesignWithStaleNetName("a");
+        Net stale = new Net("old/in_i");
+        design.addNet(stale);
+        Cell sink = design.getCell("inst/sink");
+        routeLogicalPin(sink, "I0", stale);
+        // Its routing and its BEL attributes go with it
+        PIP pip = design.getDevice().getTile("INT_X0Y0").getPIPs().get(0);
+        stale.addPIP(pip);
+        SiteInst si = sink.getSiteInst();
+        design.addBELAttr(stale, si.getSite(), si.getSiteTypeEnum(), sink.getBEL(), "ATTR", "VALUE");
+        BELAttr attr = design.getBELAttrs().get(si.getSite()).getBELAttribute(sink.getBEL(), "ATTR");
+
+        DesignTools.makePhysNetNamesConsistent(design, true);
+        Assertions.assertNull(design.getNet("old/in_i"));
+        Assertions.assertSame(design.getNet("a"), getNetOnLogicalPin(sink, "I0"));
+        Assertions.assertEquals(Arrays.asList(pip), design.getNet("a").getPIPs());
+        Assertions.assertSame(design.getNet("a"), attr.getNet());
+    }
+
+    @Test
+    public void testMakePhysNetNamesConsistentFromCellPinsAliasWithSource() {
+        // "a" has no physical net yet. The stale "old/a" and the alias "inst/in_i" each have a source:
+        // the alias takes the parent's name first, so "old/a" is left alone rather than giving "a" two
+        Design design = createDesignWithStaleNetName("old/a");
+        Net stale = design.getNet("old/a");
+        Cell src = design.getCell("src");
+        stale.createPin("A_O", src.getSiteInst());
+        Cell other = design.createAndPlaceCell(design.getTopEDIFCell(), "other", Unisim.LUT1,
+                "SLICE_X2Y0/A6LUT");
+        Net alias = new Net("inst/in_i");
+        design.addNet(alias);
+        SitePinInst aliasSource = alias.createPin("A_O", other.getSiteInst());
+
+        DesignTools.makePhysNetNamesConsistent(design, true);
+        Assertions.assertSame(alias, design.getNet("a"));
+        Assertions.assertSame(aliasSource, alias.getSource());
+        Assertions.assertNull(alias.getAlternateSource());
+        Assertions.assertSame(stale, design.getNet("old/a"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testMakePhysNetNamesConsistentFromCellPinsDisagree(boolean constants) {
+        // A stale net on the inputs of a LUT that are on two different parents (the signals "a" and
+        // "b", or GND and VCC) cannot be named after either, so it is left as it is
+        Design design = new Design("top", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+        Cell lut = design.createAndPlaceCell(top, "lut", Unisim.LUT2, "SLICE_X0Y0/A6LUT");
+        if (constants) {
+            EDIFTools.getStaticNet(NetType.GND, top, netlist).createPortInst("I0", lut.getEDIFCellInst());
+            EDIFTools.getStaticNet(NetType.VCC, top, netlist).createPortInst("I1", lut.getEDIFCellInst());
+        } else {
+            for (String name : new String[] {"a", "b"}) {
+                Cell src = design.createAndPlaceCell(top, "src_" + name, Unisim.LUT1,
+                        "SLICE_X1Y0/" + (name.equals("a") ? "A6LUT" : "B6LUT"));
+                EDIFNet n = top.createNet(name);
+                n.createPortInst("O", src.getEDIFCellInst());
+                n.createPortInst(name.equals("a") ? "I0" : "I1", lut.getEDIFCellInst());
+            }
+        }
+        Net net = new Net("old/x");
+        design.addNet(net);
+        routeLogicalPin(lut, "I0", net);
+        routeLogicalPin(lut, "I1", net);
+        PIP pip = design.getDevice().getTile("INT_X0Y0").getPIPs().get(0);
+        net.addPIP(pip);
+
+        DesignTools.makePhysNetNamesConsistent(design, true);
+        Assertions.assertSame(net, design.getNet("old/x"));
+        Assertions.assertSame(net, getNetOnLogicalPin(lut, "I0"));
+        Assertions.assertSame(net, getNetOnLogicalPin(lut, "I1"));
+        Assertions.assertEquals(Arrays.asList(pip), net.getPIPs());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testMakePhysNetNamesConsistentFromCellPinsConstant(boolean twoConstantNets) {
+        // LUT inputs tied to logical GND (two GND nets with their own GND cells, if asked), on a signal
+        // net named after a constant net that no longer exists
+        Design design = new Design("top", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+        Cell lut = design.createAndPlaceCell(top, "lut", Unisim.LUT2, "SLICE_X0Y0/A6LUT");
+        EDIFNet gnd = EDIFTools.getStaticNet(NetType.GND, top, netlist);
+        gnd.createPortInst("I0", lut.getEDIFCellInst());
+        if (twoConstantNets) {
+            EDIFCellInst gnd2 = top.createChildCellInst("GND_2", top.getCellInst("GND").getCellType());
+            EDIFNet const2 = top.createNet("const_GND_2");
+            const2.createPortInst("G", gnd2);
+            const2.createPortInst("I1", lut.getEDIFCellInst());
+        } else {
+            gnd.createPortInst("I1", lut.getEDIFCellInst());
+        }
+        Net net = new Net("old/ZERO");
+        design.addNet(net);
+        routeLogicalPin(lut, "I0", net);
+        routeLogicalPin(lut, "I1", net);
+
+        DesignTools.makePhysNetNamesConsistent(design, true);
+        Assertions.assertNull(design.getNet("old/ZERO"));
+        Assertions.assertSame(design.getGndNet(), getNetOnLogicalPin(lut, "I0"));
+        Assertions.assertSame(design.getGndNet(), getNetOnLogicalPin(lut, "I1"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"bb/inner", "src/O"})
+    public void testMakePhysNetNamesConsistentFromCellPinsInsideLeafCell(String physNetName) {
+        // A name inside a black box ("bb") or a primitive ("src"): Vivado
+        // resolves it inside the cell, which the netlist cannot, so it is left alone
+        Design design = createDesignWithStaleNetName("a");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFCell bbType = new EDIFCell(top.getLibrary(), "bbType");
+        bbType.createPort("O", EDIFDirection.OUTPUT, 1);
+        top.createChildCellInst("bb", bbType);
+        Net net = new Net(physNetName);
+        design.addNet(net);
+        Cell sink = design.getCell("inst/sink");
+        routeLogicalPin(sink, "I0", net);
+
+        DesignTools.makePhysNetNamesConsistent(design, true);
+        Assertions.assertSame(net, design.getNet(physNetName));
+        Assertions.assertSame(net, getNetOnLogicalPin(sink, "I0"));
+    }
+
+    @Test
+    public void testMakePhysNetNamesConsistentFromCellPinsNoEvidence() {
+        // A net on no cell pin gives nothing to go by, so is left alone
+        Design design = createDesignWithStaleNetName("a");
+        Net unknown = new Net("old/unknown");
+        design.addNet(unknown);
+        DesignTools.makePhysNetNamesConsistent(design, true);
+        Assertions.assertSame(unknown, design.getNet("old/unknown"));
+    }
+
+    @Test
+    public void testMakePhysNetNamesConsistentFromCellPinsTwoSources() {
+        // The parent's physical net and the stale net each have a source pin
+        Design design = createDesignWithStaleNetName("a");
+        Net a = design.getNet("a");
+        a.createPin("A_O", design.getCell("src").getSiteInst());
+        Net stale = new Net("old/in_i");
+        design.addNet(stale);
+        stale.createPin("A_O", design.createSiteInst("SLICE_X2Y0"));
+        Cell sink = design.getCell("inst/sink");
+        routeLogicalPin(sink, "I0", stale);
+        Assertions.assertNotNull(a.getSource());
+        Assertions.assertNotNull(stale.getSource());
+
+        DesignTools.makePhysNetNamesConsistent(design, true);
+        Assertions.assertSame(stale, design.getNet("old/in_i"));
+        Assertions.assertSame(stale, getNetOnLogicalPin(sink, "I0"));
     }
 
     @Test
@@ -3400,6 +3829,25 @@ public class TestDesignTools {
         }
     }
 
+    /**
+     * Two flip-flop-site gates in one Versal SLICE: routing the CE of the first one through the
+     * CE IMR adds a routethru cell to the site, which must not break the iteration over its cells.
+     */
+    @Test
+    public void testCreateCeClkOfRoutethruFFToVCCTwoCellsInSite() {
+        Design design = new Design("testCreateCeClkOfRoutethruFFToVCCTwoCellsInSite", "xcvp1202");
+        Cell and = design.createAndPlaceCell("and", Unisim.AND2B1L, "SLICE_X64Y105/AFF");
+        Cell or = design.createAndPlaceCell("or", Unisim.OR2L, "SLICE_X64Y105/BFF");
+
+        DesignTools.createCeClkOfRoutethruFFToVCC(design);
+
+        SiteInst si = and.getSiteInst();
+        Assertions.assertSame(si, or.getSiteInst());
+        Assertions.assertTrue(si.getSitePinInst("CKEN1").getNet().isVCCNet());
+        Assertions.assertTrue(si.getSitePinInst("CLK").getNet().isVCCNet());
+        Assertions.assertTrue(si.getNetFromSiteWire("FF_CLK_MOD_CLK_OUT").isGNDNet());
+    }
+
     @Test
     public void testFullyUnplaceCell() {
         Design d = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
@@ -3502,5 +3950,28 @@ public class TestDesignTools {
         DesignTools.fullyUnplaceCell(ram, null);
 
         Assertions.assertFalse(ram.isPlaced());
+    }
+
+    /**
+     * A Versal XPHY cell without a logical cell (as for one inside encrypted IP) is skipped, rather than throwing a
+     * NullPointerException.
+     */
+    @Test
+    public void testUpdateVersalXPHYPinsForDMCWithoutLogicalCell() {
+        Design design = new Design("test", "xcvc1902-vsva2197-2MP-e-S");
+        Site site = design.getDevice().getAllSitesOfType(SiteTypeEnum.XPHY)[0];
+        Cell cell = design.createAndPlaceCell("xphy", Unisim.XPHY, site.getName() + "/XPHY");
+        Assertions.assertNotNull(cell.getEDIFHierCellInst());
+        // No logical cell, as for a cell inside encrypted IP
+        design.getTopEDIFCell().removeCellInst("xphy");
+        cell.setEDIFHierCellInst(null);
+        cell.setType("XPHY");
+        Assertions.assertNull(cell.getEDIFHierCellInst());
+        Assertions.assertEquals("XPHY", cell.getType());
+
+        DesignTools.updateVersalXPHYPinsForDMC(design);
+
+        Assertions.assertSame(cell, design.getCell("xphy"));
+        Assertions.assertTrue(cell.isPlaced());
     }
 }

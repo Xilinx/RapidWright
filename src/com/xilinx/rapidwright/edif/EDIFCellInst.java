@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Objects;
 
 /**
@@ -49,7 +48,8 @@ public class EDIFCellInst extends EDIFPropertyObject {
     public static final String BLACK_BOX_PROP = "IS_IMPORTED";
     public static final String BLACK_BOX_PROP_VERSAL = "black_box";
 
-    private EDIFPortInstList portInsts;
+    /** null or a non-empty sorted array (see {@link EDIFPortInstArray}) */
+    private EDIFPortInst[] portInsts;
 
     protected EDIFCellInst() {
 
@@ -106,18 +106,17 @@ public class EDIFCellInst extends EDIFPropertyObject {
      * @param deferSort The EDIFPortInstList maintains a sorted list of EDIFPortInst 
      * objects and sorts them upon insertion.  Setting this flag to true will skip a sort addition
      * but the caller is responsible to conclude a batch of additions with a call to 
-     * {@link EDIFPortInstList#reSortList()}.  This is useful when a large number of EDIFPortInsts 
+     * {@link EDIFCell#sortEDIFPortInstLists()}.  This is useful when a large number of EDIFPortInsts 
      * will be added consecutively (such as parsing a netlist).
      */
     protected void addPortInst(EDIFPortInst epr, boolean deferSort) {
-        if (portInsts == null) portInsts = new EDIFPortInstList();
         if (!epr.getCellInst().equals(this))
             throw new RuntimeException("ERROR: Incorrect EDIFPortInst '"+
                 epr.getFullName()+"' being added to EDIFCellInst " + toString());
         if (deferSort) {
-            portInsts.deferSortAdd(epr);
+            portInsts = EDIFPortInstArray.deferSortAdd(portInsts, epr);
         } else {
-            portInsts.add(epr);
+            portInsts = EDIFPortInstArray.add(portInsts, epr);
         }
     }
 
@@ -129,7 +128,15 @@ public class EDIFCellInst extends EDIFPropertyObject {
      */
     public EDIFPortInst removePortInst(EDIFPortInst epr) {
         if (portInsts == null) return null;
-        return portInsts.remove(epr);
+        return removePortInst(epr.getCellInst(), epr.getName());
+    }
+
+    private EDIFPortInst removePortInst(EDIFCellInst inst, String portName) {
+        int idx = EDIFPortInstArray.indexOf(portInsts, inst, portName);
+        if (idx < 0) return null;
+        EDIFPortInst tmp = EDIFPortInstArray.get(portInsts, idx);
+        portInsts = EDIFPortInstArray.removeAt(portInsts, idx);
+        return tmp;
     }
 
     /**
@@ -139,8 +146,7 @@ public class EDIFCellInst extends EDIFPropertyObject {
      * @return The removed port instance, or null if none found by that name.
      */
     protected EDIFPortInst removePortInst(String portName) {
-        if (portInsts == null) return null;
-        return portInsts.remove(this, portName);
+        return removePortInst(this, portName);
     }
 
     /**
@@ -150,8 +156,7 @@ public class EDIFCellInst extends EDIFPropertyObject {
      * @return The named port instance, or null if none found by that name.
      */
     public EDIFPortInst getPortInst(String name) {
-        if (portInsts == null) return null;
-        return portInsts.get(this, name);
+        return EDIFPortInstArray.get(portInsts, this, name);
     }
 
     /**
@@ -163,8 +168,8 @@ public class EDIFCellInst extends EDIFPropertyObject {
      * @return The existing or created port instance.
      */
     public EDIFPortInst getOrCreatePortInst(String name) {
-        EDIFPortInst portInst = portInsts == null ? null : portInsts.get(this, name);
-        if (portInsts == null || portInst == null) {
+        EDIFPortInst portInst = EDIFPortInstArray.get(portInsts, this, name);
+        if (portInst == null) {
             portInst = EDIFPortInst.createPortInstFromPortInstName(name, this);
         }
         return portInst;
@@ -185,7 +190,27 @@ public class EDIFCellInst extends EDIFPropertyObject {
      * @return The collection of EDIFPortInsts on this cell.
      */
     public Collection<EDIFPortInst> getPortInsts() {
-        return portInsts == null ? Collections.emptyList() : portInsts;
+        // Always a (live) view, also when empty: a single allocation site lets the JIT
+        // scalar-replace the view in loops such as for (EDIFPortInst pi : getPortInsts())
+        return new PortInstView();
+    }
+
+    /** Live list view over {@link #portInsts}. */
+    private final class PortInstView extends EDIFPortInstArray.View {
+        @Override
+        EDIFPortInst[] store() {
+            return portInsts;
+        }
+
+        @Override
+        void store(EDIFPortInst[] s) {
+            portInsts = s;
+        }
+    }
+
+    /** Number of port instances on this cell instance (same as getPortInsts().size()). */
+    public int getPortInstCount() {
+        return EDIFPortInstArray.size(portInsts);
     }
 
     /**
@@ -286,8 +311,27 @@ public class EDIFCellInst extends EDIFPropertyObject {
         removeProperty(BLACK_BOX_PROP_VERSAL);
     }
 
+    /**
+     * @return A new {@link EDIFPortInstList} holding a snapshot of this instance's port instances,
+     * or null if it has none. The port instances are no longer stored in an EDIFPortInstList, so
+     * changes to the returned list are NOT reflected in this cell instance.
+     * @deprecated Use {@link #getPortInsts()} (a live view).
+     */
+    @Deprecated
     protected EDIFPortInstList getEDIFPortInstList() {
-        return portInsts;
+        return EDIFPortInstArray.toList(portInsts);
+    }
+
+    /**
+     * Sorts the port instances after a batch of deferred-sort additions and trims unused capacity.
+     */
+    void sortPortInsts() {
+        portInsts = EDIFPortInstArray.sort(portInsts);
+    }
+
+    /** Trims the unused capacity of the port instance storage (keeps the order). */
+    void trimPortInsts() {
+        portInsts = EDIFPortInstArray.trim(portInsts);
     }
 
     public static final byte[] EXPORT_CONST_INSTANCE_BEGIN = "         (instance ".getBytes(StandardCharsets.UTF_8);
@@ -301,14 +345,30 @@ public class EDIFCellInst extends EDIFPropertyObject {
 
 
     public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException{
+        exportEDIF(os, cache, stable, null);
+    }
+
+    /**
+     * Writes this instance as EDIF, as it is in the given view of the netlist with its macros
+     * collapsed.
+     * @param os The stream to write to.
+     * @param cache The cache of legal EDIF names.
+     * @param stable If true, the properties of this instance are written in sorted order.
+     * @param collapsedView The view of the netlist with its macros collapsed, or null to write this
+     *                      instance as it is.
+     */
+    void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable,
+            EDIFCollapsedView collapsedView) throws IOException {
+        EDIFCell type = collapsedView == null ? cellType : collapsedView.getInstanceType(cellType);
         os.write(EXPORT_CONST_INSTANCE_BEGIN);
         exportEDIFName(os, cache);
         os.write(EXPORT_CONST_VIEWREF);
-        os.write(cache.getLegalEDIFName(getViewref().getName()));
+        EDIFName view = collapsedView == null ? getViewref() : collapsedView.getViewref(this);
+        os.write(cache.getLegalEDIFName(view.getName()));
         os.write(EXPORT_CONST_CELLREF);
-        os.write(cache.getLegalEDIFName(cellType.getName()));
+        os.write(cache.getLegalEDIFName(collapsedView == null ? type.getName() : collapsedView.getName(type)));
         os.write(EXPORT_CONST_LIBRARYREF);
-        os.write(cache.getLegalEDIFName(cellType.getLibrary().getName()));
+        os.write(cache.getLegalEDIFName(type.getLibrary().getName()));
         if (getPropertyCount() > 0) {
             os.write(EXPORT_CONST_CLOSE_WITH_PROPS);
             exportEDIFProperties(os,EXPORT_CONST_PROP_INDENT, cache, stable);

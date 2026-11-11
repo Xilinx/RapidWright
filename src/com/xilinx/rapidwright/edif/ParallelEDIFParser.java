@@ -36,6 +36,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountedCompleter;
 import java.util.function.BiFunction;
+import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -170,15 +171,12 @@ public class ParallelEDIFParser implements AutoCloseable{
         numberOfThreads = workers.size();
 
         t.stop().start("Parse First Token");
-        // For each worker: the worker itself if it failed, else null
-        final List<ParallelEDIFParserWorker> failedOrNull = ParallelismTools.invokeAll(workers,
-                w -> !w.parseFirstToken() ? w : null);
+        // The workers that did not find their first cell, in order
+        final List<ParallelEDIFParserWorker> failed = ParallelismTools.stream(workers)
+                .filter(w -> !w.parseFirstToken())
+                .collect(Collectors.toList());
 
-        for (ParallelEDIFParserWorker failedWorker : failedOrNull) {
-            if (failedWorker == null) {
-                continue;
-            }
-
+        for (ParallelEDIFParserWorker failedWorker : failed) {
             if (!Device.QUIET_MESSAGE) {
                 if (failedWorker.parseException != null) {
                     String message = failedWorker.parseException.getMessage();
@@ -195,7 +193,7 @@ public class ParallelEDIFParser implements AutoCloseable{
 
             failedWorker.close();
         }
-        workers.removeAll(failedOrNull);
+        workers.removeAll(failed);
 
         //Propagate parse limit to neighbours
         for (int i = 1; i < workers.size(); i++) {

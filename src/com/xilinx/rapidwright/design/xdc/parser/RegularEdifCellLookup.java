@@ -22,6 +22,7 @@
 
 package com.xilinx.rapidwright.design.xdc.parser;
 
+import java.util.function.BiPredicate;
 import java.util.stream.Stream;
 
 import com.xilinx.rapidwright.edif.EDIFCellInst;
@@ -46,6 +47,27 @@ public class RegularEdifCellLookup extends EdifCellLookup<EDIFHierCellInst> {
     @Override
     public Stream<? extends EDIFHierCellInst> getChildrenOf(EDIFHierCellInst f) {
         return f.getCellType().getCellInsts().stream().map(f::getChild);
+    }
+
+    /**
+     * True for this class itself: its children are looked up by instance name, the relative original name. A
+     * subclass that changes getChild or getRelativeOriginalName gets the generic lookup unless it overrides this.
+     */
+    @Override
+    protected boolean isChildLookupByOriginalName() {
+        return getClass() == RegularEdifCellLookup.class;
+    }
+
+    @Override
+    protected Stream<? extends EDIFHierCellInst> getChildrenWithName(EDIFHierCellInst cell, String part,
+                                                                     BiPredicate<String, EDIFHierCellInst> filter,
+                                                                     WildcardPattern pattern) {
+        if (getClass() != RegularEdifCellLookup.class) {
+            return super.getChildrenWithName(cell, part, filter, pattern);
+        }
+        // Match the instance names (the relative original names) first, build hierarchical instances of the
+        // matches only
+        return cell.getCellType().getCellInsts().stream().filter(ci -> pattern.matches(ci.getName())).map(cell::getChild);
     }
 
     @Override
