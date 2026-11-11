@@ -386,8 +386,8 @@ public class RWRoute {
         // createNetWrapperAndConnections() skips alternate sinks already preserved for another net, but categorizeNets()
         // preserves nets asynchronously while it creates connections, so whether a node had been preserved by then
         // depends on the order of the nets and on the timing of those tasks. Now that all are preserved, remove every
-        // alternate sink preserved for another net, so that the alternate sinks depend on neither. A connection left
-        // with none gets the exclusive sink that createNetWrapperAndConnections() gives a connection without any.
+        // alternate sink preserved for another net, so that the alternate sinks depend on neither.
+        List<Connection> connectionsWithAltSinks = new ArrayList<>();
         for (Connection connection : indirectConnections) {
             List<RouteNode> altSinkRnodes = connection.getAltSinkRnodes();
             if (altSinkRnodes.isEmpty()) {
@@ -398,23 +398,36 @@ public class RWRoute {
                 Net preservedNet = routingGraph.getPreservedNet(rnode);
                 return preservedNet != null && preservedNet != net;
             });
-            if (altSinkRnodes.isEmpty()) {
-                RouteNode sinkRnode = connection.getSinkRnode();
-                sinkRnode.setType(routingGraph.getExclusiveSinkType(sinkRnode));
-                // (Unless PartialRouter has already recovered this connection's routing to it)
-                if (sinkRnode.countConnectionsOfUser(connection.getNetWrapper()) == 0) {
-                    sinkRnode.incrementUser(connection.getNetWrapper());
-                }
-            }
+            connectionsWithAltSinks.add(connection);
         }
 
         // Since createNetWrapperAndConnections() both creates the primary sink node and
         // computes alternate sinks (e.g. for LUT pin swaps), it is possible that
         // an alternate sink for one net later becomes an exclusive sink for another net.
         // Examine for all connections for this case and remove such alternate sinks.
-        for (Connection connection : indirectConnections) {
-            connection.getAltSinkRnodes().removeIf(RouteNode::isUsed);
-        }
+        // A connection left with none (by either removal) gets the exclusive sink that createNetWrapperAndConnections()
+        // gives a connection without any; that sink is then used, and may be an alternate sink of other connections, so
+        // repeat until no connection is left with none.
+        boolean madeExclusive;
+        do {
+            madeExclusive = false;
+            for (Iterator<Connection> it = connectionsWithAltSinks.iterator(); it.hasNext(); ) {
+                Connection connection = it.next();
+                List<RouteNode> altSinkRnodes = connection.getAltSinkRnodes();
+                altSinkRnodes.removeIf(RouteNode::isUsed);
+                if (!altSinkRnodes.isEmpty()) {
+                    continue;
+                }
+                RouteNode sinkRnode = connection.getSinkRnode();
+                sinkRnode.setType(routingGraph.getExclusiveSinkType(sinkRnode));
+                // (Unless PartialRouter has already recovered this connection's routing to it)
+                if (sinkRnode.countConnectionsOfUser(connection.getNetWrapper()) == 0) {
+                    sinkRnode.incrementUser(connection.getNetWrapper());
+                }
+                it.remove();
+                madeExclusive = true;
+            }
+        } while (madeExclusive);
     }
 
     protected Set<Net> ensureSinkRoutability() {

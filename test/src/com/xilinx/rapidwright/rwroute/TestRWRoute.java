@@ -2280,6 +2280,57 @@ public class TestRWRoute {
     }
 
     /**
+     * Tests LUT pin swapping on Versal when two connections are each other's only alternate sink (the 6LUT cell's
+     * input on A5, with its output on O5, and the 5LUT cell's on A6) and A6 is preserved for another net only after
+     * both were computed: the A5 connection loses A6 and gets an exclusive sink on A5, which the A6 connection then
+     * loses in turn, so it too must get an exclusive sink, on A6. (The other net is then unpreserved, as
+     * PartialRouter.ensureSinkRoutability() does for stale routing on an exclusive sink, so that A6 can be reached.)
+     */
+    @Test
+    public void testVersalLutPinSwappingAltSinksExclusiveInTurn() {
+        Design design = createLutLaneDesign("xcvc1902", "SLICE_X40Y61", 'A',
+                "LUT4/O5 O=I0^I1^I2^I3 a@A1 b@A2 c@A3 e@A5",
+                "LUT4 O=I0&I1&I2&I3 a@A1 b@A2 c@A3 f@A6", false);
+        Net other = design.createNet("other");
+        Node a6IMUX = design.getDevice().getSite("SLICE_X40Y61").getConnectedNode("A6").getAllUphillNodes().get(0);
+        Map<String, Connection> topConnections = new HashMap<>();
+        RWRouteConfig config = new RWRouteConfig(new String[] {"--nonTimingDriven", "--lutPinSwapping"});
+        RWRoute router = new RWRoute(design, config) {
+            @Override
+            protected NetWrapper createNetWrapperAndConnections(Net net) {
+                NetWrapper netWrapper = super.createNetWrapperAndConnections(net);
+                for (Connection connection : netWrapper.getConnections()) {
+                    String pinName = connection.getSink().getName();
+                    if (pinName.equals("A5") || pinName.equals("A6")) {
+                        Assertions.assertEquals(1, connection.getAltSinkRnodes().size());
+                        topConnections.put(pinName, connection);
+                    }
+                }
+                if (topConnections.size() == 2 && !routingGraph.isPreserved(a6IMUX)) {
+                    routingGraph.preserve(a6IMUX, other);
+                }
+                return netWrapper;
+            }
+
+            @Override
+            protected void determineRoutingTargets() {
+                super.determineRoutingTargets();
+                for (Connection connection : topConnections.values()) {
+                    Assertions.assertFalse(connection.hasAltSinks());
+                    RouteNode sinkRnode = connection.getSinkRnode();
+                    Assertions.assertTrue(sinkRnode.getType().isAnyExclusiveSink());
+                    Assertions.assertEquals(1, sinkRnode.countConnectionsOfUser(connection.getNetWrapper()));
+                }
+                routingGraph.unpreserve(a6IMUX);
+            }
+        };
+        RWRoute.routeDesign(router);
+        assertAllPinsRouted(design);
+        Assertions.assertEquals("A5", design.getCell("lut6").getPhysicalPinMapping("I3"));
+        Assertions.assertEquals("A6", design.getCell("lut5").getPhysicalPinMapping("I3"));
+    }
+
+    /**
      * Tests LUT pin swapping on Versal with a cell using the cascade input CASC (driven by the 6LUT of the lane
      * below). Vivado accepts CASC as an alternative to A5 and A6: a cell on the 5LUT, or on the 6LUT while the 5LUT
      * is used, that uses CASC may not use A5 or A6; a lone 6LUT cell that uses CASC may not use A5. Here the 6LUT
