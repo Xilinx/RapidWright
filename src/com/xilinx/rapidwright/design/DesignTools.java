@@ -4284,12 +4284,16 @@ public class DesignTools {
                     if (p == null) {
                         return null;
                     }
+                    if (p.equals(parent)) {
+                        continue;
+                    }
+                    // Only for a parent not seen yet: isGND() and isVCC() scan the net's port instances
                     NetType staticType = p.getNet().isGND() ? NetType.GND
                             : p.getNet().isVCC() ? NetType.VCC : null;
                     if (parent == null) {
                         parent = p;
                         parentStaticType = staticType;
-                    } else if (staticType != null ? staticType != parentStaticType : !p.equals(parent)) {
+                    } else if (staticType == null || staticType != parentStaticType) {
                         return null;
                     }
                 }
