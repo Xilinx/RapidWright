@@ -634,6 +634,9 @@ public class ParallelismTools {
         return new Iterator<E>() {
             // The number of items returned so far, each of whose elements is null
             private int returned = 0;
+            // The index of the first item not yet returned (every element before it is null), so that searches skip
+            // those already returned rather than scanning them again on every call
+            private int first = 0;
 
             @Override
             public boolean hasNext() {
@@ -652,19 +655,24 @@ public class ParallelismTools {
                     }
                     if (done >= 0) {
                         returned++;
-                        return items.set(done, null);
+                        E item = items.set(done, null);
+                        while (first < items.size() && items.get(first) == null) {
+                            first++;
+                        }
+                        return item;
                     }
                     // Every one has been claimed by another thread (so will complete without this one), and none is
                     // done yet. The exception of the one done, if any, is left for get(), as handle() completes
                     // normally
-                    getUnwrapped(CompletableFuture.anyOf(items.stream().filter((item) -> item != null).map(futureOf)
-                            .toArray(CompletableFuture<?>[]::new)).handle((r, e) -> null));
+                    getUnwrapped(CompletableFuture.anyOf(items.subList(first, items.size()).stream()
+                            .filter((item) -> item != null).map(futureOf).toArray(CompletableFuture<?>[]::new))
+                            .handle((r, e) -> null));
                 }
             }
 
             /** The index of the first item not yet returned whose CompletableFuture passes the given test, if any */
             private int indexOf(Predicate<CompletableFuture<?>> test) {
-                for (int i = 0; i < items.size(); i++) {
+                for (int i = first; i < items.size(); i++) {
                     E item = items.get(i);
                     if (item != null && test.test(futureOf.apply(item))) {
                         return i;
