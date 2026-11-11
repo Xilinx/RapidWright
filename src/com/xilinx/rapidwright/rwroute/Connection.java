@@ -32,6 +32,7 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.util.Pair;
@@ -125,19 +126,13 @@ public class Connection implements Comparable<Connection>{
         yMax = maxOfThree(sourceRnode.getEndTileYCoordinate(), sinkRnode.getEndTileYCoordinate(), yNetCenter);
         yMin = minOfThree(sourceRnode.getEndTileYCoordinate(), sinkRnode.getEndTileYCoordinate(), yNetCenter);
 
-        if (isCrossSLR() && !routingGraph.isVersal) {
-            // For SLR-crossing connections on UltraScale/UltraScale+, ensure the bounding box width contains at least
-            // one Laguna column before bounding box extension
-            // On Versal where Laguna columns do not exist and SLLs can be accessed in a distributed fashion,
-            // this optimization is not currently performed.
-            int nextLaguna = routingGraph.nextLagunaColumn[xMin];
-            int prevLaguna = routingGraph.prevLagunaColumn[xMax];
-            if (nextLaguna != Integer.MAX_VALUE) {
-                xMax = (short) Math.max(xMax, nextLaguna);
-            }
-            if (prevLaguna != Integer.MIN_VALUE) {
-                xMin = (short) Math.min(xMin, prevLaguna);
-            }
+        if (isCrossSLR()) {
+            // For SLR-crossing connections, ensure the bounding box width contains at least one column from which
+            // super long lines can cross SLRs (Laguna on UltraScale/UltraScale+, SLL on Versal) before bounding box
+            // extension
+            short widenedXMin = (short) routingGraph.getCrossingWidenedXMin(xMin, xMax);
+            xMax = (short) routingGraph.getCrossingWidenedXMax(xMin, xMax);
+            xMin = widenedXMin;
         }
 
         xMaxBB = (short) (xMax + boundingBoxExtensionX);
@@ -147,17 +142,19 @@ public class Connection implements Comparable<Connection>{
 
         if (isCrossSLR()) {
             // Equivalently, ensure that cross-SLR connections are at least as high as a SLL;
-            // if necessary, expand the sink side of the bounding box
-            short heightMinusSLL = (short) ((yMaxBB - yMinBB - 1) - routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
+            // if necessary, expand the sink side of the bounding box.
+            // The bounding box excludes its edges (see RouteNode.isInConnectionBoundingBox()), so an SLL
+            // from row y to row y + SLL length fits only if yMinBB < y and y + SLL length < yMaxBB
+            short heightMinusSLL = (short) ((yMaxBB - yMinBB - 2) - routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
             if (heightMinusSLL < 0) {
                 if (sourceRnode.getEndTileYCoordinate() <= sinkRnode.getEndTileYCoordinate()) {
                     // Upwards
-                    short newYMaxBB = (short) (yMin + routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES + 1);
+                    short newYMaxBB = (short) (Math.max(yMin, yMinBB + 1) + routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES + 1);
                     assert(newYMaxBB > yMaxBB);
                     yMaxBB = newYMaxBB;
                 } else {
                     // Downwards
-                    short newYMinBB = (short) (yMax - routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - 1);
+                    short newYMinBB = (short) (Math.min(yMax, yMaxBB - 1) - routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - 1);
                     assert(newYMinBB < yMinBB);
                     yMinBB = newYMinBB;
                 }
@@ -193,7 +190,11 @@ public class Connection implements Comparable<Connection>{
         // normalized correctly.
         assert(minSlack >= 0);
 
-        float tempCriticality  = (1 - minSlack / maxDelay);
+        // At least 0 (and at most 1, as minSlack is not negative): a connection none of whose paths reaches a timing
+        // endpoint (see TimingGraph.setTimingRequirementTopologicalOrder()), or that has no timing edges, is left with
+        // minSlack at Float.MAX_VALUE, and so a base far below -1, which Math.pow() raises to NaN for an exponent that
+        // is not an integer, and (cast to float) to plus infinity for an even one
+        float tempCriticality = Math.max(0f, 1 - minSlack / maxDelay);
 
         tempCriticality = (float) Math.pow(tempCriticality, criticalityExponent) * maxCriticality;
 
@@ -301,6 +302,22 @@ public class Connection implements Comparable<Connection>{
 
     public boolean hasAltSinks() {
         return altSinkRnodes != null && !altSinkRnodes.isEmpty();
+    }
+
+    /**
+     * Checks whether this connection's sink (and any alternate, LUT pin swapping, sinks, which are in the same INT tile
+     * and on the same side) is driven only by INODEs: an INT tile pin (NODE_PINFEED: an UltraScale/UltraScale+ IMUX;
+     * NODE_PINBOUNCE: a bypass or bounce; NODE_IMUX: a Versal IMUX) other than an UltraScale/UltraScale+ CTRL pin
+     * (NODE_PINFEED, but driven by INT_NODE_GLOBAL_*), as found on xcvu9p, xcku040, xcvc1902 and xcv80.
+     * @return True if so.
+     */
+    public boolean isSinkDrivenByINodes() {
+        if (sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK_CTRL ||
+                sinkRnode.getTile().getTileTypeEnum() != TileTypeEnum.INT) {
+            return false;
+        }
+        IntentCode ic = sinkRnode.getIntentCode();
+        return ic == IntentCode.NODE_PINFEED || ic == IntentCode.NODE_PINBOUNCE || ic == IntentCode.NODE_IMUX;
     }
 
     public void addAltSinkRnode(RouteNode sinkRnode) {
@@ -484,15 +501,28 @@ public class Connection implements Comparable<Connection>{
     }
 
     public void setAllTargets(RWRoute.ConnectionState state) {
-        sinkRnode.markTarget(state);
+        // With LUT pin swapping (the only source of alternate sinks), a net that drives several
+        // inputs of the same LUT has several connections whose candidate pins overlap, and another
+        // of them may already be routed to one of this connection's pins (including its original
+        // one). Each LUT input needs its own pin, so such a pin is not a target -- even though
+        // routing otherwise lets connections of the same net share nodes.
+        if (!hasAltSinks() || sinkRnode.countConnectionsOfUser(netWrapper) == 0) {
+            sinkRnode.markTarget(state);
+        }
         if (altSinkRnodes != null) {
             for (RouteNode rnode : altSinkRnodes) {
-                assert(rnode.countConnectionsOfUser(netWrapper) == 0);
                 assert(!rnode.getType().isAnyExclusiveSink());
                 assert(rnode.getIntentCode() != IntentCode.NODE_PINBOUNCE);
+                if (rnode.countConnectionsOfUser(netWrapper) > 0) {
+                    continue;
+                }
                 rnode.markTarget(state);
             }
         }
+        // Each LUT pin carries one signal, and this connection's candidate pins are its LUT's
+        // swappable pins that are not preserved (for other nets): this net's other connections
+        // into the LUT cannot occupy all of them, since this connection needs one too
+        assert(!state.targets.isEmpty());
     }
 
     protected Pair<SitePinInst,RouteNode> getOrCreateAlternateSource(RouteNodeGraph routingGraph) {

@@ -451,7 +451,8 @@ public class NOCDesign implements Serializable {
             for (int i=0; i<pathArray.length(); i++) {
                 JSONObject pathSolution = pathArray.getJSONObject(i);
                 NOCMaster master = masterClients.get(pathSolution.getString(NOCJSONUtil.JSON_FIELD_FROM_CELL));
-                NOCConnection path = master.getConnectionTo(pathSolution.getString(NOCJSONUtil.JSON_FIELD_TO_CELL));
+                NOCConnection path = master.getConnectionTo(pathSolution.getString(NOCJSONUtil.JSON_FIELD_TO_CELL),
+                        pathSolution.optString(NOCJSONUtil.JSON_FIELD_PORT, null));
                 path.parseRoute(pathSolution);
             }
             isRouted = true;

@@ -55,6 +55,8 @@ public enum ComponentType {
     PS_CCI_NMU_2,
     RPU_NMU_2,
     PMC_NMU_2,
+    AIE_NSU_2,
+    MMI_NMU_2,
     DDR5E;
 
     private static Map<String,ComponentType> map;

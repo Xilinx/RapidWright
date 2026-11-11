@@ -467,18 +467,10 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
          */
         private void sortAndTrimPortInstLists() {
             for (EDIFNet net : parentCell.getNets()) {
-                EDIFPortInstList list = net.getEDIFPortInstList();
-                if (list != null) {
-                    list.reSortList();
-                    list.trimToSize();
-                }
+                net.sortPortInsts();
             }
             for (EDIFCellInst inst : parentCell.getCellInsts()) {
-                EDIFPortInstList list = inst.getEDIFPortInstList();
-                if (list != null) {
-                    list.reSortList();
-                    list.trimToSize();
-                }
+                inst.sortPortInsts();
             }
         }
     }

@@ -97,6 +97,23 @@ task testJava(type:Test) {
 
   useJUnitPlatform()
   systemProperty("junit.jupiter.extensions.autodetection.enabled", true)
+
+  // Run only shard i of n of the tests (-PtestShard=i/n), to split them between CI machines
+  if (project.hasProperty('testShard')) {
+    systemProperty("rapidwright.test.shard", project.property('testShard'))
+  }
+  // Estimated test durations (-PtestDurations=file, as recorded below), to balance the shards
+  if (project.hasProperty('testDurations')) {
+    def testDurations = file(project.property('testDurations'))
+    systemProperty("rapidwright.test.durationsIn", testDurations.absolutePath)
+    // Its contents decide which tests a shard runs (a file collection, as the file may not exist)
+    inputs.files(testDurations).withPropertyName('testDurations')
+  }
+  // Record how long each test method takes, to balance the shards (see TestDurationsListener)
+  if (project.hasProperty('recordTestDurations')) {
+    systemProperty("rapidwright.test.durationsFile",
+                   layout.buildDirectory.file("test-durations/testJava.txt").get().asFile.toString())
+  }
 }
 
 test {
@@ -207,6 +224,10 @@ task testLsf(type: JavaExec) {
   mainClass = "com.xilinx.rapidwright.util.lsf.LaunchTestsOnLsf"
   workingDir = file("build/test-lsf")
   args project.tasks.findByName('testJar').getArchiveFile().get()
+  // Estimated test durations (e.g. build/test-lsf/test-durations.txt kept from an earlier run), to balance the jobs
+  if (project.hasProperty('lsfTestDurations')) {
+    systemProperty 'rapidwright.test.durationsIn', file(project.property('lsfTestDurations')).absolutePath
+  }
   doFirst {
     project.mkdir(workingDir)
   }
