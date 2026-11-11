@@ -3239,14 +3239,18 @@ public class TestDesignTools {
         design.addNet(stale);
         Cell sink = design.getCell("inst/sink");
         routeLogicalPin(sink, "I0", stale);
-        // Its routing goes with it
+        // Its routing and its BEL attributes go with it
         PIP pip = design.getDevice().getTile("INT_X0Y0").getPIPs().get(0);
         stale.addPIP(pip);
+        SiteInst si = sink.getSiteInst();
+        design.addBELAttr(stale, si.getSite(), si.getSiteTypeEnum(), sink.getBEL(), "ATTR", "VALUE");
+        BELAttr attr = design.getBELAttrs().get(si.getSite()).getBELAttribute(sink.getBEL(), "ATTR");
 
         DesignTools.makePhysNetNamesConsistent(design, true);
         Assertions.assertNull(design.getNet("old/in_i"));
         Assertions.assertSame(design.getNet("a"), getNetOnLogicalPin(sink, "I0"));
         Assertions.assertEquals(Arrays.asList(pip), design.getNet("a").getPIPs());
+        Assertions.assertSame(design.getNet("a"), attr.getNet());
     }
 
     @Test
@@ -3268,6 +3272,41 @@ public class TestDesignTools {
         Assertions.assertSame(aliasSource, alias.getSource());
         Assertions.assertNull(alias.getAlternateSource());
         Assertions.assertSame(stale, design.getNet("old/a"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testMakePhysNetNamesConsistentFromCellPinsDisagree(boolean constants) {
+        // A stale net on the inputs of a LUT that are on two different parents (the signals "a" and
+        // "b", or GND and VCC) cannot be named after either, so it is left as it is
+        Design design = new Design("top", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+        Cell lut = design.createAndPlaceCell(top, "lut", Unisim.LUT2, "SLICE_X0Y0/A6LUT");
+        if (constants) {
+            EDIFTools.getStaticNet(NetType.GND, top, netlist).createPortInst("I0", lut.getEDIFCellInst());
+            EDIFTools.getStaticNet(NetType.VCC, top, netlist).createPortInst("I1", lut.getEDIFCellInst());
+        } else {
+            for (String name : new String[] {"a", "b"}) {
+                Cell src = design.createAndPlaceCell(top, "src_" + name, Unisim.LUT1,
+                        "SLICE_X1Y0/" + (name.equals("a") ? "A6LUT" : "B6LUT"));
+                EDIFNet n = top.createNet(name);
+                n.createPortInst("O", src.getEDIFCellInst());
+                n.createPortInst(name.equals("a") ? "I0" : "I1", lut.getEDIFCellInst());
+            }
+        }
+        Net net = new Net("old/x");
+        design.addNet(net);
+        routeLogicalPin(lut, "I0", net);
+        routeLogicalPin(lut, "I1", net);
+        PIP pip = design.getDevice().getTile("INT_X0Y0").getPIPs().get(0);
+        net.addPIP(pip);
+
+        DesignTools.makePhysNetNamesConsistent(design, true);
+        Assertions.assertSame(net, design.getNet("old/x"));
+        Assertions.assertSame(net, getNetOnLogicalPin(lut, "I0"));
+        Assertions.assertSame(net, getNetOnLogicalPin(lut, "I1"));
+        Assertions.assertEquals(Arrays.asList(pip), net.getPIPs());
     }
 
     @ParameterizedTest

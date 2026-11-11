@@ -4214,6 +4214,8 @@ public class DesignTools {
                 }
             }
         }
+        // Nets merged away by their cell pins, and the net each went into
+        Map<Net, Net> mergedAway = new IdentityHashMap<>();
         for (PhysNetMerge merge : ordered) {
             Net parentPhysNet = merge.parentPhysNet;
             if (parentPhysNet == null) {
@@ -4238,8 +4240,24 @@ public class DesignTools {
                 if (mergeOntoNet(design, merge.net, parentPhysNet)) {
                     removeDuplicatePIPs(parentPhysNet);
                 }
+                mergedAway.put(merge.net, parentPhysNet);
             } else {
                 design.movePinsToNewNetDeleteOldNet(merge.net, parentPhysNet, true);
+            }
+        }
+
+        // BEL attributes on a net merged away by its cell pins go to the net it went into
+        Map<Site, SiteConfig> belAttrs = mergedAway.isEmpty() ? null : design.getBELAttrs();
+        if (belAttrs != null) {
+            for (SiteConfig siteConfig : belAttrs.values()) {
+                for (Map<String, BELAttr> attrs : siteConfig.getBELAttributes().values()) {
+                    for (BELAttr attr : attrs.values()) {
+                        Net target = mergedAway.get(attr.getNet());
+                        if (target != null) {
+                            attr.setNet(target);
+                        }
+                    }
+                }
             }
         }
     }
@@ -4254,10 +4272,7 @@ public class DesignTools {
             Map<EDIFHierNet, EDIFHierNet> netParentMap, Net gndNet, Net vccNet) {
         // A name reaching an instance of a cell with no contents is resolved inside that cell by
         // Vivado, which cannot be done here
-        Pair<List<EDIFCellInst>, String> hierObject = design.getNetlist().getHierObject(net.getName());
-        List<EDIFCellInst> insts = hierObject.getFirst();
-        if (hierObject.getSecond() != null && insts.size() > 1
-                && insts.get(insts.size() - 1).getCellType().isLeafCellOrBlackBox()) {
+        if (isInsideOpaqueCell(design.getNetlist(), net.getName())) {
             return null;
         }
         EDIFHierNet parent = null;
