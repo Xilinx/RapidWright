@@ -50,6 +50,7 @@ import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.support.LargeTest;
@@ -459,5 +460,72 @@ public class TestPartialRouter {
         PartialRouter.routeDesignWithUserDefinedArguments(design, new String[] {}, pinsToRoute, softPreserve);
 
         Assertions.assertEquals(before, getPIPs(design));
+    }
+
+    /**
+     * Tests that PartialDFXRouter can route a sink behind a locked path (of fixed PIPs) that begins with a horizontal
+     * wire. That wire becomes the connection's sink, and, unlike a sink pin, ends in a different column from the one
+     * that it begins in.
+     */
+    @Test
+    public void testPartialDFXRouterLockedPathFromHorizontalWire() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_partial.dcp");
+
+        // Find a routed sink pin whose route includes a horizontal quad or long wire, and the PIPs from that wire on
+        Net net = null;
+        SitePinInst sinkPin = null;
+        List<PIP> lockedPath = new ArrayList<>();
+        search:
+        for (Net n : design.getNets()) {
+            if (n.isStaticNet() || n.isClockNet() || !n.hasPIPs()) {
+                continue;
+            }
+            Map<Node, PIP> nodeToDriverPIP = new HashMap<>();
+            for (PIP pip : n.getPIPs()) {
+                if (!pip.isReversed()) {
+                    nodeToDriverPIP.put(pip.getEndNode(), pip);
+                }
+            }
+            for (SitePinInst spi : n.getSinkPins()) {
+                lockedPath.clear();
+                Node node = spi.getConnectedNode();
+                PIP pip;
+                while ((pip = nodeToDriverPIP.get(node)) != null) {
+                    lockedPath.add(pip);
+                    node = pip.getStartNode();
+                    IntentCode ic = node.getIntentCode();
+                    if (ic == IntentCode.NODE_HQUAD || ic == IntentCode.NODE_HLONG) {
+                        net = n;
+                        sinkPin = spi;
+                        break search;
+                    }
+                }
+            }
+        }
+        Assertions.assertNotNull(net);
+
+        // Keep only the locked path to that sink pin, as fixed PIPs
+        net.unroute();
+        for (PIP pip : lockedPath) {
+            pip.setIsPIPFixed(true);
+        }
+        net.setPIPs(lockedPath);
+
+        PartialDFXRouter.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven"},
+                Collections.singletonList(sinkPin), /* softPreserve */ false);
+
+        // The sink pin is reached from the source pin, through the locked path
+        Assertions.assertTrue(net.getPIPs().containsAll(lockedPath));
+        Map<Node, PIP> nodeToDriverPIP = new HashMap<>();
+        for (PIP pip : net.getPIPs()) {
+            nodeToDriverPIP.put(pip.getEndNode(), pip);
+        }
+        Node sourceNode = net.getSource().getConnectedNode();
+        Node node = sinkPin.getConnectedNode();
+        PIP pip;
+        while (!node.equals(sourceNode) && (pip = nodeToDriverPIP.remove(node)) != null) {
+            node = pip.getStartNode();
+        }
+        Assertions.assertEquals(sourceNode, node);
     }
 }
