@@ -42,15 +42,13 @@ import com.xilinx.rapidwright.edif.EDIFTools;
 
 /**
  * Expands the macro primitives (e.g. RAM64X1D) that are collapsed into leaf cells in a netlist
- * while cells of their expansion are placed, as {@link Design#writeCheckpoint(String)} leaves them,
- * and collapses them again afterwards.
+ * while cells of their expansion are placed, as {@link EDIFNetlist#collapseMacroUnisims(Series)}
+ * leaves them, and collapses them again afterwards.
  * <p>
- * Unlike {@link EDIFNetlist#expandMacroUnisims(Series)} and
- * {@link EDIFNetlist#collapseMacroUnisims(Series)}, which recreate every macro of the netlist from
- * its template and leave them all collapsed, only the collapsed cells are expanded, in place (their
- * instances are unchanged), and the cells their expansion needs are added to the library: undoing
- * this leaves the netlist as it was found, including the macros that were expanded and the
- * identity of the library's cells.
+ * Unlike {@link EDIFNetlist#collapseMacroUnisims(Series)}, which collapses every macro of the
+ * netlist, only the collapsed cells are expanded, in place (their instances are unchanged), and the
+ * cells their expansion needs are added to the library: undoing this leaves the netlist as it was
+ * found, including the macros that were expanded and the identity of the library's cells.
  */
 class CollapsedMacros {
 

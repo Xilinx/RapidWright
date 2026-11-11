@@ -1424,9 +1424,10 @@ public class TestReportRouteStatus {
     }
 
     /**
-     * Writing a checkpoint leaves the macro primitives of the netlist collapsed, while the placed
-     * cells are those of their expansion (also of nested macros, e.g. DSP58C inside DSP58): the route
-     * status is the same as before writing, and the netlist is left as the write left it.
+     * Writing a checkpoint leaves the macro primitives of the netlist expanded, and the route status
+     * the same. With the macros then collapsed in memory, while the placed cells are those of their
+     * expansion (also of nested macros, e.g. DSP58C inside DSP58), the route status is still the same,
+     * and the netlist is left collapsed as it was found.
      */
     @ParameterizedTest
     @CsvSource({"microblazeAndILA_3pblocks.dcp, RAM32M", "versal_slr_crossing.dcp, DSP58"})
@@ -1435,17 +1436,24 @@ public class TestReportRouteStatus {
         ReportRouteStatusResult before = ReportRouteStatus.reportRouteStatus(design, true);
         design.writeCheckpoint(tempDir.resolve(dcp));
         EDIFCell cell = design.getNetlist().getHDIPrimitivesLibrary().getCell(macro);
+        Assertions.assertTrue(cell != null && !cell.isLeafCellOrBlackBox());
+        ReportRouteStatusResult afterWrite = ReportRouteStatus.reportRouteStatus(design, true);
+        Assertions.assertEquals(before.toString(), afterWrite.toString());
+        Assertions.assertEquals(before.netsByStatus, afterWrite.netsByStatus);
+
+        design.getNetlist().collapseMacroUnisims(design.getSeries());
+        cell = design.getNetlist().getHDIPrimitivesLibrary().getCell(macro);
         Assertions.assertTrue(cell != null && cell.isLeafCellOrBlackBox());
-        ReportRouteStatusResult after = ReportRouteStatus.reportRouteStatus(design, true);
-        Assertions.assertEquals(before.toString(), after.toString());
-        Assertions.assertEquals(before.netsByStatus, after.netsByStatus);
+        ReportRouteStatusResult collapsed = ReportRouteStatus.reportRouteStatus(design, true);
+        Assertions.assertEquals(before.toString(), collapsed.toString());
+        Assertions.assertEquals(before.netsByStatus, collapsed.netsByStatus);
         // (the report expands and collapses the macro again: the library holds the same collapsed cell)
         Assertions.assertSame(cell, design.getNetlist().getHDIPrimitivesLibrary().getCell(macro));
         Assertions.assertTrue(cell.isLeafCellOrBlackBox());
     }
 
     /**
-     * A netlist with a collapsed macro (RAM32X1D, as writing a checkpoint leaves it) and an expanded
+     * A netlist with a collapsed macro (RAM32X1D, as collapseMacroUnisims() leaves it) and an expanded
      * one (RAM64X1D): the report expands only the collapsed one, and leaves the netlist as it was
      * found.
      */

@@ -180,10 +180,10 @@ public final class RouteStatusEngine {
      * as for huge designs, which tests compare).
      */
     static ReportRouteStatusResult run(Design design, boolean perNet, boolean packConflicts) {
-        // Writing a checkpoint leaves the macro primitives (e.g. RAM64X1D) collapsed in the
-        // netlist, while the cells placed for them are those of their expansion (as read from a
-        // checkpoint). Vivado expands them when it reads the design: so does the report, which then
-        // collapses them again.
+        // Macro primitives (e.g. RAM64X1D) may be collapsed in the netlist (as by
+        // EDIFNetlist.collapseMacroUnisims()), while the cells placed for them are those of their
+        // expansion (as read from a checkpoint). Vivado expands them when it reads the design: so
+        // does the report, which then collapses them again.
         CollapsedMacros expanded = CollapsedMacros.expand(design);
         try {
             return new RouteStatusEngine(design, perNet, packConflicts).run();
