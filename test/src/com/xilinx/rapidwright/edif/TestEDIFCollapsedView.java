@@ -309,6 +309,7 @@ public class TestEDIFCollapsedView {
         topBlackBox.createPort("a", EDIFDirection.INPUT, 1);
         EDIFCell blackBox1 = new EDIFCell(netlist.getLibrary("lib1"), "bb");
         blackBox1.createPort("b", EDIFDirection.INPUT, 1);
+        blackBox1.addProperty("BB_PROP", "bb1");
         EDIFCell blackBox2 = new EDIFCell(netlist.addLibrary(new EDIFLibrary("lib2")), "bb");
         blackBox2.createPort("c", EDIFDirection.INPUT, 1);
         top.createChildCellInst("top_inst", topBlackBox);
@@ -331,7 +332,14 @@ public class TestEDIFCollapsedView {
         Assertions.assertNotNull(flatBlackBox2.getPort("c"));
         for (EDIFCell cell : new EDIFCell[] {flatTopBlackBox, flatBlackBox1, flatBlackBox2}) {
             Assertions.assertSame(cell, flat.getWorkLibrary().getCell(cell.getName()));
+            // Each copy owns its ports, rather than sharing those of its source
+            for (EDIFPort port : cell.getPorts()) {
+                Assertions.assertSame(cell, port.getParentCell());
+            }
         }
+        // The properties of a black box are kept, and its source is left unchanged
+        Assertions.assertEquals("bb1", flatBlackBox1.getProperty("BB_PROP").getValue());
+        Assertions.assertSame(blackBox1, blackBox1.getPort("b").getParentCell());
     }
 
     @Test

@@ -1838,8 +1838,11 @@ public class EDIFTools {
                         flatType = prims.getCell(type.getName());
                     }
                 } else {
-                    // A black box, which is renamed if the work library has a cell of its name
-                    flatType = work.addCellRenameDuplicates(new EDIFCell(type), "flat");
+                    // A black box, copied with its ports (owned by the copy) and properties, and renamed if
+                    // the work library has a cell of its name
+                    boolean includeNetsAndInsts = false;
+                    flatType = work.addCellRenameDuplicates(new EDIFCell(null, type, type.getName(),
+                            includeNetsAndInsts), "flat");
                 }
                 flatTypes.put(type, flatType);
             }
