@@ -135,6 +135,58 @@ public class TestPartialRouter {
         VivadoToolsHelper.assertFullyRouted(design);
     }
 
+    /**
+     * Tests LUT pin swapping in partial routing when a connection whose existing route PartialRouter recovers loses
+     * its only alternate sink to another net only after it was computed: its sink, already counted by the recovered
+     * route, becomes exclusive but must still be counted only once, after promotion and after routing. (On Versal: a
+     * lone 5LUT cell's input on A5, whose only alternate sink is A6.)
+     */
+    @Test
+    public void testLutPinSwappingRecoveredSinkMadeExclusiveCountedOnce() {
+        Design design = TestRWRoute.createLutLaneDesign("xcvc1902", "SLICE_X40Y61", 'A', null, "LUT1 O=I0 e@A5", false);
+        RWRoute.routeDesignFullNonTimingDriven(design);
+        Net net = design.getNet("e");
+        TestRWRoute.assertAllPinsRouted(net);
+        // A new sink, so that the net is partially routed: its existing route to A5 is recovered
+        SitePinInst newSink = net.createPin("A_I", design.createSiteInst(design.getDevice().getSite("SLICE_X40Y63")));
+
+        Net other = design.createNet("other");
+        Node a6IMUX = design.getDevice().getSite("SLICE_X40Y61").getConnectedNode("A6").getAllUphillNodes().get(0);
+        Connection[] a5Connection = new Connection[1];
+        RWRouteConfig config = new RWRouteConfig(new String[] {"--nonTimingDriven", "--lutPinSwapping"});
+        PartialRouter router = new PartialRouter(design, config, Collections.singletonList(newSink)) {
+            @Override
+            protected NetWrapper createNetWrapperAndConnections(Net net) {
+                NetWrapper netWrapper = super.createNetWrapperAndConnections(net);
+                for (Connection connection : netWrapper.getConnections()) {
+                    if (connection.getSink().getName().equals("A5")) {
+                        Assertions.assertEquals(1, connection.getAltSinkRnodes().size());
+                        a5Connection[0] = connection;
+                        routingGraph.preserve(a6IMUX, other);
+                    }
+                }
+                return netWrapper;
+            }
+
+            @Override
+            protected void determineRoutingTargets() {
+                super.determineRoutingTargets();
+                Connection connection = a5Connection[0];
+                Assertions.assertTrue(connection.isRouted());
+                Assertions.assertFalse(connection.hasAltSinks());
+                RouteNode sinkRnode = connection.getSinkRnode();
+                Assertions.assertTrue(sinkRnode.getType().isAnyExclusiveSink());
+                Assertions.assertEquals(1, sinkRnode.countConnectionsOfUser(connection.getNetWrapper()));
+            }
+        };
+        RWRoute.routeDesign(router);
+
+        TestRWRoute.assertAllPinsRouted(net);
+        Connection connection = a5Connection[0];
+        Assertions.assertEquals(1, connection.getSinkRnode().countConnectionsOfUser(connection.getNetWrapper()));
+        Assertions.assertEquals("A5", design.getCell("lut5").getPhysicalPinMapping("I0"));
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void testPartialRouterEnsureSinkRoutabilityStatic(boolean preserveInner) {
