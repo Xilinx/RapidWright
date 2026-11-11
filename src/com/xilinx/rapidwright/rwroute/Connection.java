@@ -506,7 +506,7 @@ public class Connection implements Comparable<Connection>{
         // of them may already be routed to one of this connection's pins (including its original
         // one). Each LUT input needs its own pin, so such a pin is not a target -- even though
         // routing otherwise lets connections of the same net share nodes.
-        if (altSinkRnodes == null || sinkRnode.countConnectionsOfUser(netWrapper) == 0) {
+        if (!hasAltSinks() || sinkRnode.countConnectionsOfUser(netWrapper) == 0) {
             sinkRnode.markTarget(state);
         }
         if (altSinkRnodes != null) {
