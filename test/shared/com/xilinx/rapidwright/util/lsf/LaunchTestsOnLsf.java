@@ -114,6 +114,13 @@ public class LaunchTestsOnLsf {
      */
     public static final int REGULAR_JOB_RESERVED_GB = 8;
 
+    /**
+     * Free space required in /tmp of the host that each job runs on (LSF's tmp load index), since tests write
+     * temporary files there (some of over 4 GB), as does each JVM in unpacking native libraries. A host whose /tmp is
+     * full would fail every test sent to it.
+     */
+    public static final int MIN_FREE_TMP_GB = 20;
+
     private static final String UNITS_FILE = "units.txt";
 
     private static final String JOB_DURATIONS_FILE = "durations.txt";
@@ -122,6 +129,10 @@ public class LaunchTestsOnLsf {
     private static class TimedLsfJob extends LSFJob {
         /** Time (ms) just before submission, or -1 if not submitted */
         long submitTime = -1;
+
+        TimedLsfJob() {
+            setLsfResource("select[osver=ws8 && tmp>" + MIN_FREE_TMP_GB * 1024 + "]");
+        }
 
         @Override
         public long launchJob() {
