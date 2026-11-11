@@ -3168,6 +3168,226 @@ public class TestDesignTools {
         Assertions.assertEquals(Arrays.asList(spi), staticNet.getPins());
     }
 
+    /**
+     * A design with a top-level net "a", driven by the LUT "src" into the port "I" of the instance
+     * "inst", where it continues as "in_i" into the LUT "inst/sink". The physical net carrying it,
+     * named as given, is on the site wires of the output of "src" and of the input of "inst/sink",
+     * as when the cells were moved into this hierarchy and the net kept its old name.
+     */
+    private static Design createDesignWithStaleNetName(String physNetName) {
+        Design design = new Design("top", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFCell instType = new EDIFCell(netlist.getWorkLibrary(), "instType");
+        instType.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCellInst inst = top.createChildCellInst("inst", instType);
+
+        Cell src = design.createAndPlaceCell(top, "src", Unisim.LUT1, "SLICE_X0Y0/A6LUT");
+        Cell sink = design.createAndPlaceCell(instType, "inst/sink", Unisim.LUT1, "SLICE_X1Y0/A6LUT");
+        EDIFNet a = top.createNet("a");
+        a.createPortInst("O", src.getEDIFCellInst());
+        a.createPortInst("I", inst);
+        EDIFNet inI = instType.createNet("in_i");
+        inI.createPortInst(instType.getPort("I"));
+        inI.createPortInst("I0", sink.getEDIFCellInst());
+
+        Net net = new Net(physNetName);
+        design.addNet(net);
+        routeLogicalPin(src, "O", net);
+        routeLogicalPin(sink, "I0", net);
+        return design;
+    }
+
+    private static BELPin getBELPinOfLogicalPin(Cell cell, String logicalPin) {
+        return cell.getBEL().getPin(cell.getPhysicalPinMapping(logicalPin));
+    }
+
+    /** Routes a physical net to the site wire of a cell's logical pin, instead of any net there */
+    private static void routeLogicalPin(Cell cell, String logicalPin, Net net) {
+        BELPin pin = getBELPinOfLogicalPin(cell, logicalPin);
+        cell.getSiteInst().unrouteIntraSiteNet(pin, pin);
+        Assertions.assertTrue(cell.getSiteInst().routeIntraSiteNet(net, pin, pin));
+    }
+
+    private static Net getNetOnLogicalPin(Cell cell, String logicalPin) {
+        return cell.getSiteInst().getNetFromSiteWire(getBELPinOfLogicalPin(cell, logicalPin).getSiteWireName());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testMakePhysNetNamesConsistentFromCellPins(boolean fromCellPins) {
+        // "old/a" is not a logical net; the cell pins on its site wires are on "a" and its alias "inst/in_i"
+        Design design = createDesignWithStaleNetName("old/a");
+        Net net = design.getNet("old/a");
+        DesignTools.makePhysNetNamesConsistent(design, fromCellPins);
+        if (fromCellPins) {
+            Assertions.assertSame(net, design.getNet("a"));
+            Assertions.assertNull(design.getNet("old/a"));
+        } else {
+            Assertions.assertSame(net, design.getNet("old/a"));
+            Assertions.assertNull(design.getNet("a"));
+        }
+        Assertions.assertSame(net, getNetOnLogicalPin(design.getCell("src"), "O"));
+        Assertions.assertSame(net, getNetOnLogicalPin(design.getCell("inst/sink"), "I0"));
+    }
+
+    @Test
+    public void testMakePhysNetNamesConsistentFromCellPinsMerge() {
+        // The input side carries a stale name, and the parent already has its own physical net
+        Design design = createDesignWithStaleNetName("a");
+        Net stale = new Net("old/in_i");
+        design.addNet(stale);
+        Cell sink = design.getCell("inst/sink");
+        routeLogicalPin(sink, "I0", stale);
+        // Its routing and its BEL attributes go with it
+        PIP pip = design.getDevice().getTile("INT_X0Y0").getPIPs().get(0);
+        stale.addPIP(pip);
+        SiteInst si = sink.getSiteInst();
+        design.addBELAttr(stale, si.getSite(), si.getSiteTypeEnum(), sink.getBEL(), "ATTR", "VALUE");
+        BELAttr attr = design.getBELAttrs().get(si.getSite()).getBELAttribute(sink.getBEL(), "ATTR");
+
+        DesignTools.makePhysNetNamesConsistent(design, true);
+        Assertions.assertNull(design.getNet("old/in_i"));
+        Assertions.assertSame(design.getNet("a"), getNetOnLogicalPin(sink, "I0"));
+        Assertions.assertEquals(Arrays.asList(pip), design.getNet("a").getPIPs());
+        Assertions.assertSame(design.getNet("a"), attr.getNet());
+    }
+
+    @Test
+    public void testMakePhysNetNamesConsistentFromCellPinsAliasWithSource() {
+        // "a" has no physical net yet. The stale "old/a" and the alias "inst/in_i" each have a source:
+        // the alias takes the parent's name first, so "old/a" is left alone rather than giving "a" two
+        Design design = createDesignWithStaleNetName("old/a");
+        Net stale = design.getNet("old/a");
+        Cell src = design.getCell("src");
+        stale.createPin("A_O", src.getSiteInst());
+        Cell other = design.createAndPlaceCell(design.getTopEDIFCell(), "other", Unisim.LUT1,
+                "SLICE_X2Y0/A6LUT");
+        Net alias = new Net("inst/in_i");
+        design.addNet(alias);
+        SitePinInst aliasSource = alias.createPin("A_O", other.getSiteInst());
+
+        DesignTools.makePhysNetNamesConsistent(design, true);
+        Assertions.assertSame(alias, design.getNet("a"));
+        Assertions.assertSame(aliasSource, alias.getSource());
+        Assertions.assertNull(alias.getAlternateSource());
+        Assertions.assertSame(stale, design.getNet("old/a"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testMakePhysNetNamesConsistentFromCellPinsDisagree(boolean constants) {
+        // A stale net on the inputs of a LUT that are on two different parents (the signals "a" and
+        // "b", or GND and VCC) cannot be named after either, so it is left as it is
+        Design design = new Design("top", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+        Cell lut = design.createAndPlaceCell(top, "lut", Unisim.LUT2, "SLICE_X0Y0/A6LUT");
+        if (constants) {
+            EDIFTools.getStaticNet(NetType.GND, top, netlist).createPortInst("I0", lut.getEDIFCellInst());
+            EDIFTools.getStaticNet(NetType.VCC, top, netlist).createPortInst("I1", lut.getEDIFCellInst());
+        } else {
+            for (String name : new String[] {"a", "b"}) {
+                Cell src = design.createAndPlaceCell(top, "src_" + name, Unisim.LUT1,
+                        "SLICE_X1Y0/" + (name.equals("a") ? "A6LUT" : "B6LUT"));
+                EDIFNet n = top.createNet(name);
+                n.createPortInst("O", src.getEDIFCellInst());
+                n.createPortInst(name.equals("a") ? "I0" : "I1", lut.getEDIFCellInst());
+            }
+        }
+        Net net = new Net("old/x");
+        design.addNet(net);
+        routeLogicalPin(lut, "I0", net);
+        routeLogicalPin(lut, "I1", net);
+        PIP pip = design.getDevice().getTile("INT_X0Y0").getPIPs().get(0);
+        net.addPIP(pip);
+
+        DesignTools.makePhysNetNamesConsistent(design, true);
+        Assertions.assertSame(net, design.getNet("old/x"));
+        Assertions.assertSame(net, getNetOnLogicalPin(lut, "I0"));
+        Assertions.assertSame(net, getNetOnLogicalPin(lut, "I1"));
+        Assertions.assertEquals(Arrays.asList(pip), net.getPIPs());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testMakePhysNetNamesConsistentFromCellPinsConstant(boolean twoConstantNets) {
+        // LUT inputs tied to logical GND (two GND nets with their own GND cells, if asked), on a signal
+        // net named after a constant net that no longer exists
+        Design design = new Design("top", "xcvu3p");
+        EDIFNetlist netlist = design.getNetlist();
+        EDIFCell top = design.getTopEDIFCell();
+        Cell lut = design.createAndPlaceCell(top, "lut", Unisim.LUT2, "SLICE_X0Y0/A6LUT");
+        EDIFNet gnd = EDIFTools.getStaticNet(NetType.GND, top, netlist);
+        gnd.createPortInst("I0", lut.getEDIFCellInst());
+        if (twoConstantNets) {
+            EDIFCellInst gnd2 = top.createChildCellInst("GND_2", top.getCellInst("GND").getCellType());
+            EDIFNet const2 = top.createNet("const_GND_2");
+            const2.createPortInst("G", gnd2);
+            const2.createPortInst("I1", lut.getEDIFCellInst());
+        } else {
+            gnd.createPortInst("I1", lut.getEDIFCellInst());
+        }
+        Net net = new Net("old/ZERO");
+        design.addNet(net);
+        routeLogicalPin(lut, "I0", net);
+        routeLogicalPin(lut, "I1", net);
+
+        DesignTools.makePhysNetNamesConsistent(design, true);
+        Assertions.assertNull(design.getNet("old/ZERO"));
+        Assertions.assertSame(design.getGndNet(), getNetOnLogicalPin(lut, "I0"));
+        Assertions.assertSame(design.getGndNet(), getNetOnLogicalPin(lut, "I1"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"bb/inner", "src/O"})
+    public void testMakePhysNetNamesConsistentFromCellPinsInsideLeafCell(String physNetName) {
+        // A name inside a black box ("bb") or a primitive ("src"): Vivado
+        // resolves it inside the cell, which the netlist cannot, so it is left alone
+        Design design = createDesignWithStaleNetName("a");
+        EDIFCell top = design.getTopEDIFCell();
+        EDIFCell bbType = new EDIFCell(top.getLibrary(), "bbType");
+        bbType.createPort("O", EDIFDirection.OUTPUT, 1);
+        top.createChildCellInst("bb", bbType);
+        Net net = new Net(physNetName);
+        design.addNet(net);
+        Cell sink = design.getCell("inst/sink");
+        routeLogicalPin(sink, "I0", net);
+
+        DesignTools.makePhysNetNamesConsistent(design, true);
+        Assertions.assertSame(net, design.getNet(physNetName));
+        Assertions.assertSame(net, getNetOnLogicalPin(sink, "I0"));
+    }
+
+    @Test
+    public void testMakePhysNetNamesConsistentFromCellPinsNoEvidence() {
+        // A net on no cell pin gives nothing to go by, so is left alone
+        Design design = createDesignWithStaleNetName("a");
+        Net unknown = new Net("old/unknown");
+        design.addNet(unknown);
+        DesignTools.makePhysNetNamesConsistent(design, true);
+        Assertions.assertSame(unknown, design.getNet("old/unknown"));
+    }
+
+    @Test
+    public void testMakePhysNetNamesConsistentFromCellPinsTwoSources() {
+        // The parent's physical net and the stale net each have a source pin
+        Design design = createDesignWithStaleNetName("a");
+        Net a = design.getNet("a");
+        a.createPin("A_O", design.getCell("src").getSiteInst());
+        Net stale = new Net("old/in_i");
+        design.addNet(stale);
+        stale.createPin("A_O", design.createSiteInst("SLICE_X2Y0"));
+        Cell sink = design.getCell("inst/sink");
+        routeLogicalPin(sink, "I0", stale);
+        Assertions.assertNotNull(a.getSource());
+        Assertions.assertNotNull(stale.getSource());
+
+        DesignTools.makePhysNetNamesConsistent(design, true);
+        Assertions.assertSame(stale, design.getNet("old/in_i"));
+        Assertions.assertSame(stale, getNetOnLogicalPin(sink, "I0"));
+    }
+
     @Test
     public void testPlaceCell() {
         //test a design that already contains a Carry4 cell

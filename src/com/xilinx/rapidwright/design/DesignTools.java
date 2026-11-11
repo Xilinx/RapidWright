@@ -1187,33 +1187,44 @@ public class DesignTools {
             Net vccCell = cell.getVccNet();
             Net gndCell = cell.getGndNet();
             for (SiteInst si : cell.getSiteInsts()) {
-                // The names the site's routethru cells and their alternate pin mappings carry before
-                // its other cells are renamed. Renaming a cell may also rename those carrying its name
-                // (see Cell.updateName()), and a name changed that way is not prefixed again
-                Map<Cell, String> routethruNames = new IdentityHashMap<>();
-                Map<AltPinMapping, String> altCellNames = new IdentityHashMap<>();
-                for (Cell c : si.getCells()) {
-                    if (c.isRoutethru()) {
-                        routethruNames.put(c, c.getName());
+                // The names the site's cells and their alternate pin mappings carry before its other
+                // cells are renamed. Renaming a cell may also rename the routethrus and alternate pin
+                // mappings carrying its name (see Cell.updateName()), and a name changed that way is
+                // not prefixed again
+                Cell[] siteCells = si.getCells().toArray(new Cell[0]);
+                String[] oldNames = new String[siteCells.length];
+                List<AltPinMapping> altPinMappings = null;
+                List<String> oldAltCellNames = null;
+                for (int i = 0; i < siteCells.length; i++) {
+                    Cell c = siteCells[i];
+                    oldNames[i] = c.getName();
+                    if (c.isRoutethru() && c.hasAltPinMappings()) {
+                        if (altPinMappings == null) {
+                            altPinMappings = new ArrayList<>();
+                            oldAltCellNames = new ArrayList<>();
+                        }
                         for (AltPinMapping m : c.getAltPinMappings().values()) {
-                            altCellNames.put(m, m.getAltCellName());
+                            altPinMappings.add(m);
+                            oldAltCellNames.add(m.getAltCellName());
                         }
                     }
                 }
-                for (Cell c : new ArrayList<>(si.getCells())) {
+                for (Cell c : siteCells) {
                     if (!c.isRoutethru()) {
                         c.updateName(hierarchicalCellName + "/" + c.getName());
                         design.addCell(c);
                     }
                 }
-                for (Entry<Cell, String> rt : routethruNames.entrySet()) {
-                    if (rt.getKey().getName().equals(rt.getValue())) {
-                        rt.getKey().updateName(hierarchicalCellName + "/" + rt.getValue());
+                for (int i = 0; i < siteCells.length; i++) {
+                    Cell c = siteCells[i];
+                    if (c.isRoutethru() && c.getName().equals(oldNames[i])) {
+                        c.updateName(hierarchicalCellName + "/" + oldNames[i]);
                     }
                 }
-                for (Entry<AltPinMapping, String> alt : altCellNames.entrySet()) {
-                    if (alt.getKey().getAltCellName().equals(alt.getValue())) {
-                        alt.getKey().setAltCellName(hierarchicalCellName + "/" + alt.getValue());
+                for (int i = 0; altPinMappings != null && i < altPinMappings.size(); i++) {
+                    AltPinMapping m = altPinMappings.get(i);
+                    if (m.getAltCellName().equals(oldAltCellNames.get(i))) {
+                        m.setAltCellName(hierarchicalCellName + "/" + oldAltCellNames.get(i));
                     }
                 }
 
@@ -4077,11 +4088,18 @@ public class DesignTools {
         final Net net;
         final Net parentPhysNet;
         final String parentNetName;
+        /** True if the parent was found from the cell pins on the net's site wires */
+        final boolean fromCellPins;
 
         PhysNetMerge(Net net, Net parentPhysNet, String parentNetName) {
+            this(net, parentPhysNet, parentNetName, false);
+        }
+
+        PhysNetMerge(Net net, Net parentPhysNet, String parentNetName, boolean fromCellPins) {
             this.net = net;
             this.parentPhysNet = parentPhysNet;
             this.parentNetName = parentNetName;
+            this.fromCellPins = fromCellPins;
         }
     }
 
@@ -4093,6 +4111,24 @@ public class DesignTools {
      * @param design Design object to be modified in-place.
      */
     public static void makePhysNetNamesConsistent(Design design) {
+        makePhysNetNamesConsistent(design, false);
+    }
+
+    /**
+     * Make all of a Design's physical Net objects consistent with its logical (EDIF) netlist, as
+     * {@link #makePhysNetNamesConsistent(Design)} does, and optionally also those whose names are
+     * not a logical net at all. Such names are left behind when the cells of a placed design are
+     * moved into a new hierarchy, and Vivado drops the placement of every site that uses a net whose
+     * name it cannot find when it reads the checkpoint.
+     * @param design Design object to be modified in-place.
+     * @param fromCellPins True to also merge each physical Net whose name is not a logical net into
+     * the parent of the logical nets of the cell pins on its site wires (or rename it after that
+     * parent), when they all have the same one; constant parents of one type count as one. A Net is
+     * left as it is if no cell pin on it has a parent, if the merge would give a net two sources, or
+     * if its name points inside a cell whose contents the netlist does not hold: a black box, an
+     * encrypted cell or a primitive.
+     */
+    public static void makePhysNetNamesConsistent(Design design, boolean fromCellPins) {
         final Map<EDIFHierNet, EDIFHierNet> netParentMap = design.getNetlist().getParentNetMap();
 
         // Static nets are lazily created; do them before going parallel
@@ -4119,7 +4155,7 @@ public class DesignTools {
             EDIFHierNet hierNet = net.getLogicalHierNet();
             if (hierNet == null) {
                 // Likely an encrypted cell
-                return null;
+                return fromCellPins ? getMergeFromCellPins(design, net, netParentMap, gndNet, vccNet) : null;
             }
             EDIFHierNet parentHierNet = netParentMap.get(hierNet);
             if (parentHierNet == null) {
@@ -4161,11 +4197,34 @@ public class DesignTools {
         // classified (so that a net that cannot be classified leaves the design unchanged). Applying them in any
         // other order would leave both the surviving Net of an alias group and the order that group's pins are
         // appended in decided by whichever thread happened to arrive first, which is enough to change the order
-        // RWRoute walks its connections in and so the routing it produces
-        for (PhysNetMerge merge : merges) {
+        // RWRoute walks its connections in and so the routing it produces. Parents found from cell pins come
+        // last, so that the logical aliases have settled which Net carries the parent's name (and its source)
+        // before the two-source check below looks at it
+        List<PhysNetMerge> ordered = merges;
+        if (fromCellPins) {
+            ordered = new ArrayList<>(merges.size());
+            for (PhysNetMerge merge : merges) {
+                if (!merge.fromCellPins) {
+                    ordered.add(merge);
+                }
+            }
+            for (PhysNetMerge merge : merges) {
+                if (merge.fromCellPins) {
+                    ordered.add(merge);
+                }
+            }
+        }
+        // Nets merged away by their cell pins, and the net each went into
+        Map<Net, Net> mergedAway = new IdentityHashMap<>();
+        for (PhysNetMerge merge : ordered) {
             Net parentPhysNet = merge.parentPhysNet;
             if (parentPhysNet == null) {
                 parentPhysNet = design.getNet(merge.parentNetName);
+                if (merge.fromCellPins && parentPhysNet != null && merge.net.getSource() != null
+                        && parentPhysNet.getSource() != null) {
+                    // Each has a source, so they cannot be the same net
+                    continue;
+                }
 
                 // Nothing to merge into yet, so this net becomes the one everything else merges into
                 if (parentPhysNet == null) {
@@ -4176,8 +4235,92 @@ public class DesignTools {
                 }
             }
 
-            design.movePinsToNewNetDeleteOldNet(merge.net, parentPhysNet, true);
+            if (merge.fromCellPins) {
+                // A stale net may still be routed: keep its PIPs, which moving the pins alone drops
+                if (mergeOntoNet(design, merge.net, parentPhysNet)) {
+                    removeDuplicatePIPs(parentPhysNet);
+                }
+                mergedAway.put(merge.net, parentPhysNet);
+            } else {
+                design.movePinsToNewNetDeleteOldNet(merge.net, parentPhysNet, true);
+            }
         }
+
+        // BEL attributes on a net merged away by its cell pins go to the net it went into
+        Map<Site, SiteConfig> belAttrs = mergedAway.isEmpty() ? null : design.getBELAttrs();
+        if (belAttrs != null) {
+            for (SiteConfig siteConfig : belAttrs.values()) {
+                for (Map<String, BELAttr> attrs : siteConfig.getBELAttributes().values()) {
+                    for (BELAttr attr : attrs.values()) {
+                        Net target = mergedAway.get(attr.getNet());
+                        if (target != null) {
+                            attr.setNet(target);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Classifies a physical Net whose name is not a logical net for
+     * {@link #makePhysNetNamesConsistent(Design, boolean)}, by the parent of the logical nets of the
+     * cell pins on its site wires.
+     * @return The merge, or null if the Net is to be left as it is.
+     */
+    private static PhysNetMerge getMergeFromCellPins(Design design, Net net,
+            Map<EDIFHierNet, EDIFHierNet> netParentMap, Net gndNet, Net vccNet) {
+        // A name reaching an instance of a cell with no contents is resolved inside that cell by
+        // Vivado, which cannot be done here
+        if (isInsideOpaqueCell(design.getNetlist(), net.getName())) {
+            return null;
+        }
+        EDIFHierNet parent = null;
+        NetType parentStaticType = null;
+        for (SiteInst si : net.getSiteInsts()) {
+            if (si.getDesign() != design) {
+                // A net taken from another design can still list that design's site instances
+                continue;
+            }
+            for (String siteWire : si.getSiteWiresFromNet(net)) {
+                for (BELPin belPin : si.getSiteWirePins(siteWire)) {
+                    Cell c = si.getCell(belPin.getBEL());
+                    if (c == null || c.isRoutethru()) {
+                        continue;
+                    }
+                    String logicalPin = c.getLogicalPinMapping(belPin.getName());
+                    EDIFHierCellInst inst = logicalPin == null ? null : c.getEDIFHierCellInst();
+                    if (inst == null) {
+                        continue;
+                    }
+                    EDIFHierPortInst portInst = inst.getPortInst(logicalPin);
+                    EDIFHierNet logical = portInst == null ? null : portInst.getHierarchicalNet();
+                    EDIFHierNet p = logical == null ? null : netParentMap.get(logical);
+                    if (p == null) {
+                        return null;
+                    }
+                    if (p.equals(parent)) {
+                        continue;
+                    }
+                    // Only for a parent not seen yet: isGND() and isVCC() scan the net's port instances
+                    NetType staticType = p.getNet().isGND() ? NetType.GND
+                            : p.getNet().isVCC() ? NetType.VCC : null;
+                    if (parent == null) {
+                        parent = p;
+                        parentStaticType = staticType;
+                    } else if (staticType == null || staticType != parentStaticType) {
+                        return null;
+                    }
+                }
+            }
+        }
+        if (parent == null) {
+            return null;
+        }
+        if (parentStaticType != null) {
+            return new PhysNetMerge(net, parentStaticType == NetType.GND ? gndNet : vccNet, null, true);
+        }
+        return new PhysNetMerge(net, null, parent.getHierarchicalNetName(), true);
     }
 
     /**
