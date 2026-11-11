@@ -63,6 +63,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.CRC32;
@@ -1130,6 +1131,12 @@ public class FileTools {
         return expectedFiles;
     }
 
+    /** Number of times the download of a data file is tried before giving up */
+    private static final int DATA_FILE_DOWNLOAD_ATTEMPTS = 5;
+
+    /** Delay before the second try of a data file download, doubled before each further try */
+    private static final long DATA_FILE_DOWNLOAD_RETRY_DELAY_MS = 1000;
+
     /**
      * Downloads the specified data file and version according to
      * {@link #DATA_VERSION_FILE}. This will overwrite any existing file locally of
@@ -1144,23 +1151,71 @@ public class FileTools {
         String md5 = getCurrentDataVersion(fileName);
         String url = RAPIDWRIGHT_DATA_URL + getContainerName(fileName) + "/" +
                     md5;
-        String dstFileName = getRapidWrightPath() + File.separator + fileName;
-        String downloadedMD5 = _downloadDataFile(url, dstFileName);
-        if (!md5.equals(downloadedMD5)) {
-            System.err.println("WARNING: Download validation of file " + fileName + " failed.  Trying again...");
-            downloadedMD5 = _downloadDataFile(url, dstFileName);
-            if (!md5.equals(downloadedMD5)) {
-                throw new RuntimeException("ERROR: Failed to reliably download file: " + fileName);
-            }
-        }
-        FileTools.writeStringToTextFile(downloadedMD5, dstFileName + MD5_DATA_FILE_SUFFIX);
+        Path dst = Paths.get(getRapidWrightPath(), fileName);
+        String downloadedMD5 = downloadDataFile(url, dst, md5, DATA_FILE_DOWNLOAD_ATTEMPTS,
+                DATA_FILE_DOWNLOAD_RETRY_DELAY_MS);
+        FileTools.writeStringToTextFile(downloadedMD5, dst + MD5_DATA_FILE_SUFFIX);
         return downloadedMD5;
     }
 
-    private static String _downloadDataFile(String url, String dstFileName) {
-        Installer.downloadFile(url, dstFileName);
-        String downloadedMD5 = Installer.calculateMD5OfFile(dstFileName);
-        return downloadedMD5;
+    /**
+     * Downloads a file and validates it by its md5sum, trying again (after a delay that doubles
+     * each time) if the download fails or is not valid. A download can end early without any
+     * error (e.g. if the server closes the connection), so the md5sum is the only reliable check.
+     * The file is downloaded to a temporary file next to the destination, which replaces the
+     * destination only once it is valid: so the destination is never left partly written, and
+     * other processes that download the same file at the same time do not corrupt each other's
+     * downloads.
+     *
+     * @param url          The URL of the file
+     * @param dst          The local file to download to
+     * @param expectedMD5  The md5sum of the file
+     * @param attempts     The number of times to try the download
+     * @param retryDelayMs The delay in milliseconds before the second try
+     * @return The md5sum of the downloaded file, equal to expectedMD5
+     * @throws RuntimeException If no try downloaded a valid file
+     */
+    static String downloadDataFile(String url, Path dst, String expectedMD5, int attempts,
+                                   long retryDelayMs) {
+        String failure = null;
+        for (int attempt = 1; attempt <= attempts; attempt++) {
+            if (attempt > 1) {
+                System.err.println("WARNING: Download of " + url + " failed (" + failure
+                        + "), trying again (" + attempt + " of " + attempts + ")...");
+                try {
+                    Thread.sleep(retryDelayMs << (attempt - 2));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("ERROR: Interrupted while downloading " + url, e);
+                }
+            }
+            // A unique name, created as any other file (Files.createTempFile() would restrict its
+            // permissions to its owner)
+            Path tmp = dst.resolveSibling("." + dst.getFileName() + "." + UUID.randomUUID() + ".part");
+            try {
+                long bytes = Installer.downloadFile(url, tmp.toString());
+                String downloadedMD5 = Installer.calculateMD5OfFile(tmp);
+                if (expectedMD5.equals(downloadedMD5)) {
+                    Files.move(tmp, dst, StandardCopyOption.REPLACE_EXISTING,
+                            StandardCopyOption.ATOMIC_MOVE);
+                    return downloadedMD5;
+                }
+                failure = "downloaded " + bytes + " bytes with md5sum " + downloadedMD5
+                        + ", expected md5sum " + expectedMD5;
+            } catch (IOException e) {
+                failure = e.toString();
+            } catch (UncheckedIOException e) {
+                failure = e.getMessage() + ": " + e.getCause();
+            } finally {
+                try {
+                    Files.deleteIfExists(tmp);
+                } catch (IOException e) {
+                    // Leave it, as it is only a temporary file
+                }
+            }
+        }
+        throw new RuntimeException("ERROR: Failed to reliably download file " + dst + " from "
+                + url + " after " + attempts + " attempts (last failure: " + failure + ")");
     }
 
     /**
