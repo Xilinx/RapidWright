@@ -37,6 +37,7 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicIntegerArray;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -502,6 +503,36 @@ public class TestParallelismTools {
         }
         Assertions.assertEquals(NUM_TASKS, count);
         assertEachRunOnce(runs);
+    }
+
+    @Test
+    public void testJoinUnorderedSkipsReturned() {
+        // Already done, so each is returned in the List's order
+        final int numItems = 1000;
+        final AtomicInteger reads = new AtomicInteger();
+        final List<CompletableFuture<Integer>> futures = new ArrayList<CompletableFuture<Integer>>() {
+            @Override
+            public CompletableFuture<Integer> get(int index) {
+                reads.incrementAndGet();
+                return super.get(index);
+            }
+        };
+        for (int i = 0; i < numItems; i++) {
+            futures.add(CompletableFuture.completedFuture(i));
+        }
+        final Iterator<CompletableFuture<Integer>> it = ParallelismTools.joinUnordered(futures);
+        for (int i = 0; i < numItems; i++) {
+            Assertions.assertEquals(i, ParallelismTools.get(it.next()));
+        }
+        // Those already returned are not read again, so draining them takes linear (not quadratic) time
+        Assertions.assertTrue(reads.get() <= 4 * numItems, "List elements read: " + reads.get());
+
+        // Items added to the end once all have been returned are still included
+        Assertions.assertFalse(it.hasNext());
+        futures.add(CompletableFuture.completedFuture(numItems));
+        Assertions.assertTrue(it.hasNext());
+        Assertions.assertEquals(numItems, ParallelismTools.get(it.next()));
+        Assertions.assertFalse(it.hasNext());
     }
 
     @Test
