@@ -23,7 +23,7 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import static com.xilinx.rapidwright.rwroute.TestRWRoute.assertAllPinsRouted;
+import static com.xilinx.rapidwright.rwroute.TestRWRoute.assertModifiedNetsRouted;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -50,6 +50,7 @@ import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.support.LargeTest;
@@ -78,9 +79,7 @@ public class TestPartialRouter {
         }, null, softPreserve);
 
         Assertions.assertFalse(design.getModifiedNets().isEmpty());
-        for (Net net : design.getModifiedNets()) {
-            assertAllPinsRouted(net);
-        }
+        assertModifiedNetsRouted(design);
         VivadoToolsHelper.assertFullyRouted(design);
     }
 
@@ -113,9 +112,7 @@ public class TestPartialRouter {
         Design routed = PartialRouter.routeDesignPartialNonTimingDriven(design, null, softPreserve);
 
         Assertions.assertFalse(routed.getModifiedNets().isEmpty());
-        for (Net net : routed.getModifiedNets()) {
-            assertAllPinsRouted(net);
-        }
+        assertModifiedNetsRouted(routed);
         VivadoToolsHelper.assertFullyRouted(design);
     }
 
@@ -135,10 +132,60 @@ public class TestPartialRouter {
         Design routed = PartialRouter.routeDesignPartialTimingDriven(design, null, softPreserve);
 
         Assertions.assertFalse(routed.getModifiedNets().isEmpty());
-        for (Net net : routed.getModifiedNets()) {
-            assertAllPinsRouted(net);
-        }
+        assertModifiedNetsRouted(routed);
         VivadoToolsHelper.assertFullyRouted(design);
+    }
+
+    /**
+     * Tests LUT pin swapping in partial routing when a connection whose existing route PartialRouter recovers loses
+     * its only alternate sink to another net only after it was computed: its sink, already counted by the recovered
+     * route, becomes exclusive but must still be counted only once, after promotion and after routing. (On Versal: a
+     * lone 5LUT cell's input on A5, whose only alternate sink is A6.)
+     */
+    @Test
+    public void testLutPinSwappingRecoveredSinkMadeExclusiveCountedOnce() {
+        Design design = TestRWRoute.createLutLaneDesign("xcvc1902", "SLICE_X40Y61", 'A', null, "LUT1 O=I0 e@A5", false);
+        RWRoute.routeDesignFullNonTimingDriven(design);
+        Net net = design.getNet("e");
+        TestRWRoute.assertAllPinsRouted(net);
+        // A new sink, so that the net is partially routed: its existing route to A5 is recovered
+        SitePinInst newSink = net.createPin("A_I", design.createSiteInst(design.getDevice().getSite("SLICE_X40Y63")));
+
+        Net other = design.createNet("other");
+        Node a6IMUX = design.getDevice().getSite("SLICE_X40Y61").getConnectedNode("A6").getAllUphillNodes().get(0);
+        Connection[] a5Connection = new Connection[1];
+        RWRouteConfig config = new RWRouteConfig(new String[] {"--nonTimingDriven", "--lutPinSwapping"});
+        PartialRouter router = new PartialRouter(design, config, Collections.singletonList(newSink)) {
+            @Override
+            protected NetWrapper createNetWrapperAndConnections(Net net) {
+                NetWrapper netWrapper = super.createNetWrapperAndConnections(net);
+                for (Connection connection : netWrapper.getConnections()) {
+                    if (connection.getSink().getName().equals("A5")) {
+                        Assertions.assertEquals(1, connection.getAltSinkRnodes().size());
+                        a5Connection[0] = connection;
+                        routingGraph.preserve(a6IMUX, other);
+                    }
+                }
+                return netWrapper;
+            }
+
+            @Override
+            protected void determineRoutingTargets() {
+                super.determineRoutingTargets();
+                Connection connection = a5Connection[0];
+                Assertions.assertTrue(connection.isRouted());
+                Assertions.assertFalse(connection.hasAltSinks());
+                RouteNode sinkRnode = connection.getSinkRnode();
+                Assertions.assertTrue(sinkRnode.getType().isAnyExclusiveSink());
+                Assertions.assertEquals(1, sinkRnode.countConnectionsOfUser(connection.getNetWrapper()));
+            }
+        };
+        RWRoute.routeDesign(router);
+
+        TestRWRoute.assertAllPinsRouted(net);
+        Connection connection = a5Connection[0];
+        Assertions.assertEquals(1, connection.getSinkRnode().countConnectionsOfUser(connection.getNetWrapper()));
+        Assertions.assertEquals("A5", design.getCell("lut5").getPhysicalPinMapping("I0"));
     }
 
     @ParameterizedTest
@@ -413,5 +460,72 @@ public class TestPartialRouter {
         PartialRouter.routeDesignWithUserDefinedArguments(design, new String[] {}, pinsToRoute, softPreserve);
 
         Assertions.assertEquals(before, getPIPs(design));
+    }
+
+    /**
+     * Tests that PartialDFXRouter can route a sink behind a locked path (of fixed PIPs) that begins with a horizontal
+     * wire. That wire becomes the connection's sink, and, unlike a sink pin, ends in a different column from the one
+     * that it begins in.
+     */
+    @Test
+    public void testPartialDFXRouterLockedPathFromHorizontalWire() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_partial.dcp");
+
+        // Find a routed sink pin whose route includes a horizontal quad or long wire, and the PIPs from that wire on
+        Net net = null;
+        SitePinInst sinkPin = null;
+        List<PIP> lockedPath = new ArrayList<>();
+        search:
+        for (Net n : design.getNets()) {
+            if (n.isStaticNet() || n.isClockNet() || !n.hasPIPs()) {
+                continue;
+            }
+            Map<Node, PIP> nodeToDriverPIP = new HashMap<>();
+            for (PIP pip : n.getPIPs()) {
+                if (!pip.isReversed()) {
+                    nodeToDriverPIP.put(pip.getEndNode(), pip);
+                }
+            }
+            for (SitePinInst spi : n.getSinkPins()) {
+                lockedPath.clear();
+                Node node = spi.getConnectedNode();
+                PIP pip;
+                while ((pip = nodeToDriverPIP.get(node)) != null) {
+                    lockedPath.add(pip);
+                    node = pip.getStartNode();
+                    IntentCode ic = node.getIntentCode();
+                    if (ic == IntentCode.NODE_HQUAD || ic == IntentCode.NODE_HLONG) {
+                        net = n;
+                        sinkPin = spi;
+                        break search;
+                    }
+                }
+            }
+        }
+        Assertions.assertNotNull(net);
+
+        // Keep only the locked path to that sink pin, as fixed PIPs
+        net.unroute();
+        for (PIP pip : lockedPath) {
+            pip.setIsPIPFixed(true);
+        }
+        net.setPIPs(lockedPath);
+
+        PartialDFXRouter.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven"},
+                Collections.singletonList(sinkPin), /* softPreserve */ false);
+
+        // The sink pin is reached from the source pin, through the locked path
+        Assertions.assertTrue(net.getPIPs().containsAll(lockedPath));
+        Map<Node, PIP> nodeToDriverPIP = new HashMap<>();
+        for (PIP pip : net.getPIPs()) {
+            nodeToDriverPIP.put(pip.getEndNode(), pip);
+        }
+        Node sourceNode = net.getSource().getConnectedNode();
+        Node node = sinkPin.getConnectedNode();
+        PIP pip;
+        while (!node.equals(sourceNode) && (pip = nodeToDriverPIP.remove(node)) != null) {
+            node = pip.getStartNode();
+        }
+        Assertions.assertEquals(sourceNode, node);
     }
 }

@@ -30,9 +30,13 @@ import java.io.UncheckedIOException;
 import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
+import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import com.github.luben.zstd.Zstd;
 import org.junit.jupiter.api.Assertions;
@@ -157,5 +161,46 @@ public class TestFileTools {
                 Assertions.assertEquals(ubuf[i], (byte) bis.read());
             }
         }
+    }
+
+    @Test
+    public void testUnzipFileChecksCrc(@TempDir Path tempDir) throws IOException {
+        final byte[] data = new byte[64];
+        Arrays.fill(data, (byte) 'A');
+        final CRC32 crc = new CRC32();
+        crc.update(data);
+        final Path zip = tempDir.resolve("test.zip");
+        try (ZipOutputStream zos = new ZipOutputStream(Files.newOutputStream(zip))) {
+            for (String name : new String[]{"a.txt", "b.txt"}) {
+                // Stored, so that each entry's data is in the file as is
+                ZipEntry e = new ZipEntry(name);
+                e.setMethod(ZipEntry.STORED);
+                e.setSize(data.length);
+                e.setCrc(crc.getValue());
+                zos.putNextEntry(e);
+                zos.write(data);
+                zos.closeEntry();
+            }
+        }
+
+        // Intact: every entry is extracted
+        final Path good = tempDir.resolve("good");
+        FileTools.unzipFile(zip.toString(), good.toString());
+        Assertions.assertArrayEquals(data, Files.readAllBytes(good.resolve("a.txt")));
+        Assertions.assertArrayEquals(data, Files.readAllBytes(good.resolve("b.txt")));
+
+        // The first entry's data corrupted, but not its CRC: extracting stops at it, as it fails
+        final byte[] bytes = Files.readAllBytes(zip);
+        int start = 0;
+        for (int run = 0; run < data.length; start++) {
+            run = bytes[start] == 'A' ? run + 1 : 0;
+        }
+        start -= data.length;
+        bytes[start] = 'B';
+        Files.write(zip, bytes);
+        final Path bad = tempDir.resolve("bad");
+        FileTools.unzipFile(zip.toString(), bad.toString());
+        Assertions.assertTrue(Files.exists(bad.resolve("a.txt")));
+        Assertions.assertFalse(Files.exists(bad.resolve("b.txt")));
     }
 }
