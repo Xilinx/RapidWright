@@ -2609,10 +2609,12 @@ public class RWRoute {
         int childY = childRnode.getEndTileYCoordinate();
         RouteNode sinkRnode = connection.getSinkRnode();
         // Sinks begin where they end (in X), other than Versal CTRL pins in CLE_BC_CORE/SLL tiles and SLL inputs,
-        // whose end is the INT tile column that they serve (see RouteNodeInfo.get())
+        // whose end is the INT tile column that they serve (see RouteNodeInfo.get()), and the non-local nodes that
+        // PartialDFXRouter makes sinks (the begin of a locked path to the true sink), which may be horizontal wires
         int sinkX = sinkRnode.getEndTileXCoordinate();
         assert(sinkX == sinkRnode.getBeginTileXCoordinate() ||
-                sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL || routingGraph.isOnBothSides(sinkRnode));
+                sinkRnode.getIntentCode() == IntentCode.NODE_CLE_CTRL || routingGraph.isOnBothSides(sinkRnode) ||
+                sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK_NON_LOCAL);
         int sinkY = sinkRnode.getBeginTileYCoordinate();
         int deltaX = Math.abs(childX - sinkX);
         // Horizontal distance is measured in half tiles (each INT tile has a west and an east half) so that
