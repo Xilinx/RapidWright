@@ -197,6 +197,9 @@ public class LecReport {
         if (getPreexistingLoopCount() > 0 && !config.isAllowPreexistingLoops()) {
             return false;
         }
+        if (counts.get(LecDifferenceType.RETIMING_UNPROVEN) > 0) {
+            return false;
+        }
         return getInconclusiveCount() == 0 || config.isAllowInconclusive();
     }
 
@@ -334,6 +337,11 @@ public class LecReport {
             out.println("   " + getInconclusiveCount() + " cones could not be decided, so "
                     + "equivalence is not established for them");
             out.println("   use --allow-inconclusive to treat those as a warning instead");
+        }
+        if (counts.get(LecDifferenceType.RETIMING_UNPROVEN) > 0) {
+            out.println("   " + counts.get(LecDifferenceType.RETIMING_UNPROVEN) + " retiming "
+                    + "certificate obligations could not be decided, so the certificate is "
+                    + "not proven");
         }
     }
 

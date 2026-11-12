@@ -359,7 +359,8 @@ public class LecSelfCheck {
             String report) {
         LecReport r = result.getReport();
         int diffs = r.getEquivalenceDifferenceCount() + r.getIntroducedLoopCount();
-        int undecided = r.getInconclusiveCount();
+        int undecided = r.getInconclusiveCount()
+                + r.getCount(LecDifferenceType.RETIMING_UNPROVEN);
         // Refusing to certify is a detection too: the run fails and nothing is
         // presented as proven. Only a clean PASS counts as "not detected".
         boolean detected = diffs > 0 || undecided > 0;
@@ -1403,13 +1404,20 @@ public class LecSelfCheck {
 
     /**
      * @return An FDRE or FDSE, not already defined, whose output reaches the
-     *         instance through combinational cells only, or null.
+     *         instance through combinational cells only, or is the instance
+     *         itself, or null.
      */
     private static String registerFeeding(FlatNetlist flat, Connectivity conn, String instName,
             Set<String> defined) {
         int start = flat.findInstId(instName);
         if (start < 0) {
             return null;
+        }
+        String startType = flat.getCellTypeName(start);
+        if (startType.startsWith("FD")) {
+            // A definition by a register's output reads that register itself
+            String name = flat.getInstName(start);
+            return isRetimableType(startType) && !defined.contains(name) ? name : null;
         }
         Deque<Integer> work = new ArrayDeque<>();
         Set<Integer> seen = new HashSet<>();

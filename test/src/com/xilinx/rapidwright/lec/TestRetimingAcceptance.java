@@ -304,6 +304,26 @@ public class TestRetimingAcceptance {
                 LecDifferenceType.RETIMING_STEP_DIFFERS);
     }
 
+    /**
+     * An undecided step obligation leaves the certificate unproven, which
+     * {@code --allow-inconclusive} must not waive: every other cone assumed it.
+     */
+    @Test
+    public void testUnprovenCertificateIsNotWaived() {
+        Circuit imp = new Circuit()
+                .lut("f", "4'hE", "fo", "a", "b")
+                .flop("FDRE", "r", "fo", "qr", "vcc", "gnd")
+                .flop("FDRE", "out", "qr", "qo", "vcc", "gnd")
+                .out("q", "qo");
+        LecConfig config = LecConfig.parse(new String[] { "ref.edf", "imp.edf", "--sim-rounds",
+            "0", "--sat-budget", "0", "--allow-inconclusive" });
+        LecHarness result = LecHarness.run(andBeforeRetiming("vcc", "gnd").netlist(),
+                imp.netlist(), config, map("IMP r = REF f/O"));
+        result.assertFail();
+        Assertions.assertNotNull(result.findDifference(LecDifferenceType.RETIMING_UNPROVEN),
+                result.getOutput());
+    }
+
     // ---------------------------------------------------- invalid certificates
 
     @Test
@@ -353,6 +373,17 @@ public class TestRetimingAcceptance {
      * Instance lookup by hierarchical name: a renamed top level instance whose
      * own name contains the separator, and an instance inside a block.
      */
+    /** Certificate registers are found by path, so a key property is refused. */
+    @Test
+    public void testKeyPropertyIsRefused() {
+        LecConfig config = new LecConfig();
+        config.setKeyProperty("KEY");
+        LecException e = Assertions.assertThrows(LecException.class,
+                () -> LecHarness.run(andBeforeRetiming("vcc", "gnd").netlist(),
+                        andAfterForward().netlist(), config, map("IMP r = REF f/O")));
+        Assertions.assertTrue(e.getMessage().contains("--key-property"), e.getMessage());
+    }
+
     @Test
     public void testHierarchicalNameLookup() {
         Circuit circuit = new Circuit().flop("FDRE", "a/b", "a", "q1", "vcc", "gnd");
@@ -443,6 +474,37 @@ public class TestRetimingAcceptance {
                 Assertions.assertFalse(line.contains("SKIPPED"), line);
             }
         }
+    }
+
+    /**
+     * A definition by a register's output reads that register, so the cyclic
+     * certificate must define it, not the register upstream of it.
+     */
+    @Test
+    public void testSelfCheckCycleThroughRegisterOutput(@TempDir Path dir) throws IOException {
+        Path ref = dir.resolve("ref.edf");
+        Path imp = dir.resolve("imp.edf");
+        EDIFTools.writeEDIFFile(ref, new Circuit()
+                .flop("FDRE", "x", "a", "qx", "vcc", "gnd")
+                .flop("FDRE", "p", "qx", "qp", "vcc", "gnd")
+                .out("q", "qp").netlist(), LecNetlistFixtures.ULTRASCALE_PLUS_PART);
+        EDIFTools.writeEDIFFile(imp, new Circuit()
+                .flop("FDRE", "x", "a", "qx", "vcc", "gnd")
+                .flop("FDRE", "s", "qx", "qs", "vcc", "gnd")
+                .out("q", "qs").netlist(), LecNetlistFixtures.ULTRASCALE_PLUS_PART);
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        PrintStream original = System.out;
+        int exit;
+        try {
+            System.setOut(new PrintStream(buffer));
+            exit = new LecSelfCheck(ref, imp, map("IMP s = REF p/Q")).run();
+        } finally {
+            System.setOut(original);
+        }
+        String output = buffer.toString();
+        Assertions.assertEquals(LogicEquivalenceChecker.EXIT_PASS, exit, output);
+        Assertions.assertTrue(Arrays.stream(output.split("\\R")).anyMatch(
+                l -> l.startsWith("certificate made cyclic") && !l.contains("SKIPPED")), output);
     }
 
     private static int run(Path ref, Path imp, Path map) {
