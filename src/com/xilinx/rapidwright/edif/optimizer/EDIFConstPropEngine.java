@@ -26,7 +26,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
@@ -364,11 +363,12 @@ class EDIFConstPropEngine {
             }
             frozen[l] = f;
             if (kind[l] == K_LUT || kind[l] == K_LUT62 || kind[l] == K_LUTCY) {
-                EDIFPropertyValue init = inst.getProperty("INIT");
+                // Decoded at the width of the INIT parameter (a LUT2's 2'hF is 4'h3)
+                Long init = PrimitiveDefaults.getInitBits(inst);
                 if (init == null) {
                     frozen[l] = true;
                 } else {
-                    origInit[l] = LUTTools.getInitValue(init.getValue());
+                    origInit[l] = init;
                 }
             }
             if (kind[l] == K_GND || kind[l] == K_VCC) {
@@ -694,10 +694,11 @@ class EDIFConstPropEngine {
         EDIFCellInst inst = idx.getLeafInst(l);
         String key = "IS_" + pin + "_INVERTED";
         Map<String, String> pm = props.get(l);
+        // A one-bit parameter: only the least significant bit of a number counts
         if (pm != null && pm.containsKey(key)) {
-            return isTrue(pm.get(key));
+            return VerilogLiterals.isBitSet(pm.get(key));
         }
-        return isTrue(PrimitiveDefaults.getValue(inst, key));
+        return VerilogLiterals.isBitSet(PrimitiveDefaults.getValue(inst, key));
     }
 
     /** Effective (inversion applied) constant value of a pin: UNK, C0 or C1. */
@@ -747,7 +748,8 @@ class EDIFConstPropEngine {
                 async = true;
                 break;
         }
-        int init = isTrue(PrimitiveDefaults.getValue(idx.getLeafInst(l), "INIT")) ? SET1 : SET0;
+        int init = VerilogLiterals.isBitSet(PrimitiveDefaults.getValue(idx.getLeafInst(l), "INIT"))
+                ? SET1 : SET0;
         byte rst = effVal(l, rstPin);
         int q = findPin(l, "Q");
         if (q < 0) {
@@ -1128,10 +1130,13 @@ class EDIFConstPropEngine {
         if (d == UNK) {
             return;
         }
-        long init = LUTTools.getInitValue(PrimitiveDefaults.getValue(idx.getLeafInst(l), "INIT"));
+        Long init = PrimitiveDefaults.getInitBits(idx.getLeafInst(l));
+        if (init == null) {
+            return;
+        }
         int bits = idx.getLeafInst(l).getCellType().getName().equals("SRL16E") ? 16 : 32;
         long all = (1L << bits) - 1;
-        if ((d == C0 && (init & all) != 0) || (d == C1 && (init & all) != all)) {
+        if ((d == C0 && init != 0) || (d == C1 && init != all)) {
             return;
         }
         removeLeaf(l, RM_CONST);

@@ -88,4 +88,43 @@ public final class PrimitiveDefaults {
         EDIFPropertyValue v = inst.getProperty(key);
         return v != null ? v.getValue() : getDefault(inst.getCellType(), key);
     }
+
+    /**
+     * @param type A primitive type name.
+     * @return The width in bits of the INIT parameter of a LUT (LUT1-6, LUT6_2, LUT6CY, LUTCY1,
+     * LUTCY2) or shift register (SRL16E, SRLC32E), -1 for any other type.
+     */
+    public static int getInitWidth(String type) {
+        if (type.length() == 4 && type.startsWith("LUT") && type.charAt(3) >= '1'
+                && type.charAt(3) <= '6') {
+            return 1 << (type.charAt(3) - '0');
+        }
+        switch (type) {
+            case "LUT6_2":
+            case "LUT6CY":
+                return 64;
+            case "LUTCY1":
+            case "LUTCY2":
+            case "SRLC32E":
+                return 32;
+            case "SRL16E":
+                return 16;
+            default:
+                return -1;
+        }
+    }
+
+    /**
+     * @param inst A LUT or shift register instance (see {@link #getInitWidth}).
+     * @return Its INIT (own value, else default) as the parameter's bits: a literal is truncated
+     * or extended to the parameter's width, as in Verilog (a LUT2's INIT of 2'hF is 4'h3). Null
+     * if the instance is of another type, has no INIT or its INIT is not a number.
+     */
+    public static Long getInitBits(EDIFCellInst inst) {
+        int width = getInitWidth(inst.getCellType().getName());
+        if (width < 0) {
+            return null;
+        }
+        return VerilogLiterals.parseBits(getValue(inst, "INIT"), width);
+    }
 }

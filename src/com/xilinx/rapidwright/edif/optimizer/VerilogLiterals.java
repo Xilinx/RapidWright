@@ -132,6 +132,53 @@ public final class VerilogLiterals {
 
     /**
      * @param value A property value.
+     * @param width The width in bits (1 to 64) of the bit-vector parameter it is assigned to.
+     * @return The bits of the parameter (see {@link #parseNumber} and {@link #toWidth}), so a
+     * LUT2's INIT of 2'hF is 4'h3; null if value is not a number.
+     */
+    public static Long parseBits(String value, int width) {
+        if (width < 1 || width > 64) {
+            throw new IllegalArgumentException("Width must be from 1 to 64: " + width);
+        }
+        BigInteger n = parseNumber(value);
+        return n == null ? null : toWidth(n, width).longValue();
+    }
+
+    /**
+     * @param value A property value.
+     * @return True if a one-bit parameter (e.g. a flip-flop's INIT or a pin's IS_*_INVERTED)
+     * assigned value is 1: TRUE/YES (in any case), or a number whose least significant bit is 1
+     * (as Verilog truncates it to one bit, so 2'b10 is 0).
+     */
+    public static boolean isBitSet(String value) {
+        if (value == null) {
+            return false;
+        }
+        // Fast path for the common forms (this is called for every pin inversion and INIT)
+        switch (value) {
+            case "1'b1":
+            case "1":
+            case "TRUE":
+            case "true":
+                return true;
+            case "1'b0":
+            case "0":
+            case "FALSE":
+            case "false":
+                return false;
+            default:
+                break;
+        }
+        String v = value.trim();
+        if (v.equalsIgnoreCase("TRUE") || v.equalsIgnoreCase("YES")) {
+            return true;
+        }
+        BigInteger n = parseNumber(v);
+        return n != null && n.testBit(0);
+    }
+
+    /**
+     * @param value A property value.
      * @return TRUE or FALSE for TRUE/FALSE or YES/NO (in any case) and for numbers (true if not
      * zero), null for anything else.
      */

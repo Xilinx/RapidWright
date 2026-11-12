@@ -1173,7 +1173,19 @@ class EDIFOptEditor {
                 net.getParentCell().removeNet(net);
             }
         }
-        // Static sources left without a net (unless preserved, as in Vivado)
+        // Static sources left without a net (unless preserved, as in Vivado). When sweeping,
+        // also those disconnected in the input netlist, in every definition outside preserved
+        // hierarchy (they would otherwise keep an empty hierarchical cell)
+        if (removeUnloadedNets) {
+            Map<EDIFCell, Long> occurrences = new IdentityHashMap<>();
+            Set<EDIFCell> preserved = Collections.newSetFromMap(new IdentityHashMap<>());
+            analyzeHierarchy(occurrences, preserved);
+            for (EDIFCell cell : occurrences.keySet()) {
+                if (!preserved.contains(cell)) {
+                    touched.add(cell);
+                }
+            }
+        }
         for (EDIFCell cell : touched) {
             for (EDIFCellInst inst : new ArrayList<>(cell.getCellInsts())) {
                 if (inst.getCellType().isStaticSource()

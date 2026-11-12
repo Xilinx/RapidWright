@@ -34,7 +34,6 @@ import java.util.TreeSet;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.VivadoProp;
 import com.xilinx.rapidwright.design.VivadoPropType;
-import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
@@ -90,8 +89,13 @@ public class EDIFRandomSimEquivalence {
         final boolean[] cutType;
         /** Nets with a driver (a leaf output, bidirectional pin or top-level input). */
         final boolean[] driven;
-        /** First driver pin of each net, -1 if none. */
-        final int[] netDriverPin;
+        /**
+         * Source pins (leaf outputs, bidirectional pins, top-level inputs) of each net n:
+         * srcPins[srcStart[n]] to srcPins[srcStart[n + 1] - 1]. Usually one, several for e.g.
+         * tri-state buffers (simulated as the XOR of their values).
+         */
+        final int[] srcStart;
+        final int[] srcPins;
         /** Combinational cells turned into cut points because they are on a loop. */
         boolean[] loopCut;
         /** Nets whose value depends on a loop cut through simulated logic. */
@@ -109,28 +113,40 @@ public class EDIFRandomSimEquivalence {
                 byName.put(names[l], l);
                 EDIFCellInst inst = idx.getLeafInst(l);
                 kind[l] = idx.isLeafBlackBox(l) ? C_CUT : kindOf(inst.getCellType().getName());
-                EDIFPropertyValue v = inst.getProperty("INIT");
-                if (v != null && (kind[l] == C_LUT || kind[l] == C_LUT62 || kind[l] == C_LUTCY)) {
-                    init[l] = LUTTools.getInitValue(v.getValue());
+                if (inst.getProperty("INIT") != null
+                        && (kind[l] == C_LUT || kind[l] == C_LUT62 || kind[l] == C_LUTCY)) {
+                    // At the width of the INIT parameter: a LUT2's 2'hF is 4'h3
+                    Long v = PrimitiveDefaults.getInitBits(inst);
+                    if (v == null) {
+                        // Not a number: not simulated, compared as a cut cell
+                        kind[l] = C_CUT;
+                    } else {
+                        init[l] = v;
+                    }
                 }
                 cutType[l] = kind[l] == C_CUT;
             }
-            driven = new boolean[idx.getNumNets()];
+            // Found once per net: looking them up per load is quadratic in the fanout
+            int numNets = idx.getNumNets();
+            srcStart = new int[numNets + 1];
             for (int p = 0; p < idx.getNumPins(); p++) {
                 if (idx.getPinDir(p) != EDIFLeafIndex.SINK && idx.getPinNet(p) >= 0) {
-                    driven[idx.getPinNet(p)] = true;
+                    srcStart[idx.getPinNet(p) + 1]++;
                 }
             }
-            // Found once per net: looking it up per load is quadratic in the fanout
-            netDriverPin = new int[idx.getNumNets()];
-            for (int net = 0; net < idx.getNumNets(); net++) {
-                netDriverPin[net] = -1;
-                for (int i = idx.getNetPinStart(net); i < idx.getNetPinEnd(net); i++) {
-                    if (idx.getPinDir(idx.getNetPin(i)) == EDIFLeafIndex.DRIVER) {
-                        netDriverPin[net] = idx.getNetPin(i);
-                        break;
-                    }
+            for (int net = 0; net < numNets; net++) {
+                srcStart[net + 1] += srcStart[net];
+            }
+            srcPins = new int[srcStart[numNets]];
+            int[] fill = Arrays.copyOf(srcStart, numNets);
+            for (int p = 0; p < idx.getNumPins(); p++) {
+                if (idx.getPinDir(p) != EDIFLeafIndex.SINK && idx.getPinNet(p) >= 0) {
+                    srcPins[fill[idx.getPinNet(p)]++] = p;
                 }
+            }
+            driven = new boolean[numNets];
+            for (int net = 0; net < numNets; net++) {
+                driven[net] = srcStart[net + 1] > srcStart[net];
             }
             loopCut = new boolean[n];
             order = topoOrder();
@@ -219,8 +235,8 @@ public class EDIFRandomSimEquivalence {
         }
 
         /**
-         * Orders evaluation nodes (one per combinational leaf, four per LOOKAHEAD8) so drivers
-         * come first; leaves in true loops become cuts.
+         * Orders evaluation nodes (one per combinational leaf, four per LOOKAHEAD8) so all the
+         * drivers of a net come first; leaves in true loops become cuts.
          */
         private int[] topoOrder() {
             int n = idx.getNumLeaves();
@@ -237,20 +253,24 @@ public class EDIFRandomSimEquivalence {
                     if (idx.getPinDir(p) == EDIFLeafIndex.DRIVER || idx.getPinNet(p) < 0) {
                         continue;
                     }
-                    int dp = driverPin(idx.getPinNet(p));
-                    int d = dp < 0 ? -1 : idx.getPinLeaf(dp);
-                    if (d < 0 || !isComb(d)) {
-                        continue;
-                    }
-                    int dn = nodeOf(d, idx.getPinPortInst(dp).getName());
+                    int net = idx.getPinNet(p);
                     String pin = idx.getPinPortInst(p).getName();
-                    for (int sub = 0; sub < subs(l); sub++) {
-                        if (dependsOn(l, sub, pin)) {
-                            indeg[l * 4 + sub]++;
-                            if (succ.get(dn) == null) {
-                                succ.set(dn, new ArrayList<>());
+                    // All the drivers of a multi-driven net contribute to its value
+                    for (int i = srcStart[net]; i < srcStart[net + 1]; i++) {
+                        int dp = srcPins[i];
+                        int d = idx.getPinLeaf(dp);
+                        if (d < 0 || !isComb(d)) {
+                            continue;
+                        }
+                        int dn = nodeOf(d, idx.getPinPortInst(dp).getName());
+                        for (int sub = 0; sub < subs(l); sub++) {
+                            if (dependsOn(l, sub, pin)) {
+                                indeg[l * 4 + sub]++;
+                                if (succ.get(dn) == null) {
+                                    succ.set(dn, new ArrayList<>());
+                                }
+                                succ.get(dn).add(l * 4 + sub);
                             }
-                            succ.get(dn).add(l * 4 + sub);
                         }
                     }
                 }
@@ -309,10 +329,11 @@ public class EDIFRandomSimEquivalence {
          * cells never change. So does the output of a LUT that, with its fixed inputs at their
          * values, does not depend on its other inputs (e.g. a clock gate whose enable is
          * constant 0), and the outputs of other simulated cells whose inputs all never change.
-         * Cells cut to break loops are not included.
+         * Cells cut to break loops are not included. A net with several sources never changes
+         * only if none of them does.
          */
         byte[] fixedNets(Map<Integer, Long> forced) {
-            byte[] fixed = new byte[idx.getNumNets()];
+            Fixed fixed = new Fixed(idx.getNumNets());
             for (int l = 0; l < idx.getNumLeaves(); l++) {
                 Long f = forced.get(l);
                 if (kind[l] == C_GND || f != null && f == 0L) {
@@ -326,23 +347,81 @@ public class EDIFRandomSimEquivalence {
             for (int node : order) {
                 int l = node / 4;
                 if (kind[l] == C_LUT) {
-                    byte out = fixedLut(l, fixed);
+                    byte out = fixedLut(l, fixed.state);
                     if (out != NOT_FIXED) {
                         markOutputs(l, fixed, out);
                     }
                     continue;
                 }
+                // Each node of a LOOKAHEAD8 marks its own output, once, from its own inputs
+                int sub = node % 4;
                 boolean all = true;
                 for (int p = idx.getLeafPinStart(l); p < idx.getLeafPinEnd(l) && all; p++) {
                     int n = idx.getPinNet(p);
                     all = idx.getPinDir(p) == EDIFLeafIndex.DRIVER || n < 0
-                            || fixed[n] != NOT_FIXED;
+                            || !dependsOn(l, sub, idx.getPinPortInst(p).getName())
+                            || fixed.state[n] != NOT_FIXED;
                 }
                 if (all) {
-                    markOutputs(l, fixed, FIXED_UNKNOWN);
+                    markOutputs(l, kind[l] == C_LOOKAHEAD ? sub : -1, fixed, FIXED_UNKNOWN);
                 }
             }
-            return fixed;
+            return fixed.state;
+        }
+
+        /** Nets found never to change so far, and the sources of multi-source nets seen. */
+        private static final class Fixed {
+            final byte[] state;
+            /** Combined state of the sources of a net seen so far, and their number. */
+            final byte[] partial;
+            final int[] seen;
+
+            Fixed(int numNets) {
+                state = new byte[numNets];
+                partial = new byte[numNets];
+                seen = new int[numNets];
+            }
+        }
+
+        /**
+         * @return The fixed state of a net with two sources in the given states: the XOR of
+         * their values if both are known (as simulated), else unknown.
+         */
+        private static byte combine(byte a, byte b) {
+            boolean known = (a == FIXED_0 || a == FIXED_1) && (b == FIXED_0 || b == FIXED_1);
+            return !known ? FIXED_UNKNOWN : a == b ? FIXED_0 : FIXED_1;
+        }
+
+        /**
+         * @return The mask of the inputs of LUT l that its output depends on when the inputs on
+         * nets fixed to a known value (unconnected ones are 0) hold that value.
+         */
+        int lutSupport(int l, byte[] fixed) {
+            int k = idx.getLeafInst(l).getCellType().getName().charAt(3) - '0';
+            int known = 0;
+            int knownVal = 0;
+            for (int i = 0; i < k; i++) {
+                int n = netOfPin(l, "I" + i);
+                byte f = n < 0 ? FIXED_0 : fixed[n];
+                if (f == FIXED_0 || f == FIXED_1) {
+                    known |= 1 << i;
+                    knownVal |= f == FIXED_1 ? 1 << i : 0;
+                }
+            }
+            int support = 0;
+            for (int row = 0; row < (1 << k); row++) {
+                if ((row & known) != knownVal) {
+                    continue;
+                }
+                for (int i = 0; i < k; i++) {
+                    int bit = 1 << i;
+                    if ((known & bit) == 0 && (support & bit) == 0
+                            && ((init[l] >>> row) & 1L) != ((init[l] >>> (row ^ bit)) & 1L)) {
+                        support |= bit;
+                    }
+                }
+            }
+            return support;
         }
 
         /** @return The fixed state of the output of LUT l (NOT_FIXED if it may change). */
@@ -385,23 +464,39 @@ public class EDIFRandomSimEquivalence {
             return -1;
         }
 
-        private void markOutputs(int l, byte[] nets, byte state) {
+        /**
+         * Marks the nets driven by leaf l as fixed in the given state. A net with several
+         * sources is marked once all of them are (sources never marked, e.g. top-level inputs or
+         * cut cells not assumed constant, leave it not fixed).
+         */
+        private void markOutputs(int l, Fixed fixed, byte state) {
+            markOutputs(l, -1, fixed, state);
+        }
+
+        /** As {@link #markOutputs(int, Fixed, byte)}, only output sub of a LOOKAHEAD8 if >= 0. */
+        private void markOutputs(int l, int sub, Fixed fixed, byte state) {
             for (int p = idx.getLeafPinStart(l); p < idx.getLeafPinEnd(l); p++) {
                 int n = idx.getPinNet(p);
-                if (idx.getPinDir(p) == EDIFLeafIndex.DRIVER && n >= 0) {
-                    nets[n] = state;
+                if (idx.getPinDir(p) != EDIFLeafIndex.DRIVER || n < 0
+                        || sub >= 0 && nodeOf(l, idx.getPinPortInst(p).getName()) != l * 4 + sub) {
+                    continue;
+                }
+                int sources = srcStart[n + 1] - srcStart[n];
+                if (sources == 1) {
+                    fixed.state[n] = state;
+                    continue;
+                }
+                byte s = fixed.seen[n] == 0 ? state : combine(fixed.partial[n], state);
+                fixed.partial[n] = s;
+                if (++fixed.seen[n] == sources) {
+                    fixed.state[n] = s;
                 }
             }
         }
 
-        /** @return The (first) driver pin of a net, -1 if none. */
+        /** @return The first source pin of a net (see {@link #srcPins}), -1 if none. */
         int driverPin(int net) {
-            return netDriverPin[net];
-        }
-
-        int driverLeaf(int net) {
-            int dp = netDriverPin[net];
-            return dp < 0 ? -1 : idx.getPinLeaf(dp);
+            return srcStart[net + 1] > srcStart[net] ? srcPins[srcStart[net]] : -1;
         }
 
         long in(int l, String pin) {
@@ -428,6 +523,15 @@ public class EDIFRandomSimEquivalence {
         /** @return True if a property of leaf l (or its primitive default) is true. */
         boolean attrTrue(int l, String key) {
             return VerilogLiterals.isTrue(PrimitiveDefaults.getValue(idx.getLeafInst(l), key));
+        }
+
+        /**
+         * @return True if a one-bit parameter of leaf l (or its primitive default), e.g. a
+         * flip-flop's INIT or an IS_*_INVERTED, is 1: only the least significant bit of a number
+         * counts (2'b10 is 0).
+         */
+        boolean attrBit(int l, String key) {
+            return VerilogLiterals.isBitSet(PrimitiveDefaults.getValue(idx.getLeafInst(l), key));
         }
     }
 
@@ -630,7 +734,7 @@ public class EDIFRandomSimEquivalence {
                     return null;
                 }
                 long v = m.val[n];
-                return m.attrTrue(l, "IS_" + pin + "_INVERTED") ? ~v : v;
+                return m.attrBit(l, "IS_" + pin + "_INVERTED") ? ~v : v;
             }
         }
         return null;
@@ -675,16 +779,15 @@ public class EDIFRandomSimEquivalence {
                 continue;
             }
             if (type.matches("FD[RSCP]E|LD[CP]E")) {
-                boolean init1 = a.attrTrue(l, "INIT");
+                boolean init1 = a.attrBit(l, "INIT");
                 forced.put(l, init1 ? -1L : 0L);
                 removedFF.add(l);
             } else if (type.matches("SRL16E|SRLC32E")) {
                 // A removed shift register can only be constant if all its initial bits are
                 // equal (then D must equal them); otherwise it keeps pseudo-random values
                 long all = type.equals("SRL16E") ? 0xFFFFL : 0xFFFFFFFFL;
-                long init = LUTTools.getInitValue(PrimitiveDefaults.getValue(
-                        a.idx.getLeafInst(l), "INIT")) & all;
-                if (init == 0L || init == all) {
+                Long init = PrimitiveDefaults.getInitBits(a.idx.getLeafInst(l));
+                if (init != null && (init == 0L || init == all)) {
                     forced.put(l, init == 0L ? 0L : -1L);
                     removedFF.add(l);
                 } else {
@@ -952,46 +1055,63 @@ public class EDIFRandomSimEquivalence {
     /**
      * Marks the leaves of the original netlist whose outputs reach an observed point (top-level
      * output or input of a cut cell present in both netlists) through simulated logic or
-     * removed sequential cells.
+     * removed sequential cells. The inputs of a LUT that its output does not depend on, with its
+     * inputs fed by constants (GND/VCC, through simulated logic) at their values, are not
+     * followed: e.g. a swept chain of flip-flops loading only a LUT made constant is not
+     * observed, so is not assumed constant and checked (which can take one simulation pass per
+     * flip-flop, as each one found not constant can only invalidate the next).
      */
     private static boolean[] observedCone(Model a, Model b) {
         EDIFLeafIndex idx = a.idx;
+        // Constants that hold whatever is assumed about the removed sequential cells
+        byte[] fixed = a.fixedNets(new HashMap<>());
         boolean[] seen = new boolean[idx.getNumLeaves()];
         List<Integer> stack = new ArrayList<>();
         for (int p = idx.getNumLeafPins(); p < idx.getNumPins(); p++) {
             if (idx.getPinDir(p) != EDIFLeafIndex.DRIVER && idx.getPinNet(p) >= 0) {
-                pushDriver(a, idx.getPinNet(p), seen, stack);
+                pushDrivers(a, idx.getPinNet(p), seen, stack);
             }
         }
         for (int l = 0; l < idx.getNumLeaves(); l++) {
             if (a.kind[l] == C_CUT && b.byName.containsKey(a.names[l])) {
-                pushInputs(a, l, seen, stack);
+                pushInputs(a, l, fixed, seen, stack);
             }
         }
         while (!stack.isEmpty()) {
             int l = stack.remove(stack.size() - 1);
             boolean keptCut = a.kind[l] == C_CUT && b.byName.containsKey(a.names[l]);
             if (!keptCut) {
-                pushInputs(a, l, seen, stack);
+                pushInputs(a, l, fixed, seen, stack);
             }
         }
         return seen;
     }
 
-    private static void pushInputs(Model a, int l, boolean[] seen, List<Integer> stack) {
+    private static void pushInputs(Model a, int l, byte[] fixed, boolean[] seen,
+                                   List<Integer> stack) {
+        int support = a.kind[l] == C_LUT ? a.lutSupport(l, fixed) : -1;
         for (int p = a.idx.getLeafPinStart(l); p < a.idx.getLeafPinEnd(l); p++) {
-            if (a.idx.getPinDir(p) != EDIFLeafIndex.DRIVER && a.idx.getPinNet(p) >= 0) {
-                pushDriver(a, a.idx.getPinNet(p), seen, stack);
+            if (a.idx.getPinDir(p) == EDIFLeafIndex.DRIVER || a.idx.getPinNet(p) < 0) {
+                continue;
             }
+            if (support != -1) {
+                // LUT inputs are I0 to I5
+                int i = a.idx.getPinPortInst(p).getName().charAt(1) - '0';
+                if ((support & (1 << i)) == 0) {
+                    continue;
+                }
+            }
+            pushDrivers(a, a.idx.getPinNet(p), seen, stack);
         }
     }
 
-    private static void pushDriver(Model a, int n, boolean[] seen, List<Integer> stack) {
-        int dp = a.driverPin(n);
-        int d = dp < 0 ? -1 : a.idx.getPinLeaf(dp);
-        if (d >= 0 && !seen[d]) {
-            seen[d] = true;
-            stack.add(d);
+    private static void pushDrivers(Model a, int n, boolean[] seen, List<Integer> stack) {
+        for (int i = a.srcStart[n]; i < a.srcStart[n + 1]; i++) {
+            int d = a.idx.getPinLeaf(a.srcPins[i]);
+            if (d >= 0 && !seen[d]) {
+                seen[d] = true;
+                stack.add(d);
+            }
         }
     }
 

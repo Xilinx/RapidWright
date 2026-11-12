@@ -32,7 +32,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
@@ -42,6 +41,7 @@ import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.edif.optimizer.EDIFLeafIndex;
+import com.xilinx.rapidwright.edif.optimizer.PrimitiveDefaults;
 import com.xilinx.rapidwright.edif.optimizer.VerilogLiterals;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 
@@ -209,11 +209,11 @@ public class EDIFLeafNetlistComparator {
             return null;
         }
         int size = type.charAt(3) - '0';
-        EDIFPropertyValue initVal = inst.getProperty("INIT");
-        if (initVal == null) {
+        // At the width of the INIT parameter: a LUT2's 2'hF is 4'h3
+        Long init = PrimitiveDefaults.getInitBits(inst);
+        if (init == null) {
             return null;
         }
-        long init = LUTTools.getInitValue(initVal.getValue());
         TreeSet<String> varSet = new TreeSet<>();
         String[] in = new String[size];
         for (int i = 0; i < size; i++) {

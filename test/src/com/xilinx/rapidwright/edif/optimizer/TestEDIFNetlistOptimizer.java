@@ -509,6 +509,25 @@ public class TestEDIFNetlistOptimizer {
     }
 
     @Test
+    public void testVerilogLiteralsAtParameterWidth() {
+        // Bit-vector parameters: a literal truncated by its width, then to the parameter's
+        Assertions.assertEquals(Long.valueOf(0x3), VerilogLiterals.parseBits("2'hF", 4));
+        Assertions.assertEquals(Long.valueOf(0x5), VerilogLiterals.parseBits("8'hF5", 4));
+        Assertions.assertEquals(Long.valueOf(-1L),
+                VerilogLiterals.parseBits("64'hFFFF_FFFF_FFFF_FFFF", 64));
+        Assertions.assertEquals(Long.valueOf(0xFFFF), VerilogLiterals.parseBits("-1", 16));
+        Assertions.assertNull(VerilogLiterals.parseBits("SYNC", 4));
+        // One-bit parameters: only the least significant bit counts
+        for (String t : new String[] {"TRUE", "yes", "1", "1'b1", "2'b11", "3", "4'hF"}) {
+            Assertions.assertTrue(VerilogLiterals.isBitSet(t), t);
+        }
+        for (String f : new String[] {"FALSE", "no", "0", "1'b0", "2'b10", "2", "4'hE", "SYNC",
+                null}) {
+            Assertions.assertFalse(VerilogLiterals.isBitSet(f), f);
+        }
+    }
+
+    @Test
     public void testVerilogLiterals() {
         Assertions.assertEquals(BigInteger.valueOf(10), VerilogLiterals.parseNumber("4'hA"));
         Assertions.assertEquals(BigInteger.valueOf(5), VerilogLiterals.parseNumber("3'b1_01"));
@@ -1529,5 +1548,220 @@ public class TestEDIFNetlistOptimizer {
                 Assertions.assertEquals(net, found, name);
             }
         }
+    }
+
+    /** @return The type of the leaf cell driving top-level net name, null if none. */
+    private static String driverType(EDIFNetlist nl, String name) {
+        for (EDIFPortInst pi : nl.getTopCell().getNet(name).getPortInsts()) {
+            if (pi.getCellInst() != null && pi.isOutput()) {
+                return pi.getCellInst().getCellType().getName();
+            }
+        }
+        return null;
+    }
+
+    /** LUT2 L (inputs a, i1) with the given INIT, or VCC/GND (for "1"/"0") on output o. */
+    private static EDIFNetlist lut2(String init, String i1) {
+        OptProbes.B b = new OptProbes.B("lut_init_width");
+        b.in("a", "b");
+        b.out("o");
+        if (init.equals("1")) {
+            b.inst(Unisim.VCC, "V", "P=o");
+        } else if (init.equals("0")) {
+            b.inst(Unisim.GND, "G", "G=o");
+        } else {
+            b.inst(Unisim.LUT2, "L", "I0=a", "I1=" + i1, "O=o", "@INIT=" + init);
+        }
+        return b.nl;
+    }
+
+    @Test
+    public void testLutInitIsDecodedAtItsWidth() {
+        // A LUT2's INIT of 2'hF is 4'h3 (not 4'hF, which is constant 1)
+        Assertions.assertTrue(new EDIFRandomSimEquivalence().check(lut2("2'hF", "b"), lut2("1", ""),
+                2) > 0);
+        Assertions.assertEquals(0, new EDIFRandomSimEquivalence().check(lut2("2'hF", "b"),
+                lut2("4'h3", "b"), 2));
+        Assertions.assertEquals(0, new EDIFLeafNetlistComparator().compare(lut2("2'hF", "b"),
+                lut2("4'h3", "b")));
+        Assertions.assertTrue(new EDIFLeafNetlistComparator().compare(lut2("2'hF", "b"),
+                lut2("4'hF", "b")) > 0);
+        // With I1 = 1 the output is 0
+        EDIFNetlist opt = lut2("2'hF", "1");
+        EDIFTools.optimizeNetlist(opt, new EDIFOptOptions());
+        Assertions.assertEquals("GND", driverType(opt, "o"));
+        EDIFRandomSimEquivalence eq = new EDIFRandomSimEquivalence();
+        Assertions.assertEquals(0, eq.check(lut2("2'hF", "1"), opt, 2),
+                eq.getExamples().toString());
+    }
+
+    /** A flip-flop with its clock enable inactive (output o), or GND/VCC on o. */
+    private static EDIFNetlist heldFlipFlop(String init) {
+        OptProbes.B b = new OptProbes.B("held_ff");
+        b.in("clk", "a");
+        b.out("o");
+        if (init.equals("1")) {
+            b.inst(Unisim.VCC, "V", "P=o");
+        } else if (init.equals("0")) {
+            b.inst(Unisim.GND, "G", "G=o");
+        } else {
+            b.inst(Unisim.FDRE, "F", "C=clk", "D=a", "CE=0", "R=0", "Q=o", "@INIT=" + init);
+        }
+        return b.nl;
+    }
+
+    /** A flip-flop loading constant 1 with its D inversion set to the given value. */
+    private static EDIFNetlist invertedD(String inverted) {
+        OptProbes.B b = new OptProbes.B("inv_d_ff");
+        b.in("clk");
+        b.out("o");
+        b.inst(Unisim.FDRE, "F", "C=clk", "D=1", "CE=1", "R=0", "Q=o", "@INIT=1'b1",
+                "@IS_D_INVERTED=" + inverted);
+        return b.nl;
+    }
+
+    @Test
+    public void testOneBitParametersUseTheirLeastSignificantBit() {
+        // INIT=2'b10 on a one-bit INIT is 0
+        Assertions.assertTrue(new EDIFRandomSimEquivalence().check(heldFlipFlop("2'b10"),
+                heldFlipFlop("1"), 2) > 0);
+        Assertions.assertEquals(0, new EDIFRandomSimEquivalence().check(heldFlipFlop("2'b10"),
+                heldFlipFlop("0"), 2));
+        EDIFNetlist opt = heldFlipFlop("2'b10");
+        EDIFTools.optimizeNetlist(opt, new EDIFOptOptions());
+        Assertions.assertEquals("GND", driverType(opt, "o"));
+        // IS_D_INVERTED=2'b10 does not invert: D is 1, as INIT, so the output is constant 1
+        opt = invertedD("2'b10");
+        EDIFTools.optimizeNetlist(opt, new EDIFOptOptions());
+        Assertions.assertEquals("VCC", driverType(opt, "o"));
+        EDIFRandomSimEquivalence eq = new EDIFRandomSimEquivalence();
+        Assertions.assertEquals(0, eq.check(invertedD("2'b10"), opt, 2),
+                eq.getExamples().toString());
+        // Inverted, D is 0: not constant
+        opt = invertedD("2'b01");
+        EDIFTools.optimizeNetlist(opt, new EDIFOptOptions());
+        Assertions.assertEquals("FDRE", driverType(opt, "o"));
+    }
+
+    /**
+     * Net m is driven by both X (from a) and Y (from c through W); Z loads it. Y is a buffer, or
+     * an inverter if invertY.
+     */
+    private static EDIFNetlist lateDriver(String prefix, boolean invertY) {
+        OptProbes.B b = new OptProbes.B("late_driver");
+        b.in("a", "c");
+        b.out("o");
+        b.lut(prefix + "X", "2", "m", "a");
+        b.lut(prefix + "W", "2", "w", "c");
+        b.lut(prefix + "Y", invertY ? "1" : "2", "m", "w");
+        b.lut(prefix + "Z", "2", "o", "m");
+        return b.nl;
+    }
+
+    @Test
+    public void testRandomSimEquivalenceEvaluatesAllDriversFirst() {
+        // Z must be evaluated after both drivers of m, whatever the order of the cells (the
+        // names vary it): a change in the late driver Y changes o
+        for (int i = 0; i < 20; i++) {
+            String prefix = "p" + i + "_";
+            Assertions.assertEquals(0, new EDIFRandomSimEquivalence().check(
+                    lateDriver(prefix, false), lateDriver(prefix, false), 2), prefix);
+            Assertions.assertTrue(new EDIFRandomSimEquivalence().check(lateDriver(prefix, false),
+                    lateDriver(prefix, true), 2) > 0, prefix);
+        }
+    }
+
+    /**
+     * A chain of n flip-flops, each clocked by the previous one (so none is constant), loading
+     * only an AND with ground; or (if !withChain) ground on its output o.
+     */
+    private static EDIFNetlist rippleIntoConstant(int n, boolean withChain) {
+        OptProbes.B b = new OptProbes.B("ripple_const");
+        b.in("clk");
+        b.out("o");
+        if (!withChain) {
+            b.inst(Unisim.GND, "G", "G=o");
+            return b.nl;
+        }
+        for (int i = 0; i < n; i++) {
+            b.inst(Unisim.FDRE, "F" + i, "C=" + (i == 0 ? "clk" : "q" + (i - 1)), "D=1", "CE=1",
+                    "R=0", "Q=q" + i, "@INIT=1'b0");
+        }
+        b.lut("L", "8", "o", "q" + (n - 1), "0");
+        return b.nl;
+    }
+
+    @Test
+    public void testRandomSimEquivalenceSkipsLogicMaskedByConstants() {
+        // The chain only reaches o through an input L does not depend on: it is not observed,
+        // so not assumed constant (which takes a simulation pass per flip-flop to disprove)
+        int n = 200;
+        EDIFRandomSimEquivalence eq = new EDIFRandomSimEquivalence();
+        Assertions.assertEquals(0, eq.check(rippleIntoConstant(n, true),
+                rippleIntoConstant(n, false), 2), eq.getExamples().toString());
+        Assertions.assertEquals(0, eq.getRemovedNonConstant());
+        // Through a LUT that depends on it, the chain is observed (and not constant)
+        EDIFNetlist observed = rippleIntoConstant(n, true);
+        observed.getTopCell().getCellInst("L").addProperty("INIT", "4'hA");
+        Assertions.assertTrue(eq.check(observed, rippleIntoConstant(n, false), 2) > 0);
+    }
+
+    /**
+     * A LOOKAHEAD8 with all inputs tied to ground except CYH (from a): COUTB, COUTD and COUTF
+     * never change, COUTH does. A removed flip-flop F (output o) is clocked by the given output;
+     * or (if out is null) ground on o.
+     */
+    private static EDIFNetlist lookaheadClock(String out) {
+        OptProbes.B b = new OptProbes.B("lookahead_clock");
+        b.in("a");
+        b.out("o");
+        if (out == null) {
+            b.inst(Unisim.GND, "G", "G=o");
+            return b.nl;
+        }
+        String[] conns = new String[18];
+        int k = 0;
+        conns[k++] = "CIN=0";
+        for (char c = 'A'; c <= 'H'; c++) {
+            conns[k++] = "CY" + c + "=" + (c == 'H' ? "a" : "0");
+            conns[k++] = "PROP" + c + "=0";
+        }
+        conns[k] = out + "=clk";
+        b.inst(Unisim.LOOKAHEAD8, "C", conns);
+        b.inst(Unisim.FDRE, "F", "C=clk", "D=1", "CE=1", "R=0", "Q=o", "@INIT=1'b0");
+        return b.nl;
+    }
+
+    @Test
+    public void testRandomSimEquivalenceFindsFixedLookaheadOutputs() {
+        // Clocked by COUTF, which never changes, F stays 0; clocked by COUTH it does not
+        EDIFRandomSimEquivalence eq = new EDIFRandomSimEquivalence();
+        Assertions.assertEquals(0, eq.check(lookaheadClock("COUTF"), lookaheadClock(null), 2),
+                eq.getExamples().toString());
+        Assertions.assertTrue(eq.check(lookaheadClock("COUTH"), lookaheadClock(null), 2) > 0);
+    }
+
+    @Test
+    public void testSweepRemovesDisconnectedStaticSources() {
+        // 'sub' only contains a GND connected to nothing: it is removed, as is the unconnected
+        // VCC of the top cell; the GND inside the DONT_TOUCH instance 'k' stays
+        OptProbes.B b = new OptProbes.B("dangling_static");
+        b.in("a");
+        b.out("o");
+        EDIFCell sub = b.cell("sub");
+        b.in(sub, "x");
+        b.instIn(sub, Unisim.GND, "G");
+        b.inst(sub, "u", "x=a");
+        EDIFCell keep = b.cell("keep");
+        b.in(keep, "x");
+        b.instIn(keep, Unisim.GND, "G");
+        b.inst(keep, "k", "x=a").addProperty("DONT_TOUCH", "TRUE");
+        b.inst(Unisim.VCC, "V");
+        b.lut("L", "2", "o", "a");
+        EDIFTools.optimizeNetlist(b.nl, new EDIFOptOptions());
+        Assertions.assertNull(b.top.getCellInst("u"));
+        Assertions.assertNull(b.top.getCellInst("V"));
+        Assertions.assertNotNull(b.top.getCellInst("k"));
+        Assertions.assertNotNull(keep.getCellInst("G"));
     }
 }
