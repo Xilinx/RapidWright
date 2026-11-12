@@ -1861,6 +1861,46 @@ public class DesignTools {
     }
 
     /**
+     * Checks whether any PIP of a net starts or ends at the node of one of the given pins. It compares the
+     * tile and wire index of each PIP's start and end wire against the wires of the pins' nodes, so no node
+     * is created per PIP.
+     * @param net The net whose PIPs are checked.
+     * @param pins The pins whose nodes are looked for.
+     * @return True if at least one PIP of the net starts or ends at a node of the given pins, or if
+     * a placed pin has no node (then only the full search can tell).
+     */
+    private static boolean isAnyPIPOnPinNodes(Net net, Collection<SitePinInst> pins) {
+        if (!net.hasPIPs()) {
+            return false;
+        }
+        Map<Tile, Set<Integer>> pinNodeWires = new HashMap<>();
+        for (SitePinInst p : pins) {
+            if (p.getSiteInst() == null || p.getSite() == null) {
+                // Skipped by getTrimmablePIPsFromPins() too
+                continue;
+            }
+            Node node = p.getConnectedNode();
+            if (node == null) {
+                // Matched against PIPs with a null node: leave it to the full search
+                return true;
+            }
+            for (Wire w : node.getAllWiresInNode()) {
+                pinNodeWires.computeIfAbsent(w.getTile(), (t) -> new HashSet<>()).add(w.getWireIndex());
+            }
+        }
+        if (pinNodeWires.isEmpty()) {
+            return false;
+        }
+        for (PIP pip : net.getPIPs()) {
+            Set<Integer> wires = pinNodeWires.get(pip.getTile());
+            if (wires != null && (wires.contains(pip.getStartWireIndex()) || wires.contains(pip.getEndWireIndex()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * For the given set of pins, if they were removed, determine which PIPs could
      * be trimmed as they no longer route to any specific sink. This method only
      * works for sink pins. See {@link #unrouteSourcePin(SitePinInst)} for handling
@@ -1875,6 +1915,11 @@ public class DesignTools {
      */
     public static Set<PIP> getTrimmablePIPsFromPins(Net net, Collection<SitePinInst> pins,
             boolean overrideNetPins) {
+        if (!isAnyPIPOnPinNodes(net, pins)) {
+            // No PIP starts or ends at any of the pins' nodes: nothing can be trimmed and nothing below would
+            // change, so skip building maps over all of the net's PIPs (costly on large, e.g. static, nets)
+            return new HashSet<>();
+        }
         // Map listing the PIPs that drive a Node
         Map<Node,ArrayList<PIP>> reverseConns = new HashMap<>();
         Map<Node,Integer> fanout = new HashMap<>();
