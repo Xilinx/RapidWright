@@ -1660,15 +1660,125 @@ public class TestEDIFNetlistOptimizer {
 
     @Test
     public void testRandomSimEquivalenceEvaluatesAllDriversFirst() {
-        // Z must be evaluated after both drivers of m, whatever the order of the cells (the
-        // names vary it): a change in the late driver Y changes o
+        // Whatever the order of the cells (the names vary it), a change in the late driver Y
+        // is not reported as equivalent (m has simulated drivers: o is not checked)
         for (int i = 0; i < 20; i++) {
             String prefix = "p" + i + "_";
-            Assertions.assertEquals(0, new EDIFRandomSimEquivalence().check(
-                    lateDriver(prefix, false), lateDriver(prefix, false), 2), prefix);
-            Assertions.assertTrue(new EDIFRandomSimEquivalence().check(lateDriver(prefix, false),
-                    lateDriver(prefix, true), 2) > 0, prefix);
+            EDIFRandomSimEquivalence eq = new EDIFRandomSimEquivalence();
+            Assertions.assertEquals(0, eq.check(lateDriver(prefix, false),
+                    lateDriver(prefix, false), 2), prefix);
+            eq.check(lateDriver(prefix, false), lateDriver(prefix, true), 2);
+            Assertions.assertNotEquals("EQUIVALENT", eq.getVerdict(), prefix);
         }
+    }
+
+    /** Output o driven by two cells of the given type from input a, or by GND if type is null. */
+    private static EDIFNetlist twoDrivers(Unisim type) {
+        OptProbes.B b = new OptProbes.B("two_drivers");
+        b.in("clk", "a");
+        b.out("o");
+        if (type == null) {
+            b.inst(Unisim.GND, "G", "G=o");
+        } else if (type == Unisim.FDRE) {
+            // Two flip-flops held at 1
+            for (String name : new String[] {"F0", "F1"}) {
+                b.inst(Unisim.FDRE, name, "C=clk", "D=a", "CE=0", "R=0", "Q=o", "@INIT=1'b1");
+            }
+        } else {
+            b.inst(type, "D0", "I=a", "O=o");
+            b.inst(type, "D1", "I=a", "O=o");
+        }
+        return b.nl;
+    }
+
+    @Test
+    public void testRandomSimEquivalenceDoesNotCancelCorrelatedDrivers() {
+        // Two buffers of a resolve to a, not to their XOR (0): o is not checked
+        EDIFRandomSimEquivalence eq = new EDIFRandomSimEquivalence();
+        Assertions.assertEquals(0, eq.check(twoDrivers(Unisim.BUF), twoDrivers(null), 2));
+        Assertions.assertTrue(eq.getUnchecked() > 0);
+        Assertions.assertEquals("INCONCLUSIVE", eq.getVerdict());
+        eq.check(twoDrivers(Unisim.BUF), twoDrivers(Unisim.INV), 2);
+        Assertions.assertEquals("INCONCLUSIVE", eq.getVerdict());
+        // Also when only the optimized netlist has them
+        eq.check(twoDrivers(null), twoDrivers(Unisim.BUF), 2);
+        Assertions.assertEquals("INCONCLUSIVE", eq.getVerdict());
+        // Removed flip-flops on a multi-driven net are not assumed constant (1 XOR 1 is 0)
+        Assertions.assertTrue(eq.check(twoDrivers(Unisim.FDRE), twoDrivers(null), 2) > 0);
+        Assertions.assertEquals("NOT EQUIVALENT", eq.getVerdict());
+        // Independent drivers (cut cells, e.g. tri-state buffers) are still checked
+        Assertions.assertEquals(0, eq.check(triStates(true), triStates(true), 2));
+        Assertions.assertEquals("EQUIVALENT", eq.getVerdict());
+    }
+
+    @Test
+    public void testRandomSimEquivalenceIsInconclusiveOnUncheckedLoops() {
+        // o is driven by a combinational loop: replacing it by ground is not checked
+        OptProbes.B b = new OptProbes.B("loop_out");
+        b.in("a");
+        b.out("o");
+        b.lut("L", "6", "o", "a", "o");
+        OptProbes.B g = new OptProbes.B("loop_out");
+        g.in("a");
+        g.out("o");
+        g.inst(Unisim.GND, "G", "G=o");
+        EDIFRandomSimEquivalence eq = new EDIFRandomSimEquivalence();
+        Assertions.assertEquals(0, eq.check(b.nl, g.nl, 2));
+        Assertions.assertEquals("INCONCLUSIVE", eq.getVerdict());
+    }
+
+    /**
+     * A flip-flop (output o) on a clock gated by an enable that is constant 0: GND through an
+     * INV of VCC, or through a BUF; or (if !withFF) ground on o.
+     */
+    private static EDIFNetlist gatedClock(Unisim type, boolean withFF) {
+        OptProbes.B b = new OptProbes.B("gated_clock");
+        b.in("clk");
+        b.out("o");
+        if (!withFF) {
+            b.inst(Unisim.GND, "G", "G=o");
+            return b.nl;
+        }
+        b.inst(type, "E", "I=" + (type == Unisim.INV ? "1" : "0"), "O=en");
+        b.lut("A", "8", "gclk", "clk", "en");
+        b.inst(Unisim.FDRE, "F", "C=gclk", "D=1", "CE=1", "R=0", "Q=o", "@INIT=1'b0");
+        return b.nl;
+    }
+
+    @Test
+    public void testRandomSimEquivalenceSeesConstantsThroughInvAndBuf() {
+        // The gated clock never changes, so F stays 0
+        for (Unisim type : new Unisim[] {Unisim.INV, Unisim.BUF}) {
+            EDIFRandomSimEquivalence eq = new EDIFRandomSimEquivalence();
+            Assertions.assertEquals(0, eq.check(gatedClock(type, true), gatedClock(type, false), 2),
+                    type + " " + eq.getExamples());
+            Assertions.assertEquals("EQUIVALENT", eq.getVerdict());
+        }
+    }
+
+    /** A flip-flop and a LUT whose outputs are on unloaded nets, or unconnected. */
+    private static EDIFNetlist unloadedOutputs(boolean connected, boolean swapLutInputs) {
+        OptProbes.B b = new OptProbes.B("unloaded_outputs");
+        b.in("clk", "a", "c");
+        b.inst(Unisim.FDRE, "F", "C=clk", "D=a", "CE=1", "R=0", "Q=" + (connected ? "q" : ""),
+                "@INIT=1'b0");
+        // An AND, so swapping the inputs gives an equivalent LUT
+        b.lut("L", "8", connected ? "x" : "", swapLutInputs ? "c" : "a", swapLutInputs ? "a" : "c");
+        return b.nl;
+    }
+
+    @Test
+    public void testComparatorComparesOutputConnections() {
+        EDIFLeafNetlistComparator cmp = new EDIFLeafNetlistComparator();
+        Assertions.assertEquals(0, cmp.compare(unloadedOutputs(true, false),
+                unloadedOutputs(true, true)));
+        Assertions.assertEquals(1,
+                cmp.getDiffCount(EDIFLeafNetlistComparator.Category.LUT_EQUIVALENT));
+        // F/Q and L/O (also when L is an equivalent LUT) are connected in the gold netlist only
+        Assertions.assertEquals(2, cmp.compare(unloadedOutputs(true, false),
+                unloadedOutputs(false, true)), cmp.getDiffs().toString());
+        Assertions.assertEquals(2,
+                cmp.getDiffCount(EDIFLeafNetlistComparator.Category.PIN_CONNECTED));
     }
 
     /**

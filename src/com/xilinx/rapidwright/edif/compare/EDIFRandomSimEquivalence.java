@@ -62,7 +62,10 @@ import com.xilinx.rapidwright.edif.optimizer.VerilogLiterals;
  * connected inputs (a pin on an undriven net counts as
  * unconnected); any difference is a mismatch. Flip-flops that exist only in the original netlist
  * are assumed to have been removed as constants: they take their constant value and their next
- * state is checked to equal it.
+ * state is checked to equal it. Observations that depend on a combinational loop, or on a net
+ * with several drivers some of which are simulated or constant (their resolution is not
+ * modeled), are not checked: with no mismatch, the result is then inconclusive (see
+ * {@link #getVerdict}).
  */
 public class EDIFRandomSimEquivalence {
 
@@ -98,7 +101,11 @@ public class EDIFRandomSimEquivalence {
         final int[] srcPins;
         /** Combinational cells turned into cut points because they are on a loop. */
         boolean[] loopCut;
-        /** Nets whose value depends on a loop cut through simulated logic. */
+        /**
+         * Nets whose simulated value is not reliable: they depend, through simulated logic, on a
+         * loop cut or on a multi-driven net not resolved by XOR (see {@link #isResolvedByXor}).
+         * Observations of them are not checked.
+         */
         boolean[] tainted;
 
         Model(EDIFNetlist nl) {
@@ -154,12 +161,18 @@ public class EDIFRandomSimEquivalence {
             computeTaint();
         }
 
-        /** Marks nets fed (through simulated logic) by cells cut to break loops. */
+        /** Computes {@link #tainted}. */
         private void computeTaint() {
             tainted = new boolean[idx.getNumNets()];
             for (int l = 0; l < idx.getNumLeaves(); l++) {
                 if (loopCut[l]) {
                     taintOutputs(l);
+                }
+            }
+            // Multi-driven nets whose drivers' XOR may cancel (not a resolution of them)
+            for (int n = 0; n < idx.getNumNets(); n++) {
+                if (!isResolvedByXor(n)) {
+                    tainted[n] = true;
                 }
             }
             for (int node : order) {
@@ -328,12 +341,13 @@ public class EDIFRandomSimEquivalence {
          * sequential cells in forced hold their values. Nets driven by static sources or forced
          * cells never change. So does the output of a LUT that, with its fixed inputs at their
          * values, does not depend on its other inputs (e.g. a clock gate whose enable is
-         * constant 0), and the outputs of other simulated cells whose inputs all never change.
-         * Cells cut to break loops are not included. A net with several sources never changes
-         * only if none of them does.
+         * constant 0), the output of an INV or BUF whose input never changes (with its value),
+         * and the outputs of other simulated cells whose inputs all never change. Cells cut to
+         * break loops are not included, nor are nets with several sources (see
+         * {@link #isResolvedByXor}).
          */
         byte[] fixedNets(Map<Integer, Long> forced) {
-            Fixed fixed = new Fixed(idx.getNumNets());
+            byte[] fixed = new byte[idx.getNumNets()];
             for (int l = 0; l < idx.getNumLeaves(); l++) {
                 Long f = forced.get(l);
                 if (kind[l] == C_GND || f != null && f == 0L) {
@@ -347,9 +361,19 @@ public class EDIFRandomSimEquivalence {
             for (int node : order) {
                 int l = node / 4;
                 if (kind[l] == C_LUT) {
-                    byte out = fixedLut(l, fixed.state);
+                    byte out = fixedLut(l, fixed);
                     if (out != NOT_FIXED) {
                         markOutputs(l, fixed, out);
+                    }
+                    continue;
+                }
+                if (kind[l] == C_INV || kind[l] == C_BUF) {
+                    // Known values pass through (e.g. VCC -> INV -> clock gate enable)
+                    int n = netOfPin(l, "I");
+                    byte in = n < 0 ? FIXED_0 : fixed[n];
+                    if (in != NOT_FIXED) {
+                        markOutputs(l, fixed, kind[l] == C_BUF || in == FIXED_UNKNOWN ? in
+                                : in == FIXED_0 ? FIXED_1 : FIXED_0);
                     }
                     continue;
                 }
@@ -360,36 +384,49 @@ public class EDIFRandomSimEquivalence {
                     int n = idx.getPinNet(p);
                     all = idx.getPinDir(p) == EDIFLeafIndex.DRIVER || n < 0
                             || !dependsOn(l, sub, idx.getPinPortInst(p).getName())
-                            || fixed.state[n] != NOT_FIXED;
+                            || fixed[n] != NOT_FIXED;
                 }
                 if (all) {
                     markOutputs(l, kind[l] == C_LOOKAHEAD ? sub : -1, fixed, FIXED_UNKNOWN);
                 }
             }
-            return fixed.state;
+            return fixed;
         }
 
-        /** Nets found never to change so far, and the sources of multi-source nets seen. */
-        private static final class Fixed {
-            final byte[] state;
-            /** Combined state of the sources of a net seen so far, and their number. */
-            final byte[] partial;
-            final int[] seen;
-
-            Fixed(int numNets) {
-                state = new byte[numNets];
-                partial = new byte[numNets];
-                seen = new int[numNets];
-            }
+        /** @return The number of sources of net n (see {@link #srcPins}). */
+        int numSources(int n) {
+            return srcStart[n + 1] - srcStart[n];
         }
 
         /**
-         * @return The fixed state of a net with two sources in the given states: the XOR of
-         * their values if both are known (as simulated), else unknown.
+         * @return True if the value of net n is modeled faithfully: it has at most one source,
+         * or all its sources are top-level ports or cut cells (e.g. tri-state buffers), whose
+         * values are independent pseudo-random values, so their XOR changes with any change in
+         * the sources. With a simulated or constant source, sources can be correlated and their
+         * XOR cancel (two buffers of a give 0, not a), so the net is not.
          */
-        private static byte combine(byte a, byte b) {
-            boolean known = (a == FIXED_0 || a == FIXED_1) && (b == FIXED_0 || b == FIXED_1);
-            return !known ? FIXED_UNKNOWN : a == b ? FIXED_0 : FIXED_1;
+        boolean isResolvedByXor(int n) {
+            if (numSources(n) <= 1) {
+                return true;
+            }
+            for (int i = srcStart[n]; i < srcStart[n + 1]; i++) {
+                int d = idx.getPinLeaf(srcPins[i]);
+                if (d >= 0 && kind[d] != C_CUT) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /** @return True if leaf l drives a net with several sources. */
+        boolean drivesMultiSourceNet(int l) {
+            for (int p = idx.getLeafPinStart(l); p < idx.getLeafPinEnd(l); p++) {
+                int n = idx.getPinNet(p);
+                if (idx.getPinDir(p) != EDIFLeafIndex.SINK && n >= 0 && numSources(n) > 1) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /**
@@ -465,32 +502,22 @@ public class EDIFRandomSimEquivalence {
         }
 
         /**
-         * Marks the nets driven by leaf l as fixed in the given state. A net with several
-         * sources is marked once all of them are (sources never marked, e.g. top-level inputs or
-         * cut cells not assumed constant, leave it not fixed).
+         * Marks the nets driven by leaf l as fixed in the given state, except nets with several
+         * sources, which are never fixed (see {@link #isResolvedByXor}).
          */
-        private void markOutputs(int l, Fixed fixed, byte state) {
+        private void markOutputs(int l, byte[] fixed, byte state) {
             markOutputs(l, -1, fixed, state);
         }
 
-        /** As {@link #markOutputs(int, Fixed, byte)}, only output sub of a LOOKAHEAD8 if >= 0. */
-        private void markOutputs(int l, int sub, Fixed fixed, byte state) {
+        /** As {@link #markOutputs(int, byte[], byte)}, only output sub of a LOOKAHEAD8 if >= 0. */
+        private void markOutputs(int l, int sub, byte[] fixed, byte state) {
             for (int p = idx.getLeafPinStart(l); p < idx.getLeafPinEnd(l); p++) {
                 int n = idx.getPinNet(p);
-                if (idx.getPinDir(p) != EDIFLeafIndex.DRIVER || n < 0
+                if (idx.getPinDir(p) != EDIFLeafIndex.DRIVER || n < 0 || numSources(n) > 1
                         || sub >= 0 && nodeOf(l, idx.getPinPortInst(p).getName()) != l * 4 + sub) {
                     continue;
                 }
-                int sources = srcStart[n + 1] - srcStart[n];
-                if (sources == 1) {
-                    fixed.state[n] = state;
-                    continue;
-                }
-                byte s = fixed.seen[n] == 0 ? state : combine(fixed.partial[n], state);
-                fixed.partial[n] = s;
-                if (++fixed.seen[n] == sources) {
-                    fixed.state[n] = s;
-                }
+                fixed[n] = state;
             }
         }
 
@@ -651,7 +678,8 @@ public class EDIFRandomSimEquivalence {
     /**
      * Assigns sources (ports, constants, cut outputs) and evaluates the logic. A net with several
      * drivers (e.g. tri-state buffers) gets the XOR of their values: not their resolution, but
-     * any change in its set of drivers changes its value.
+     * any change in its set of drivers changes its value if they are independent (see
+     * {@link Model#isResolvedByXor}; other multi-driven nets are tainted).
      */
     private static void simulate(Model m, int round, Map<Integer, Long> forced) {
         Arrays.fill(m.val, 0L);
@@ -700,7 +728,10 @@ public class EDIFRandomSimEquivalence {
 
     private int unchecked;
 
-    /** @return Observations skipped because they depend on a combinational loop. */
+    /**
+     * @return Observations skipped because they depend on a combinational loop or on a
+     * multi-driven net with simulated or constant drivers (see {@link #getVerdict}).
+     */
     public int getUnchecked() {
         return unchecked;
     }
@@ -745,7 +776,8 @@ public class EDIFRandomSimEquivalence {
      * @param orig The original netlist.
      * @param opt The optimized netlist.
      * @param rounds Number of 64-pattern simulation rounds (at least 1).
-     * @return The number of mismatching observations.
+     * @return The number of mismatching observations. Zero proves nothing about the
+     * observations not checked (see {@link #getVerdict}).
      */
     public int check(EDIFNetlist orig, EDIFNetlist opt, int rounds) {
         if (rounds < 1) {
@@ -776,6 +808,12 @@ public class EDIFRandomSimEquivalence {
             EDIFCell cell = a.idx.getLeafInst(l).getCellType();
             String type = cell.getName();
             if (!observed[l] || b.byName.containsKey(a.names[l]) || !EDIFLeafNetlistComparator.isPrimitive(cell)) {
+                continue;
+            }
+            if (a.drivesMultiSourceNet(l)) {
+                // A constant would be XORed with the other drivers: not assumed, so it keeps
+                // pseudo-random values
+                removedNonConstant++;
                 continue;
             }
             if (type.matches("FD[RSCP]E|LD[CP]E")) {
@@ -1119,16 +1157,21 @@ public class EDIFRandomSimEquivalence {
                               List<Integer> removedFF) {
         // Top-level outputs
         Map<String, Long> bOut = new HashMap<>();
+        Set<String> bTainted = new java.util.HashSet<>();
         for (int p = b.idx.getNumLeafPins(); p < b.idx.getNumPins(); p++) {
             if (b.idx.getPinDir(p) != EDIFLeafIndex.DRIVER && b.idx.getPinNet(p) >= 0) {
-                bOut.put(b.idx.getPinPortInst(p).getName(), b.val[b.idx.getPinNet(p)]);
+                String name = b.idx.getPinPortInst(p).getName();
+                bOut.put(name, b.val[b.idx.getPinNet(p)]);
+                if (b.tainted[b.idx.getPinNet(p)]) {
+                    bTainted.add(name);
+                }
             }
         }
         for (int p = a.idx.getNumLeafPins(); p < a.idx.getNumPins(); p++) {
             if (a.idx.getPinDir(p) != EDIFLeafIndex.DRIVER && a.idx.getPinNet(p) >= 0) {
                 String name = a.idx.getPinPortInst(p).getName();
                 Long v = bOut.remove(name);
-                if (a.tainted[a.idx.getPinNet(p)]) {
+                if (a.tainted[a.idx.getPinNet(p)] || bTainted.contains(name)) {
                     unchecked++;
                     continue;
                 }
@@ -1140,6 +1183,10 @@ public class EDIFRandomSimEquivalence {
         }
         // Outputs connected only in the optimized netlist
         for (String name : bOut.keySet()) {
+            if (bTainted.contains(name)) {
+                unchecked++;
+                continue;
+            }
             checked++;
             fail("round " + round + " port " + name + " connected only in the optimized netlist");
         }
@@ -1185,6 +1232,13 @@ public class EDIFRandomSimEquivalence {
 
     /** Checks that the next state of a removed sequential cell equals its assumed constant. */
     private static boolean isInductivelyConstant(Model a, int l, long q, byte[] fixed) {
+        // Unreliable input values prove nothing
+        for (int p = a.idx.getLeafPinStart(l); p < a.idx.getLeafPinEnd(l); p++) {
+            int n = a.idx.getPinNet(p);
+            if (a.idx.getPinDir(p) != EDIFLeafIndex.DRIVER && n >= 0 && a.tainted[n]) {
+                return false;
+            }
+        }
         String type = a.idx.getLeafInst(l).getCellType().getName();
         if (type.startsWith("SRL")) {
             Long d = pinValue(a, l, "D");
@@ -1238,6 +1292,15 @@ public class EDIFRandomSimEquivalence {
         return checked;
     }
 
+    /**
+     * @return The result of the last check: NOT EQUIVALENT if there were mismatches, else
+     * INCONCLUSIVE if some observations could not be checked (see {@link #getUnchecked}), else
+     * EQUIVALENT.
+     */
+    public String getVerdict() {
+        return mismatches > 0 ? "NOT EQUIVALENT" : unchecked > 0 ? "INCONCLUSIVE" : "EQUIVALENT";
+    }
+
     public List<String> getExamples() {
         return examples;
     }
@@ -1254,15 +1317,15 @@ public class EDIFRandomSimEquivalence {
         EDIFRandomSimEquivalence eq = new EDIFRandomSimEquivalence();
         int bad = eq.check(orig, opt, rounds);
         System.out.println("Observations checked: " + eq.getChecked() + " x 64 patterns");
-        System.out.println("Observations depending on combinational loops (unchecked): "
-                + eq.getUnchecked());
+        System.out.println("Observations depending on combinational loops or unresolved"
+                + " multi-driven nets (unchecked): " + eq.getUnchecked());
         System.out.println("Removed sequential cells not constant (dead logic): "
                 + eq.getRemovedNonConstant());
         System.out.println("Mismatches: " + bad);
         for (String s : eq.getExamples()) {
             System.out.println("  " + s);
         }
-        System.out.println(bad == 0 ? "EQUIVALENT" : "NOT EQUIVALENT");
+        System.out.println(eq.getVerdict());
         System.out.println(String.format("TIME=%.1fs", (System.nanoTime() - t0) / 1e9));
     }
 }

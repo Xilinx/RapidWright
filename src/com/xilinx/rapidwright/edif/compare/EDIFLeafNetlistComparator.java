@@ -66,7 +66,7 @@ public class EDIFLeafNetlistComparator {
         PROPERTY,
         /** An input pin is driven differently. */
         PIN_DRIVER,
-        /** A pin is connected in one netlist only. */
+        /** A pin (input or output) is connected in one netlist only. */
         PIN_CONNECTED,
         /** LUT whose INIT/pin drivers differ but computes the same function of the same drivers. */
         LUT_EQUIVALENT,
@@ -289,6 +289,7 @@ public class EDIFLeafNetlistComparator {
                 String gf = lutFunction(gi, gd);
                 if (gf != null && gf.equals(lutFunction(ti, td))) {
                     addDiff(Category.LUT_EQUIVALENT, gType, name + " " + gType + " vs " + tType);
+                    compareOutputs(name, gType, g, e.getValue(), t, tl);
                     comparePropsAndPins(name, gType, gi, ti, gd, td, true);
                 } else {
                     addDiff(Category.TYPE, gType, name + " " + gType + " vs " + tType + " gold="
@@ -296,6 +297,8 @@ public class EDIFLeafNetlistComparator {
                 }
                 continue;
             }
+            // Output connections are compared for every cell (LUT equivalence only covers inputs)
+            compareOutputs(name, gType, g, e.getValue(), t, tl);
             boolean lutEquiv = false;
             if (!gd.equals(td) || !Objects.equals(prop(gi, "INIT"), prop(ti, "INIT"))) {
                 String gf = lutFunction(gi, gd);
@@ -381,6 +384,39 @@ public class EDIFLeafNetlistComparator {
                 addDiff(Category.PIN_CONNECTED, type, name + "/" + pin + ": " + gv + " vs " + tv);
             } else if (!gv.equals(tv)) {
                 addDiff(Category.PIN_DRIVER, type, name + "/" + pin + ": " + gv + " vs " + tv);
+            }
+        }
+    }
+
+    /** @return The names of the output pins of leaf l that are connected to a net. */
+    private static Set<String> connectedOutputs(EDIFLeafIndex idx, int l) {
+        Set<String> pins = new TreeSet<>();
+        for (int p = idx.getLeafPinStart(l); p < idx.getLeafPinEnd(l); p++) {
+            if (idx.getPinDir(p) == EDIFLeafIndex.DRIVER && idx.getPinNet(p) >= 0) {
+                pins.add(idx.getPinPortInst(p).getName());
+            }
+        }
+        return pins;
+    }
+
+    /**
+     * Reports the output pins of a leaf present in both netlists that are connected to a net
+     * (loaded or not) in one netlist only.
+     */
+    private void compareOutputs(String name, String type, EDIFLeafIndex g, int gl,
+                                EDIFLeafIndex t, int tl) {
+        Set<String> go = connectedOutputs(g, gl);
+        Set<String> to = connectedOutputs(t, tl);
+        if (go.equals(to)) {
+            return;
+        }
+        Set<String> pins = new TreeSet<>(go);
+        pins.addAll(to);
+        for (String pin : pins) {
+            if (go.contains(pin) != to.contains(pin)) {
+                addDiff(Category.PIN_CONNECTED, type, name + "/" + pin + ": "
+                        + (go.contains(pin) ? "connected vs unconnected"
+                        : "unconnected vs connected"));
             }
         }
     }
