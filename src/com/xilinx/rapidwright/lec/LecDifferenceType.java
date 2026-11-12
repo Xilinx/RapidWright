@@ -69,6 +69,25 @@ public enum LecDifferenceType {
     /** A terminal exists in the implementation but not the reference. */
     TERMINAL_MISSING_IN_REF("Terminal missing in REF"),
 
+    /**
+     * A register a retiming certificate defines does not keep its definition
+     * across a clock edge: the certificate, or the retiming, is wrong.
+     */
+    RETIMING_STEP_DIFFERS("Retimed register's next state differs"),
+
+    /** A defined register's initial value contradicts its definition. */
+    RETIMING_INIT_DIFFERS("Retimed register's initial value differs"),
+
+    /** A defined register is clocked differently from what its definition reads. */
+    RETIMING_CLOCK_DIFFERS("Retimed register's clock differs"),
+
+    /**
+     * A step or clock obligation of the retiming certificate could not be
+     * decided. Unlike {@link #CONE_INCONCLUSIVE} this cannot be waived: every
+     * other cone was checked assuming the certificate, so nothing is proven.
+     */
+    RETIMING_UNPROVEN("Retiming certificate unproven"),
+
     /** The comparison could not be decided, so nothing was proven. */
     CONE_INCONCLUSIVE("Cone inconclusive");
 
@@ -87,7 +106,7 @@ public enum LecDifferenceType {
      *         opposed to an admission that the check was not completed.
      */
     public boolean isProvenDifference() {
-        return this != CONE_INCONCLUSIVE;
+        return this != CONE_INCONCLUSIVE && this != RETIMING_UNPROVEN;
     }
 
     /**

@@ -78,11 +78,14 @@ public class TerminalAttributes {
 
     private final Map<String, String> properties;
 
+    private final boolean devicePrimitive;
+
     private TerminalAttributes(String cellTypeName, String libraryName,
-            Map<String, String> properties) {
+            Map<String, String> properties, boolean devicePrimitive) {
         this.cellTypeName = cellTypeName;
         this.libraryName = libraryName;
         this.properties = properties;
+        this.devicePrimitive = devicePrimitive;
     }
 
     private static Set<String> buildIgnored() {
@@ -137,7 +140,7 @@ public class TerminalAttributes {
         }
         EDIFLibrary library = inst == null ? null : inst.getCellType().getLibrary();
         return new TerminalAttributes(cellTypeName, library == null ? null : library.getName(),
-                properties);
+                properties, inst != null && CellClassifier.isDevicePrimitive(inst.getCellType()));
     }
 
     /**
@@ -159,6 +162,14 @@ public class TerminalAttributes {
     /** @return The library of the cell type, or null for a top level port. */
     public String getLibraryName() {
         return libraryName;
+    }
+
+    /**
+     * @return True if the terminal is a device primitive rather than a black box
+     *         that merely shares a primitive's name.
+     */
+    public boolean isDevicePrimitive() {
+        return devicePrimitive;
     }
 
     public Map<String, String> getProperties() {

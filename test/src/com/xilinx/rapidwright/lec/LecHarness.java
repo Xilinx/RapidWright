@@ -55,9 +55,15 @@ public class LecHarness {
     }
 
     public static LecHarness run(EDIFNetlist ref, EDIFNetlist imp, LecConfig config) {
+        return run(ref, imp, config, null);
+    }
+
+    /** Compares two netlists related by a retiming, proving the certificate. */
+    public static LecHarness run(EDIFNetlist ref, EDIFNetlist imp, LecConfig config,
+            RetimingMap retiming) {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         PrintStream out = new PrintStream(buffer);
-        LecResult result = LogicEquivalenceChecker.compare(ref, imp, config, out);
+        LecResult result = LogicEquivalenceChecker.compare(ref, imp, config, retiming, out);
         out.flush();
         return new LecHarness(result, buffer.toString());
     }
