@@ -422,15 +422,33 @@ public class TestLecAcceptance {
         Assertions.assertEquals("ram/WEA[0]", difference.getSubject());
     }
 
+    /**
+     * The defaults are those of device primitives: a black box named RAMB36E2
+     * does not take them, so its unconnected WEA[0] differs from one tied high.
+     */
+    @Test
+    public void testBlackBoxNamedLikeAPrimitiveTakesNoDefault() {
+        check(ramWithWriteEnable(false, true, false), ramWithWriteEnable(false, true, false))
+                .assertPass();
+        check(ramWithWriteEnable(false, true, false), ramWithWriteEnable(true, true, true))
+                .assertFail();
+    }
+
     private static EDIFNetlist ramWithWriteEnable(boolean tiedLow) {
+        return ramWithWriteEnable(tiedLow, false, false);
+    }
+
+    private static EDIFNetlist ramWithWriteEnable(boolean tied, boolean blackBox, boolean high) {
         LecNetlistFixtures fixture = new LecNetlistFixtures("top");
         EDIFCell top = fixture.getTop();
-        EDIFCell ramType = fixture.primitive("RAMB36E2", new String[0], new String[0]);
+        EDIFCell ramType = blackBox ? fixture.newHierCell("RAMB36E2")
+                : fixture.primitive("RAMB36E2", new String[0], new String[0]);
         ramType.createPort("WEA[3:0]", EDIFDirection.INPUT, 4);
         EDIFCellInst ram = LecNetlistFixtures.add(top, "ram", ramType);
-        EDIFCellInst gnd = LecNetlistFixtures.add(top, "GND", fixture.gnd());
-        EDIFNet net = LecNetlistFixtures.connect(top, "gnd", gnd, "G");
-        if (tiedLow) {
+        EDIFCellInst tie = high ? LecNetlistFixtures.add(top, "VCC", fixture.vcc())
+                : LecNetlistFixtures.add(top, "GND", fixture.gnd());
+        EDIFNet net = LecNetlistFixtures.connect(top, "tie", tie, high ? "P" : "G");
+        if (tied) {
             net.createPortInst("WEA[0]", ram);
         }
         return fixture.getNetlist();

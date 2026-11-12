@@ -586,7 +586,9 @@ public class ConeBuilder {
     private int defaultLit(int instId, int bit) {
         String typeName = flat.getCellTypeName(instId);
         String pinName = flat.getIndex(instId).getPortBitName(bit);
-        NetType tie = lookupPinDefault(typeName, pinName);
+        // (the table is for device primitives, not black boxes named like them)
+        NetType tie = CellClassifier.isDevicePrimitive(flat.getCellType(instId))
+                ? lookupPinDefault(typeName, pinName) : NetType.GND;
         log.warn(IMPLICIT_TIE, typeName + "." + pinName + " -> "
                 + (tie == NetType.VCC ? "VCC" : "GND"), flat.getInstName(instId));
         return tie == NetType.VCC ? Aig.TRUE : Aig.FALSE;
