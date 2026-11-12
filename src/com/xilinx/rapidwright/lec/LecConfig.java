@@ -108,8 +108,6 @@ public class LecConfig {
 
     private boolean sweep;
 
-    private boolean expandMacros;
-
     LecConfig() {
     }
 
@@ -157,7 +155,6 @@ public class LecConfig {
                 + "value of this property where present instead of by its hierarchical path; for "
                 + "transforms that move terminals and record their original path")
                 .withRequiredArg().describedAs("name");
-        parser.accepts("expand-macros", "Expand macro primitives instead of modelling them natively");
         parser.accepts("elaborate-only", "Build cones and report statistics without comparing");
         parser.accepts("classify-only", "Report connectivity and cell classification only");
         parser.accepts("verbose", "Print progress and per phase timing");
@@ -192,7 +189,6 @@ public class LecConfig {
         config.allowPreexistingLoops = options.has("allow-preexisting-loops");
         config.allowSeriesMismatch = options.has("allow-series-mismatch");
         config.strictBlackBoxes = options.has("strict-black-boxes");
-        config.expandMacros = options.has("expand-macros");
         config.keyProperty = (String) options.valueOf("key-property");
         config.elaborateOnly = options.has("elaborate-only");
         config.classifyOnly = options.has("classify-only");
@@ -389,10 +385,6 @@ public class LecConfig {
 
     public boolean isSweep() {
         return sweep;
-    }
-
-    public boolean isExpandMacros() {
-        return expandMacros;
     }
 
     void setRefFile(Path refFile) {
