@@ -39,6 +39,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
@@ -428,6 +429,9 @@ public class ModuleInst extends AbstractModuleInst<Module, Site, ModuleInst>{
                 }
                 // Some tiles have nodes that are depopulated, we need to detect those
                 Node endNode = newPip.getEndNode();
+                if (endNode != null && newPipTile.getTileTypeEnum() == TileTypeEnum.SLL && endNode.toString().contains("UBUMP") && endNode.getAllDownhillNodes().size() == 1) {
+                    return false;
+                }
                 if (endNode != null && endNode.getAllDownhillPIPs().size() == 0
                         && pip.getEndNode().getAllDownhillPIPs().size() != 0) {
                     return false;
