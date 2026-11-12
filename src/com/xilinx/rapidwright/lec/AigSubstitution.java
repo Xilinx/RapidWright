@@ -40,7 +40,8 @@ import java.util.Arrays;
  *
  * Values may be supplied after construction, as long as every input a cone
  * reaches has its value before the cone is applied. The set of replaced inputs
- * is fixed up front, which is what keeps the memo valid as values arrive.
+ * is fixed up front and a value, once given, cannot change, which is what keeps
+ * the memo valid as values arrive.
  */
 public class AigSubstitution {
 
@@ -78,11 +79,19 @@ public class AigSubstitution {
         }
     }
 
-    /** Sets the literal that replaces one of the inputs given at construction. */
+    /**
+     * Sets the literal that replaces one of the inputs given at construction.
+     * Setting the same literal again is allowed; a different one is not, since
+     * cones already applied would keep the old value.
+     */
     public void setValue(int piIndex, int lit) {
         if (piIndex >= replaced.length || !replaced[piIndex]) {
             throw new IllegalArgumentException("Input " + aig.getPiName(piIndex)
                     + " was not declared as replaced");
+        }
+        if (valueByPi[piIndex] != UNSET && valueByPi[piIndex] != lit) {
+            throw new IllegalStateException("Input " + aig.getPiName(piIndex)
+                    + " already has a different value");
         }
         valueByPi[piIndex] = lit;
     }

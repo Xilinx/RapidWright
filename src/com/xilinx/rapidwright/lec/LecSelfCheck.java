@@ -347,7 +347,7 @@ public class LecSelfCheck {
                     + applied.description + "  ->  " + firstLine(e.getMessage()));
             return;
         }
-        evaluate(name, expect, applied, result, buffer.toString());
+        evaluate(ctx, name, expect, applied, result, buffer.toString());
     }
 
     private static String firstLine(String message) {
@@ -355,7 +355,8 @@ public class LecSelfCheck {
         return lines.length > 1 ? lines[0] + " " + lines[1].trim() : message;
     }
 
-    private void evaluate(String name, Expect expect, Applied applied, LecResult result,
+    private void evaluate(Context ctx, String name, Expect expect, Applied applied,
+            LecResult result,
             String report) {
         LecReport r = result.getReport();
         int diffs = r.getEquivalenceDifferenceCount() + r.getIntroducedLoopCount();
@@ -376,7 +377,7 @@ public class LecSelfCheck {
             }
             if (applied.conePin != null) {
                 boolean named = reportsPin(result, applied.conePin)
-                        || reportsRetimedRegister(result, applied.conePin);
+                        || reportsRetimedRegister(ctx, result, applied.conePin);
                 detail += named ? ", names the expected pin" : ", DOES NOT name expected pin "
                         + shorten(applied.conePin);
                 if (!named) {
@@ -461,23 +462,36 @@ public class LecSelfCheck {
     }
 
     /**
-     * @return True if the pin belongs to a register the certificate defines and
-     *         a retiming finding names that register. A defined register's own
-     *         pins are not compared by name; its retiming obligations are.
+     * @return True if the pin belongs to a register the certificate defines, or
+     *         to an implementation register a REF definition reads, and a
+     *         retiming finding names the register or that definition. These
+     *         registers' own pins are not compared by name; the retiming
+     *         obligations that involve them are.
      */
-    private boolean reportsRetimedRegister(LecResult result, String pin) {
+    private boolean reportsRetimedRegister(Context ctx, LecResult result, String pin) {
         if (retiming == null) {
             return false;
         }
         String register = pin.substring(0, pin.lastIndexOf('/'));
-        if (!retiming.registersOn(RetimingMap.Side.IMP).contains(register)) {
-            return false;
+        Set<String> subjects = new HashSet<>();
+        if (retiming.registersOn(RetimingMap.Side.IMP).contains(register)) {
+            subjects.add("IMP " + register);
+        }
+        for (RetimingMap.Entry e : retiming.getEntries()) {
+            if (e.getRegisterSide() == RetimingMap.Side.REF
+                    && registersFeeding(ctx.flat, ctx.conn, e.getDefiningInst()).contains(register)) {
+                subjects.add("REF " + e.getRegister());
+            }
         }
         for (LecDifference d : result.getReport().getDifferences()) {
             String subject = d.getSubject();
-            if (subject.startsWith("retiming ") && (subject.endsWith(" IMP " + register)
-                    || subject.contains(" IMP " + register + " vs "))) {
-                return true;
+            if (!subject.startsWith("retiming ")) {
+                continue;
+            }
+            for (String s : subjects) {
+                if (subject.endsWith(" " + s) || subject.contains(" " + s + " vs ")) {
+                    return true;
+                }
             }
         }
         return false;
@@ -492,15 +506,20 @@ public class LecSelfCheck {
     /**
      * Finds a look up table whose cone is exactly its own function: every input
      * driven by a terminal output or a constant, and its output driving a single
-     * checked flip flop data pin.
+     * checked flip flop data pin. A table whose output defines a REF register is
+     * not one: the certificate substitutes it, and its retiming obligations, not
+     * the flip flop pin, report a change.
      */
     private LutSite findCleanLut(Context ctx, int skip) {
         if (ctx.cleanSites == null) {
             ctx.cleanSites = new ArrayList<>();
+            Set<String> defining = retiming == null ? new HashSet<>()
+                    : definingInsts(RetimingMap.Side.IMP);
             for (int id : ctx.flat.getLeafInstIds()) {
                 String type = ctx.flat.getCellTypeName(id);
                 if (!type.startsWith("LUT") || type.startsWith("LUT6CY")
-                        || type.equals("LUT6_2") || type.equals("LUT1")) {
+                        || type.equals("LUT6_2") || type.equals("LUT1")
+                        || defining.contains(ctx.flat.getInstName(id))) {
                     continue;
                 }
                 LutSite site = describeLutSite(ctx, id);
@@ -778,7 +797,9 @@ public class LecSelfCheck {
                 observed = idx.getPortOfBit(b).isOutput()
                         && ctx.isObserved(ctx.flat.getGlobalPin(id, b));
             }
-            if (observed) {
+            if (observed || (retiming != null && definingInsts(RetimingMap.Side.IMP)
+                    .contains(ctx.flat.getInstName(id)))) {
+                // A certificate's defining pin is observed by the certificate
                 continue;
             }
             EDIFCellInst inst = ctx.flat.getInst(id);
@@ -1050,7 +1071,7 @@ public class LecSelfCheck {
 
     private Applied changeFlopInit(Context ctx) {
         for (int id : ctx.flat.getLeafInstIds()) {
-            if (!ctx.flat.getCellTypeName(id).startsWith("FD")) {
+            if (!ctx.flat.getCellTypeName(id).startsWith("FD") || !initIsChecked(ctx, id)) {
                 continue;
             }
             EDIFCellInst flop = ctx.flat.getInst(id);
@@ -1166,7 +1187,7 @@ public class LecSelfCheck {
                 ctx -> retimedFlop(ctx, null, (c, id) -> moveClock(c, id)));
         check("look up table feeding a retimed register inverted", Expect.DETECT,
                 ctx -> retimedFlop(ctx, null, (c, id) -> invertDriverLut(c, id)));
-        check("certificate entry dropped", Expect.DETECT, ctx -> dropEntry());
+        check("certificate entry dropped", Expect.DETECT, this::dropEntry);
         check("certificate made cyclic", Expect.REFUSE, this::makeCyclic);
     }
 
@@ -1175,10 +1196,11 @@ public class LecSelfCheck {
     }
 
     /**
-     * Applies a mutation to the first register the retiming created in the
-     * implementation that it can be applied to. These are the registers the
-     * certificate defines, and the registers the implementation has and the
-     * reference does not.
+     * Applies a mutation to the first register the certificate defines in the
+     * implementation that it can be applied to. Damage to a defined register
+     * always breaks one of its obligations. An implementation register a REF
+     * definition only reads is not used: a change to it can be harmless, such
+     * as an INIT flip on one input of a zero-initialised AND.
      *
      * @param livePin A pin that must not be tied to a constant for the change to
      *                be observable: {@code "SR"} for the reset or set pin, or
@@ -1187,6 +1209,11 @@ public class LecSelfCheck {
     private Applied retimedFlop(Context ctx, String livePin, FlopMutation mutation) {
         for (int id : retimedImpFlops(ctx)) {
             if (livePin != null && isTied(ctx, id, livePin)) {
+                continue;
+            }
+            int ce = rootOf(ctx, id, "CE");
+            if (ce >= 0 && ctx.conn.getRootKind(ce) == Connectivity.CONST0) {
+                // A register that never loads ignores its D and its driver
                 continue;
             }
             String description = mutation.apply(ctx, id);
@@ -1200,30 +1227,44 @@ public class LecSelfCheck {
     }
 
     private List<Integer> retimedImpFlops(Context ctx) {
-        Set<String> names = new LinkedHashSet<>(
-                retiming.registersOn(RetimingMap.Side.IMP));
-        Set<String> refFlops = new HashSet<>();
-        for (int id : refFlat().getLeafInstIds()) {
-            if (isRetimableType(refFlat().getCellTypeName(id))) {
-                refFlops.add(refFlat().getInstName(id));
-            }
-        }
-        for (int id : ctx.flat.getLeafInstIds()) {
-            if (isRetimableType(ctx.flat.getCellTypeName(id))) {
-                String name = ctx.flat.getInstName(id);
-                if (!refFlops.contains(name)) {
-                    names.add(name);
-                }
-            }
-        }
         List<Integer> ids = new ArrayList<>();
-        for (String name : names) {
+        for (String name : retiming.registersOn(RetimingMap.Side.IMP)) {
             int id = ctx.flat.findInstId(name);
             if (id >= 0 && isRetimableType(ctx.flat.getCellTypeName(id))) {
                 ids.add(id);
             }
         }
         return ids;
+    }
+
+    /**
+     * @return True if a register's INIT is checked, so flipping it must be
+     *         detected: it is compared with its REF namesake, or the
+     *         certificate defines it. A register only a REF definition reads
+     *         is neither.
+     */
+    private boolean initIsChecked(Context ctx, int id) {
+        if (retiming == null) {
+            return true;
+        }
+        String name = ctx.flat.getInstName(id);
+        if (retiming.registersOn(RetimingMap.Side.IMP).contains(name)) {
+            return true;
+        }
+        int ref = refFlat().findInstId(name);
+        return ref >= 0 && refFlat().getCellTypeName(ref).startsWith("FD")
+                && !retiming.registersOn(RetimingMap.Side.REF).contains(name);
+    }
+
+    /** @return The instances holding the defining pins that live in one netlist. */
+    private Set<String> definingInsts(RetimingMap.Side side) {
+        Set<String> insts = new HashSet<>();
+        for (RetimingMap.Entry e : retiming.getEntries()) {
+            if (e.getRegisterSide() != side) {
+                insts.add(e.getDefiningInst());
+            }
+        }
+        return insts;
     }
 
     private static boolean isRetimableType(String type) {
@@ -1326,7 +1367,10 @@ public class LecSelfCheck {
             int root = rootOf(ctx, other, "C");
             EDIFCellInst flop = ctx.flat.getInst(id);
             EDIFCellInst donor = ctx.flat.getInst(other);
-            if (root < 0 || root == own || donor.getParentCell() != flop.getParentCell()) {
+            // The same flattened parent, not just the same cell definition: two
+            // instances of one cell can be clocked differently through the
+            // same local net, and moving to it would change nothing
+            if (root < 0 || root == own || ctx.flat.getParent(other) != ctx.flat.getParent(id)) {
                 continue;
             }
             EDIFNet clock = donor.getPortInst("C").getNet();
@@ -1364,14 +1408,44 @@ public class LecSelfCheck {
         return bit < 0 ? -1 : ctx.conn.getPinRoot(ctx.flat.getGlobalPin(id, bit));
     }
 
-    private Applied dropEntry() {
+    /**
+     * Drops an entry whose loss must fail the run: its register has no namesake
+     * in the other netlist and no other definition reads it, so without the
+     * entry it is a terminal difference. A certificate need not be minimal, and
+     * dropping an entry that is not needed changes nothing.
+     */
+    private Applied dropEntry(Context ctx) {
         List<RetimingMap.Entry> entries = retiming.getEntries();
+        RetimingMap.Entry dropped = null;
+        for (RetimingMap.Entry e : entries) {
+            boolean inImp = e.getRegisterSide() == RetimingMap.Side.IMP;
+            if ((inImp ? refFlat() : ctx.flat).findInstId(e.getRegister()) >= 0) {
+                continue;
+            }
+            FlatNetlist own = inImp ? ctx.flat : refFlat();
+            Connectivity conn = inImp ? ctx.conn : refConn;
+            boolean read = false;
+            for (RetimingMap.Entry other : entries) {
+                read |= other.getRegisterSide() != e.getRegisterSide()
+                        && registersFeeding(own, conn, other.getDefiningInst())
+                                .contains(e.getRegister());
+            }
+            if (!read) {
+                dropped = e;
+                break;
+            }
+        }
+        if (dropped == null) {
+            return null;
+        }
         RetimingMap mutated = new RetimingMap();
-        for (int i = 1; i < entries.size(); i++) {
-            define(mutated, entries.get(i), entries.get(i).getDefiningPinKey());
+        for (RetimingMap.Entry e : entries) {
+            if (e != dropped) {
+                define(mutated, e, e.getDefiningPinKey());
+            }
         }
         Applied a = new Applied();
-        a.description = "dropped " + shorten(entries.get(0).toString());
+        a.description = "dropped " + shorten(dropped.toString());
         a.retiming = mutated;
         return a;
     }
@@ -1385,8 +1459,15 @@ public class LecSelfCheck {
         boolean defineInRef = first.getRegisterSide() == RetimingMap.Side.IMP;
         FlatNetlist flat = defineInRef ? refFlat() : ctx.flat;
         Connectivity conn = defineInRef ? refConn : ctx.conn;
-        String register = registerFeeding(flat, conn, first.getDefiningInst(),
-                retiming.registersOn(defineInRef ? RetimingMap.Side.REF : RetimingMap.Side.IMP));
+        Set<String> defined = retiming.registersOn(
+                defineInRef ? RetimingMap.Side.REF : RetimingMap.Side.IMP);
+        String register = null;
+        for (String candidate : registersFeeding(flat, conn, first.getDefiningInst())) {
+            if (!defined.contains(candidate)) {
+                register = candidate;
+                break;
+            }
+        }
         if (register == null) {
             return null;
         }
@@ -1403,21 +1484,24 @@ public class LecSelfCheck {
     }
 
     /**
-     * @return An FDRE or FDSE, not already defined, whose output reaches the
-     *         instance through combinational cells only, or is the instance
-     *         itself, or null.
+     * @return The FDRE and FDSE registers whose outputs reach the instance
+     *         through combinational cells only, nearest first, or the instance
+     *         itself if it is one: a definition by a register's output reads
+     *         that register. Look up table inputs its table ignores are not
+     *         followed, since the definition does not read them.
      */
-    private static String registerFeeding(FlatNetlist flat, Connectivity conn, String instName,
-            Set<String> defined) {
+    private static Set<String> registersFeeding(FlatNetlist flat, Connectivity conn,
+            String instName) {
+        Set<String> registers = new LinkedHashSet<>();
         int start = flat.findInstId(instName);
         if (start < 0) {
-            return null;
+            return registers;
         }
-        String startType = flat.getCellTypeName(start);
-        if (startType.startsWith("FD")) {
-            // A definition by a register's output reads that register itself
-            String name = flat.getInstName(start);
-            return isRetimableType(startType) && !defined.contains(name) ? name : null;
+        if (flat.getCellTypeName(start).startsWith("FD")) {
+            if (isRetimableType(flat.getCellTypeName(start))) {
+                registers.add(instName);
+            }
+            return registers;
         }
         Deque<Integer> work = new ArrayDeque<>();
         Set<Integer> seen = new HashSet<>();
@@ -1428,19 +1512,16 @@ public class LecSelfCheck {
                 continue;
             }
             String type = flat.getCellTypeName(id);
-            if (id != start && isRetimableType(type)) {
-                String name = flat.getInstName(id);
-                if (!defined.contains(name)) {
-                    return name;
-                }
-                continue;
-            }
             if (id != start && type.startsWith("FD")) {
+                if (isRetimableType(type)) {
+                    registers.add(flat.getInstName(id));
+                }
                 continue;
             }
             CellIndex idx = flat.getIndex(id);
             for (int b = 0; b < idx.getPortBitCount(); b++) {
-                if (idx.getPortOfBit(b).getDirection() != EDIFDirection.INPUT) {
+                if (idx.getPortOfBit(b).getDirection() != EDIFDirection.INPUT
+                        || !lutReadsInput(flat, id, idx.getPortBitName(b))) {
                     continue;
                 }
                 int root = conn.getPinRoot(flat.getGlobalPin(id, b));
@@ -1449,7 +1530,31 @@ public class LecSelfCheck {
                 }
             }
         }
-        return null;
+        return registers;
+    }
+
+    /**
+     * @return False only for a look up table input its table ignores: the
+     *         table is the same whatever that input's value.
+     */
+    private static boolean lutReadsInput(FlatNetlist flat, int id, String pin) {
+        String type = flat.getCellTypeName(id);
+        if (!type.matches("LUT[1-6]") || !pin.matches("I[0-5]")) {
+            return true;
+        }
+        EDIFPropertyValue init = flat.getInst(id).getProperty("INIT");
+        if (init == null || init.getValue() == null) {
+            return true;
+        }
+        long table = LUTTools.getInitValue(init.getValue());
+        int input = pin.charAt(1) - '0';
+        int size = 1 << (type.charAt(3) - '0');
+        for (int index = 0; index < size; index++) {
+            if (((table >>> index) & 1) != ((table >>> (index ^ (1 << input))) & 1)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void define(RetimingMap map, RetimingMap.Entry entry, String pin) {
