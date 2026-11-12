@@ -232,7 +232,7 @@ public class ConnectivityBuilder {
 
         reportAnomalies(flat, rootCount, rootKind, driverCount, extraDrivers, rootDriverPin, log);
         return new Connectivity(netRoot, pinRoot, rootCount, rootKind, rootDriverPin,
-                rootTopPortBit, extraDrivers);
+                rootTopPortBit, topSources, extraDrivers);
     }
 
     private static void appendDriver(Map<Integer, int[]> extraDrivers, int root, int first,
@@ -322,6 +322,10 @@ public class ConnectivityBuilder {
      */
     private static byte constKindOf(FlatNetlist flat, int instId) {
         EDIFCell cell = flat.getCellType(instId);
+        if (!CellClassifier.isDevicePrimitive(cell)) {
+            // (a black box named GND or VCC is not one)
+            return CONST_NONE;
+        }
         if (cell.isGNDSource()) {
             return Connectivity.CONST0;
         }

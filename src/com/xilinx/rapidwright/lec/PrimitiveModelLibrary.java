@@ -125,18 +125,14 @@ public class PrimitiveModelLibrary {
      * can be high impedance, which an and-inverter graph cannot represent; they
      * fall through to being terminals instead.
      *
-     * For the differential receivers, the golden model drives the output from
-     * {@code I} whenever the pair is valid, that is whenever {@code IB} is the
-     * complement of {@code I}; the degenerate cases are undefined rather than
-     * meaningful. The model used here is therefore {@code O = I}.
+     * Differential receivers (IBUFDS and friends) are not modelled: their output
+     * follows {@code I} only while {@code IB} is its complement, which nothing
+     * here proves. As terminals, both of their inputs are checked.
      */
     private static void addBuffers(Set<String> types) {
         types.add("IBUF");
         types.add("IBUFG");
         types.add("OBUF");
-        types.add("IBUFDS");
-        types.add("IBUFGDS");
-        types.add("IBUFDS_DIFF_OUT");
         types.add("OBUFDS");
         // (what RapidWright's readers turn an OBUFDS into for some I/O standards)
         types.add("OBUFDS_DUAL_BUF");

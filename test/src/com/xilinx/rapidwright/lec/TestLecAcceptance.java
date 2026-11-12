@@ -35,6 +35,7 @@ import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
+import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
 
@@ -404,6 +405,167 @@ public class TestLecAcceptance {
         netlist.exportEDIF(file);
         return NetlistLoader.load(file, new LecConfig(),
                 new LecLog(false, new PrintStream(new ByteArrayOutputStream())));
+    }
+
+    /**
+     * An unconnected pin takes the default Vivado ties it to, which for the bits
+     * of a bus pin is listed per bit: RAMB36E2's WEA[0] is tied high, so leaving
+     * it unconnected differs from tying it low.
+     */
+    @Test
+    public void testUnconnectedBusPinBitTakesItsDefault() {
+        check(ramWithWriteEnable(false), ramWithWriteEnable(false)).assertPass();
+        LecHarness result = check(ramWithWriteEnable(false), ramWithWriteEnable(true));
+        result.assertFail();
+        LecDifference difference = result.findDifference(LecDifferenceType.CONE_FUNCTION_DIFFERS);
+        Assertions.assertNotNull(difference, "The tied write enable was not reported");
+        Assertions.assertEquals("ram/WEA[0]", difference.getSubject());
+    }
+
+    private static EDIFNetlist ramWithWriteEnable(boolean tiedLow) {
+        LecNetlistFixtures fixture = new LecNetlistFixtures("top");
+        EDIFCell top = fixture.getTop();
+        EDIFCell ramType = fixture.primitive("RAMB36E2", new String[0], new String[0]);
+        ramType.createPort("WEA[3:0]", EDIFDirection.INPUT, 4);
+        EDIFCellInst ram = LecNetlistFixtures.add(top, "ram", ramType);
+        EDIFCellInst gnd = LecNetlistFixtures.add(top, "GND", fixture.gnd());
+        EDIFNet net = LecNetlistFixtures.connect(top, "gnd", gnd, "G");
+        if (tiedLow) {
+            net.createPortInst("WEA[0]", ram);
+        }
+        return fixture.getNetlist();
+    }
+
+    /**
+     * A differential receiver's output follows I only while IB is its
+     * complement, so its IB input is checked too: moving it to another input
+     * must fail.
+     */
+    @Test
+    public void testDifferentialReceiverInputIsChecked() {
+        check(differentialInput("b"), differentialInput("b")).assertPass();
+        check(differentialInput("b"), differentialInput("c")).assertFail();
+    }
+
+    private static EDIFNetlist differentialInput(String negative) {
+        LecNetlistFixtures fixture = new LecNetlistFixtures("top");
+        EDIFCell top = fixture.getTop();
+        for (String name : new String[] { "a", "b", "c" }) {
+            LecNetlistFixtures.port(top, name, EDIFDirection.INPUT);
+        }
+        LecNetlistFixtures.port(top, "o", EDIFDirection.OUTPUT);
+        EDIFCellInst ibuf = LecNetlistFixtures.add(top, "ibuf",
+                fixture.primitive("IBUFDS", new String[] { "I", "IB" }, new String[] { "O" }));
+        LecNetlistFixtures.connect(top, "a", top, "a", ibuf, "I");
+        LecNetlistFixtures.connect(top, negative, top, negative, ibuf, "IB");
+        LecNetlistFixtures.connect(top, "o", ibuf, "O", top, "o");
+        return fixture.getNetlist();
+    }
+
+    /**
+     * What a bidirectional pin of a terminal receives is checked: an IOBUF
+     * whose IO moves from input a to input b must fail, although its output
+     * is the same variable in both netlists.
+     */
+    @Test
+    public void testInoutPinOfTerminalIsChecked() {
+        check(ioBufferOn("a"), ioBufferOn("a")).assertPass();
+        LecHarness result = check(ioBufferOn("a"), ioBufferOn("b"));
+        result.assertFail();
+        LecDifference difference = result.findDifference(LecDifferenceType.CONE_FUNCTION_DIFFERS);
+        Assertions.assertNotNull(difference, "The moved IO pin was not reported");
+        Assertions.assertEquals("iob/IO", difference.getSubject());
+    }
+
+    private static EDIFNetlist ioBufferOn(String pad) {
+        LecNetlistFixtures fixture = new LecNetlistFixtures("top");
+        EDIFCell top = fixture.getTop();
+        LecNetlistFixtures.port(top, "a", EDIFDirection.INPUT);
+        LecNetlistFixtures.port(top, "b", EDIFDirection.INPUT);
+        LecNetlistFixtures.port(top, "o", EDIFDirection.OUTPUT);
+        EDIFCell iobufType = fixture.primitive("IOBUF", new String[] { "I", "T" },
+                new String[] { "O" });
+        iobufType.createPort("IO", EDIFDirection.INOUT, 1);
+        EDIFCellInst iob = LecNetlistFixtures.add(top, "iob", iobufType);
+        EDIFCellInst gnd = LecNetlistFixtures.add(top, "GND", fixture.gnd());
+        EDIFCellInst vcc = LecNetlistFixtures.add(top, "VCC", fixture.vcc());
+        LecNetlistFixtures.connect(top, "gnd", gnd, "G", iob, "I");
+        LecNetlistFixtures.connect(top, "vcc", vcc, "P", iob, "T");
+        LecNetlistFixtures.connect(top, pad, top, pad, iob, "IO");
+        LecNetlistFixtures.connect(top, "o", iob, "O", top, "o");
+        return fixture.getNetlist();
+    }
+
+    /**
+     * A short is named after its leaf drivers, which leaves out a top level
+     * input driving it too: one that only IMP connects to the short must not
+     * pass.
+     */
+    @Test
+    public void testShortWithTopLevelSourceDoesNotPass() {
+        EDIFNetlist imp = LecNetlistFixtures.shortedNet("4'h8");
+        LecNetlistFixtures.port(imp.getTopCell(), "c", EDIFDirection.INPUT);
+        LecNetlistFixtures.connect(imp.getTopCell(), "short", imp.getTopCell(), "c");
+        EDIFNetlist ref = LecNetlistFixtures.shortedNet("4'h8");
+        LecNetlistFixtures.port(ref.getTopCell(), "c", EDIFDirection.INPUT);
+        Assertions.assertNotEquals(LogicEquivalenceChecker.EXIT_PASS, check(ref, imp).getExitCode(),
+                "A top level input added to a short passed");
+    }
+
+    /**
+     * Only a primitive GND is a constant: a black box named GND driving an
+     * output differs from a primitive GND driving it.
+     */
+    @Test
+    public void testBlackBoxNamedGndIsNotAConstant() {
+        check(groundedOutput(false), groundedOutput(false)).assertPass();
+        check(groundedOutput(false), groundedOutput(true)).assertFail();
+    }
+
+    private static EDIFNetlist groundedOutput(boolean primitiveGround) {
+        LecNetlistFixtures fixture = new LecNetlistFixtures("top");
+        EDIFCell top = fixture.getTop();
+        LecNetlistFixtures.port(top, "o", EDIFDirection.OUTPUT);
+        EDIFCell blackBox = fixture.newHierCell("GND");
+        LecNetlistFixtures.port(blackBox, "G", EDIFDirection.OUTPUT);
+        EDIFCellInst bb = LecNetlistFixtures.add(top, "bb", blackBox);
+        if (primitiveGround) {
+            EDIFCellInst gnd = LecNetlistFixtures.add(top, "GND", fixture.gnd());
+            LecNetlistFixtures.connect(top, "o", gnd, "G", top, "o");
+        } else {
+            LecNetlistFixtures.connect(top, "o", bb, "G", top, "o");
+        }
+        return fixture.getNetlist();
+    }
+
+    /**
+     * A black box's IS_<pin>_INVERTED parameter has no known meaning, so it is
+     * neither folded into the cone nor left out of the attribute comparison:
+     * changing it and inverting the pin's driver must fail.
+     */
+    @Test
+    public void testBlackBoxInversionParameterIsNotFolded() {
+        check(blackBoxWithInversion(false), blackBoxWithInversion(false)).assertPass();
+        check(blackBoxWithInversion(false), blackBoxWithInversion(true)).assertFail();
+    }
+
+    private static EDIFNetlist blackBoxWithInversion(boolean inverted) {
+        LecNetlistFixtures fixture = new LecNetlistFixtures("top");
+        EDIFCell top = fixture.getTop();
+        LecNetlistFixtures.port(top, "a", EDIFDirection.INPUT);
+        EDIFCell blackBox = fixture.newHierCell("opaque_ip");
+        LecNetlistFixtures.port(blackBox, "I", EDIFDirection.INPUT);
+        EDIFCellInst bb = LecNetlistFixtures.add(top, "bb", blackBox);
+        if (inverted) {
+            LecNetlistFixtures.setProperty(bb, "IS_I_INVERTED", "1'b1");
+            EDIFCellInst inv = LecNetlistFixtures.add(top, "inv", fixture.lut(1));
+            LecNetlistFixtures.setProperty(inv, "INIT", "2'h1");
+            LecNetlistFixtures.connect(top, "a", top, "a", inv, "I0");
+            LecNetlistFixtures.connect(top, "a_n", inv, "O", bb, "I");
+        } else {
+            LecNetlistFixtures.connect(top, "a", top, "a", bb, "I");
+        }
+        return fixture.getNetlist();
     }
 
     /** Two runs over the same inputs must produce byte identical reports. */

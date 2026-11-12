@@ -113,21 +113,30 @@ public class NetlistSummary {
             String instName = flat.getInstName(instId);
             CellIndex index = flat.getIndex(instId);
             Set<String> foldedPins = new TreeSet<>();
+            boolean primitive = CellClassifier.isDevicePrimitive(flat.getCellType(instId));
             for (int bit = 0; bit < index.getPortBitCount(); bit++) {
                 EDIFPort port = index.getPortOfBit(bit);
+                String pinName = index.getPortBitName(bit);
+                if (port.getDirection() == EDIFDirection.INOUT) {
+                    putUnique(coneLiterals, TerminalKey.forPin(instName, pinName),
+                            cones.literalReceivedByInout(instId, bit));
+                    continue;
+                }
                 if (port.getDirection() != EDIFDirection.INPUT) {
                     continue;
                 }
-                String pinName = index.getPortBitName(bit);
                 int lit = cones.literalDriving(instId, bit);
                 String basePin = CellClassifier.stripBusIndex(pinName);
-                if (ModelUtils.isPinBitInverted(flat.getInst(instId), basePin,
-                        busIndexOf(pinName))) {
-                    lit = Aig.not(lit);
+                // (only a device primitive's IS_<pin>_INVERTED is known to invert the pin)
+                if (primitive) {
+                    if (ModelUtils.isPinBitInverted(flat.getInst(instId), basePin,
+                            busIndexOf(pinName))) {
+                        lit = Aig.not(lit);
+                    }
+                    // The cone accounts for this pin's inversion either way, so the
+                    // attribute is folded even where it reads zero.
+                    foldedPins.add(basePin);
                 }
-                // The cone accounts for this pin's inversion either way, so the
-                // attribute is folded even where it reads zero.
-                foldedPins.add(basePin);
                 putUnique(coneLiterals, TerminalKey.forPin(instName, pinName), lit);
             }
             putUnique(terminals, instName.isEmpty() ? typeName : instName,

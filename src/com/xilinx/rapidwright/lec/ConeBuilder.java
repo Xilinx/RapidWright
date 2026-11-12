@@ -296,6 +296,39 @@ public class ConeBuilder {
         return literalOfPin(conn.getDriverPin(root));
     }
 
+    /**
+     * Resolves what a terminal's bidirectional pin (such as an IOBUF's IO)
+     * receives. The pin drives its node too, so where it is the only leaf
+     * driver, it receives what the top level port there drives: one port is
+     * that port's variable, several are unmatchable, none is as unconnected.
+     * Otherwise this is the node's own function.
+     */
+    public int literalReceivedByInout(int instId, int bit) {
+        int pin = flat.getGlobalPin(instId, bit);
+        int root = pin < 0 ? -1 : conn.getPinRoot(pin);
+        if (root < 0) {
+            return defaultLit(instId, bit);
+        }
+        if (conn.getDriverPin(root) != pin || conn.getExtraDrivers(root) != null) {
+            return literalOfNetRoot(root);
+        }
+        switch (conn.getTopSourceCount(root)) {
+        case 0:
+            return defaultLit(instId, bit);
+        case 1:
+            return topPortLit(root);
+        default:
+            Integer cached = multiDriverLits.get(root);
+            if (cached == null) {
+                cached = unstableInput(TerminalKey.MULTI_DRIVER_PREFIX, "#" + (unstableCounter++));
+                log.warn(UNSTABLE_MULTI_DRIVER, conn.getTopSourceCount(root) + " top level ports",
+                        flat.getPinName(instId, bit));
+                multiDriverLits.put(root, cached);
+            }
+            return cached;
+        }
+    }
+
     private int literalOfDriver(int driverPin) {
         if (driverPin < 0) {
             return Aig.FALSE;
@@ -481,8 +514,9 @@ public class ConeBuilder {
      * combinational cloud is therefore queued, see
      * {@link #takeShortedDriverPins()}, and checked as a cone of its own: with
      * the same drivers computing the same functions, the short resolves the
-     * same way in both netlists. Without known drivers the variable is
-     * unmatchable and taints the cones that reach it.
+     * same way in both netlists. Without known drivers, or with a top level
+     * port among them (which the name leaves out), the variable is unmatchable
+     * and taints the cones that reach it.
      */
     private int multiDriverLit(int root) {
         Integer cached = multiDriverLits.get(root);
@@ -491,7 +525,7 @@ public class ConeBuilder {
         }
         int[] drivers = conn.getExtraDrivers(root);
         int lit;
-        if (drivers != null) {
+        if (drivers != null && conn.getTopSourceCount(root) == 0) {
             String[] names = new String[drivers.length];
             for (int i = 0; i < drivers.length; i++) {
                 int owner = pinOwner[drivers[i]];
@@ -504,7 +538,7 @@ public class ConeBuilder {
         } else {
             lit = unstableInput(TerminalKey.MULTI_DRIVER_PREFIX, "#" + (unstableCounter++));
             log.warn(UNSTABLE_MULTI_DRIVER, drivers == null ? "unknown drivers"
-                    : drivers.length + " drivers", exampleDriverName(drivers));
+                    : drivers.length + " drivers and a top level port", exampleDriverName(drivers));
         }
         multiDriverLits.put(root, lit);
         return lit;
@@ -551,7 +585,7 @@ public class ConeBuilder {
      */
     private int defaultLit(int instId, int bit) {
         String typeName = flat.getCellTypeName(instId);
-        String pinName = CellClassifier.stripBusIndex(flat.getIndex(instId).getPortBitName(bit));
+        String pinName = flat.getIndex(instId).getPortBitName(bit);
         NetType tie = lookupPinDefault(typeName, pinName);
         log.warn(IMPLICIT_TIE, typeName + "." + pinName + " -> "
                 + (tie == NetType.VCC ? "VCC" : "GND"), flat.getInstName(instId));
@@ -590,7 +624,13 @@ public class ConeBuilder {
             return NetType.GND;
         }
         try {
+            // The table names the bits of a bus pin (e.g. RAMB36E2's WEA[0]); a bus
+            // pin it lists as a whole is found without the index
             NetType tie = CellPinStaticDefaults.getCellPinDefault(series, unisim, pinName);
+            String basePin = CellClassifier.stripBusIndex(pinName);
+            if (tie == null && !basePin.equals(pinName)) {
+                tie = CellPinStaticDefaults.getCellPinDefault(series, unisim, basePin);
+            }
             return tie == null ? NetType.GND : tie;
         } catch (RuntimeException e) {
             return NetType.GND;

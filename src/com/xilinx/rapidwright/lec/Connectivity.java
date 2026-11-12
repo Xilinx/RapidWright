@@ -90,16 +90,20 @@ public class Connectivity {
      */
     private final int[] rootTopPortBit;
 
+    /** Per root: the number of top level input and inout port bits driving it */
+    private final int[] rootTopSources;
+
     private final int rootCount;
 
     Connectivity(int[] netRoot, int[] pinRoot, int rootCount, byte[] rootKind, int[] rootDriverPin,
-            int[] rootTopPortBit, Map<Integer, int[]> extraDrivers) {
+            int[] rootTopPortBit, int[] rootTopSources, Map<Integer, int[]> extraDrivers) {
         this.netRoot = netRoot;
         this.pinRoot = pinRoot;
         this.rootCount = rootCount;
         this.rootKind = rootKind;
         this.rootDriverPin = rootDriverPin;
         this.rootTopPortBit = rootTopPortBit;
+        this.rootTopSources = rootTopSources;
         this.extraDrivers = extraDrivers;
     }
 
@@ -165,6 +169,11 @@ public class Connectivity {
 
     public int getTopPortBit(int root) {
         return rootTopPortBit[root];
+    }
+
+    /** @return The number of top level input and inout port bits driving the root. */
+    public int getTopSourceCount(int root) {
+        return rootTopSources[root];
     }
 
     /**
