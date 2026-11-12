@@ -36,7 +36,8 @@ public class ReportRouteStatus {
      * netlist, the placement (including site routing) and the routing of the design, but does not
      * rely on (nor modify) the {@link SitePinInst#isRouted()} state. Macro primitives collapsed in
      * the netlist (as by {@link EDIFNetlist#collapseMacroUnisims(Series)}) are expanded, in place
-     * and left expanded, as Vivado does when it reads a design.
+     * and left expanded, as Vivado does when it reads a design (a netlist that tracks cell changes
+     * records the expansion).
      * @param design Design to examine.
      * @return ReportRouteStatusResult object.
      */

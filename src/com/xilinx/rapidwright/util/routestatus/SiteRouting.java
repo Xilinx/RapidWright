@@ -247,8 +247,8 @@ final class SiteRouting {
 
     /**
      * Gets the logical cell of a (placed, not routethru) cell, looked up by name: the one the cell
-     * refers to may be gone, e.g. after the macro primitives of the netlist were collapsed and
-     * expanded again (see RouteStatusEngine.run()).
+     * refers to may be gone, e.g. after {@code EDIFNetlist.collapseMacroUnisims()}, when the report
+     * expands the macros again with new instances inside them (see RouteStatusEngine.run()).
      */
     static EDIFHierCellInst getLogicalCell(Design design, Cell cell) {
         EDIFNetlist netlist = design.getNetlist();

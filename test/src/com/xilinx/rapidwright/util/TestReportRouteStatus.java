@@ -931,17 +931,22 @@ public class TestReportRouteStatus {
      * Vivado ties the unconnected input ports of a macro primitive (here a DSP58, unplaced) to their
      * default constants when it expands it, which makes GND and VCC logical nets (with no placed
      * pins, as the macro). It leaves the unconnected pins of other primitives (here a flip-flop's)
-     * unconnected. (Vivado 2026.1's counts)
+     * unconnected. (Vivado 2026.1's counts) A DSP58 left collapsed (not expanded by the test) is
+     * expanded by the report, although none of its cells is placed.
      */
-    @ParameterizedTest(name = "DSP58 {0}, FDRE {1}")
-    @CsvSource({"true, false, 1316", "false, true, 0", "true, true, 1316"})
-    public void testReportRouteStatusUnconnectedMacroPorts(boolean dsp, boolean ff, int logicalNets) {
+    @ParameterizedTest(name = "DSP58 {0} (expanded {1}), FDRE {2}")
+    @CsvSource({"true, true, false, 1316", "true, false, false, 1316", "false, false, true, 0",
+            "true, true, true, 1316"})
+    public void testReportRouteStatusUnconnectedMacroPorts(boolean dsp, boolean expand, boolean ff,
+            int logicalNets) {
         Design design = new Design("macro_tie", "xcvp1202-vsva2785-2MHP-e-S");
         EDIFNetlist netlist = design.getNetlist();
         EDIFCell top = netlist.getTopCell();
         if (dsp) {
             top.createChildCellInst("dsp", netlist.getHDIPrimitive(Unisim.DSP58));
-            netlist.expandMacroUnisims(design.getSeries());
+            if (expand) {
+                netlist.expandMacroUnisims(design.getSeries());
+            }
         }
         if (ff) {
             top.createChildCellInst("ff", netlist.getHDIPrimitive(Unisim.FDRE));
@@ -954,6 +959,7 @@ public class TestReportRouteStatus {
         Assertions.assertEquals(0, rrs.routableNets);
         if (dsp) {
             assertNetStatuses(rrs, new String[]{"GLOBAL_LOGIC0=UNPLACED_ALL", "GLOBAL_LOGIC1=UNPLACED_ALL"});
+            Assertions.assertFalse(top.getCellInst("dsp").getCellType().isLeafCellOrBlackBox());
         }
     }
 
@@ -1454,6 +1460,18 @@ public class TestReportRouteStatus {
         // (the library holds the same cell, expanded)
         Assertions.assertSame(cell, design.getNetlist().getHDIPrimitivesLibrary().getCell(macro));
         Assertions.assertFalse(cell.isLeafCellOrBlackBox());
+    }
+
+    /**
+     * A netlist without a primitives library is reported without adding one.
+     */
+    @Test
+    public void testReportRouteStatusAddsNoPrimitivesLibrary() {
+        Design design = new Design("design", "xcvc1902-vsvd1760-2MP-e-S");
+        EDIFNetlist netlist = design.getNetlist();
+        netlist.removeLibrary(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME);
+        ReportRouteStatus.reportRouteStatus(design, true);
+        Assertions.assertNull(netlist.getLibrary(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME));
     }
 
     /**

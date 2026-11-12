@@ -83,6 +83,7 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.util.IntHashSet;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.ReportRouteStatus;
@@ -197,11 +198,13 @@ public final class RouteStatusEngine {
      */
     private static boolean hasCollapsedMacros(Design design) {
         Series series = design.getSeries();
-        if (series == null) {
+        // (EDIFNetlist.getHDIPrimitivesLibrary() would add the library if missing)
+        EDIFLibrary prims = design.getNetlist().getLibrary(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME);
+        if (series == null || prims == null) {
             return false;
         }
         EDIFLibrary macros = Design.getMacroPrimitives(series);
-        for (EDIFCell cell : design.getNetlist().getHDIPrimitivesLibrary().getCells()) {
+        for (EDIFCell cell : prims.getCells()) {
             EDIFCell macro = macros.getCell(cell.getName());
             if (macro != null && cell.isLeafCellOrBlackBox() && !macro.isLeafCellOrBlackBox()) {
                 return true;
