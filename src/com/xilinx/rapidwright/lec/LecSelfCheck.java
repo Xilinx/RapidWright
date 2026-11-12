@@ -85,6 +85,7 @@ public class LecSelfCheck {
         long impInit;
         int[] inputPiOrder;      // LUT input index -> source terminal name, for the oracle
         String[] inputTerminals;
+        int constantIndex;       // INIT index bits of the inputs tied high
         boolean haveOracle;
     }
 
@@ -363,7 +364,7 @@ public class LecSelfCheck {
                 continue;
             }
             Map<String, Boolean> assignment = d.getVerdict().getCounterExample();
-            int index = 0;
+            int index = applied.constantIndex;
             for (int i = 0; i < applied.inputTerminals.length; i++) {
                 Boolean value = assignment.get(applied.inputTerminals[i]);
                 if (value == null) {
@@ -579,6 +580,8 @@ public class LecSelfCheck {
             if (!site.isConstant[i]) {
                 terms.add(site.inputTerminals[i]);
                 order.add(site.inputIndex[i]);
+            } else if (site.constantValue[i]) {
+                a.constantIndex |= 1 << site.inputIndex[i];
             }
         }
         a.inputTerminals = terms.toArray(new String[0]);
@@ -657,7 +660,7 @@ public class LecSelfCheck {
                     // can easily have no explicitly tied table input at all.
                     tied = i;
                     tiedHigh = ConeBuilder.pinDefault(ctx.series, type,
-                            CellClassifier.stripBusIndex(idx.getPortBitName(bit))) == NetType.VCC;
+                            idx.getPortBitName(bit)) == NetType.VCC;
                     continue;
                 }
                 byte kind = ctx.conn.getRootKind(root);

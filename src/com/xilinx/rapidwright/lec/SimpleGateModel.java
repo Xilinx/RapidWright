@@ -124,9 +124,8 @@ public class SimpleGateModel implements PrimitiveModel {
 
     private static boolean isBuffer(String typeName) {
         return typeName.equals("BUF") || typeName.equals("IBUF") || typeName.equals("OBUF")
-                || typeName.equals("IBUFG") || typeName.equals("IBUFDS")
-                || typeName.equals("IBUFGDS") || typeName.equals("IBUFDS_DIFF_OUT")
-                || typeName.equals("OBUFDS") || typeName.equals("OBUFDS_DUAL_BUF");
+                || typeName.equals("IBUFG") || typeName.equals("OBUFDS")
+                || typeName.equals("OBUFDS_DUAL_BUF");
     }
 
     @Override

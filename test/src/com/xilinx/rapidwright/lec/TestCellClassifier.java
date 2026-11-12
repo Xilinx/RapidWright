@@ -109,9 +109,21 @@ public class TestCellClassifier {
      */
     @Test
     public void testIoBuffersAreTransparent() {
-        for (String name : new String[] { "IBUF", "OBUF", "IBUFDS", "OBUFDS" }) {
+        for (String name : new String[] { "IBUF", "OBUF", "OBUFDS" }) {
             Assertions.assertEquals(CellRole.COMBINATIONAL, roleOfPrimitive(name),
                     name + " must be transparent to logic");
+        }
+    }
+
+    /**
+     * A differential receiver's output follows I only while IB is its
+     * complement, which is not proven, so it is a terminal: both inputs are
+     * checked.
+     */
+    @Test
+    public void testDifferentialReceiversAreTerminals() {
+        for (String name : new String[] { "IBUFDS", "IBUFGDS", "IBUFDS_DIFF_OUT" }) {
+            Assertions.assertEquals(CellRole.TERMINAL, roleOfPrimitive(name), name);
         }
     }
 
