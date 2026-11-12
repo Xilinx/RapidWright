@@ -352,17 +352,19 @@ final class SiteRouting {
 
     /**
      * Checks whether any of the given input site pin nodes of a (signal) net in a slice has site
-     * routing of the net that reaches no placed cell pin (see
-     * {@link #reachesPlacedCellPin(SiteInst, String, NetType)}). (Other sites, e.g. of I/O, may
-     * pass a pin on to a cell without storing the site routing to it.)
+     * routing of the net, or of one of its aliases (the physical nets of its other segments), that
+     * reaches no placed cell pin (see {@link #reachesPlacedCellPin(SiteInst, String, NetType)}).
+     * (Other sites, e.g. of I/O, may pass a pin on to a cell without storing the site routing to
+     * it.)
+     * @param aliases The aliases of the net, or null.
      */
-    static boolean hasStaleSitePin(Net net, List<Node> nodes) {
+    static boolean hasStaleSitePin(Net net, List<Net> aliases, List<Node> nodes) {
         Design design = net.getDesign();
         for (Node node : nodes) {
             SitePin sitePin = node.getSitePin();
             SiteInst si = (sitePin == null) ? null : design.getSiteInstFromSite(sitePin.getSite());
             BELPin port = (si == null || !Utils.isSLICE(si)) ? null : getSitePortPin(si, sitePin);
-            if (port == null || !isNetSitePin(net, si, port)) {
+            if (port == null || !isNetSitePin(net, aliases, si, port)) {
                 continue;
             }
             boolean direct = false;
@@ -385,6 +387,21 @@ final class SiteRouting {
      * Checks whether an input site pin belongs to a signal net in its site: its site wire carries
      * the net, or (without any site wire assignment) the net has a SitePinInst on it.
      */
+    static boolean isNetSitePin(Net net, List<Net> aliases, SiteInst si, BELPin port) {
+        if (isNetSitePin(net, si, port)) {
+            return true;
+        }
+        if (aliases != null) {
+            for (Net alias : aliases) {
+                if (isNetSitePin(alias, si, port)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** As {@link #isNetSitePin(Net, List, SiteInst, BELPin)}, for one physical net */
     static boolean isNetSitePin(Net net, SiteInst si, BELPin port) {
         Net wireNet = si.getNetFromSiteWireIndex(port.getSiteWireIndex());
         if (wireNet != null) {

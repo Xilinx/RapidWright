@@ -32,6 +32,7 @@ import static com.xilinx.rapidwright.util.routestatus.NetStatus.ROUTED;
 import static com.xilinx.rapidwright.util.routestatus.NetStatus.UNROUTED;
 import static com.xilinx.rapidwright.util.routestatus.NetStatus.has;
 import static com.xilinx.rapidwright.util.routestatus.SiteRouting.getLogicalCell;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.getPrimarySitePinName;
 import static com.xilinx.rapidwright.util.routestatus.SiteRouting.storedPins;
 
 import java.util.ArrayList;
@@ -226,7 +227,7 @@ final class InvalidSites {
         }
         SiteInst si = pin.cell.getSiteInst();
         for (String siteWire : si.getSiteWiresFromNet(net)) {
-            String sitePin = si.getPrimarySitePinName(siteWire);
+            String sitePin = getPrimarySitePinName(si, siteWire);
             int pinIndex = (sitePin == null) ? -1 : si.getSite().getPinIndex(sitePin);
             if (pinIndex >= 0 && si.getSite().isInputPin(pinIndex)) {
                 return true;

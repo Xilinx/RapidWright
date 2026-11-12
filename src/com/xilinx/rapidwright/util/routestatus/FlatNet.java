@@ -26,6 +26,7 @@ import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.getLeaf
 import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.getSegments;
 import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.getSitePinFeeding;
 import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.hasPhysicalPin;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.getSitePinNode;
 import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isClockBufferSite;
 
 import java.util.ArrayList;
@@ -429,7 +430,8 @@ final class FlatNet extends Connections {
             for (String physPin : pin.getPhysicalPins()) {
                 BELPin belPin = pin.cell.getBEL().getPin(physPin);
                 String sitePin = (belPin == null) ? null : getSitePinFeeding(si, belPin);
-                Node node = (sitePin == null) ? null : si.getSite().getConnectedNode(si.getPrimarySitePinName(sitePin));
+                // (translated to the primary site type only if the site instance is of an alternate one)
+                Node node = (sitePin == null) ? null : getSitePinNode(si, sitePin);
                 if (node != null && isReachedByGeneralRouting(node)) {
                     return true;
                 }

@@ -461,10 +461,24 @@ final class SitePinClaims {
 
     /**
      * Gets the sorted keys of the nodes of the input site pins of a net whose site routing does not
-     * lead to a placed cell pin (e.g. left behind by unplacing a cell), which are not loads.
+     * lead to a placed cell pin (e.g. left behind by unplacing a cell), which are not loads. Also
+     * those of its aliases (the physical nets of its other segments), whose sink pins its routing
+     * includes.
+     * @param aliases The aliases of the net, or null.
      */
-    static long[] getStaleSitePinKeys(Net net, NetType staticType) {
+    static long[] getStaleSitePinKeys(Net net, List<Net> aliases, NetType staticType) {
         List<Long> keys = new ArrayList<>();
+        addStaleSitePinKeys(net, staticType, keys);
+        if (aliases != null) {
+            for (Net alias : aliases) {
+                addStaleSitePinKeys(alias, staticType, keys);
+            }
+        }
+        return toSortedDistinct(keys);
+    }
+
+    /** Adds the keys of the stale input site pins of one physical net (see above). */
+    private static void addStaleSitePinKeys(Net net, NetType staticType, List<Long> keys) {
         for (SiteInst si : net.getSiteInsts()) {
             for (String siteWire : si.getSiteWiresFromNet(net)) {
                 for (BELPin pin : si.getSiteWirePins(siteWire)) {
@@ -504,6 +518,5 @@ final class SitePinClaims {
                 }
             }
         }
-        return toSortedDistinct(keys);
     }
 }

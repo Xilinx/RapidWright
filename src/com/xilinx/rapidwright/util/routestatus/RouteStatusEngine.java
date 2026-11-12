@@ -1111,7 +1111,7 @@ public final class RouteStatusEngine {
                 return s | ANTENNAS | lockedNodes(graph) | (flat.hasPinsInMultipleSites(design) ? PARTIAL : 0);
             }
             // Site pins left in sites without a placed cell of the net are not loads
-            staleKeys = getStaleSitePinKeys(net, null);
+            staleKeys = getStaleSitePinKeys(net, entries.aliasNets.get(entry), null);
         }
         analyzeRouting(net, flat, entry, graph, staleKeys);
         s |= lockedNodes(graph);
@@ -1159,13 +1159,13 @@ public final class RouteStatusEngine {
         if (graph.reachedSinks < graph.sinks && sitePinKeys != null) {
             // Site routing is sometimes left behind (e.g. static ties for LUT pins, or where routing
             // bounces through a site pin) where no placed cell uses it: such site pins are not loads
-            long[] staleSitePinKeys = getStaleSitePinKeys(net, isStatic ? net.getType() : null);
+            long[] staleSitePinKeys = getStaleSitePinKeys(net, aliases, isStatic ? net.getType() : null);
             graph.analyze(net, aliases, isStatic, sitePinKeys, staleSitePinKeys, partitionPinKeys, placedSource);
-        } else if (graph.leafSinks != null && hasStaleSitePin(net, graph.leafSinks)) {
+        } else if (graph.leafSinks != null && hasStaleSitePin(net, aliases, graph.leafSinks)) {
             // Neither is a site pin (even with a SitePinInst) where routing ends, if the net's site
             // routing from it reaches no placed cell: the routing to it is an antenna
-            graph.analyze(net, aliases, isStatic, sitePinKeys, getStaleSitePinKeys(net, null), partitionPinKeys,
-                    placedSource);
+            graph.analyze(net, aliases, isStatic, sitePinKeys, getStaleSitePinKeys(net, aliases, null),
+                    partitionPinKeys, placedSource);
         }
     }
 

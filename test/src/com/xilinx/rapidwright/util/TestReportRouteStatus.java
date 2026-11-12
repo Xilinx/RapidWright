@@ -1431,6 +1431,39 @@ public class TestReportRouteStatus {
     }
 
     /**
+     * An input site pin whose site routing, of an alias of a net (a physical net named after another
+     * of its segments, here without routing), reaches no placed cell is no load of the net either:
+     * routing of the net to it is an antenna, and without routing to it the net is fully routed
+     * (Vivado 2025.2 reports both the same).
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testReportRouteStatusStaleSitePinOfAlias(boolean routedTo) {
+        Design design = RapidWrightDCP.loadDCP("picoblaze4_ooc_X6Y60_X6Y65_X10Y60_X10Y65.dcp");
+        Net net = design.getNet("picoblaze_0_12/in_port[0]");
+        Net alias = design.createNet("picoblaze_0_12/processor/Q[0]");
+        SiteInst si = design.getSiteInstFromSiteName("SLICE_X10Y64");
+        Assertions.assertNull(si.getCell("B6LUT"));
+        Assertions.assertNull(si.getCell("B5LUT"));
+        BELPin b2 = si.getBEL("B2").getPin("B2");
+        si.routeIntraSiteNet(alias, b2, b2);
+        if (routedTo) {
+            net.addPIP(design.getDevice().getPIP("INT_X6Y64/INT.INT_NODE_IMUX_13_INT_OUT0->>IMUX_E9"));
+        }
+        ReportRouteStatusResult rrs = ReportRouteStatus.reportRouteStatus(design, true);
+        Assertions.assertEquals(PICOBLAZE4_SUMMARY_HEAD +
+                "           # of fully routed nets............. :         " + (routedTo ? 771 : 772) + " :\n" +
+                "       # of nets with routing errors.......... :           " + (routedTo ? 3 : 2) + " :\n" +
+                "           # of nets with some unplaced pins.. :           2 :\n" +
+                "           # of nets with some unrouted pins.. :           2 :\n" +
+                (routedTo ? "           # of nets with antennas/islands.... :           1 :\n" : "") +
+                "   ------------------------------------------- : ----------- :",
+                rrs.toString());
+        assertNetStatuses(rrs, new String[]{"picoblaze_0_12/in_port[0]="
+                + (routedTo ? "ANTENNAS,HAS_ROUTING" : "HAS_ROUTING,ROUTED")});
+    }
+
+    /**
      * Writing a checkpoint leaves the macro primitives of the netlist expanded, and the route status
      * the same. With the macros then collapsed in memory, while the placed cells are those of their
      * expansion (also of nested macros, e.g. DSP58C inside DSP58), the route status is still the same,
