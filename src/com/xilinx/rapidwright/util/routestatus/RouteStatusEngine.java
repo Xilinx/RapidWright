@@ -81,6 +81,7 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.util.IntHashSet;
 import com.xilinx.rapidwright.util.ParallelismTools;
@@ -180,18 +181,33 @@ public final class RouteStatusEngine {
      * as for huge designs, which tests compare).
      */
     static ReportRouteStatusResult run(Design design, boolean perNet, boolean packConflicts) {
-        // Macro primitives (e.g. RAM64X1D) may be collapsed in the netlist (as by
-        // EDIFNetlist.collapseMacroUnisims()), while the cells placed for them are those of their
-        // expansion (as read from a checkpoint). Vivado expands them when it reads the design: so
-        // does the report, which then collapses them again.
-        CollapsedMacros expanded = CollapsedMacros.expand(design);
-        try {
-            return new RouteStatusEngine(design, perNet, packConflicts).run();
-        } finally {
-            if (expanded != null) {
-                expanded.collapse();
+        // Vivado expands macro primitives (e.g. RAM64X1D) when it reads a design, as RapidWright does
+        // and keeps them in memory. Those collapsed since (as by EDIFNetlist.collapseMacroUnisims())
+        // are expanded again, in place.
+        if (hasCollapsedMacros(design)) {
+            design.getNetlist().expandMacroUnisims(design.getSeries());
+        }
+        return new RouteStatusEngine(design, perNet, packConflicts).run();
+    }
+
+    /**
+     * Checks whether macro primitives are collapsed in a design's netlist. Only then is
+     * {@link EDIFNetlist#expandMacroUnisims(Series)} called: it always resets the netlist's parent
+     * net map, which takes seconds to rebuild for a large design.
+     */
+    private static boolean hasCollapsedMacros(Design design) {
+        Series series = design.getSeries();
+        if (series == null) {
+            return false;
+        }
+        EDIFLibrary macros = Design.getMacroPrimitives(series);
+        for (EDIFCell cell : design.getNetlist().getHDIPrimitivesLibrary().getCells()) {
+            EDIFCell macro = macros.getCell(cell.getName());
+            if (macro != null && cell.isLeafCellOrBlackBox() && !macro.isLeafCellOrBlackBox()) {
+                return true;
             }
         }
+        return false;
     }
 
     private ReportRouteStatusResult run() {

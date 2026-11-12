@@ -24,6 +24,8 @@ package com.xilinx.rapidwright.util;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.util.routestatus.RouteStatusEngine;
 
 public class ReportRouteStatus {
@@ -32,7 +34,9 @@ public class ReportRouteStatus {
      * Compute the route status of the given Design the way Vivado's `report_route_status` does,
      * such that every count in the returned summary matches Vivado's. It examines the logical
      * netlist, the placement (including site routing) and the routing of the design, but does not
-     * rely on (nor modify) the {@link SitePinInst#isRouted()} state.
+     * rely on (nor modify) the {@link SitePinInst#isRouted()} state. Macro primitives collapsed in
+     * the netlist (as by {@link EDIFNetlist#collapseMacroUnisims(Series)}) are expanded, in place
+     * and left expanded, as Vivado does when it reads a design.
      * @param design Design to examine.
      * @return ReportRouteStatusResult object.
      */
