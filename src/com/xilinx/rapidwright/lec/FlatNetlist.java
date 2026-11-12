@@ -389,6 +389,9 @@ public class FlatNetlist {
      * are matched by.
      *
      * @return The hierarchical name, or the empty string for the top instance.
+     * @throws LecException If the name starts with
+     *         {@link TerminalKey#UNSTABLE_PREFIX}, which every key built from it
+     *         would then start with too.
      */
     public String getInstName(int instId) {
         if (instId == 0) {
@@ -416,6 +419,12 @@ public class FlatNetlist {
                 return String.join(EDIFTools.EDIF_HIER_SEP, Arrays.copyOfRange(parts, at, depth));
             }
             parts[--at] = instObj[i].getName();
+        }
+        if (parts[0].startsWith(TerminalKey.UNSTABLE_PREFIX)) {
+            // The name of every pin below would be read as one of the checker's own variables
+            throw new LecException("Instance '" + parts[0] + "' starts with '"
+                    + TerminalKey.UNSTABLE_PREFIX + "', which is reserved for the checker's "
+                    + "own variables, so it cannot name an instance");
         }
         return String.join(EDIFTools.EDIF_HIER_SEP, parts);
     }

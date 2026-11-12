@@ -311,6 +311,39 @@ public class TestLecAcceptance {
     }
 
     /**
+     * A leaf cell outside the primitives library is a black box whatever it is
+     * called, so replacing a flip flop with a leaf {@code work.FDRE} of the same
+     * pins and properties is a terminal type difference, not a match.
+     */
+    @Test
+    public void testLeafNamedLikeAPrimitiveFails() {
+        EDIFNetlist imp = LecNetlistFixtures.clockedFlop("clk_a");
+        EDIFCellInst ff = imp.getTopCell().getCellInst("ff");
+        EDIFCell leaf = new EDIFCell(imp.getTopCell().getLibrary(), ff.getCellType(), "FDRE", false);
+        ff.setCellType(leaf);
+        LecHarness result = check(LecNetlistFixtures.clockedFlop("clk_a"), imp);
+        result.assertFail();
+        LecDifference difference =
+                result.findDifference(LecDifferenceType.TERMINAL_CELL_TYPE_DIFFERS);
+        Assertions.assertNotNull(difference, "The replaced flip flop was not reported");
+        Assertions.assertEquals("ff", difference.getSubject());
+    }
+
+    /**
+     * A key built from an instance path starting with the reserved unstable
+     * prefix would be read as one of the checker's own variables (here that of
+     * black box {@code bb}'s output Q in IMP), so such a netlist is refused.
+     */
+    @Test
+    public void testInstanceNamedWithReservedPrefixIsRefused() {
+        EDIFNetlist imp = LecNetlistFixtures.clockedFlop("clk_a");
+        LecNetlistFixtures.add(imp.getTopCell(), TerminalKey.OPAQUE_PREFIX + "IMP:bb",
+                imp.getTopCell().getCellInst("ff").getCellType());
+        Assertions.assertThrows(LecException.class,
+                () -> check(LecNetlistFixtures.clockedFlop("clk_a"), imp));
+    }
+
+    /**
      * The negative cases generalised: every destructive
      * change must produce a non-zero exit code.
      */
