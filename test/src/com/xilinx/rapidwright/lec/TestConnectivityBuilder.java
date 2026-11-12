@@ -177,12 +177,20 @@ public class TestConnectivityBuilder {
         Map<String, Integer> viaEdif = buildNodeMap(fromEdif);
         Assertions.assertEquals(viaDcp.keySet(), viaEdif.keySet(),
                 "The two readers disagree on which hierarchical nets exist");
+        // Both ways: a node split by one reader, or two merged
         Map<Integer, Integer> mapping = new HashMap<>();
+        Map<Integer, Integer> reverse = new HashMap<>();
         for (Map.Entry<String, Integer> e : viaDcp.entrySet()) {
-            Integer previous = mapping.putIfAbsent(e.getValue(), viaEdif.get(e.getKey()));
+            Integer edifNode = viaEdif.get(e.getKey());
+            Integer previous = mapping.putIfAbsent(e.getValue(), edifNode);
             if (previous != null) {
-                Assertions.assertEquals(previous, viaEdif.get(e.getKey()),
+                Assertions.assertEquals(previous, edifNode,
                         "Net '" + e.getKey() + "' groups differently via EDIF than via DCP");
+            }
+            previous = reverse.putIfAbsent(edifNode, e.getValue());
+            if (previous != null) {
+                Assertions.assertEquals(previous, e.getValue(),
+                        "Net '" + e.getKey() + "' groups differently via DCP than via EDIF");
             }
         }
     }

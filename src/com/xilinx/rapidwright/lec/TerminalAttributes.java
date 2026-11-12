@@ -25,11 +25,13 @@ package com.xilinx.rapidwright.lec;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
 import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFLibrary;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 
 /**
@@ -67,10 +69,19 @@ public class TerminalAttributes {
 
     private final String cellTypeName;
 
+    /**
+     * The library of the cell type, or null for a top level port. Part of the
+     * type's identity: a leaf {@code work.FDRE} is a black box, not the
+     * {@code hdi_primitives.FDRE} flip flop.
+     */
+    private final String libraryName;
+
     private final Map<String, String> properties;
 
-    private TerminalAttributes(String cellTypeName, Map<String, String> properties) {
+    private TerminalAttributes(String cellTypeName, String libraryName,
+            Map<String, String> properties) {
         this.cellTypeName = cellTypeName;
+        this.libraryName = libraryName;
         this.properties = properties;
     }
 
@@ -124,7 +135,9 @@ public class TerminalAttributes {
                 properties.put(key, value == null ? "" : String.valueOf(value.getValue()));
             }
         }
-        return new TerminalAttributes(cellTypeName, properties);
+        EDIFLibrary library = inst == null ? null : inst.getCellType().getLibrary();
+        return new TerminalAttributes(cellTypeName, library == null ? null : library.getName(),
+                properties);
     }
 
     /**
@@ -143,6 +156,11 @@ public class TerminalAttributes {
         return cellTypeName;
     }
 
+    /** @return The library of the cell type, or null for a top level port. */
+    public String getLibraryName() {
+        return libraryName;
+    }
+
     public Map<String, String> getProperties() {
         return properties;
     }
@@ -155,8 +173,10 @@ public class TerminalAttributes {
      */
     public List<String> diff(TerminalAttributes other) {
         List<String> differences = new ArrayList<>();
-        if (!cellTypeName.equals(other.cellTypeName)) {
-            differences.add("cell type " + cellTypeName + " vs " + other.cellTypeName);
+        if (!cellTypeName.equals(other.cellTypeName)
+                || !Objects.equals(libraryName, other.libraryName)) {
+            differences.add("cell type " + qualifiedTypeName() + " vs "
+                    + other.qualifiedTypeName());
             return differences;
         }
         Set<String> keys = new TreeSet<>(properties.keySet());
@@ -173,5 +193,10 @@ public class TerminalAttributes {
             }
         }
         return differences;
+    }
+
+    /** The cell type with its library, for messages (they are compared separately). */
+    private String qualifiedTypeName() {
+        return libraryName == null ? cellTypeName : libraryName + ":" + cellTypeName;
     }
 }

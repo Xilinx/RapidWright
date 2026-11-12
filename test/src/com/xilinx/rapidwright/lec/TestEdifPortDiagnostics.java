@@ -62,4 +62,43 @@ public class TestEdifPortDiagnostics {
         Assertions.assertEquals("I7", findings.get(0).getPortName());
         Assertions.assertEquals("LUT1", findings.get(0).getReferencedCell());
     }
+
+    /**
+     * Cells of the same name in different libraries have their own ports: a port
+     * that only the other library's cell declares is still undeclared, whether
+     * the library is named by the instance or is the instance's own.
+     */
+    @Test
+    public void testSameNamedCellsInDifferentLibraries(@TempDir Path dir) throws IOException {
+        Path edif = dir.resolve("bad.edf");
+        Files.write(edif, Arrays.asList(
+                "(edif top",
+                "  (library libA",
+                "    (cell shared (celltype GENERIC)",
+                "      (view netlist (viewtype NETLIST)",
+                "        (interface (port I0 (direction INPUT)))))",
+                "    (cell user (celltype GENERIC)",
+                "      (view netlist (viewtype NETLIST)",
+                "        (contents",
+                "          (instance a (viewref netlist (cellref shared)))",
+                "          (net n (joined (portref I7 (instanceref a))))))))",
+                "  (library libB",
+                "    (cell shared (celltype GENERIC)",
+                "      (view netlist (viewtype NETLIST)",
+                "        (interface (port I7 (direction INPUT)))))",
+                "    (cell top (celltype GENERIC)",
+                "      (view netlist (viewtype NETLIST)",
+                "        (contents",
+                "          (instance b (viewref netlist (cellref shared (libraryref libA))))",
+                "          (instance c (viewref netlist (cellref shared)))",
+                "          (net m (joined (portref I7 (instanceref b))",
+                "                         (portref I7 (instanceref c))))))))))"));
+        List<EdifPortDiagnostics.Finding> findings = EdifPortDiagnostics.scan(edif, 10);
+        Assertions.assertEquals(2, findings.size(), findings.toString());
+        for (EdifPortDiagnostics.Finding finding : findings) {
+            Assertions.assertEquals("I7", finding.getPortName());
+            Assertions.assertEquals("shared", finding.getReferencedCell());
+            Assertions.assertEquals("libA", finding.getReferencedLibrary());
+        }
+    }
 }

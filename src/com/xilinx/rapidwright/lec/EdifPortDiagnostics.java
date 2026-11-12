@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -56,6 +57,9 @@ public class EdifPortDiagnostics {
     /** Characters an EDIF identifier can contain, in the forms Vivado writes. */
     private static final String NAME = "[A-Za-z0-9_$&\\-\\.\\[\\]]+";
 
+    private static final Pattern LIBRARY_START =
+            Pattern.compile("\\((?:library|external)\\s+(?:\\(rename\\s+)?(" + NAME + ")");
+
     private static final Pattern CELL_START =
             Pattern.compile("\\(cell\\s+(?:\\(rename\\s+)?(" + NAME + ")");
 
@@ -64,7 +68,7 @@ public class EdifPortDiagnostics {
 
     private static final Pattern INSTANCE = Pattern.compile("\\(instance\\s+(?:\\(rename\\s+)?("
             + NAME + ")(?:\\s+\"[^\"]*\"\\s*\\))?\\s+\\(viewref\\s+" + NAME
-            + "\\s+\\(cellref\\s+(" + NAME + ")");
+            + "\\s+\\(cellref\\s+(" + NAME + ")(?:\\s+\\(libraryref\\s+(" + NAME + ")\\))?");
 
     private static final Pattern PORT_REF = Pattern.compile("\\(portref\\s+(?:\\(member\\s+)?("
             + NAME + ")(?:\\s+\\d+\\))?\\s*(?:\\(instanceref\\s+(" + NAME + ")\\))?");
@@ -76,17 +80,20 @@ public class EdifPortDiagnostics {
 
         private final String instanceName;
 
+        private final String referencedLibrary;
+
         private final String referencedCell;
 
         private final String portName;
 
         private final long line;
 
-        Finding(String enclosingCell, String instanceName, String referencedCell, String portName,
+        Finding(String enclosingCell, String instanceName, CellRef referenced, String portName,
                 long line) {
             this.enclosingCell = enclosingCell;
             this.instanceName = instanceName;
-            this.referencedCell = referencedCell;
+            this.referencedLibrary = referenced.library;
+            this.referencedCell = referenced.cell;
             this.portName = portName;
             this.line = line;
         }
@@ -99,6 +106,11 @@ public class EdifPortDiagnostics {
             return referencedCell;
         }
 
+        /** @return The library of the referenced cell, or null if no library preceded it. */
+        public String getReferencedLibrary() {
+            return referencedLibrary;
+        }
+
         public long getLine() {
             return line;
         }
@@ -106,7 +118,38 @@ public class EdifPortDiagnostics {
         @Override
         public String toString() {
             return "line " + line + ": port '" + portName + "' on instance '" + instanceName
-                    + "' of cell '" + referencedCell + "', inside cell '" + enclosingCell + "'";
+                    + "' of cell '" + referencedCell + "' (library '" + referencedLibrary
+                    + "'), inside cell '" + enclosingCell + "'";
+        }
+    }
+
+    /**
+     * A cell qualified by its library: cells of the same name in different
+     * libraries are different cells, with their own ports.
+     */
+    private static final class CellRef {
+
+        private final String library;
+
+        private final String cell;
+
+        CellRef(String library, String cell) {
+            this.library = library;
+            this.cell = cell;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof CellRef)) {
+                return false;
+            }
+            CellRef other = (CellRef) o;
+            return Objects.equals(library, other.library) && cell.equals(other.cell);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(library, cell);
         }
     }
 
@@ -124,7 +167,7 @@ public class EdifPortDiagnostics {
      */
     public static List<Finding> scan(Path edifFile, int limit) {
         try {
-            Map<String, Set<String>> portsByCell = collectDeclaredPorts(edifFile);
+            Map<CellRef, Set<String>> portsByCell = collectDeclaredPorts(edifFile);
             return findUndeclaredReferences(edifFile, portsByCell, limit);
         } catch (IOException | RuntimeException e) {
             return new ArrayList<>();
@@ -132,15 +175,18 @@ public class EdifPortDiagnostics {
     }
 
     /** First pass: every port each cell declares. */
-    private static Map<String, Set<String>> collectDeclaredPorts(Path edifFile) throws IOException {
-        Map<String, Set<String>> portsByCell = new HashMap<>();
+    private static Map<CellRef, Set<String>> collectDeclaredPorts(Path edifFile) throws IOException {
+        Map<CellRef, Set<String>> portsByCell = new HashMap<>();
         Set<String> current = null;
+        String library = null;
         try (BufferedReader reader = Files.newBufferedReader(edifFile, StandardCharsets.ISO_8859_1)) {
             String line;
             while ((line = reader.readLine()) != null) {
+                library = libraryStartedOn(line, library);
                 Matcher cell = CELL_START.matcher(line);
                 if (cell.find()) {
-                    current = portsByCell.computeIfAbsent(cell.group(1), k -> new HashSet<>());
+                    current = portsByCell.computeIfAbsent(new CellRef(library, cell.group(1)),
+                            k -> new HashSet<>());
                 }
                 if (current == null || line.indexOf("(port ") < 0) {
                     continue;
@@ -155,6 +201,18 @@ public class EdifPortDiagnostics {
     }
 
     /**
+     * @return The library a line starts, else the current one. A cell refers to
+     *         another cell of its own library unless it names one.
+     */
+    private static String libraryStartedOn(String line, String library) {
+        if (line.indexOf("(library ") < 0 && line.indexOf("(external ") < 0) {
+            return library;
+        }
+        Matcher start = LIBRARY_START.matcher(line);
+        return start.find() ? start.group(1) : library;
+    }
+
+    /**
      * Second pass: every connection whose port is absent from the cell it names.
      *
      * A cell whose ports were never seen is skipped rather than reported, since
@@ -162,15 +220,17 @@ public class EdifPortDiagnostics {
      * would be noise.
      */
     private static List<Finding> findUndeclaredReferences(Path edifFile,
-            Map<String, Set<String>> portsByCell, int limit) throws IOException {
+            Map<CellRef, Set<String>> portsByCell, int limit) throws IOException {
         List<Finding> findings = new ArrayList<>();
-        Map<String, String> instanceToCell = new HashMap<>();
+        Map<String, CellRef> instanceToCell = new HashMap<>();
         String enclosing = "?";
+        String library = null;
         long lineNumber = 0;
         try (BufferedReader reader = Files.newBufferedReader(edifFile, StandardCharsets.ISO_8859_1)) {
             String line;
             while ((line = reader.readLine()) != null) {
                 lineNumber++;
+                library = libraryStartedOn(line, library);
                 Matcher cell = CELL_START.matcher(line);
                 if (cell.find()) {
                     enclosing = cell.group(1);
@@ -179,7 +239,9 @@ public class EdifPortDiagnostics {
                 if (line.indexOf("(instance ") >= 0) {
                     Matcher instance = INSTANCE.matcher(line);
                     while (instance.find()) {
-                        instanceToCell.put(instance.group(1), instance.group(2));
+                        String cellLibrary = instance.group(3) == null ? library : instance.group(3);
+                        instanceToCell.put(instance.group(1),
+                                new CellRef(cellLibrary, instance.group(2)));
                     }
                 }
                 if (line.indexOf("(portref ") < 0) {
@@ -193,7 +255,7 @@ public class EdifPortDiagnostics {
     }
 
     private static void collectFromLine(String line, long lineNumber, String enclosing,
-            Map<String, String> instanceToCell, Map<String, Set<String>> portsByCell,
+            Map<String, CellRef> instanceToCell, Map<CellRef, Set<String>> portsByCell,
             List<Finding> findings, int limit) {
         Matcher ref = PORT_REF.matcher(line);
         while (ref.find()) {
@@ -201,7 +263,7 @@ public class EdifPortDiagnostics {
             if (instance == null) {
                 continue;
             }
-            String targetCell = instanceToCell.get(instance);
+            CellRef targetCell = instanceToCell.get(instance);
             if (targetCell == null) {
                 continue;
             }
@@ -227,9 +289,10 @@ public class EdifPortDiagnostics {
                 .append("in this tool; Vivado rejects the same file.");
         sb.append(System.lineSeparator()).append("  ").append(findings.size())
                 .append(" such connections were found in ").append(source).append(":");
-        Map<String, Integer> byCell = new HashMap<>();
+        Map<CellRef, Integer> byCell = new HashMap<>();
         for (Finding finding : findings) {
-            byCell.merge(finding.getReferencedCell(), 1, Integer::sum);
+            byCell.merge(new CellRef(finding.getReferencedLibrary(), finding.getReferencedCell()), 1,
+                    Integer::sum);
         }
         int shown = 0;
         for (Finding finding : findings) {
