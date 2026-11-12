@@ -50,14 +50,17 @@ import com.xilinx.rapidwright.util.Pair;
  * database and the placement and routing data. On a large part that difference
  * is several gigabytes, and none of it is needed to reason about logic.
  *
- * <h2>Why macros are not expanded by default</h2>
+ * <h2>Macro primitives</h2>
  *
- * {@code EDIFNetlist.expandMacroUnisims} installs a single expanded cell per
- * macro type and shares it across every instance of that type, without
- * propagating per instance parameters. After expansion, every {@code LUT6CY}
- * instance's children carry the macro template's INIT rather than the
- * instance's own, so a checker that descended into them would read the wrong
- * function. Macro types are therefore left intact and modelled natively.
+ * RapidWright's readers expand the macro primitives (e.g. {@code LUT6_2},
+ * {@code RAM64X1D}, {@code IBUF} on UltraScale) of a netlist that names its
+ * part. The contents of an expanded macro are not used: a single expanded cell
+ * per macro type is shared across every instance of that type, without per
+ * instance parameters, so every {@code LUT6CY} instance's children carry the
+ * macro template's INIT rather than the instance's own, and a checker that
+ * descended into them would read the wrong function. Macro instances are
+ * therefore atoms, modelled natively, whether expanded or not (see
+ * {@link FlatNetlist}).
  */
 public class NetlistLoader {
 
@@ -80,7 +83,7 @@ public class NetlistLoader {
      * Reads a netlist, choosing the reader by file extension.
      *
      * @param file   A {@code .dcp} or {@code .edf} file.
-     * @param config Controls whether macros are expanded.
+     * @param config The configuration of the run.
      * @param log    Receives progress messages.
      */
     public static EDIFNetlist load(Path file, LecConfig config, LecLog log) {
@@ -111,9 +114,6 @@ public class NetlistLoader {
         }
         if (netlist == null) {
             throw new LecException("No logical netlist found in '" + file + "'");
-        }
-        if (config.isExpandMacros()) {
-            expandMacros(netlist, file, log);
         }
         return netlist;
     }
@@ -301,24 +301,6 @@ public class NetlistLoader {
         } catch (IOException e) {
             return false;
         }
-    }
-
-    /**
-     * Expands macro primitives when explicitly requested. Warns loudly, because
-     * expansion loses per instance parameters on every macro whose function
-     * depends on one.
-     */
-    private static void expandMacros(EDIFNetlist netlist, Path file, LecLog log) {
-        Series series = getSeries(netlist, file);
-        if (series == null) {
-            throw new LecException("Cannot expand macros for '" + file
-                    + "': the netlist does not name a part");
-        }
-        log.getPrintStream().println("WARNING: --expand-macros is enabled. RapidWright's macro "
-                + "expansion does not propagate per instance parameters, so any macro whose "
-                + "function depends on one (LUT6CY INIT, distributed RAM INIT) will be modelled "
-                + "with the macro template's values instead.");
-        netlist.expandMacroUnisims(series);
     }
 
     /**

@@ -130,7 +130,8 @@ public class ConnectivityBuilder {
     /**
      * Handles one port instance on a child of the cell being swept: either merge
      * across the boundary into the child's internal net, or, when the child is
-     * an atom, record the pin.
+     * an atom (even one with contents, such as an expanded macro), record the
+     * pin.
      */
     private static void connectChildPin(FlatNetlist flat, NetUnionFind uf, DriverList drivers,
             int[] pinNet, LecLog log, int instId, CellIndex index, int outerNet,
@@ -148,12 +149,13 @@ public class ConnectivityBuilder {
                     flat.getInstName(childId));
             return;
         }
-        int innerNet = childIndex.getBoundaryNet(bit);
-        if (innerNet >= 0) {
-            uf.union(outerNet, flat.getGlobalNet(childId, innerNet));
-            return;
-        }
+        // An atom may have contents, as an expanded macro primitive (e.g. LUT6_2) does: its pins
+        // are recorded, and its contents ignored.
         if (!flat.isLeaf(childId)) {
+            int innerNet = childIndex.getBoundaryNet(bit);
+            if (innerNet >= 0) {
+                uf.union(outerNet, flat.getGlobalNet(childId, innerNet));
+            }
             return;
         }
         int globalPin = flat.getGlobalPin(childId, bit);

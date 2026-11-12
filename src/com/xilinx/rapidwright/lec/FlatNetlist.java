@@ -56,10 +56,13 @@ import com.xilinx.rapidwright.edif.EDIFTools;
  *
  * A cell is an atom if it is a leaf or black box, or if it lives in the
  * {@code hdi_primitives} library. The second condition matters: RapidWright's
+ * readers expand the macro primitives of a netlist that names its part, and
  * macro expansion shares one expanded cell across every instance of a macro
  * type and does not propagate per instance parameters, so descending into an
  * expanded macro would read the macro template's INIT rather than the
- * instance's. Macro types are therefore treated as atoms and modeled natively.
+ * instance's. Macro types are therefore treated as atoms and modeled natively:
+ * the pins of an atom are its leaf pins, and the nets inside it are not
+ * indexed.
  */
 public class FlatNetlist {
 
@@ -123,7 +126,8 @@ public class FlatNetlist {
         int leafCount = 0;
         for (int i = 0; i < instCount; i++) {
             CellIndex index = CellIndex.get(cellTypes.get(cellTypeId[i]));
-            netBase[i + 1] = netBase[i] + index.getNetCount();
+            // (the nets inside an atom, e.g. an expanded macro, are never visited)
+            netBase[i + 1] = netBase[i] + (leaf[i] ? 0 : index.getNetCount());
             pinBase[i + 1] = pinBase[i] + (leaf[i] ? index.getPortBitCount() : 0);
             if (leaf[i]) {
                 leafCount++;

@@ -181,10 +181,12 @@
  * <li>DSPs are opaque terminals: their inputs are checked, but their internal
  * logic is not modelled.</li>
  * <li>Distributed RAM is a terminal.</li>
- * <li>Macro primitives are modelled natively rather than expanded, because
- * {@code expandMacroUnisims} shares one expanded cell per macro type and does
- * not propagate per-instance parameters. If one netlist holds a macro where the
- * other holds its expanded primitives, that is reported as a terminal set
+ * <li>Macro primitives are modelled natively, whether RapidWright's reader
+ * expanded them (it does when the netlist names its part) or not: the contents
+ * of an expanded macro are ignored, because {@code expandMacroUnisims} shares
+ * one expanded cell per macro type and does not propagate per-instance
+ * parameters. If one netlist holds a macro where the other holds the primitives
+ * it expands to as separate instances, that is reported as a terminal set
  * difference.</li>
  * <li>Tristate is cut rather than modelled: buffers that can drive high
  * impedance are opaque terminals.</li>

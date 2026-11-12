@@ -24,14 +24,19 @@ package com.xilinx.rapidwright.lec;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.nio.file.Path;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFTools;
 
 /**
  * End to end acceptance cases on small in-memory netlists.
@@ -318,6 +323,54 @@ public class TestLecAcceptance {
             Assertions.assertNotEquals(LogicEquivalenceChecker.EXIT_PASS, result.getExitCode(),
                     "INIT " + init + " changes the logic but the checker passed");
         }
+    }
+
+    /**
+     * RapidWright's readers expand the macro primitives of a netlist that names
+     * its part (here an IBUF and a LUT6_2 on UltraScale+). The pins of an
+     * expanded macro must still be those of an atom: if they were lost, both
+     * netlists would lose them alike and a rewired macro input would pass.
+     */
+    @Test
+    public void testExpandedMacrosAreChecked(@TempDir Path dir) {
+        EDIFNetlist ref = readMacroDesign(dir, "ref", false);
+        EDIFCell lut = ref.getHDIPrimitivesLibrary().getCell(Unisim.LUT6_2.name());
+        Assertions.assertFalse(lut.isLeafCellOrBlackBox(), "LUT6_2 was not expanded when read");
+
+        LecHarness result = check(ref, readMacroDesign(dir, "copy", false));
+        result.assertPass();
+        Assertions.assertTrue(result.getReport().getConesChecked() > 0, "No cones were checked");
+
+        result = check(ref, readMacroDesign(dir, "rewired", true));
+        result.assertFail();
+        LecDifference difference = result.findDifference(LecDifferenceType.CONE_FUNCTION_DIFFERS);
+        Assertions.assertNotNull(difference, "The differing cone was not reported");
+    }
+
+    /**
+     * Writes and reads back a design whose output is its input {@code a}, through
+     * an IBUF and a LUT6_2 (O6 = I0), or input {@code b} once the LUT6_2's I0 and
+     * I1 are swapped.
+     */
+    private static EDIFNetlist readMacroDesign(Path dir, String name, boolean swapped) {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("top");
+        EDIFTools.ensureCorrectPartInEDIF(netlist, "xcvu3p-ffvc1517-2-e");
+        EDIFCell top = netlist.getTopCell();
+        LecNetlistFixtures.port(top, "a", EDIFDirection.INPUT);
+        LecNetlistFixtures.port(top, "b", EDIFDirection.INPUT);
+        LecNetlistFixtures.port(top, "o", EDIFDirection.OUTPUT);
+        EDIFCellInst ibuf = top.createChildCellInst("ibuf", netlist.getHDIPrimitive(Unisim.IBUF));
+        EDIFCellInst lut = top.createChildCellInst("lut", netlist.getHDIPrimitive(Unisim.LUT6_2));
+        LecNetlistFixtures.setProperty(lut, "INIT", "64'hAAAAAAAAAAAAAAAA");
+        LecNetlistFixtures.connect(top, "a", top, "a", ibuf, "I");
+        LecNetlistFixtures.connect(top, "a_ibuf", ibuf, "O", lut, swapped ? "I1" : "I0",
+                lut, "I2", lut, "I3", lut, "I4", lut, "I5");
+        LecNetlistFixtures.connect(top, "b", top, "b", lut, swapped ? "I0" : "I1");
+        LecNetlistFixtures.connect(top, "o", lut, "O6", top, "o");
+        Path file = dir.resolve(name + ".edf");
+        netlist.exportEDIF(file);
+        return NetlistLoader.load(file, new LecConfig(),
+                new LecLog(false, new PrintStream(new ByteArrayOutputStream())));
     }
 
     /** Two runs over the same inputs must produce byte identical reports. */

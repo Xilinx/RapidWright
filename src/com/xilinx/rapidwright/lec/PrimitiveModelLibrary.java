@@ -138,6 +138,8 @@ public class PrimitiveModelLibrary {
         types.add("IBUFGDS");
         types.add("IBUFDS_DIFF_OUT");
         types.add("OBUFDS");
+        // (what RapidWright's readers turn an OBUFDS into for some I/O standards)
+        types.add("OBUFDS_DUAL_BUF");
     }
 
     /**

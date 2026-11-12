@@ -126,7 +126,7 @@ public class SimpleGateModel implements PrimitiveModel {
         return typeName.equals("BUF") || typeName.equals("IBUF") || typeName.equals("OBUF")
                 || typeName.equals("IBUFG") || typeName.equals("IBUFDS")
                 || typeName.equals("IBUFGDS") || typeName.equals("IBUFDS_DIFF_OUT")
-                || typeName.equals("OBUFDS");
+                || typeName.equals("OBUFDS") || typeName.equals("OBUFDS_DUAL_BUF");
     }
 
     @Override
