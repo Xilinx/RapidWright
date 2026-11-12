@@ -81,6 +81,13 @@ public enum LecDifferenceType {
     /** A defined register is clocked differently from what its definition reads. */
     RETIMING_CLOCK_DIFFERS("Retimed register's clock differs"),
 
+    /**
+     * A step or clock obligation of the retiming certificate could not be
+     * decided. Unlike {@link #CONE_INCONCLUSIVE} this cannot be waived: every
+     * other cone was checked assuming the certificate, so nothing is proven.
+     */
+    RETIMING_UNPROVEN("Retiming certificate unproven"),
+
     /** The comparison could not be decided, so nothing was proven. */
     CONE_INCONCLUSIVE("Cone inconclusive");
 
@@ -99,7 +106,7 @@ public enum LecDifferenceType {
      *         opposed to an admission that the check was not completed.
      */
     public boolean isProvenDifference() {
-        return this != CONE_INCONCLUSIVE;
+        return this != CONE_INCONCLUSIVE && this != RETIMING_UNPROVEN;
     }
 
     /**

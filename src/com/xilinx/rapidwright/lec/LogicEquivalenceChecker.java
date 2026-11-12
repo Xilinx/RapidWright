@@ -195,6 +195,11 @@ public class LogicEquivalenceChecker {
             LecConfig config, RetimingMap retiming, PrintStream out, LecLog log) {
         RetimingMap certificate = config.isClassifyOnly() || retiming == null
                 || retiming.isEmpty() ? null : retiming;
+        if (certificate != null && config.getKeyProperty() != null) {
+            // Certificate registers are found by instance path, while terminals and
+            // the substitution use key-derived names, so the two could disagree.
+            throw new LecException("--retiming-map cannot be combined with --key-property");
+        }
         RuntimeTrackerTree timers = new RuntimeTrackerTree("LogicEquivalenceChecker",
                 config.isVerbose());
         Aig aig = new Aig(1 << 20);

@@ -496,7 +496,7 @@ class RetimingCheck {
                 report.add(new LecDifference(taskTypes.get(i), task.getKey(), null, verdict,
                         null));
             } else if (verdict.getKind() == ConeVerdict.Kind.INCONCLUSIVE) {
-                report.add(new LecDifference(LecDifferenceType.CONE_INCONCLUSIVE, task.getKey(),
+                report.add(new LecDifference(LecDifferenceType.RETIMING_UNPROVEN, task.getKey(),
                         null, verdict, null));
             }
         }
