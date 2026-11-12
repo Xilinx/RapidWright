@@ -1756,6 +1756,49 @@ public class TestEDIFNetlistOptimizer {
         }
     }
 
+    /**
+     * A LUT6CY (inputs from a) with the given INIT whose GE output drives o directly, or (if
+     * throughLookahead) the GEA input of a LOOKAHEAD8 whose COUTB drives o.
+     */
+    private static EDIFNetlist carryGenerate(String init, boolean throughLookahead) {
+        OptProbes.B b = new OptProbes.B("carry_ge");
+        b.in("a");
+        b.out("o");
+        b.inst(Unisim.LUT6CY, "C", "I0=a", "I1=a", "I2=a", "I3=a", "I4=a",
+                "GE=" + (throughLookahead ? "ge" : "o"), "@INIT=" + init);
+        if (throughLookahead) {
+            b.inst(Unisim.LOOKAHEAD8, "L", "CIN=a", "CYA=a", "CYB=a", "PROPA=a", "PROPB=a",
+                    "GEA=ge", "COUTB=o");
+        }
+        return b.nl;
+    }
+
+    @Test
+    public void testRandomSimEquivalenceDoesNotSimulateCarryGenerate() {
+        // GE is not modeled: an output it drives is not checked
+        EDIFRandomSimEquivalence eq = new EDIFRandomSimEquivalence();
+        eq.check(carryGenerate("64'h0", false), carryGenerate("64'hFFFFFFFFFFFFFFFF", false), 2);
+        Assertions.assertEquals("INCONCLUSIVE", eq.getVerdict());
+        // The LOOKAHEAD8 does not use GEA: its output is still checked
+        eq.check(carryGenerate("64'h0", true), carryGenerate("64'h0", true), 2);
+        Assertions.assertEquals("EQUIVALENT", eq.getVerdict());
+    }
+
+    @Test
+    public void testRandomSimEquivalenceDoesNotTakeUndrivenOutputsAsZero() {
+        // Ground on o vs o left undriven
+        OptProbes.B g = new OptProbes.B("undriven_out");
+        g.in("a");
+        g.out("o");
+        g.inst(Unisim.GND, "G", "G=o");
+        OptProbes.B u = new OptProbes.B("undriven_out");
+        u.in("a");
+        u.out("o");
+        EDIFRandomSimEquivalence eq = new EDIFRandomSimEquivalence();
+        Assertions.assertTrue(eq.check(g.nl, u.nl, 2) > 0);
+        Assertions.assertEquals(0, eq.check(u.nl, u.nl, 2));
+    }
+
     /** A flip-flop and a LUT whose outputs are on unloaded nets, or unconnected. */
     private static EDIFNetlist unloadedOutputs(boolean connected, boolean swapLutInputs) {
         OptProbes.B b = new OptProbes.B("unloaded_outputs");

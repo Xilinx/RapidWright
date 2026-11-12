@@ -175,11 +175,22 @@ public class EDIFRandomSimEquivalence {
                     tainted[n] = true;
                 }
             }
+            // The GE output of LUTCY2/LUT6CY is not modeled (the unisim models leave it
+            // undriven): it is not simulated
+            for (int l = 0; l < idx.getNumLeaves(); l++) {
+                if (kind[l] == C_LUTCY) {
+                    int n = netOfPin(l, "GE");
+                    if (n >= 0) {
+                        tainted[n] = true;
+                    }
+                }
+            }
             for (int node : order) {
                 int l = node / 4;
                 for (int p = idx.getLeafPinStart(l); p < idx.getLeafPinEnd(l); p++) {
                     int n = idx.getPinNet(p);
-                    if (idx.getPinDir(p) != EDIFLeafIndex.DRIVER && n >= 0 && tainted[n]) {
+                    if (idx.getPinDir(p) != EDIFLeafIndex.DRIVER && n >= 0 && tainted[n]
+                            && dependsOn(l, node % 4, idx.getPinPortInst(p).getName())) {
                         taintOutputs(l);
                         break;
                     }
@@ -235,6 +246,10 @@ public class EDIFRandomSimEquivalence {
         private boolean dependsOn(int l, int sub, String pin) {
             if (kind[l] != C_LOOKAHEAD || pin.equals("CIN")) {
                 return true;
+            }
+            if (pin.startsWith("GE")) {
+                // GEA-GEH are not used by the LOOKAHEAD8 unisim model
+                return false;
             }
             char c = pin.charAt(pin.length() - 1);
             return c - 'A' <= 2 * sub + 1;
@@ -1158,12 +1173,16 @@ public class EDIFRandomSimEquivalence {
         // Top-level outputs
         Map<String, Long> bOut = new HashMap<>();
         Set<String> bTainted = new java.util.HashSet<>();
+        Set<String> bDriven = new java.util.HashSet<>();
         for (int p = b.idx.getNumLeafPins(); p < b.idx.getNumPins(); p++) {
             if (b.idx.getPinDir(p) != EDIFLeafIndex.DRIVER && b.idx.getPinNet(p) >= 0) {
                 String name = b.idx.getPinPortInst(p).getName();
                 bOut.put(name, b.val[b.idx.getPinNet(p)]);
                 if (b.tainted[b.idx.getPinNet(p)]) {
                     bTainted.add(name);
+                }
+                if (b.driven[b.idx.getPinNet(p)]) {
+                    bDriven.add(name);
                 }
             }
         }
@@ -1176,7 +1195,9 @@ public class EDIFRandomSimEquivalence {
                     continue;
                 }
                 checked++;
-                if (v == null || v != a.val[a.idx.getPinNet(p)]) {
+                // An undriven output simulates as 0 but is not a constant 0
+                if (v == null || v != a.val[a.idx.getPinNet(p)]
+                        || a.driven[a.idx.getPinNet(p)] != bDriven.contains(name)) {
                     fail("round " + round + " port " + name);
                 }
             }
@@ -1295,7 +1316,8 @@ public class EDIFRandomSimEquivalence {
     /**
      * @return The result of the last check: NOT EQUIVALENT if there were mismatches, else
      * INCONCLUSIVE if some observations could not be checked (see {@link #getUnchecked}), else
-     * EQUIVALENT.
+     * EQUIVALENT (no mismatch in the simulated patterns: not a proof; more rounds give more
+     * confidence).
      */
     public String getVerdict() {
         return mismatches > 0 ? "NOT EQUIVALENT" : unchecked > 0 ? "INCONCLUSIVE" : "EQUIVALENT";
