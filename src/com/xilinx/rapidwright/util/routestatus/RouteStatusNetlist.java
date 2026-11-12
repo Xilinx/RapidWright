@@ -245,6 +245,8 @@ final class RouteStatusNetlist {
         boolean childOutputOnly;
         /** Whether inside a macro primitive */
         boolean insideMacro;
+        /** Whether connected to an input port of its (non-top) cell that is unconnected outside it */
+        boolean danglingInput;
 
     }
 
@@ -928,6 +930,7 @@ final class RouteStatusNetlist {
             t.namedBy = NAMED_BY_SEGMENT;
             t.portOnlyOutput = false;
             t.insideMacro = info.insideMacro;
+            t.danglingInput = false;
             t.ownPortOnlyOutput = last == first + 1 && kinds[first] == OWN_PORT && info.ownOutputs[slots[first]];
             boolean childOutput = false;
             boolean ownOutput = false;
@@ -942,6 +945,8 @@ final class RouteStatusNetlist {
                     case OWN_PORT:
                         if (portBinding == null) {
                             addTopPort(t, info.nets[n].getPortInsts().get(p - first));
+                        } else if (portBinding[slots[p]] == null && !info.ownOutputs[slots[p]] && !info.insideMacro) {
+                            t.danglingInput = true;
                         }
                         break;
                     case BLACK_BOX:

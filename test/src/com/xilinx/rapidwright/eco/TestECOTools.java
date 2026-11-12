@@ -70,7 +70,6 @@ import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.CodeGenerator;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
-import com.xilinx.rapidwright.util.VivadoTools;
 import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
 public class TestECOTools {
@@ -729,9 +728,7 @@ public class TestECOTools {
         }
 
         if (FileTools.isVivadoOnPath()) {
-            // (not compared with ReportRouteStatus.reportRouteStatus(), which names and counts the
-            // undriven nets of the unconnected copies of the cell differently from Vivado)
-            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+            ReportRouteStatusResult rrs = VivadoToolsHelper.reportRouteStatus(design);
             Assertions.assertEquals(1135, rrs.logicalNets);
             Assertions.assertEquals(728, rrs.netsWithNoPlacedPins);
             Assertions.assertEquals(2, rrs.netsWithRoutingErrors);

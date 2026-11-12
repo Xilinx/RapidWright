@@ -89,6 +89,11 @@ final class FlatNet extends Connections {
     EDIFNet macroNet;
     /** The leaf loads on segments inside LUT6_2 macros */
     int macroLeafLoads;
+    /**
+     * Whether a segment (outside macros) connects to an input port of its cell that is unconnected
+     * outside it: Vivado then names the net after a segment outside the macros, and does not tie it
+     */
+    boolean danglingInput;
 
     /** The pins on leaf cells, see {@link #getLeafPins(Design)} (or null) */
     private List<LeafPin> leafPins;
@@ -170,7 +175,7 @@ final class FlatNet extends Connections {
             if (undrivenNet != null) {
                 prefix = undrivenPrefix;
                 net = undrivenNet;
-            } else if (macroNet != null) {
+            } else if (macroNet != null && !danglingInput) {
                 prefix = macroPrefix;
                 net = macroNet;
             }
@@ -224,6 +229,7 @@ final class FlatNet extends Connections {
             nameMacro(prefix, net);
             macroLeafLoads += t.leafLoads;
         }
+        danglingInput |= t.danglingInput;
         segments++;
         addConnections(t);
         hasOutputChainEnd |= t.childOutputOnly;
@@ -237,6 +243,7 @@ final class FlatNet extends Connections {
         segments += other.segments;
         addConnections(other);
         insideMacro &= other.insideMacro;
+        danglingInput |= other.danglingInput;
         name(other.namedBy, other.prefix, other.net);
         namePortOnly(other.portOnlyPrefix, other.portOnlyNet);
         nameUndriven(other.undrivenPrefix, other.undrivenNet);

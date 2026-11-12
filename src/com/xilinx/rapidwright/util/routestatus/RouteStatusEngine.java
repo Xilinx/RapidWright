@@ -335,11 +335,6 @@ public final class RouteStatusEngine {
     }
 
     /**
-     * Checks whether a flat net only has undriven pins inside macro primitives, which Vivado ties to
-     * a constant (its expansion of the macro includes the constant source), also where the net
-     * reaches no pin outside LUT6_2 macros (its own site routing then does not matter).
-     */
-    /**
      * Counts the unconnected input ports of macros that Vivado ties to GND (VCC) as loads of it, and
      * as unplaced loads if none of the macro's cells is placed.
      */
@@ -369,10 +364,16 @@ public final class RouteStatusEngine {
         }
     }
 
+    /**
+     * Checks whether a flat net only has undriven pins inside macro primitives, which Vivado ties to
+     * a constant (its expansion of the macro includes the constant source), also where the net
+     * reaches no pin outside LUT6_2 macros (its own site routing then does not matter), unless it
+     * reaches an input port of a cell that is unconnected outside it.
+     */
     private static boolean isTiedInsideMacro(FlatNet flat) {
         boolean macroLoads = flat.insideMacro || (flat.leafLoads > 0 && flat.macroLeafLoads == flat.leafLoads
                 && flat.leafInouts == 0 && flat.blackBoxDrivers == 0);
-        return macroLoads && flat.leafDrivers == 0 && !flat.hasTopPorts();
+        return macroLoads && flat.leafDrivers == 0 && !flat.hasTopPorts() && !flat.danglingInput;
     }
 
     /**
