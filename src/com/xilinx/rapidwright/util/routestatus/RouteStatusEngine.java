@@ -46,6 +46,7 @@ import static com.xilinx.rapidwright.util.routestatus.NodeKeys.nodeKey;
 import static com.xilinx.rapidwright.util.routestatus.NodeKeys.sortedDistinct;
 import static com.xilinx.rapidwright.util.routestatus.SitePinClaims.getStaleSitePinKeys;
 import static com.xilinx.rapidwright.util.routestatus.SiteRouting.MAX_SITE_ROUTING_DEPTH;
+import static com.xilinx.rapidwright.util.routestatus.SiteRouting.getSitePinNodes;
 import static com.xilinx.rapidwright.util.routestatus.SiteRouting.hasStaleSitePin;
 import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isBlockRamSite;
 import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isHardBlockCell;
@@ -987,8 +988,30 @@ public final class RouteStatusEngine {
                 || (design.getDevice().getSeries() != Series.Series7 && flat.getControlPinLoads(design) != 0)) {
             return true;
         }
+        // (without a physical net, a load whose site wire carries another net is claimed from its
+        // input site pin, see SitePinClaims.addClaimedLoadSitePins())
+        boolean claimsLoadSitePins = entries.nets.get(entry) == null && !entries.aliasNets.containsKey(entry);
         for (LeafPin pin : flat.getLeafPins(design)) {
-            if (pin.isPlaced() && !Utils.isSLICE(pin.cell.getSiteInst()) && !isBlockRamSite(pin.cell.getSiteInst())) {
+            if (!pin.isPlaced()) {
+                continue;
+            }
+            SiteInst si = pin.cell.getSiteInst();
+            if (!Utils.isSLICE(si) && !isBlockRamSite(si)) {
+                return true;
+            }
+            if (claimsLoadSitePins && !pin.isOutput() && isSiteRoutedToSitePin(pin, si)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Checks whether the site wire of a placed pin carries a net and leads to an input site pin. */
+    private static boolean isSiteRoutedToSitePin(LeafPin pin, SiteInst si) {
+        for (String physPin : pin.getPhysicalPins()) {
+            BELPin belPin = pin.cell.getBEL().getPin(physPin);
+            if (belPin != null && si.getNetFromSiteWireIndex(belPin.getSiteWireIndex()) != null
+                    && !getSitePinNodes(si, belPin.getSiteWireIndex(), true).isEmpty()) {
                 return true;
             }
         }
