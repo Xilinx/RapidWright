@@ -71,6 +71,19 @@ public class TestAigSubstitution {
         Assertions.assertEquals(aig.and(y, Aig.not(x)), swap.apply(f));
     }
 
+    /** A value cannot change once given, or applied cones would keep the old one. */
+    @Test
+    public void testValueCannotChange() {
+        Aig aig = new Aig();
+        int x = aig.newInput("x", true);
+        AigSubstitution sub = new AigSubstitution(aig, new int[] { pi(aig, x) });
+        sub.setValue(pi(aig, x), Aig.FALSE);
+        Assertions.assertEquals(Aig.FALSE, sub.apply(x));
+        sub.setValue(pi(aig, x), Aig.FALSE);
+        Assertions.assertThrows(IllegalStateException.class,
+                () -> sub.setValue(pi(aig, x), Aig.TRUE));
+    }
+
     /** Replacing every input by a constant folds the cone to a constant. */
     @Test
     public void testConstantsFold() {

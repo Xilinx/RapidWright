@@ -482,29 +482,100 @@ public class TestRetimingAcceptance {
      */
     @Test
     public void testSelfCheckCycleThroughRegisterOutput(@TempDir Path dir) throws IOException {
-        Path ref = dir.resolve("ref.edf");
-        Path imp = dir.resolve("imp.edf");
-        EDIFTools.writeEDIFFile(ref, new Circuit()
+        String output = campaign(dir, new Circuit()
                 .flop("FDRE", "x", "a", "qx", "vcc", "gnd")
                 .flop("FDRE", "p", "qx", "qp", "vcc", "gnd")
-                .out("q", "qp").netlist(), LecNetlistFixtures.ULTRASCALE_PLUS_PART);
-        EDIFTools.writeEDIFFile(imp, new Circuit()
+                .out("q", "qp"), new Circuit()
                 .flop("FDRE", "x", "a", "qx", "vcc", "gnd")
                 .flop("FDRE", "s", "qx", "qs", "vcc", "gnd")
-                .out("q", "qs").netlist(), LecNetlistFixtures.ULTRASCALE_PLUS_PART);
+                .out("q", "qs"), map("IMP s = REF p/Q"));
+        assertExercised(output, "certificate made cyclic");
+    }
+
+    /**
+     * The cyclic certificate must define a register the definition reads, not
+     * one on a look up table input the table ignores. Either input is ignored
+     * in turn, so the walk's input order cannot hide the case.
+     */
+    @Test
+    public void testSelfCheckCycleSkipsIgnoredLutInput(@TempDir Path dir) throws IOException {
+        for (String init : new String[] { "4'hC", "4'hA" }) {
+            Circuit ref = new Circuit()
+                    .flop("FDRE", "ra", "a", "qa", "vcc", "gnd")
+                    .flop("FDRE", "rb", "b", "qb", "vcc", "gnd")
+                    .lut("f", init, "fo", "qa", "qb")
+                    .flop("FDRE", "out", "fo", "qo", "vcc", "gnd")
+                    .out("q", "qo")
+                    .out("q2", "qa")
+                    .out("q3", "qb");
+            String kept = init.equals("4'hC") ? "ra" : "rb";
+            Circuit imp = new Circuit()
+                    .flop("FDRE", kept, kept.equals("ra") ? "a" : "b",
+                            kept.equals("ra") ? "qa" : "qb", "vcc", "gnd")
+                    .lut("f", init, "fo", "a", "b")
+                    .flop("FDRE", "r", "fo", "qr", "vcc", "gnd")
+                    .flop("FDRE", "out", "qr", "qo", "vcc", "gnd")
+                    .out("q", "qo")
+                    .out(kept.equals("ra") ? "q2" : "q3", kept.equals("ra") ? "qa" : "qb")
+                    .out(kept.equals("ra") ? "q3" : "q2", "qr");
+            assertExercised(campaign(dir, ref, imp, map("IMP r = REF f/O")),
+                    "certificate made cyclic");
+        }
+    }
+
+    /**
+     * Backward retiming of a zero-initialised AND: flipping the INIT of one
+     * implementation input register changes nothing, so the campaign must not
+     * pick those registers for damage it expects to be detected.
+     */
+    @Test
+    public void testSelfCheckCampaignBackward(@TempDir Path dir) throws IOException {
+        String output = campaign(dir, new Circuit()
+                .lut("f", "4'h8", "fo", "a", "b")
+                .flop("FDRE", "r", "fo", "qr", "vcc", "gnd")
+                .flop("FDRE", "out", "qr", "qo", "vcc", "gnd")
+                .out("q", "qo"), new Circuit()
+                .flop("FDRE", "ra", "a", "qa", "vcc", "gnd")
+                .flop("FDRE", "rb", "b", "qb", "vcc", "gnd")
+                .lut("f", "4'h8", "fo", "qa", "qb")
+                .flop("FDRE", "out", "fo", "qo", "vcc", "gnd")
+                .out("q", "qo"), map("REF r = IMP f/O"));
+        assertExercised(output, "certificate entry dropped");
+        assertExercised(output, "certificate made cyclic");
+    }
+
+    /** A certificate need not be minimal: only a needed entry is dropped. */
+    @Test
+    public void testSelfCheckDropsANeededEntry(@TempDir Path dir) throws IOException {
+        String output = campaign(dir, andBeforeRetiming("vcc", "gnd"), andAfterForward(),
+                map("IMP out = REF out/Q", "IMP r = REF f/O"));
+        assertExercised(output, "certificate entry dropped");
+    }
+
+    /** Runs the mutation campaign, which must meet every expectation. */
+    private static String campaign(Path dir, Circuit refCircuit, Circuit impCircuit,
+            RetimingMap map) throws IOException {
+        Path ref = dir.resolve("ref.edf");
+        Path imp = dir.resolve("imp.edf");
+        EDIFTools.writeEDIFFile(ref, refCircuit.netlist(), LecNetlistFixtures.ULTRASCALE_PLUS_PART);
+        EDIFTools.writeEDIFFile(imp, impCircuit.netlist(), LecNetlistFixtures.ULTRASCALE_PLUS_PART);
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         PrintStream original = System.out;
         int exit;
         try {
             System.setOut(new PrintStream(buffer));
-            exit = new LecSelfCheck(ref, imp, map("IMP s = REF p/Q")).run();
+            exit = new LecSelfCheck(ref, imp, map).run();
         } finally {
             System.setOut(original);
         }
         String output = buffer.toString();
         Assertions.assertEquals(LogicEquivalenceChecker.EXIT_PASS, exit, output);
+        return output;
+    }
+
+    private static void assertExercised(String output, String mutation) {
         Assertions.assertTrue(Arrays.stream(output.split("\\R")).anyMatch(
-                l -> l.startsWith("certificate made cyclic") && !l.contains("SKIPPED")), output);
+                l -> l.startsWith(mutation) && !l.contains("SKIPPED")), output);
     }
 
     private static int run(Path ref, Path imp, Path map) {
