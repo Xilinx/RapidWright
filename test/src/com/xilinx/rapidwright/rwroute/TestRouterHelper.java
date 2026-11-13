@@ -96,6 +96,33 @@ public class TestRouterHelper {
         Assertions.assertEquals(nodeAsString, String.valueOf(RouterHelper.projectInputPinToINTNode(spi)));
     }
 
+    /**
+     * The OUTB_B_IN input of a slave IOB is fed only by the OUTB_B output of its master (e.g. the inverted output of
+     * a differential output buffer). That output pin's node is also reachable through a routethru of the master site
+     * (from its OP input, itself fed from the fabric through a bitslice routethru), so while the master's OUTB_B is
+     * not in use the input still projects onto that fabric node; once it is in use, the input is fed by it directly
+     * and must not project onto an INT tile node at all.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "true,null",
+            "false,INT_X36Y271/IMUX_W16"
+    })
+    public void testProjectInputPinToINTNodeFromUsedSiteOutput(boolean masterOutputUsed, String nodeAsString) {
+        Design design = new Design("design", "xcvu3p");
+        SiteInst master = design.createSiteInst("IOB_X0Y234");
+        SiteInst slave = design.createSiteInst("IOB_X0Y235");
+        Net net = design.createNet("outb");
+        if (masterOutputUsed) {
+            net.createPin("OUTB_B", master);
+        }
+        SitePinInst sink = net.createPin("OUTB_B_IN", slave);
+        Assertions.assertEquals(nodeAsString, String.valueOf(RouterHelper.projectInputPinToINTNode(sink)));
+        // The master's own OP input (fed from the fabric through a bitslice routethru) still projects
+        SitePinInst op = design.createNet("op").createPin("OP", master);
+        Assertions.assertEquals("INT_X36Y271/IMUX_W16", String.valueOf(RouterHelper.projectInputPinToINTNode(op)));
+    }
+
     @ParameterizedTest
     @MethodSource
     public void testInvertPossibleGndPinsToVccPins(String partName, String siteName, List<String> pinNamesAndInverted) {
