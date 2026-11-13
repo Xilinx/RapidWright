@@ -841,21 +841,26 @@ public class TestReportRouteStatus {
      * A LUT pair of a Versal slice used as two LUT5s (the output of the 6LUT on O5): Vivado 2026.1
      * finds the site programming invalid if the cell of the 6LUT has inputs on both A5 and A6, with or
      * without a cell in the 5LUT. All the nets with pins in the slice then conflict, and the routing
-     * into (or out of) it leads nowhere.
+     * into (or out of) it leads nowhere. An input of the 6LUT cell tied to VCC or GND (on A5, A6 or
+     * both) is not an input on that pin: the pair is then valid.
      */
-    @ParameterizedTest(name = "6LUT {0} -> {1}, 5LUT cell {2}")
+    @ParameterizedTest(name = "6LUT {0} -> {1}, 5LUT cell {2}, ties {3}")
     @CsvSource({
             // Valid
-            "'A1,A6', O5, true, 11, 9, 0, 0",
-            "'A1,A5', O5, true, 11, 9, 0, 0",
-            "'A1,A5,A6', O6, true, 11, 9, 0, 0",
+            "'A1,A6', O5, true, '', 11, 9, 0, 0",
+            "'A1,A5', O5, true, '', 11, 9, 0, 0",
+            "'A1,A5,A6', O6, true, '', 11, 9, 0, 0",
+            "'A1,A5,A6', O5, true, 'A5=VCC,A6=VCC', 11, 9, 0, 0",
+            "'A1,A5,A6', O5, true, 'A5=GND,A6=GND', 11, 9, 0, 0",
+            "'A1,A5,A6', O5, true, 'A5=VCC', 11, 9, 0, 0",
+            "'A1,A5,A6', O5, true, 'A6=GND', 11, 9, 0, 0",
             // Invalid
-            "'A1,A5,A6', O5, true, 11, 2, 7, 2",
-            "'A1,A5,A6', O5, false, 10, 4, 4, 1",
+            "'A1,A5,A6', O5, true, '', 11, 2, 7, 2",
+            "'A1,A5,A6', O5, false, '', 10, 4, 4, 1",
     })
     public void testReportRouteStatusInvalidVersalLutPair(String lut6Inputs, String lut6Output, boolean lut5Cell,
-                                                          int logicalNets, int fullyRouted, int errors,
-                                                          int partial) {
+                                                          String lut6Ties, int logicalNets, int fullyRouted,
+                                                          int errors, int partial) {
         Design design = new Design("dual_lut5", "vp1202");
         EDIFCell top = design.getTopEDIFCell();
         Net clk = design.createNet("clk");
@@ -895,8 +900,15 @@ public class TestReportRouteStatus {
             lut5.addPinMapping("O5", "O");
             luts.add(lut5);
         }
+        List<String> ties = Arrays.asList(lut6Ties.split(","));
         for (int i = 0; i < lut6Pins.length; i++) {
-            ECOTools.connectNet(design, lut6, "I" + i, inputs.get(i));
+            Net net = inputs.get(i);
+            if (ties.contains(lut6Pins[i] + "=VCC")) {
+                net = design.getVccNet();
+            } else if (ties.contains(lut6Pins[i] + "=GND")) {
+                net = design.getGndNet();
+            }
+            ECOTools.connectNet(design, lut6, "I" + i, net);
         }
         if (lut5Cell) {
             ECOTools.connectNet(design, luts.get(1), "I0", inputs.get(3));

@@ -38,6 +38,7 @@ import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
+import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Series;
@@ -141,7 +142,9 @@ final class VersalRules {
 
     /**
      * Adds the slices whose LUT programming Vivado finds invalid: a cell of a 6LUT whose output is O5
-     * (a LUT pair used as two LUT5s) with inputs on both A5 and A6 (whether or not the 5LUT has a cell).
+     * (a LUT pair used as two LUT5s) with signal inputs on both A5 and A6 (whether or not the 5LUT
+     * has a cell). An input tied to VCC or GND is not one: Vivado 2026.1 accepts the pair when A5 or
+     * A6 (or both) carries a constant.
      */
     static void findInvalidSites(Design design, InvalidSites invalidSites) {
         for (SiteInst si : design.getSiteInsts()) {
@@ -155,11 +158,24 @@ final class VersalRules {
         for (char letter = 'A'; letter <= 'H'; letter++) {
             Cell lut6 = si.getCell(letter + "6LUT");
             if (lut6 != null && !lut6.isRoutethru() && lut6.getLogicalPinMapping("O5") != null
-                    && lut6.getLogicalPinMapping("A5") != null && lut6.getLogicalPinMapping("A6") != null) {
+                    && isSignalInput(si, lut6, "A5") && isSignalInput(si, lut6, "A6")) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * Checks whether an input pin of a LUT cell is mapped to a cell pin whose site wire does not carry
+     * VCC or GND (a site wire without a net counts as a signal input).
+     */
+    private static boolean isSignalInput(SiteInst si, Cell lut, String belPin) {
+        if (lut.getLogicalPinMapping(belPin) == null) {
+            return false;
+        }
+        BELPin pin = lut.getBEL().getPin(belPin);
+        Net net = (pin == null) ? null : si.getNetFromSiteWire(pin.getSiteWireName());
+        return net == null || !net.isStaticNet();
     }
 
     static boolean isVersalClockingSite(SiteInst si) {
