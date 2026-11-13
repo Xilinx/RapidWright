@@ -367,7 +367,7 @@ public class TestRWRoute {
         Assertions.assertEquals(expectedNetsModified, assertModifiedNetsRouted(design));
 
         if (FileTools.isVivadoOnPath()) {
-            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+            ReportRouteStatusResult rrs = VivadoToolsHelper.reportRouteStatus(design);
             Assertions.assertEquals(290, rrs.fullyRoutedNets);
             Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
             Assertions.assertEquals(8, rrs.unroutedNets); // There are 8 nets driven from a blackbox cell;
@@ -1495,7 +1495,7 @@ public class TestRWRoute {
 
         if (FileTools.isVivadoOnPath()) {
             // Testcase has a number of undriven nets, so just check for unrouted nets
-            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design);
+            ReportRouteStatusResult rrs = VivadoToolsHelper.reportRouteStatus(design);
             Assertions.assertEquals(0, rrs.unroutedNets);
         }
     }
