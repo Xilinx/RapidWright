@@ -239,8 +239,9 @@ public class NetlistBrowser extends QMainWindow {
             boolean skipXdef = true;
             netlist = Design.readCheckpoint(args[0], skipXdef).getNetlist();
         } else {
+            // Reading it expands its macros, unless it does not name its part
             netlist = EDIFTools.readEdifFile(args[0]);
-            if (!netlist.expandMacroUnisims()) {
+            if (EDIFTools.getPartName(netlist) == null) {
                 System.err.println("WARNING: Unable to expand macro unisims, target Series is unknown. "
                         + "Try setting the part in the EDIFNetlist (see EDIFTools.ensureCorrectPartInEDIF()");
             }

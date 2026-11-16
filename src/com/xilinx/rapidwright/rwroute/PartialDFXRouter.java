@@ -134,6 +134,7 @@ public class PartialDFXRouter extends PartialRouter {
 
                 switch (beginOfLockedPath.getType()) {
                     case NON_LOCAL:
+                    case NON_LOCAL_INHERIT_PREV_SIDE:
                         beginOfLockedPath.setType(RouteNodeType.EXCLUSIVE_SINK_NON_LOCAL);
                         break;
                     case EXCLUSIVE_SINK_NON_LOCAL:

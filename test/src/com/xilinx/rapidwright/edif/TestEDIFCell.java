@@ -184,4 +184,28 @@ public class TestEDIFCell {
             Assertions.assertNotNull(portInst);
         }
     }
+
+    @Test
+    public void testHasCompatibleInterfaceResolvedInouts() {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("test");
+        EDIFLibrary work = netlist.getWorkLibrary();
+        EDIFCell inout = new EDIFCell(work, "inout");
+        inout.createPort("IO", EDIFDirection.INOUT, 1);
+        EDIFDirection[] directions = {EDIFDirection.INPUT, EDIFDirection.OUTPUT,
+                EDIFDirection.INOUT, EDIFDirection.INTERNAL, null};
+        for (EDIFDirection direction : directions) {
+            EDIFCell other = new EDIFCell(work, "other_" + direction);
+            other.createPort("IO", direction, 1);
+            // Only an inout matches strictly, while an inout also resolves to an input or output
+            boolean matches = direction == EDIFDirection.INOUT;
+            boolean resolves = direction == EDIFDirection.INPUT || direction == EDIFDirection.OUTPUT;
+            Assertions.assertEquals(matches, inout.hasCompatibleInterface(other),
+                    String.valueOf(direction));
+            Assertions.assertEquals(matches || resolves,
+                    inout.hasCompatibleInterface(other, true), String.valueOf(direction));
+            // ... but only on this side
+            Assertions.assertEquals(matches, other.hasCompatibleInterface(inout, true),
+                    String.valueOf(direction));
+        }
+    }
 }

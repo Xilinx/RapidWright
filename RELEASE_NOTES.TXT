@@ -1,3 +1,95 @@
+============= RapidWright 2026.1.2-beta released on 2026-11-11 ================
+Notes:
+  - [LaunchTestsOnLsf] Run test jobs only on hosts with free /tmp space (#1530)
+  - [TestDCPLoad] Restore the readable-EDIF auto-generate flag after tests (#1529)
+  - [RWRoute] Allow PartialDFXRouter's non-local sinks in sink X assertion (#1528)
+  - [DesignTools] makePhysNetNamesConsistent(): parents of unresolved names from cell pins; populateBlackBox() rename speed (#1527)
+  - [RWRoute] Drop alternate sinks preserved for another net, after awaiting (#1526)
+  - [DesignTools] populateBlackBox(): prefix routethru names once (#1480)
+  - [RWRoute] Faster, tighter search; SLR-crossing, congestion, timing-model and PartialRouter fixes (#1501)
+  - [EDIFNetlist] Keep macros expanded in memory, collapse only when writing (#1484)
+  - [GitHub Actions] Balance the test shards with durations from master's last run (#1523)
+  - [LaunchTestsOnLsf] Split the regular tests into balanced LSF jobs (#1522)
+  - [GitHub Actions] Split the Java tests into 6 balanced shards per configuration (#1521)
+  - [UltraScaleClockRouting] Drive the clock root's row from the distribution going up (#1520)
+  - [GlobalSignalRouting] Only route constants through free Versal IRI sites (#1519)
+  - [VersalClockRouting] Route clock regions missing from the VDISTR trees (#1516)
+  - [UltraScaleClockRouting] Retry routing tracks and clock roots for the distribution (#1517)
+  - [Tests] Cut CI test time: release cached devices, fewer optical-flow routes (#1518)
+  - [VersalClockRouting] Route clocks to hard block clock inputs and from BUFG_GTs (#1509)
+  - [UltraScaleClockRouting] Route clocks to BITSLICE_RX_TX FIFO clock inputs (#1515)
+  - [GlobalSignalRouting] Skip used Versal slice outputs as static sources (#1502)
+  - [UltraScaleClockRouting] Avoid the clock tracks of clocks already routed (#1500)
+  - [RWRoute] Route clock inputs driven through dedicated paths directly (#1499)
+  - [EDIFNetlist] Build lazily created maps before publishing them (#1497)
+  - [GlobalSignalRouting] Route constants to IO output pins through site routethrus (#1495)
+  - [RouteNodeGraph] Handle the CLE_BC_CORE_MX tiles of Versal devices (#1514)
+  - [EDIF] Compact EDIFCell maps and port inst arrays (about 20% less heap) (#1490)
+  - [GlobalSignalRouting] Route Versal clocks from BUFGCTRL and BUFGCE_DIV sources (#1513)
+  - [DesignTools] Skip XPHY cells without a logical cell in updateVersalXPHYPinsForDMC() (#1510)
+  - [DesignTools] Fix ConcurrentModificationException in createCeClkOfRoutethruFFToVCC() (#1508)
+  - [RWRoute] Support Versal devices without CLE_BC_CORE tiles (xcvp1902) (#1505)
+  - [RWRoute] Share the INT tile sink node of sinks of the same net (#1507)
+  - [GlobalSignalRouting] Route UltraScale clocks to MMCM clock inputs (#1506)
+  - [EdifCellLookup] Look up wildcard cell names without rescanning every child (#1503)
+  - [GlobalSignalRouting] Route UltraScale+ clocks to PS8 clock inputs (#1504)
+  - [UltraScaleClockRouting] Drive each row buffer of a clock only once (#1492)
+  - [RWRoute] Make SLR-crossing bounding boxes tall enough for an SLL (#1493)
+  - [RouterHelper] Find the INT node of a BUFGCE CLK_IN in a CMT tile (#1498)
+  - [DesignTools] Skip unconnected logical pins in getPortInstsFromSitePinInst() (#1496)
+  - [DesignTools] Skip unplaced cells in createCeSrRstPinsToVCC() (#1494)
+  - [VersalClockRouting] Route clock buffer inputs cascaded from a clock net (#1491)
+  - Write EDIF as parallel pieces; ParallelismTools joinOrdered()/joinUnordered() and chunking (#1475)
+  - [RWRoute] Fix timing-driven LUT pin swapping crashes on routethrus and distributed RAMs (#1489)
+  - [Timing] Describe a source pin driven through a routethru cell (#1488)
+  - [TestEDIFPortInstListTrim] Compare stable EDIF exports (#1485)
+  - [RWRoute] Timing-driven LUT pin swapping with LUT logic delays (#1482)
+  - [RWRoute] LUT pin swapping when net drives >1 input of same LUT (#1481)
+  - [CombineDcps] Add a command-line tool to combine a design with implementations of its black boxes (#1465)
+  - [ConstraintTools] Scope get_ports to the black box in merged constraints (#1463)
+  - [DesignTools] populateBlackBox(): carry over the circuits' BEL attributes (#1464)
+  - [DesignTools] Drop the evicted SiteInst workaround the master merge restored
+  - [ConstraintTools] Add addBlackBoxConstraints() (#1457)
+  - [DesignTools] populateBlackBox(): replace site instances that only lock BELs (#1451)
+  - [DesignTools] Accept black box inouts resolved by the filling circuit (#1450)
+  - [DesignTools] fullyUnplaceCell(): alternate site types, in-site loads (#1479)
+  - [NOCDesign] Match NoC solution paths by slave port; add AIE_NSU_2 and MMI_NMU_2 (#1478)
+  - [DesignTools] populateBlackBox(): keep each PIP once on merged nets (#1454)
+  - [NOCDesign] Support Versal Gen 2 (NoC2) traffic and solutions (#1476)
+  - [DesignTools] populateBlackBox(): drop a circuit's empty context nets (#1452)
+  - [Params] Read RW_ZSTD_COMPRESSION_LEVEL from its own parameter (#1469)
+  - [DesignTools] populateBlackBox(): re-point site routing of a circuit's other static nets (#1453)
+  - [ParallelismTools] Cleanup usage in EDIF export, DesignTools, RWRoute (#1466)
+  - [ParallelEDIFParser] Faster, leaner parsing of large EDIFs (#1460)
+  - [ParallelismTools] Move to common ForkJoinPool (#1447)
+  - [ParallelismTools] Fix trySteal() to not be O(N) per call (#1445)
+  - [SiteInst] Tests for SiteInst tracking changes (#1443)
+  - [Net] Tests for Net tracking changes (#1442)
+  - [NOCDesign] Write and read NOC traffic of a design without NOC clients (#1462)
+  - [EDIFNetlist] Write libraries in dependency order in exportEDIF() (#1449)
+  - [DesignTools] populateBlackBox() to not return modified nets (#1441)
+  - [EDIFNetlist] Add findParentNet() to look up one parent net without the map (#1456)
+  - [EDIFNetlist] Walk cell definitions to find unused cells (#1455)
+  - [DesignTools] Rework populateBlackBox() batching, net merging, and reporting (#1424)
+  - Cut DCP load heap by about 30%: compact Net/Cell/SiteInst storage and Design maps
+  - [Cell][Device] Build lazily created pin and clock region maps before publishing them
+  - Fix four DCP read/write bugs
+  - [Design] Thread-safe change tracking
+  - Stream and parallelize DCP writing
+  - [Design] placeCell(): do not tie A6 to VCC when the 6LUT of the pair uses it
+  - Reader, writer and SiteInst fixes for Vivado-like route status
+  - [Cell] Rename a cell's routethrus and alternate pin mappings in updateName()
+  - [HierSepNetResolver] Use the values that invokeAll() now returns
+  - [Device] Save the device cache file atomically
+  - [Net] Skip site wire map rebuilds in updateName() and rename()
+  - [SiteInst] Key tracked originals by site; never leave removed SiteInsts modified
+  - [ZipDeflaterOutputStream] Use the JDK's CRC32
+  - [Net] When tracked, leave modified set + and routing behind
+  - [BELAttrDB] Look up BEL attribute nets without the parent net map
+
+API Additions:
+
+
 ============= RapidWright 2026.1.1-beta released on 2026-09-30 ================
 Notes: 
   - Have tests preserve edif gen flag (#1438)

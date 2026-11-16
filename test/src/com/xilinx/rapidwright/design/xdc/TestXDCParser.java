@@ -1021,8 +1021,13 @@ public class TestXDCParser {
         public Design getDesign() {
             Design d = design == null ? null : design.get();
             if (d == null) {
+                boolean origAutoGenerate = Design.isAutoGenerateReadableEdif();
                 Design.setAutoGenerateReadableEdif(true);
-                d = Design.readCheckpoint(path, true);
+                try {
+                    d = Design.readCheckpoint(path, true);
+                } finally {
+                    Design.setAutoGenerateReadableEdif(origAutoGenerate);
+                }
                 this.design = new WeakReference<>(d);
             }
             return d;

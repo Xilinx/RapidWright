@@ -187,8 +187,8 @@ public class NetlistClockDetection {
             return;
         }
 
+        // Both readers expand the netlist's macros
         EDIFNetlist nl = args[0].endsWith(".dcp") ? Design.readCheckpoint(args[0]).getNetlist() : EDIFTools.readEdifFile(args[0]);
-        nl.expandMacroUnisims();
 
         JSONObject out = new JSONObject();
 

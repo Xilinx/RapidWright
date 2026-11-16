@@ -437,12 +437,15 @@ public class EDIFNetlistComparator {
         }
         CodePerfTracker t = new CodePerfTracker("Compare EDIF Netlists");
         t.start("Load Gold");
+        // Reading a netlist expands its macros if it names its part, which the golden netlist must
         EDIFNetlist gold = EDIFTools.readEdifFile(args[0]);
         Series series = PartNameTools.getPart(EDIFTools.getPartName(gold)).getSeries();
-        gold.expandMacroUnisims(series);
         t.stop().start("Load Test");
         EDIFNetlist test = EDIFTools.readEdifFile(args[1]);
-        test.expandMacroUnisims(series);
+        if (EDIFTools.getPartName(test) == null) {
+            // Expand it as for the part of the golden netlist
+            test.expandMacroUnisims(series);
+        }
         t.stop().start("Compare");
         EDIFNetlistComparator comparator = new EDIFNetlistComparator();
         int diffs = comparator.compareNetlists(gold, test);

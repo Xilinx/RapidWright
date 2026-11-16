@@ -146,9 +146,8 @@ public class TestLUTTools {
             "bnn.dcp,false,true",
             "bnn.dcp,true,false",
             "bnn.dcp,true,true",
-            "optical-flow.dcp,false,false",
-            "optical-flow.dcp,false,true",
-            "optical-flow.dcp,true,false",
+            // The other optical-flow combinations route exactly as TestRWRoute and TestPhysNetlistWriter
+            // already do, so only route it once here, with both options enabled
             "optical-flow.dcp,true,true",
     })
     @LargeTest(max_memory_gb = 8)

@@ -77,7 +77,7 @@ public class Params {
      * range from -7 to 22, with higher numbers producing a more compact result for
      * more runtime.
      */
-    public static int RW_ZSTD_COMPRESSION_LEVEL = getParamOrDefaultIntSetting(RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK_NAME,
+    public static int RW_ZSTD_COMPRESSION_LEVEL = getParamOrDefaultIntSetting(RW_ZSTD_COMPRESSION_LEVEL_NAME,
             RW_ZSTD_DEFAULT_COMPRESSION_LEVEL);
 
     /**

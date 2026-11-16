@@ -203,9 +203,10 @@ public class TestEDIFPortInstListTrim {
         EDIFNetlist netlist = design.getNetlist();
         Path out1 = dir.resolve("trim1.edf");
         Path out2 = dir.resolve("trim2.edf");
-        netlist.exportEDIF(out1.toString());
+        // (stable exports, whose timestamp does not depend on when they are written)
+        netlist.exportEDIF(out1, true);
         netlist.trimEDIFPortInstLists();
-        netlist.exportEDIF(out2.toString());
+        netlist.exportEDIF(out2, true);
         Assertions.assertEquals(readAll(out1), readAll(out2));
     }
 

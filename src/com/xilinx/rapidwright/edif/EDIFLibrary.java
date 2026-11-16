@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -24,7 +24,6 @@
 
 package com.xilinx.rapidwright.edif;
 
-import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
@@ -35,13 +34,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Future;
 import java.util.function.Predicate;
-
-import com.xilinx.rapidwright.util.NoCloseOutputStream;
-import com.xilinx.rapidwright.util.ParallelDCPInput;
-import com.xilinx.rapidwright.util.ParallelDCPOutput;
-import com.xilinx.rapidwright.util.ParallelismTools;
+import java.util.function.UnaryOperator;
 
 /**
  * Keeps track of a set of {@link EDIFCell} objects
@@ -260,25 +254,40 @@ public class EDIFLibrary extends EDIFName {
      */
     public Collection<EDIFLibrary> getExternallyReferencedLibraries() {
         Set<EDIFLibrary> set = new HashSet<>();
-        addExternallyReferencedLibraries(getCells(), set);
+        for (EDIFCell c : getCells()) {
+            addExternallyReferencedLibraries(c, set);
+        }
         return set;
     }
 
     /**
-     * Adds the libraries, other than this one, of the cells instantiated within the provided cells.
-     * @param cells Cells of this library to visit.
-     * @param set Set to add the referenced libraries to.
+     * Adds the libraries, other than this one, of the cells instantiated within the given cell (cells not in any
+     * library are skipped).
+     * @param cell Cell of this library to visit.
+     * @param set Set to add the referenced libraries to. May be a concurrent set (which cannot hold null), shared by
+     *            threads visiting other cells: a library already in it is not added again, as adding to a concurrent
+     *            set may lock even then.
      */
-    void addExternallyReferencedLibraries(Collection<EDIFCell> cells, Set<EDIFLibrary> set) {
+    void addExternallyReferencedLibraries(EDIFCell cell, Set<EDIFLibrary> set) {
+        addExternallyReferencedLibraries(cell, set, UnaryOperator.identity());
+    }
+
+    /**
+     * As {@link #addExternallyReferencedLibraries(EDIFCell, Set)}, with each instance taken to be of the cell that the
+     * given function returns for its cell type (such as {@link EDIFCollapsedView#getInstanceType(EDIFCell)}).
+     */
+    void addExternallyReferencedLibraries(EDIFCell cell, Set<EDIFLibrary> set, UnaryOperator<EDIFCell> instanceType) {
         // Most instances refer to the same few libraries, so skip repeats of the last one found
         EDIFLibrary last = this;
-        for (EDIFCell c : cells) {
-            for (EDIFCellInst i : c.getCellInsts()) {
-                EDIFLibrary lib = i.getCellType().getLibrary();
-                if (lib != this && lib != last) {
+        for (EDIFCellInst i : cell.getCellInsts()) {
+            EDIFLibrary lib = instanceType.apply(i.getCellType()).getLibrary();
+            if (lib != null && lib != this && lib != last) {
+                // In a ConcurrentHashMap's key set, contains() never locks, whereas add() locks the library's bin even
+                // if it is already there (from Java 9, unless it is the bin's first), so check first: most are
+                if (!set.contains(lib)) {
                     set.add(lib);
-                    last = lib;
                 }
+                last = lib;
             }
         }
     }
@@ -332,14 +341,26 @@ public class EDIFLibrary extends EDIFName {
     private static final byte[] EXPORT_CONST_TECHNOLOGY = "\n    (edifLevel 0)\n    (technology (numberDefinition ))\n".getBytes(StandardCharsets.UTF_8);
     private static final byte[] EXPORT_CONST_LIBRARY_END = "  )\n".getBytes(StandardCharsets.UTF_8);
 
-    void exportEDIF(List<EDIFCell> cells, OutputStream os, boolean writeHeader, boolean writeFooter, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException {
+    /**
+     * Writes the given cells of this library as EDIF.
+     * @param cells The cells to write, in order.
+     * @param os The stream to write to.
+     * @param writeHeader If true, the library's header is written before the cells.
+     * @param writeFooter If true, the library's footer is written after the cells.
+     * @param cache The cache of legal EDIF names.
+     * @param stable If true, the contents of each cell are written in sorted order.
+     * @param collapsedView The view of the netlist with its macros collapsed, which is written, or
+     *                      null to write the cells as they are.
+     */
+    void exportEDIF(List<EDIFCell> cells, OutputStream os, boolean writeHeader, boolean writeFooter,
+            EDIFWriteLegalNameCache<?> cache, boolean stable, EDIFCollapsedView collapsedView) throws IOException {
         if (writeHeader) {
             os.write(EXPORT_CONST_LIBRARY_START);
             exportEDIFName(os, cache);
             os.write(EXPORT_CONST_TECHNOLOGY);
         }
         for (EDIFCell c : cells) {
-            c.exportEDIF(os, cache, stable);
+            c.exportEDIF(os, cache, stable, collapsedView);
         }
         if (writeFooter) {
             os.write(EXPORT_CONST_LIBRARY_END);
@@ -347,37 +368,9 @@ public class EDIFLibrary extends EDIFName {
     }
 
     public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException {
-        exportEDIF(getValidCellExportOrder(stable), os, true, true, cache, stable);
+        exportEDIF(getValidCellExportOrder(stable), os, true, true, cache, stable, null);
     }
     public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache) throws IOException {
         exportEDIF(os, cache, false);
-    }
-
-    public List<Future<ParallelDCPInput>> exportEDIF(EDIFWriteLegalNameCache<?> cache) throws IOException{
-        if (!ParallelismTools.getParallel()) {
-            throw new RuntimeException();
-        }
-
-        List<EDIFCell> validCellOrder = getValidCellExportOrder(false);
-        final int chunkSize = 256;
-
-        List<Future<ParallelDCPInput>> streamFutures = new ArrayList<>();
-        for (long i = 0; i < validCellOrder.size(); i += chunkSize) {
-            final boolean firstChunk = (i == 0);
-            final boolean lastChunk = (i + chunkSize >= validCellOrder.size());
-            List<EDIFCell> chunk = validCellOrder.subList((int) i, (int) (lastChunk ? validCellOrder.size() : i + chunkSize));
-
-            streamFutures.add(ParallelismTools.submit(
-                    () -> ParallelDCPOutput.newStream((os) -> {
-                        try (BufferedOutputStream bs = new BufferedOutputStream(new NoCloseOutputStream(os))) {
-                            exportEDIF(chunk, bs, firstChunk, lastChunk, cache, false);
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        }
-                    })
-            ));
-        }
-
-        return streamFutures;
     }
 }

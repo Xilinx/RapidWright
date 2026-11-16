@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -298,12 +299,51 @@ public class VersalClockRouting {
                     + " while routing clock " + clk + ", skew will be suboptimal.");
         }
 
+        // The vertical distribution trees may not provide a path for every clock region of
+        // the range (e.g. for some clock region rows of multi-SLR devices): route those clock
+        // regions after the others, straight to a vertical distribution line of their own, and
+        // from any node of the distribution routed so far below the clock root
+        Map<ClockRegion, List<Pair<IntentCode, ClockRegion>>> distrPaths = new HashMap<>();
+        List<ClockRegion> spineCRsWithoutPath = new ArrayList<>();
+        // Only route to the vertical distribution lines of the clock region rows with sinks:
+        // those of the other rows would be left dangling
+        Set<Integer> rowsWithSinks = new HashSet<>();
+        for (ClockRegion cr : clockRegions) {
+            rowsWithSinks.add(cr.getInstanceY());
+        }
         for (ClockRegion cr : verticalSpineCRs) {
+            if (!rowsWithSinks.contains(cr.getInstanceY())) {
+                continue;
+            }
+            List<Pair<IntentCode, ClockRegion>> distrPath = getVDistrPath(clkTree, cr);
+            if (distrPath.isEmpty()) {
+                distrPath = getVDistrPath(null, cr);
+                spineCRsWithoutPath.add(cr);
+            }
+            distrPaths.put(cr, distrPath);
+        }
+        List<ClockRegion> spineCRsInRoutingOrder = new ArrayList<>(distrPaths.keySet());
+        spineCRsInRoutingOrder.sort(Comparator.comparingInt(ClockRegion::getInstanceY));
+        spineCRsInRoutingOrder.removeAll(spineCRsWithoutPath);
+        spineCRsInRoutingOrder.addAll(spineCRsWithoutPath);
+        Set<Node> distrNodes = new HashSet<>();
+
+        for (ClockRegion cr : spineCRsInRoutingOrder) {
             q.clear();
             visited.clear();
-            q.add(clockRootNode);
+            if (spineCRsWithoutPath.contains(cr) && !distrNodes.isEmpty()) {
+                // Branch off the vertical distribution already routed, below the clock root: starting from the
+                // VROUTE again could transition onto the vertical distribution a second time
+                for (Node n : distrNodes) {
+                    if (!n.equals(vroute)) {
+                        q.add(new NodeWithPrevAndCost(n));
+                    }
+                }
+            } else {
+                q.add(clockRootNode);
+            }
 
-            List<Pair<IntentCode, ClockRegion>> distrPath = getVDistrPath(clkTree, cr);
+            List<Pair<IntentCode, ClockRegion>> distrPath = distrPaths.get(cr);
             nextDistrLevel: for (Pair<IntentCode, ClockRegion> target : distrPath) {
                 IntentCode targetIC = target.getFirst();
                 ClockRegion targetCR = target.getSecond();
@@ -316,11 +356,13 @@ public class VersalClockRouting {
                     }
                     IntentCode currIC = curr.getIntentCode();
                     ClockRegion currCR = curr.getTile().getClockRegion();
-                    if (currCR != null && targetCR == currCR && currIC == targetIC) {
+                    if (currCR != null && targetCR == currCR && currIC == targetIC && drivesDistribution(curr)) {
                         q.clear();
                         visited.clear();
                         q.add(curr);
-                        allPIPs.addAll(RouterHelper.getPIPsFromNodes(curr.getPrevPath()));
+                        List<Node> path = curr.getPrevPath();
+                        allPIPs.addAll(RouterHelper.getPIPsFromNodes(path));
+                        distrNodes.addAll(path);
                         if (targetIC == IntentCode.NODE_GLOBAL_VDISTR) {
                             crToVdist.put(cr, curr);
                         }
@@ -348,6 +390,10 @@ public class VersalClockRouting {
             if (!crToVdist.containsKey(cr)) {
                 ClockRegion correspondingCR = device.getClockRegion(cr.getRow(), x);
                 Node vNode = crToVdist.get(correspondingCR);
+                if (vNode == null) {
+                    throw new RuntimeException("ERROR: No vertical distribution line routed in clock region "
+                            + correspondingCR + " for clock region " + cr + " of clock " + clk);
+                }
                 crToVdist.put(cr, vNode);
             }
         }
@@ -359,6 +405,20 @@ public class VersalClockRouting {
         }
 
         return crToVdist;
+    }
+
+    /**
+     * Checks if a vertical distribution node can continue the clock tree, i.e. it
+     * drives at least one node. This excludes dead ends such as
+     * CLK_REBUF_VERT_VNOC_TOP_COA_TILE_X69Y327/CLK_CMT_DRVR_TRI_1_CLK_OUT_B on
+     * xcvc1902, a GLOBAL_VDISTR node in the top clock region row without any
+     * downhill node, which would otherwise be picked as the vertical distribution
+     * line of that row.
+     * @param node The vertical distribution node.
+     * @return True if the node drives at least one node.
+     */
+    private static boolean drivesDistribution(Node node) {
+        return !node.getAllDownhillNodes().isEmpty();
     }
 
     private static List<Pair<IntentCode, ClockRegion>> getVDistrPath(VersalClockTree clkTree,
@@ -579,19 +639,21 @@ public class VersalClockRouting {
             IntentCode.NODE_INTF_CTRL,
             IntentCode.NODE_IRI,
             IntentCode.NODE_PINFEED,
-            IntentCode.NODE_GLOBAL_LEAF
+            IntentCode.NODE_GLOBAL_LEAF,
+            IntentCode.NODE_DEDICATED
         );
         Set<Node> visited = new HashSet<>();
         Queue<NodeWithPrev> q = new ArrayDeque<>();
         Predicate<Node> isNodeUnavailable = (node) -> getNodeStatus.apply(node) == NodeStatus.UNAVAILABLE;
-        RouteThruHelper routeThruHelper = new RouteThruHelper(clk.getDesign().getDevice());
+        Design design = clk.getDesign();
+        RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
 
         nextPin: for (SitePinInst p: clk.getPins()) {
-            if (p.isOutPin() || p.isRouted() || Utils.isIOB(p.getSiteInst())) {
+            if (p.isOutPin() || p.isRouted() || Utils.isIOB(p.getSiteInst()) || isDrivenByGlobalClockNode(p)) {
                 continue;
             }
             NodeWithPrev sink = new NodeWithPrev(p.getConnectedNode());
-            ClockRegion cr = p.getTile().getClockRegion();
+            ClockRegion cr = getSinkClockRegion(sink);
             boolean crossCRSink = Utils.isPS(p.getSiteInst()) || Utils.isNOC(p.getSiteInst());
             q.clear();
             q.add(sink);
@@ -609,7 +671,8 @@ public class VersalClockRouting {
                     if (!visited.add(uphill)) {
                         continue;
                     }
-                    if (routeThruHelper.isRouteThru(uphill, curr) && curr.getIntentCode() != IntentCode.NODE_IRI) {
+                    if (routeThruHelper.isRouteThru(uphill, curr) && curr.getIntentCode() != IntentCode.NODE_IRI
+                            && !isRouteThruToDedicatedNodeAvailable(design, uphill, curr)) {
                         continue;
                     }
                     if (isNodeUnavailable.test(uphill)) {
@@ -633,6 +696,86 @@ public class VersalClockRouting {
         return lcbMappings;
     }
 
+    /**
+     * Gets the clock region whose leaf clock buffers (LCBs) can reach a clock sink: that of the
+     * sink's node, unless all the nodes driving it are in another clock region (the clock region
+     * of the interface tile through which a hard block is reached, e.g. that of the DCLK input of
+     * a CMT_DPLL or CMT_MMCM site on xcvc1902, which is in the clock region row below).
+     * @param sinkNode The node of the sink pin.
+     * @return The clock region of the LCBs to search for.
+     */
+    private static ClockRegion getSinkClockRegion(Node sinkNode) {
+        ClockRegion cr = sinkNode.getTile().getClockRegion();
+        ClockRegion uphillCR = null;
+        for (Node uphill : sinkNode.getAllUphillNodes()) {
+            ClockRegion ucr = uphill.getTile().getClockRegion();
+            if (ucr == null || ucr.equals(cr) || (uphillCR != null && !uphillCR.equals(ucr))) {
+                return cr;
+            }
+            uphillCR = ucr;
+        }
+        return uphillCR == null ? cr : uphillCR;
+    }
+
+    /**
+     * Checks if a routethru onto a dedicated node can be used to reach a clock sink from a leaf
+     * clock buffer, as Vivado does: e.g. the APB3CLK input of a GTY_QUAD site on xcvc1902 is only
+     * reached through the APB3CLK routethru of the neighboring XPIPE_QUAD site.
+     * @param design The design.
+     * @param head The routethru's start node.
+     * @param tail The routethru's end node.
+     * @return True if the tail is a dedicated node and the routethru is free.
+     */
+    private static boolean isRouteThruToDedicatedNodeAvailable(Design design, Node head, Node tail) {
+        if (tail.getIntentCode() != IntentCode.NODE_DEDICATED) {
+            return false;
+        }
+        PIP routethru = PIP.getArbitraryPIP(head, tail);
+        return routethru != null && RouteThruHelper.isRouteThruPIPAvailable(design, routethru);
+    }
+
+    /**
+     * Checks if a sink pin of a clock net is driven only by global clock (GCLK)
+     * nodes rather than through a leaf clock buffer (LCB). This is the case for the
+     * inputs of clock buffers (e.g. a BUFGCE cascaded from another BUFGCE), which
+     * must be reached directly from the clock tree (e.g. through a horizontal
+     * distribution track of the clock buffer row) instead of from an LCB.
+     * @param p The sink pin.
+     * @return True if all nodes driving the pin's node are global clock nodes.
+     */
+    public static boolean isDrivenByGlobalClockNode(SitePinInst p) {
+        Node node = p.getConnectedNode();
+        if (node == null) {
+            return false;
+        }
+        List<Node> uphill = node.getAllUphillNodes();
+        if (uphill.isEmpty()) {
+            return false;
+        }
+        for (Node n : uphill) {
+            if (n.getIntentCode() != IntentCode.NODE_GLOBAL_GCLK) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Intent codes of the nodes that routes to pins driven by global clock nodes
+     * may use (see {@link #isDrivenByGlobalClockNode(SitePinInst)}).
+     */
+    private static final Set<IntentCode> GLOBAL_CLOCK_SINK_INTENT_CODES = EnumSet.of(
+            IntentCode.NODE_GLOBAL_BUFG,
+            IntentCode.NODE_GLOBAL_GCLK,
+            IntentCode.NODE_GLOBAL_HROUTE,
+            IntentCode.NODE_GLOBAL_HROUTE_HSR,
+            IntentCode.NODE_GLOBAL_VROUTE,
+            IntentCode.NODE_GLOBAL_HDISTR,
+            IntentCode.NODE_GLOBAL_HDISTR_HSR,
+            IntentCode.NODE_GLOBAL_VDISTR,
+            IntentCode.NODE_GLOBAL_VDISTR_LVL1,
+            IntentCode.NODE_GLOBAL_VDISTR_LVL2);
+
     public static void routeNonLCBPins(Net clk, List<SitePinInst> sinks,
             Function<Node, NodeStatus> getNodeStatus) {
         Set<Node> visited = new HashSet<>();
@@ -641,6 +784,8 @@ public class VersalClockRouting {
         nextPin: for (SitePinInst p : sinks) {
             q.clear();
             visited.clear();
+            // Clock buffer inputs may only be reached through the dedicated global clock routing
+            boolean globalClockOnly = isDrivenByGlobalClockNode(p);
             NodeWithPrev sink = new NodeWithPrev(p.getConnectedNode());
             List<Node> uphill = sink.getAllUphillNodes();
             boolean sinkOneHopLater = false;
@@ -652,6 +797,10 @@ public class VersalClockRouting {
                 int cost = pip.getTile().getManhattanDistance(sink.getTile());
                 q.add(new NodeWithPrevAndCost(pip.getEndNode(), null, cost));
             }
+            // Also start from the clock source, in case the net has no PIPs yet
+            // (e.g. when it only drives the input of another clock buffer)
+            Node srcNode = clk.getSource().getConnectedNode();
+            q.add(new NodeWithPrevAndCost(srcNode, null, srcNode.getTile().getManhattanDistance(sink.getTile())));
 
             while (!q.isEmpty()) {
                 NodeWithPrevAndCost curr = q.poll();
@@ -676,6 +825,9 @@ public class VersalClockRouting {
                 }
 
                 for (Node downhill : curr.getAllDownhillNodes()) {
+                    if (globalClockOnly && !GLOBAL_CLOCK_SINK_INTENT_CODES.contains(downhill.getIntentCode())) {
+                        continue;
+                    }
                     if (!visited.add(downhill)) {
                         continue;
                     }

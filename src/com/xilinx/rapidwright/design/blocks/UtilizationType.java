@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -33,6 +33,7 @@ import java.util.Set;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
 
 /**
  * Different categories of fabric utilization.
@@ -83,13 +84,14 @@ public enum UtilizationType {
     public static Map<UtilizationType, Integer> computeUtilization(Design design) {
         Map<UtilizationType, Integer> map = new HashMap<>();
 
-        design.getNetlist().collapseMacroUnisims(design.getSeries());
-
         Set<String> notTracked = new HashSet<>();
 
         int[] lutCounts = new int[7];
 
-        for (EDIFHierCellInst i : design.getNetlist().getAllLeafHierCellInstances()) {
+        // Macros count as the primitive they are, rather than as the primitives they expand into
+        EDIFNetlist netlist = design.getNetlist();
+        for (EDIFHierCellInst i : netlist.getAllLeafDescendants(netlist.getTopHierCellInst(),
+                (cell) -> cell.getLibrary().isHDIPrimitivesLibrary())) {
             String type = i.getCellType().getName();
             switch (type) {
             case "LUT1":
@@ -184,8 +186,6 @@ public enum UtilizationType {
                     System.out.println("Didn't count: " + type);
             }
         }
-
-        design.getNetlist().expandMacroUnisims(design.getSeries());
 
         // Calculate potential estimates for LUTs
         int lutEstimate = 0;

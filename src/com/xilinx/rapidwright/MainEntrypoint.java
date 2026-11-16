@@ -39,6 +39,7 @@ import com.xilinx.rapidwright.design.blocks.PBlockGenerator;
 import com.xilinx.rapidwright.design.compare.DesignComparator;
 import com.xilinx.rapidwright.design.merge.MergeDesigns;
 import com.xilinx.rapidwright.design.tools.ArrayBuilder;
+import com.xilinx.rapidwright.design.tools.CombineDcps;
 import com.xilinx.rapidwright.design.tools.CopyImplementation;
 import com.xilinx.rapidwright.design.tools.DesignObfuscator;
 import com.xilinx.rapidwright.design.tools.LUTTools;
@@ -143,6 +144,7 @@ public class MainEntrypoint {
         addFunction("BlockUpdater", BlockUpdater::main);
         addFunction("BrowseDevice", BrowseDevice::main);
         addFunction("CheckAccuracyUsingGnlDesigns", CheckAccuracyUsingGnlDesigns::main);
+        addFunction("CombineDcps", CombineDcps::main);
         addFunction("CompareRouteStatusReports", CompareRouteStatusReports::main);
         addFunction("CopyMMCMCell", CopyMMCMCell::main);
         addFunction("CopyImplementation", CopyImplementation::main);

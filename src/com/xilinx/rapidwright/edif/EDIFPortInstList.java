@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -28,7 +28,9 @@ import java.util.Collections;
 import java.util.Comparator;
 
 /**
- * Customized ArrayList<EDIFPortInst> for the {@link EDIFNet} and {@link EDIFCellInst} classes.
+ * Customized ArrayList<EDIFPortInst>, formerly the storage of the {@link EDIFNet} and
+ * {@link EDIFCellInst} classes (which now store a bare sorted array, see EDIFPortInstArray, and
+ * expose it via getPortInsts()).
  * Maintains a sorted list to allow for a O(log n) retrieval lookup by name.  Overwrites 
  * existing entries with most recent value.
  */
@@ -37,6 +39,19 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
     private static final long serialVersionUID = 8718591209309655922L;
 
     public static final EDIFPortInstList EMPTY = new EDIFPortInstList();
+
+    public EDIFPortInstList() {
+        super();
+    }
+
+    /**
+     * Creates a list holding the given port instances, in iteration order (which should already
+     * be sorted). The capacity equals the size.
+     * @param c Port instances to copy.
+     */
+    public EDIFPortInstList(java.util.Collection<? extends EDIFPortInst> c) {
+        super(c);
+    }
 
     /**
      * Inserts the port inst into the list such that the list remains sorted.  If an identical 
@@ -139,5 +154,20 @@ public class EDIFPortInstList extends ArrayList<EDIFPortInst> {
      */
     public void reSortList() {
         Collections.sort(this);
+        // Unlike add(), deferSortAdd() does not replace an existing equal port inst
+        assert(!hasAdjacentDuplicates());
+    }
+
+    /**
+     * @return True if any two adjacent port insts compare equal (i.e. there are duplicates, if this list
+     * is sorted).
+     */
+    private boolean hasAdjacentDuplicates() {
+        for (int i = 1; i < size(); i++) {
+            if (get(i - 1).compareTo(get(i)) == 0) {
+                return true;
+            }
+        }
+        return false;
     }
 }

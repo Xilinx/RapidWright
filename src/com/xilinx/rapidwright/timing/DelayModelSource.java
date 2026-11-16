@@ -98,6 +98,9 @@ abstract class DelayModelSource {
         aMap.put("F7MUX_GH",   (short) 4);
         aMap.put("RAMB36E2", (short) 5);
         aMap.put("URAM288", (short) 6);
+        aMap.put("F8MUX_BOT",  (short) 7);
+        aMap.put("F8MUX_TOP",  (short) 7);
+        aMap.put("F9MUX",      (short) 8);
         bel2IdxMap = Collections.unmodifiableMap(aMap);
     }
 

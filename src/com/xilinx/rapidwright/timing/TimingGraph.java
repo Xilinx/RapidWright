@@ -171,20 +171,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             if (net.isStaticNet()) continue;
             addNetDelayEdges(net);
         }
-        
-        addTimingEdgesOfNets(isPartialRouting, targetNets);
-        
+
         if (routerTimer != null) routerTimer.getRuntimeTracker("add net dly edges").stop();
-    }
-    
-    private void addTimingEdgesOfNets(boolean isPartialRouting, Collection<Net> assignedNets) {
-        for (Net net : assignedNets) {
-            if (net.isClockNet()) continue;//this is for getting rid of the problem in addNetDelayEdges() of clock net
-            if (net.isStaticNet()) continue;
-            if (!isPartialRouting || !net.hasPIPs()) {
-                addNetDelayEdges(net);
-            }
-        }
     }
     
     public void populateHierCellInstMap() {
@@ -222,8 +210,12 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
         Map<String, EDIFCellInst> partialCellMap = new HashMap<>();
         Set<String> keys = new HashSet<>();
         for (Net n : nets) {
-            if (n.isClockNet() || n.isStaticNet() || n.hasPIPs()) continue;
-            if (!RouterHelper.isRoutableNetWithSourceSinks(n)) continue;
+            // Including a net with routing: one being routed partially (e.g. by PartialRouter) keeps its routing until
+            // it is done, and its cells' arcs are as needed as those of an unrouted net
+            if (n.isClockNet() || n.isStaticNet()) continue;
+            // A net that never leaves its site has no sink site pins (e.g. a LUT driving the flip-flop beside it), but
+            // its cells' arcs are as needed as those of one that does
+            if (!n.getSinkPins().isEmpty() && !RouterHelper.isRoutableNetWithSourceSinks(n)) continue;
             List<EDIFHierPortInst> ehportInsts = design.getNetlist().getPhysicalPins(n.getName());
             if (ehportInsts == null) {
                 System.out.println("WARNING: Unable to find physical pins on Net '" + n.getName() + "'; possibly due to an encrypted netlist.");
@@ -328,7 +320,16 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 if (v.equals(superSink)) {
                     v.setMinRequiredTime(requirement);
                 } else {
-                    v.setMinRequiredTime(Short.MAX_VALUE);//NOTE: there are dangling timing vertices not connected to super sink
+                    // A dangling vertex, one with no path to the super sink, has no requirement: so that a vertex
+                    // none of whose paths reaches the super sink has an infinite required time and slack, whatever
+                    // the requirement (rather than a finite stand-in, below which a slow enough clock would bring
+                    // its slack)
+                    // TODO: Not all dangling vertices are unconstrained. Some are timing paths that this graph cuts
+                    // short, for want of an arc or an endpoint: e.g. on boom_medium_routed (timing driven), many
+                    // connections with no path to the super sink end at the write side of distributed RAMs (I, WE,
+                    // WADR*), DSP inputs (A, B, CE*) or block RAM parity inputs (DINPADINP*), rather than at an
+                    // output port. Their timing is not seen
+                    v.setMinRequiredTime(Float.POSITIVE_INFINITY);
                 }
             }
             
@@ -1069,7 +1070,8 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                     }
                 }
             }
-            else if (myCellName.startsWith("LUT") || myCellName.startsWith("RAM") || myCellName.startsWith("SRL")) {
+            else if (myCellName.startsWith("LUT") || myCellName.startsWith("RAM") || myCellName.startsWith("SRL") ||
+                    myCellName.startsWith("MUXF")) {
                 EDIFCell parent = c.getParentCell();
                 boolean excludeSomeEdges = false;
                 boolean eqHasI0 = false;
@@ -1583,8 +1585,19 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
                 }
             } else {
                 physPinName = cell.getPhysicalPinMapping(portName);
+                if (physPinName != null && physPinName.startsWith("WA") && cell.getBEL().isLUT()) {
+                    // A distributed RAM's address pin maps to both a read (A*) and a write (WA*) address pin, whose
+                    // site pins differ (SLICEM.H[1-6] also serves as the WA for A-G LUTs); use the former since that
+                    // is where its logic edges (to its outputs) begin
+                    for (String pin : cell.getAllPhysicalPinMappings(portName)) {
+                        if (pin.startsWith("A")) {
+                            physPinName = pin;
+                            break;
+                        }
+                    }
+                }
                 // spi5 = cell.getSitePinFromLogicalPin(hport.getPortInst().getName(), null);
-                spi5 = cell.getSiteInst().getSitePinInst(DesignTools.getRoutedSitePin(cell, net, portName)); // use the new method to get over unmatched SitePinInst issue
+                spi5 = cell.getSiteInst().getSitePinInst(DesignTools.getRoutedSitePinFromPhysicalPin(cell, net, physPinName)); // use the new method to get over unmatched SitePinInst issue
             }
            
            // if cell is dsp, and port name included in DSP pin mapping, override the fullName that is used to build timing edges
@@ -1691,28 +1704,26 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
 
             boolean forceUpdateEdge = false;
             float netDelay = 0f;
-            if (haveIntrasiteNet) {//LUT driving a FF is here
-                String param2 = srcCell.getBELName()+"/"+ source.getName();
-                String param3 = null;
-                if (sink_belpins.get(D) == null) {
-                    param3 =  dstCell.getBELName() +"/" + stringSinks.get(D).getName();
-                } else {
-                    param3 =  dstCell.getBELName() +"/" +sink_belpins.get(D).getName();
-                }
-                float tmpNetDelay;
-                Short returnValue = intrasiteAndLogicDelayModel.getIntraSiteDelay(
-                            si.getSiteTypeEnum(),
-                            param2,
-                            param3);
-                if (returnValue == null) {
+            // A sink that the net reaches without leaving its source's site is given the hop between their BEL pins:
+            // every sink of a net that never leaves its site (e.g. a LUT driving the flip-flop beside it), and one
+            // without a site pin of its own of a net that does (e.g. that flip-flop, when the LUT's output also leaves
+            // the site), which calcDelay() would give no delay
+            Short intraSiteHop = null;
+            if (haveIntrasiteNet || (spi_sink == null && srcCell != null && dstCell != null && source != null &&
+                    sink != null && dstCell.getSiteInst() == srcCell.getSiteInst())) {
+                String sinkPinName = (sink_belpins.get(D) == null) ? stringSinks.get(D).getName()
+                        : sink_belpins.get(D).getName();
+                intraSiteHop = intrasiteAndLogicDelayModel.getIntraSiteDelay(srcCell.getSiteInst().getSiteTypeEnum(),
+                        srcCell.getBELName() + "/" + source.getName(), dstCell.getBELName() + "/" + sinkPinName);
+                if (intraSiteHop == null && haveIntrasiteNet) {
                     continue;
                 }
-                tmpNetDelay = (float) returnValue;
-                
-                intraSiteDelay = Math.max(0f, tmpNetDelay);// YZhou: for intrasite net, its intrasite delay is equal to net delay
-                netDelay = Math.max(0f, tmpNetDelay);
+            }
+            if (intraSiteHop != null) {
+                // YZhou: for intrasite net, its intrasite delay is equal to net delay
+                intraSiteDelay = Math.max(0f, intraSiteHop);
+                netDelay = intraSiteDelay;
                 forceUpdateEdge = true;
-                
             } else {
                 if (srcCell == null)
                     continue;
@@ -1866,10 +1877,14 @@ public class TimingGraph extends DefaultDirectedWeightedGraph<TimingVertex, Timi
             if (hportsFromSitePinInsts.isEmpty()) {
                 throw new RuntimeException("ERROR: Unable to find hierarchical logical cell pins from: " + connection.getSink());
             }
-            EDIFHierPortInst hportSink = hportsFromSitePinInsts.get(0);
-            SitePinInst mappedSink = edifHPortMap.get(hportSink);
-            
-            List<TimingEdge> timingEdges = sinkSitePinInstTimingEdges.get(mappedSink);
+            // Prefer the timing edges of this sink pin, since it may also reach cell pins whose timing edges are
+            // those of another site pin (e.g. SLICEM.H[1-6] also serves as the WA for A-G LUTs used as distributed RAM)
+            List<TimingEdge> timingEdges = sinkSitePinInstTimingEdges.get(connection.getSink());
+            if (timingEdges == null) {
+                EDIFHierPortInst hportSink = hportsFromSitePinInsts.get(0);
+                SitePinInst mappedSink = edifHPortMap.get(hportSink);
+                timingEdges = sinkSitePinInstTimingEdges.get(mappedSink);
+            }
             if (timingEdges == null) {
                 throw new RuntimeException("ERROR: No timing edges for connection from: " + connection.getSource() + " to " + connection.getSink());
             }
