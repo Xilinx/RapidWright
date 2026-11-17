@@ -3281,10 +3281,7 @@ public class DesignTools {
     public static void createMissingSitePinInsts(Design design) {
         EDIFNetlist netlist = design.getNetlist();
 
-        // Compute (if needed) the physical net pin map outside of parallel loop below
-        // (Note that this also computes the parent net map used in assertions)
-        netlist.getPhysicalNetPinMap();
-
+        // The physical pins of each net are found on demand, in the parallel loop below
         List<Net> nets = new ArrayList<>(design.getNets().size());
         for (Net net : design.getNets()) {
             if (net.isUsedNet() || net.isZNet()) {

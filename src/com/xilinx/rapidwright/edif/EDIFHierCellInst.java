@@ -54,7 +54,7 @@ public class EDIFHierCellInst implements Comparable<EDIFHierCellInst> {
         }
     }
 
-    private static boolean isToplevelInst(EDIFCellInst eci) {
+    static boolean isToplevelInst(EDIFCellInst eci) {
         EDIFCell cellType = eci.getCellType();
         EDIFLibrary library = cellType.getLibrary();
         EDIFNetlist netlist = library.getNetlist();
@@ -116,6 +116,14 @@ public class EDIFHierCellInst implements Comparable<EDIFHierCellInst> {
 
     public EDIFCellInst getInst() {
         return cellInsts[cellInsts.length-1];
+    }
+
+    /**
+     * @return The cell instances of this hierarchical instance as they are stored, from the first
+     * (the top cell instance, if absolute) to {@link #getInst()}. The array must not be changed.
+     */
+    EDIFCellInst[] getCellInstArray() {
+        return cellInsts;
     }
 
     @Override

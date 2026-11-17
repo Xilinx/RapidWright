@@ -129,6 +129,9 @@ public class EDIFPort extends EDIFPropertyObject {
      */
     public void setDirection(EDIFDirection direction) {
         this.direction = direction;
+        if (parentCell != null) {
+            parentCell.portDirectionChanged();
+        }
     }
 
     /**
