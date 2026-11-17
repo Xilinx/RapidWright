@@ -69,10 +69,18 @@ final class EDIFNetConnectivity {
     private static final AtomicReferenceFieldUpdater<EDIFNet, EDIFNetConnectivity> RECORDED =
             AtomicReferenceFieldUpdater.newUpdater(EDIFNet.class, EDIFNetConnectivity.class, "connectivity");
 
-    private static final Comparator<EDIFPortInst> BY_NAME = Comparator.comparing(EDIFPortInst::getName);
+    private static final Comparator<EDIFPortInst> BY_NAME = Comparator.comparing(EDIFNetConnectivity::getPortInstName);
 
     /** What is recorded in an epoch before this one is no longer used by any netlist */
     private static volatile int minEpoch;
+
+    /** True if a netlist keeps results since the last change of a netlist */
+    private static volatile boolean resultsKept;
+
+    /** Counts the changes of netlists that were made while a netlist kept results */
+    private static volatile int changeCount;
+
+    private static final Object CHANGE_LOCK = new Object();
 
     /**
      * Marks a cell that connectivity was computed from as a leaf cell, or for the direction of
@@ -167,9 +175,42 @@ final class EDIFNetConnectivity {
         return minEpoch;
     }
 
-    /** Drops the connectivity recorded in all netlists. */
+    /** Drops the connectivity recorded in all netlists, and the results they keep. */
     static void resetAll() {
         minEpoch = newEpoch();
+        netlistChanged();
+    }
+
+    /**
+     * To be called when a netlist has changed: the results that netlists keep until then (their
+     * physical pins, and the parent nets of all their nets) are no longer used. Those of all
+     * netlists, as a cell or a net of one netlist can be used in another (a cell can be
+     * instantiated in another netlist, and a shallow copy of a cell shares its nets), so that
+     * the netlist of what has changed is not the only one that may keep results of it.
+     */
+    static void netlistChanged() {
+        if (resultsKept) {
+            synchronized (CHANGE_LOCK) {
+                resultsKept = false;
+                changeCount++;
+            }
+        }
+    }
+
+    /**
+     * To be called when a netlist starts to keep results.
+     * @return What to give {@link #isCurrent(int)} to find out if they can still be used.
+     */
+    static int keepResults() {
+        synchronized (CHANGE_LOCK) {
+            resultsKept = true;
+            return changeCount;
+        }
+    }
+
+    /** Checks if no netlist has changed since {@link #keepResults()} returned the given count. */
+    static boolean isCurrent(int count) {
+        return changeCount == count;
     }
 
     /**
@@ -177,6 +218,7 @@ final class EDIFNetConnectivity {
      * @param net The net.
      * @param epoch The epoch of the netlist asking.
      * @return The connectivity of the net and of the nets of its cell connected to it.
+     * @throws NotRecordedException If it cannot be recorded.
      */
     static EDIFNetConnectivity get(EDIFNet net, int epoch) {
         EDIFNetConnectivity c = net.connectivity;
@@ -215,15 +257,79 @@ final class EDIFNetConnectivity {
         return sourceBelow;
     }
 
+    /**
+     * Gets the name that a port inst has by its port and index, which is what tells the port (and
+     * bit) of a cell it is on. This is its name ({@link EDIFPortInst#getName()}, by which it is
+     * found on its net and cell instance), unless its port or index was changed since it was
+     * created, see {@link EDIFPortInst#setIndex(int)}.
+     * @return The same as {@link EDIFPortInst#getPortInstNameFromPort()}, without creating the
+     * name if the port inst has it.
+     */
+    static String getPortInstName(EDIFPortInst portInst) {
+        String name = portInst.getName();
+        EDIFPort port = portInst.getPort();
+        if (port == null || name == null) {
+            // Still being read
+            return name;
+        }
+        if (!port.isBus()) {
+            String portName = port.getBusName();
+            return name.equals(portName) ? name : portName;
+        }
+        // name == busName + '[' + index in the name + ']'
+        String busName = port.getBusName(true);
+        int end = name.length() - 1;
+        if (end > busName.length() && name.charAt(end) == ']' && name.startsWith(busName)) {
+            String portName = port.getName();
+            int separator = portName.lastIndexOf(':');
+            if (separator == -1) {
+                separator = portName.lastIndexOf(']');
+            }
+            long left = parseInt(portName, portName.lastIndexOf('[') + 1, separator);
+            long nameIndex = parseInt(name, busName.length(), end);
+            if (left != NOT_AN_INT && nameIndex != NOT_AN_INT) {
+                // As EDIFPort.getPortInstNameFromPort() gets the index in the name
+                int index = portInst.getIndex();
+                if (nameIndex == (port.isLittleEndian() ? left - index : index - left)) {
+                    return name;
+                }
+            }
+        }
+        return portInst.getPortInstNameFromPort();
+    }
+
+    private static final long NOT_AN_INT = Long.MIN_VALUE;
+
+    /** Parses the decimal integer in s from start (inclusive) to end, without creating objects. */
+    private static long parseInt(String s, int start, int end) {
+        if (start < 0 || start >= end || end - start > 10) {
+            return NOT_AN_INT;
+        }
+        boolean isNegative = s.charAt(start) == '-';
+        int i = isNegative ? start + 1 : start;
+        if (i == end) {
+            return NOT_AN_INT;
+        }
+        long value = 0;
+        for (; i < end; i++) {
+            int digit = s.charAt(i) - '0';
+            if (digit < 0 || digit > 9) {
+                return NOT_AN_INT;
+            }
+            value = value * 10 + digit;
+        }
+        return isNegative ? -value : value;
+    }
+
     /** Checks if this group is connected to the port of its cell with the given port inst name. */
     private boolean hasPort(String portInstName) {
         Object ports = this.ports;
         if (ports instanceof EDIFPortInst) {
-            return ((EDIFPortInst) ports).getName().equals(portInstName);
+            return getPortInstName((EDIFPortInst) ports).equals(portInstName);
         }
         if (ports != null) {
             for (EDIFPortInst port : (EDIFPortInst[]) ports) {
-                if (port.getName().equals(portInstName)) {
+                if (getPortInstName(port).equals(portInstName)) {
                     return true;
                 }
             }
@@ -289,9 +395,17 @@ final class EDIFNetConnectivity {
         return null;
     }
 
+    /**
+     * Gets the net outside a cell instance that is on a port of its cell.
+     * @param inst The cell instance.
+     * @param port A port inst (without a cell inst) on a net inside the cell.
+     * @return The net of the port inst of the instance for the same port, or null if none.
+     */
     private static EDIFNet getNetOn(EDIFCellInst inst, EDIFPortInst port) {
-        EDIFPortInst outer = inst.getPortInst(port.getName());
-        return outer == null ? null : outer.getNet();
+        String name = getPortInstName(port);
+        EDIFPortInst outer = inst.getPortInst(name);
+        // It is found by the name it was created with, and may be for another bit by now
+        return (outer != null && getPortInstName(outer).equals(name)) ? outer.getNet() : null;
     }
 
     /**
@@ -299,28 +413,45 @@ final class EDIFNetConnectivity {
      * that port which has the port inst for it. (A port inst that was removed from its net may
      * leave the net as the one of the port.)
      * @param cell The cell.
-     * @param portInstName Name of the port inst, which is that of the port and, for a bus, its bit.
+     * @param portInstName Name of the port inst, which is that of the port and, for a bus, its
+     * bit, see {@link #getPortInstName(EDIFPortInst)}.
      * @return The net inside the cell, or null if none is connected to the port.
      */
     static EDIFNet getConnectedNet(EDIFCell cell, String portInstName) {
         EDIFNet net = cell.getInternalNet(portInstName);
-        if (net == null || net.getPortInst(null, portInstName) != null) {
+        if (net == null) {
+            return null;
+        }
+        EDIFPortInst found = net.getPortInst(null, portInstName);
+        if (found != null && getPortInstName(found).equals(portInstName)) {
             return net;
         }
-        // Not found by name: make sure, as the port insts of a net are no longer sorted once a
-        // cell instance on it is renamed
+        // Not found by the name it was created with: make sure, as the port insts of a net are
+        // no longer sorted once a cell instance on it is renamed, and as a port inst can be
+        // given another index
+        return hasPort(net, portInstName) ? net : null;
+    }
+
+    /**
+     * Checks if a net has the port inst for a port of its cell, by examining its port insts in
+     * turn.
+     * @param net The net.
+     * @param portInstName Name of the port inst, see {@link #getPortInstName(EDIFPortInst)}.
+     * @return True if the net has a port inst without a cell inst with that name.
+     */
+    static boolean hasPort(EDIFNet net, String portInstName) {
         EDIFPortInst[] portInsts = net.getPortInstArray();
         if (portInsts != null) {
             for (EDIFPortInst portInst : portInsts) {
                 if (portInst == null) {
                     break;
                 }
-                if (portInst.getCellInst() == null && portInstName.equals(portInst.getName())) {
-                    return net;
+                if (portInst.getCellInst() == null && portInstName.equals(getPortInstName(portInst))) {
+                    return true;
                 }
             }
         }
-        return null;
+        return false;
     }
 
     /**
@@ -334,17 +465,37 @@ final class EDIFNetConnectivity {
         return cell.getInternalNet(portInstName) == net;
     }
 
+    private static final int MAX_ATTEMPTS = 16;
+
+    /**
+     * Thrown when the connectivity of a net cannot be recorded: in a netlist where the nets do
+     * not agree on which of them are connected (two port insts of a cell instance that were
+     * given the same bit of a port, for example), recording it for one net replaces what was
+     * recorded for another, and the other way around. Nothing is kept for such nets, nor for
+     * the nets whose connectivity is computed from theirs: they are to be searched.
+     */
+    static final class NotRecordedException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+
+        NotRecordedException() {
+            super("The nets do not agree on which of them are connected", null, false, false);
+        }
+    }
+
     private static EDIFNetConnectivity compute(EDIFNet first, int epoch) {
-        EDIFNetConnectivity c;
-        do {
-            c = computeOnce(first, epoch);
-        } while (c == null);
-        return c;
+        for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+            EDIFNetConnectivity c = computeOnce(first, epoch);
+            if (c != null) {
+                return c;
+            }
+        }
+        throw new NotRecordedException();
     }
 
     /**
-     * @return The connectivity of the group of the net, or null if another thread replaced, while
-     * it was computed, some of what it was computed from, in which case it is to be computed again.
+     * @return The connectivity of the group of the net, or null if some of what it was computed
+     * from was replaced meanwhile (by another thread, or while it was computed), in which case it
+     * is to be computed again.
      */
     private static EDIFNetConnectivity computeOnce(EDIFNet first, int epoch) {
         Builder b = new Builder(first);
@@ -362,7 +513,7 @@ final class EDIFNetConnectivity {
                 }
                 EDIFCellInst inst = portInst.getCellInst();
                 if (inst == null) {
-                    if (cell == null || isConnected(cell, portInst.getName(), net)) {
+                    if (cell == null || isConnected(cell, getPortInstName(portInst), net)) {
                         b.addPort(portInst);
                     }
                     continue;
@@ -382,17 +533,27 @@ final class EDIFNetConnectivity {
                         b.addSources(portInst, null, 1);
                     }
                 }
-                EDIFNet inner = type.getInternalNet(portInst.getName());
+                // A cell without nets on its ports (as a leaf cell) needs no name
+                String name = type.getInternalNetMap().isEmpty() ? null : getPortInstName(portInst);
+                EDIFNet inner = (name != null) ? type.getInternalNet(name) : null;
                 EDIFNetConnectivity below = (inner != null) ? get(inner, epoch) : null;
-                if (below == null || !below.hasPort(portInst.getName())) {
-                    // No net inside the instance is connected to the port (see getConnectedNet())
+                if (below == null || !below.hasPort(name)) {
+                    // No net inside the instance is connected to the port (see getConnectedNet()),
+                    // until its cell is told of one. The port is that of another cell if the cell
+                    // is a shallow copy of it, in which case that cell is the one told
                     if (!isLeaf) {
                         b.addUnconnected(type);
+                        EDIFCell portCell = portInst.getPort().getParentCell();
+                        if (portCell != type && portCell != null) {
+                            b.addUnconnected(portCell);
+                        }
                     }
                     continue;
                 }
-                if (b.connect(inst, portInst, below)) {
-                    b.addBelow(inst, below);
+                if (b.connect(inst, name, below)) {
+                    // From the net inside, the port inst is found by the name it was created
+                    // with: only then is this the connectivity above that of the net inside
+                    b.addBelow(name.equals(portInst.getName()) ? inst : null, below);
                     b.addSources(portInst, below, below.sourceCount);
                 }
             }
@@ -416,7 +577,7 @@ final class EDIFNetConnectivity {
         private int sourceCount;
         /** The connectivity of the nets inside instances that this is computed from */
         private ArrayList<EDIFNetConnectivity> below;
-        /** The instance of each of these */
+        /** The instance of each of these, or null if this is not found from it as the one above */
         private ArrayList<EDIFCellInst> belowInsts;
         /** Cells with a port that has no net inside, and a net of this group outside */
         private ArrayList<EDIFCell> unconnected;
@@ -505,17 +666,17 @@ final class EDIFNetConnectivity {
          * As several nets of this group may be connected to that group, it is only to be counted
          * for one of them: the one on its first port that is connected on the instance.
          * @param inst The instance.
-         * @param portInst The port inst of the instance on a net of this group.
+         * @param name The name ({@link #getPortInstName(EDIFPortInst)}) of the port inst of the
+         * instance on a net of this group.
          * @param below The connectivity of the net inside the instance on that port.
          * @return True if this is the port inst to count the group below for.
          */
-        boolean connect(EDIFCellInst inst, EDIFPortInst portInst, EDIFNetConnectivity below) {
+        boolean connect(EDIFCellInst inst, String name, EDIFNetConnectivity below) {
             Object belowPorts = below.ports;
             if (belowPorts instanceof EDIFPortInst) {
                 // The port of the port inst
                 return true;
             }
-            String name = portInst.getName();
             boolean isFirst = true;
             for (EDIFPortInst belowPort : (EDIFPortInst[]) belowPorts) {
                 EDIFNet net = getNetOn(inst, belowPort);
@@ -523,7 +684,7 @@ final class EDIFNetConnectivity {
                     continue;
                 }
                 addNet(net);
-                if (isFirst && !belowPort.getName().equals(name)) {
+                if (isFirst && !getPortInstName(belowPort).equals(name)) {
                     // Counted from that net, which adds the nets on the other ports
                     return false;
                 }
@@ -567,13 +728,15 @@ final class EDIFNetConnectivity {
                     isCurrent &= b.valid;
                 }
                 if (!isCurrent) {
-                    // Another thread recorded one of these again meanwhile
+                    // One of these was recorded again meanwhile
                     c.valid = false;
                     return null;
                 }
                 for (int i = 0; i < below.size(); i++) {
                     // Saves finding this from there
-                    below.get(i).above = new Above(belowInsts.get(i), c);
+                    if (belowInsts.get(i) != null) {
+                        below.get(i).above = new Above(belowInsts.get(i), c);
+                    }
                 }
             }
             if (unconnected != null) {
@@ -583,9 +746,9 @@ final class EDIFNetConnectivity {
             }
             for (int i = 0; i < netCount; i++) {
                 EDIFNetConnectivity old = RECORDED.getAndSet(getNet(i), c);
-                if (old != null && old.valid) {
+                if (old != null && old != c && old.valid) {
                     // Nothing can be told to drop what was computed from it once it is replaced
-                    invalidate(old);
+                    invalidate(old, c);
                 }
             }
             return c;
@@ -631,7 +794,7 @@ final class EDIFNetConnectivity {
     }
 
     /**
-     * Drops what is recorded for a net that changed, and what the netlist of the net keeps.
+     * Drops what is recorded for a net that changed, and the results that netlists keep.
      * @param net A net that had a port inst added, removed or changed.
      */
     static void netChanged(EDIFNet net) {
@@ -639,10 +802,7 @@ final class EDIFNetConnectivity {
         if (c != null) {
             invalidate(c);
         }
-        EDIFCell cell = net.getParentCell();
-        if (cell != null) {
-            cell.netlistChanged();
-        }
+        netlistChanged();
     }
 
     /**
@@ -655,9 +815,17 @@ final class EDIFNetConnectivity {
     static void portInstChanged(EDIFNet net, EDIFPortInst portInst) {
         netChanged(net);
         EDIFCellInst inst = portInst.getCellInst();
-        EDIFCell type = (inst != null) ? inst.getCellType() : null;
-        String name = portInst.getName();
-        if (type == null || name == null) {
+        if (inst == null) {
+            // The net may be on a port of its cell that it was not on
+            EDIFCell cell = net.getParentCell();
+            if (cell != null) {
+                cell.portConnected();
+            }
+            return;
+        }
+        EDIFCell type = inst.getCellType();
+        String name = (type != null) ? getPortInstName(portInst) : null;
+        if (name == null) {
             return;
         }
         EDIFNet inner = getConnectedNet(type, name);
@@ -690,10 +858,7 @@ final class EDIFNetConnectivity {
                 }
             }
         }
-        EDIFCell cell = inst.getParentCell();
-        if (cell != null) {
-            cell.netlistChanged();
-        }
+        netlistChanged();
     }
 
     /**
@@ -701,8 +866,16 @@ final class EDIFNetConnectivity {
      * @param set An EDIFNetConnectivity, or a set of them as kept by
      * {@link #addTo(Object, EDIFNetConnectivity)}.
      */
-    @SuppressWarnings("unchecked")
     static void invalidate(Object set) {
+        invalidate(set, null);
+    }
+
+    /**
+     * @param except Connectivity to keep, as it replaces what is dropped: it is found on the nets
+     * of what it replaces.
+     */
+    @SuppressWarnings("unchecked")
+    private static void invalidate(Object set, EDIFNetConnectivity except) {
         ArrayDeque<Object> todo = null;
         while (set != null) {
             if (set instanceof ArrayList) {
@@ -712,7 +885,7 @@ final class EDIFNetConnectivity {
                 todo.addAll((ArrayList<EDIFNetConnectivity>) set);
             } else {
                 EDIFNetConnectivity c = (EDIFNetConnectivity) set;
-                if (c.valid) {
+                if (c.valid && c != except) {
                     c.valid = false;
                     Object other = c.forgetNets();
                     Object dependents;

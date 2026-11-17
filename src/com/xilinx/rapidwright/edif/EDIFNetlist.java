@@ -364,7 +364,7 @@ public class EDIFNetlist extends EDIFName {
             topCellInstance.setName(newName);
         }
         // The hierarchical nets that are kept have another name now
-        parentNets.netlistChanged();
+        EDIFNetConnectivity.netlistChanged();
     }
 
     /**
@@ -1856,14 +1856,6 @@ public class EDIFNetlist extends EDIFName {
      */
     public boolean isParentNetMapBuilt() {
         return parentNets.isComplete();
-    }
-
-    /**
-     * Called by the cells and nets of this netlist when they change, so that what is kept until
-     * the netlist changes is dropped.
-     */
-    void connectivityChanged() {
-        parentNets.netlistChanged();
     }
 
     /**

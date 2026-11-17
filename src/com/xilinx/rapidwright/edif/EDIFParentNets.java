@@ -64,7 +64,7 @@ final class EDIFParentNets {
     /** Connectivity recorded for nets is only used if it is from this epoch */
     private volatile int epoch = EDIFNetConnectivity.newEpoch();
 
-    /** What is kept until the netlist changes, null if nothing */
+    /** What is kept until a netlist changes, null if nothing */
     private volatile Results results;
 
     private final Map<EDIFHierNet, EDIFHierNet> parentNetMap = new ParentNetMap();
@@ -77,18 +77,28 @@ final class EDIFParentNets {
         this.netlist = netlist;
     }
 
-    /** What was found for a netlist, until it changes. */
+    /**
+     * What was found for a netlist, until a netlist changes: any netlist, as the cells and nets
+     * of one can be used in another (see {@link EDIFNetConnectivity#netlistChanged()}).
+     */
     private static final class Results {
         /** The top cell inst of the netlist these are for */
         final EDIFCellInst top;
+        /** What {@link EDIFNetConnectivity#keepResults()} returned when these were created */
+        final int changeCount;
         /** The physical pins of the parent nets asked for */
         final Map<EDIFHierNet, List<EDIFHierPortInst>> pins = new ConcurrentHashMap<>();
         volatile StaticPins staticPins;
         volatile AllNets allNets;
         volatile Map<String, String> allNames;
 
-        Results(EDIFCellInst top) {
+        Results(EDIFCellInst top, int changeCount) {
             this.top = top;
+            this.changeCount = changeCount;
+        }
+
+        boolean isFor(EDIFCellInst top) {
+            return this.top == top && EDIFNetConnectivity.isCurrent(changeCount);
         }
     }
 
@@ -122,20 +132,10 @@ final class EDIFParentNets {
         results = null;
     }
 
-    /**
-     * Drops what is kept until the netlist changes. What is recorded for the nets of the netlist
-     * is dropped by the nets that change.
-     */
-    void netlistChanged() {
-        if (results != null) {
-            results = null;
-        }
-    }
-
     /** True if the parent nets of all nets of the netlist are found and kept. */
     boolean isComplete() {
         Results r = results;
-        return r != null && r.allNets != null;
+        return r != null && r.isFor(netlist.getTopCellInst()) && r.allNets != null;
     }
 
     private int getEpoch() {
@@ -156,11 +156,11 @@ final class EDIFParentNets {
         }
         EDIFCellInst top = netlist.getTopCellInst();
         Results r = results;
-        if (r == null || r.top != top) {
+        if (r == null || !r.isFor(top)) {
             synchronized (this) {
                 r = results;
-                if (r == null || r.top != top) {
-                    r = new Results(top);
+                if (r == null || !r.isFor(top)) {
+                    r = new Results(top, EDIFNetConnectivity.keepResults());
                     results = r;
                 }
             }
@@ -179,6 +179,20 @@ final class EDIFParentNets {
         if (net == null) {
             return null;
         }
+        try {
+            return findParentNet(net);
+        } catch (EDIFNetConnectivity.NotRecordedException e) {
+            // The nets do not agree on which of them are connected: those found from this one
+            EDIFHierPortInst source = search(net, null, null);
+            return (source != null) ? source.getHierarchicalNet() : null;
+        }
+    }
+
+    /**
+     * Finds the parent net of a net from what is recorded for the nets of the netlist.
+     * @throws EDIFNetConnectivity.NotRecordedException If that cannot be recorded for a net.
+     */
+    private EDIFHierNet findParentNet(EDIFHierNet net) {
         final int epoch = getEpoch();
         EDIFHierCellInst hierInst = net.getHierarchicalInst();
         EDIFCellInst[] insts = hierInst.getCellInstArray();
@@ -757,26 +771,6 @@ final class EDIFParentNets {
     }
 
     /**
-     * Checks if a net has the port inst for a port of its cell. A net whose port inst was removed
-     * may still be the one that the cell has for the port, but is no longer connected to it.
-     * The port insts of the net are examined in turn, as the search does next.
-     */
-    private static boolean hasPort(EDIFNet net, String portInstName) {
-        EDIFPortInst[] portInsts = net.getPortInstArray();
-        if (portInsts != null) {
-            for (EDIFPortInst portInst : portInsts) {
-                if (portInst == null) {
-                    break;
-                }
-                if (portInst.getCellInst() == null && portInstName.equals(portInst.getName())) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    /**
      * Searches the nets connected to a net, breadth-first: those inside the cell instances on the
      * net, and for a net on a port of its cell, the one outside its instance.
      * @param initialNet The net to start from.
@@ -814,8 +808,8 @@ final class EDIFParentNets {
                     break;
                 }
                 EDIFCellInst cellInst = portInst.getCellInst();
-                String name = portInst.getName();
                 if (cellInst == null) {
+                    String name = EDIFNetConnectivity.getPortInstName(portInst);
                     if (!EDIFNetConnectivity.isConnected(searchInst.inst.getCellType(), name, net)) {
                         // Another net is the one on this port
                         continue;
@@ -843,8 +837,11 @@ final class EDIFParentNets {
                     if (parent == null) {
                         continue;
                     }
+                    // The port inst outside is found by the name it was created with, and may be
+                    // for another bit by now
                     EDIFPortInst outer = searchInst.inst.getPortInst(name);
-                    EDIFNet outerNet = (outer != null) ? outer.getNet() : null;
+                    EDIFNet outerNet = (outer != null && EDIFNetConnectivity.getPortInstName(outer).equals(name))
+                            ? outer.getNet() : null;
                     if (outerNet != null && parent.visit(outerNet)) {
                         instQueue.add(parent);
                         netQueue.add(outerNet);
@@ -866,10 +863,14 @@ final class EDIFParentNets {
                     }
                 }
                 // Down in the hierarchy
-                EDIFNet inner = cellType.getInternalNet(name);
+                // A cell without nets on its ports (as a leaf cell) needs no name. A net whose
+                // port inst was removed may still be the one that the cell has for the port
+                String name = cellType.getInternalNetMap().isEmpty() ? null
+                        : EDIFNetConnectivity.getPortInstName(portInst);
+                EDIFNet inner = (name != null) ? cellType.getInternalNet(name) : null;
                 if (inner != null) {
                     SearchInst child = searchInst.getChild(cellInst);
-                    if (!child.isVisited(inner) && hasPort(inner, name)) {
+                    if (!child.isVisited(inner) && EDIFNetConnectivity.hasPort(inner, name)) {
                         child.visit(inner);
                         instQueue.add(child);
                         netQueue.add(inner);

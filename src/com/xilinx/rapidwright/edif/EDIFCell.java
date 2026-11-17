@@ -597,8 +597,19 @@ public class EDIFCell extends EDIFPropertyObject {
                 newNet.connectivityChanged();
             }
         }
-        if (newNet != null && connectivityWatchers != null) {
-            // The port may be connected inside this cell now
+        if (newNet != null) {
+            portConnected();
+        }
+        EDIFNetConnectivity.netlistChanged();
+    }
+
+    /**
+     * To be called when a port of this cell may have got a net inside this cell: drops what is
+     * recorded for finding parent nets (see {@link EDIFNetConnectivity}) for the nets on a port
+     * of an instance of this cell that had none.
+     */
+    void portConnected() {
+        if (connectivityWatchers != null) {
             Object watchers;
             synchronized (this) {
                 watchers = connectivityWatchers;
@@ -610,7 +621,6 @@ public class EDIFCell extends EDIFPropertyObject {
                 EDIFNetConnectivity.invalidate(watchers);
             }
         }
-        netlistChanged();
     }
 
     /**
@@ -622,7 +632,7 @@ public class EDIFCell extends EDIFPropertyObject {
                 // It was used as a leaf cell, and will no longer be one
                 resetConnectivity();
             }
-            netlistChanged();
+            EDIFNetConnectivity.netlistChanged();
         }
     }
 
@@ -635,7 +645,7 @@ public class EDIFCell extends EDIFPropertyObject {
                 // The pins of its instances are now leaf cell pins
                 resetConnectivity();
             }
-            netlistChanged();
+            EDIFNetConnectivity.netlistChanged();
         }
     }
 
@@ -648,35 +658,20 @@ public class EDIFCell extends EDIFPropertyObject {
                 // Whether a pin of a leaf cell is a source depends on its direction
                 resetConnectivity();
             }
-            netlistChanged();
+            EDIFNetConnectivity.netlistChanged();
         }
     }
 
     /**
-     * Drops everything recorded for finding parent nets (see {@link EDIFNetConnectivity}) in the
-     * netlist of this cell, as it is not known what depends on this cell.
+     * Drops everything recorded for finding parent nets (see {@link EDIFNetConnectivity}), as it
+     * is not known what depends on this cell: in all netlists, as a cell can be instantiated in
+     * a netlist other than its own.
      */
     private void resetConnectivity() {
         synchronized (this) {
             connectivityWatchers = null;
         }
-        EDIFNetlist netlist = getNetlist();
-        if (netlist != null) {
-            netlist.resetParentNetMap();
-        } else {
-            EDIFNetConnectivity.resetAll();
-        }
-    }
-
-    /**
-     * Tells the netlist of this cell, if any, that it has changed, so that it drops the results
-     * it keeps until then.
-     */
-    void netlistChanged() {
-        EDIFNetlist netlist = getNetlist();
-        if (netlist != null) {
-            netlist.connectivityChanged();
-        }
+        EDIFNetConnectivity.resetAll();
     }
 
     /**
@@ -915,7 +910,6 @@ public class EDIFCell extends EDIFPropertyObject {
         if (EDIFNetConnectivity.active) {
             // It is a leaf cell from now on
             resetConnectivity();
-            netlistChanged();
         }
     }
 
