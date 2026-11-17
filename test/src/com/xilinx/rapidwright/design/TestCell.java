@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, 2025-2026, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -23,7 +23,10 @@
 
 package com.xilinx.rapidwright.design;
 
+import java.util.Arrays;
+import java.util.List;
 
+import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
@@ -33,8 +36,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-
-import java.util.List;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestCell {
     @ParameterizedTest
@@ -172,5 +174,42 @@ public class TestCell {
         // Renaming must invalidate that cache; since the netlist contains no logical
         // cell instance by the new name, it must now resolve to null
         Assertions.assertNull(cell.getEDIFHierCellInst());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testGetSitePinFromLogicalPin(boolean createAX) {
+        Design design = new Design("top", Device.PYNQ_Z1);
+        SiteInst si = design.createSiteInst("SLICE_X1Y0");
+        Net net = design.createNet("net");
+        SitePinInst a3 = net.createPin("A3", si);
+        SitePinInst ax = createAX ? net.createPin("AX", si) : null;
+
+        Cell ff = design.createAndPlaceCell("ff", Unisim.FDRE, "SLICE_X1Y0/AFF");
+
+        BELPin ffD = ff.getBEL().getPin("D");
+        for (SitePinInst spi : Arrays.asList(ax, a3)) {
+            if (spi == null) {
+                continue;
+            }
+
+            Assertions.assertNull(DesignTools.getRoutedSitePin(ff, net, "D"));
+            if (createAX) {
+                // Without intra-site routing, the existing AX pin is a valid default for D.
+                Assertions.assertSame(ax, ff.getSitePinFromLogicalPin("D", null));
+            } else {
+                // An unrouted A3 pin is not selected by inferring a LUT route-through.
+                Assertions.assertNull(ff.getSitePinFromLogicalPin("D", null));
+            }
+
+            BELPin bp = spi.getBELPin();
+            Assertions.assertTrue(si.routeIntraSiteNet(net, bp, ffD));
+
+            Assertions.assertEquals(bp.getName(), DesignTools.getRoutedSitePin(ff, net, "D"));
+            // Follow the actual route, including A3 when AX also exists (PR #473).
+            Assertions.assertSame(spi, ff.getSitePinFromLogicalPin("D", null));
+
+            Assertions.assertTrue(si.unrouteIntraSiteNet(bp, ffD));
+        }
     }
 }
