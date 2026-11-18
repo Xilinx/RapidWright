@@ -197,6 +197,10 @@ public class ConeBuilder {
             role = classifier.classify(flat.getCellType(instId));
             roleOfType[typeId] = role;
         }
+        if (role == CellRole.TERMINAL
+                && PrimitiveModelLibrary.isConditional(flat.getCellTypeName(instId))) {
+            return classifier.classify(flat, conn, instId);
+        }
         return role;
     }
 
@@ -427,6 +431,16 @@ public class ConeBuilder {
         PrimitiveModel model = library.get(flat.getCellTypeName(owner));
         int lit = model.build(aig, flat.getIndex(owner), flat.getInst(owner), bit,
                 frameLits[frame]);
+        if (lit == Aig.TRUE && PrimitiveModelLibrary.isConditional(flat.getCellTypeName(owner))) {
+            // A transparent gated clock buffer passes I only once I has been low
+            // after configuration. Logic that makes I constantly high (a tied I
+            // keeps the buffer a terminal) never opens the gate, so the output
+            // is unknown: an unstable variable leaves its loads unproven.
+            log.warn(UNMODELED_OUTPUT, flat.getCellTypeName(owner) + "."
+                    + flat.getIndex(owner).getPortBitName(bit) + " with I constantly high",
+                    flat.getInstName(owner));
+            lit = unstableInput(TerminalKey.OPAQUE_PREFIX, unstablePinName(owner, bit));
+        }
         litOf[pin] = lit;
         state[pin] = BLACK;
         pop();
@@ -661,8 +675,28 @@ public class ConeBuilder {
      * otherwise.
      */
     static NetType pinDefault(Series series, Unisim unisim, String pinName) {
+        NetType tie = listedPinDefault(series, unisim, pinName);
+        return tie == null ? NetType.GND : tie;
+    }
+
+    /** @see #pinDefault(Series, Unisim, String) */
+    static NetType pinDefault(Series series, String typeName, String pinName) {
+        return pinDefault(series, toUnisim(typeName), pinName);
+    }
+
+    /**
+     * @return The tie value the pin default table lists for an unconnected
+     *         pin, or null without a recognised part or for a pin the table
+     *         does not list, where {@link #pinDefault(Series, Unisim, String)}
+     *         falls back to ground.
+     */
+    static NetType listedPinDefault(Series series, String typeName, String pinName) {
+        return listedPinDefault(series, toUnisim(typeName), pinName);
+    }
+
+    private static NetType listedPinDefault(Series series, Unisim unisim, String pinName) {
         if (series == null || unisim == Unisim.GND) {
-            return NetType.GND;
+            return null;
         }
         try {
             // The table names the bits of a bus pin (e.g. RAMB36E2's WEA[0]); a bus
@@ -672,15 +706,10 @@ public class ConeBuilder {
             if (tie == null && !basePin.equals(pinName)) {
                 tie = CellPinStaticDefaults.getCellPinDefault(series, unisim, basePin);
             }
-            return tie == null ? NetType.GND : tie;
+            return tie;
         } catch (RuntimeException e) {
-            return NetType.GND;
+            return null;
         }
-    }
-
-    /** @see #pinDefault(Series, Unisim, String) */
-    static NetType pinDefault(Series series, String typeName, String pinName) {
-        return pinDefault(series, toUnisim(typeName), pinName);
     }
 
     private void push(int pin) {

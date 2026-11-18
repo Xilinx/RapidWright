@@ -87,7 +87,16 @@
  * comparison. Everything between terminals is the <b>combinational cloud</b>:
  * LUTs, wide-function multiplexers, every carry primitive ({@code CARRY4},
  * {@code CARRY8}, {@code LOOKAHEAD8}, {@code MUXCY}, {@code XORCY},
- * {@code LUT6CY}), soft gates and IO buffers.
+ * {@code LUT6CY}), soft gates, IO buffers, and the global clock buffers
+ * {@code BUFG} and {@code BUFG_FABRIC}. A {@code BUFGCE} whose {@code I} is
+ * not tied to a constant, whose {@code CE} is tied active, whose
+ * {@code CE_TYPE} is {@code SYNC} or {@code ASYNC} and that does not set
+ * {@code STARTUP_SYNC}, or a {@code BUFGCE_DIV} that also has
+ * {@code CLR} tied inactive, no {@code HARDSYNC_CLR} and {@code BUFGCE_DIVIDE}
+ * of 1, is a transparent buffer too; with any other control or setting it
+ * stays a terminal, with a warning. Every other clock
+ * buffer (multiplexers, transceiver and processing system buffers, the
+ * multi-output buffers) stays a terminal.
  *
  * <p>Reported as differences: a differing cone function, a terminal present in
  * one netlist only, a terminal whose type or functional attributes changed, and
