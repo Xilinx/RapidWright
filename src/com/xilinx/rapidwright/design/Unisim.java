@@ -33,7 +33,7 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 
 /**
- * Generated on: Tue Jun 09 13:13:33 MDT 2026
+ * Generated on: Wed Nov 11 16:44:19 MST 2026
  * by: com.xilinx.rapidwright.release.UnisimParser
  *
  * Enumerates supported Unisim primitives that map to Xilinx devices.
@@ -191,6 +191,7 @@ public enum Unisim {
     DFE_FIR,
     DFE_MATRIX_FIR,
     DFE_NL_FIR,
+    DFE_POLY,
     DFE_PQ_DECIM,
     DFE_PQ_INTERP,
     DFE_PRACH,
@@ -1391,6 +1392,10 @@ public enum Unisim {
     TEMAC_SINGLE,
     TX_BITSLICE,
     TX_BITSLICE_TRI,
+    UCIE_AP,
+    UCIE_AP_SHIM_BOT,
+    UCIE_AP_SHIM_TOP,
+    UCIE_SP,
     URAM288,
     URAM288E5,
     URAM288E5_BASE,
