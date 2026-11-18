@@ -2,8 +2,10 @@ apply plugin: 'application'
 apply plugin: 'java-library'
 apply plugin: "java-test-fixtures"
 
-sourceCompatibility = 8
-targetCompatibility = 8
+java {
+     sourceCompatibility = JavaVersion.VERSION_1_8
+     targetCompatibility = JavaVersion.VERSION_1_8
+}
 
 repositories {
     if (project.hasProperty('additionalMavenRepo')) {
@@ -36,15 +38,26 @@ dependencies {
   api 'org.capnproto:runtime:0.1.13'
   api 'net.sf.jopt-simple:jopt-simple:5.0.4'
   api 'org.python:jython-standalone:2.7.2'
-  api 'com.google.protobuf:protobuf-java:3.25.0'
+  api 'com.google.ortools:ortools-java:9.14.6206'
+  api 'com.google.protobuf:protobuf-java:4.31.1'
   api 'org.jetbrains:annotations:20.1.0'
   api 'org.zeromq:jeromq:0.5.2'
   api 'commons-cli:commons-cli:1.2'
   api 'org.json:json:20160810'
   api 'com.jcraft:jzlib:1.1.3'
-  api 'commons-io:commons-io:2.11.0'
+  api 'commons-io:commons-io:2.20.0'
+  api 'com.google.guava:guava:33.5.0-jre'
   api 'com.xilinx.rapidwright:qtjambi-'+os+':4.5.2_01'
   api 'com.xilinx.rapidwright:jupyter-kernel-jsr223:1.0.1'
+  if (JavaVersion.current() < JavaVersion.VERSION_17) {
+    // Eclipse ELK doesn't compile to support JDK8 anymore
+    api 'com.xilinx.rapidwright:org.eclipse.elk-deps-jdk8:0.10.0-rc1'
+  } else {
+    api 'org.eclipse.elk:org.eclipse.elk.core:0.10.0'
+    api 'org.eclipse.elk:org.eclipse.elk.graph:0.10.0'
+    api 'org.eclipse.elk:org.eclipse.elk.alg.layered:0.10.0'
+  }
+  api 'com.xilinx.rapidwright:jacl:1.4.1'
   testFixturesApi 'org.junit.jupiter:junit-jupiter-api:5.7.1'
   testFixturesApi 'org.junit.jupiter:junit-jupiter-engine:5.7.1'
   testFixturesApi 'org.junit.jupiter:junit-jupiter-params:5.7.1'
@@ -52,27 +65,24 @@ dependencies {
 }
 //Kryo needs to access sun.nio.ch.DirectBuffer. This is forbidden by default in Java 16 and up. Check if we need to add a jvm arg.
 if (org.gradle.api.JavaVersion.current().isJava10Compatible()) {
-	applicationDefaultJvmArgs = ["--add-exports=java.base/sun.nio.ch=ALL-UNNAMED"]
+   application {
+       applicationDefaultJvmArgs = ["--add-exports=java.base/sun.nio.ch=ALL-UNNAMED"]
+   }
 }
 if(project.hasProperty('limitToSingleProc') && limitToSingleProc.equals("single-threaded")) {
+   application {
 	applicationDefaultJvmArgs << "-XX:ActiveProcessorCount=1"
+   }
 }
 
 
-configurations.implementation.canBeResolved = true
-configurations.testImplementation.canBeResolved = true
-configurations.testFixturesImplementation.canBeResolved = true
-configurations.api.canBeResolved = true
 
 tasks.withType(Test) {
-  if (System.getenv("GITHUB_ACTION")) {
-    maxHeapSize = "5G"
-  } else {
-    maxHeapSize = "10G"
+  maxHeapSize = "10G"
+  application {
+      // Propagate JVM settings to test JVM
+      jvmArgs applicationDefaultJvmArgs
   }
-  //Propagate JVM settings to test JVM
-  jvmArgs applicationDefaultJvmArgs
-
   environment 'RAPIDWRIGHT_PATH', gradle.ext.rapidwrightDir
 
   //We need to rerun tests when the data files change
@@ -87,6 +97,23 @@ task testJava(type:Test) {
 
   useJUnitPlatform()
   systemProperty("junit.jupiter.extensions.autodetection.enabled", true)
+
+  // Run only shard i of n of the tests (-PtestShard=i/n), to split them between CI machines
+  if (project.hasProperty('testShard')) {
+    systemProperty("rapidwright.test.shard", project.property('testShard'))
+  }
+  // Estimated test durations (-PtestDurations=file, as recorded below), to balance the shards
+  if (project.hasProperty('testDurations')) {
+    def testDurations = file(project.property('testDurations'))
+    systemProperty("rapidwright.test.durationsIn", testDurations.absolutePath)
+    // Its contents decide which tests a shard runs (a file collection, as the file may not exist)
+    inputs.files(testDurations).withPropertyName('testDurations')
+  }
+  // Record how long each test method takes, to balance the shards (see TestDurationsListener)
+  if (project.hasProperty('recordTestDurations')) {
+    systemProperty("rapidwright.test.durationsFile",
+                   layout.buildDirectory.file("test-durations/testJava.txt").get().asFile.toString())
+  }
 }
 
 test {
@@ -128,8 +155,62 @@ tasks.withType(Test) {
   finalizedBy remindSubmodules
 }
 
+// Run the examples as smoke tests, since CI otherwise only compiles them.
+// Args are closures because some point into the RapidWrightDCP submodule.
+// That submodule is only initialized once the task graph runs.
+def rwDcp = { String name -> file("test/RapidWrightDCP/${name}").toString() }
+
+ext.exampleRuns = [
+  [name: 'Lesson1'],
+  [name: 'CustomRouting'],
+  [name: 'DecomposeLUT'],
+  [name: 'ExampleNetlistCreation'],
+  [name: 'AddSubGenerator'],
+  [name: 'CounterGenerator'],
+  [name: 'MultGenerator'],
+  [name: 'PipelineGenerator'],
+  [name: 'SLRCrosserGenerator'],
+  [name: 'PipelineGeneratorWithRouting'],
+  [name: 'PolynomialGenerator', args: { -> ['x^2+3*x+5', '16'] }],
+  [name: 'CountRoutedNets', args: { -> [rwDcp('picoblaze_ooc_X10Y235.dcp')] }],
+  [name: 'FindBlackBoxes', args: { -> [rwDcp('picoblaze_ooc_X10Y235.dcp')] }],
+  [name: 'ReportTimingExample', args: { -> [rwDcp('picoblaze_ooc_X10Y235.dcp')] }],
+  [name: 'PrintEDIFInstances', args: { -> [rwDcp('duplicateCellNames.edf'), 'instnames.txt'] }],
+  [name: 'PartRetargeter', args: { -> [rwDcp('picoblaze_ooc_X10Y235.dcp'), 'retargeted.dcp', 'xcvu9p-flgb2104-2-i', '0'] }],
+  [name: 'RelocateHierarchy', args: { -> [rwDcp('picoblaze_ooc_X10Y235.dcp'), '', '0', '5', 'relocated.dcp'] }],
+  [name: 'PicoBlazeArray', args: { -> [rwDcp('PicoBlazeArray'), 'xcvu3p-ffvc1517-2-i', 'picoblaze_array.dcp', '--no_hand_placer'] }],
+]
+
+def exampleTasks = ext.exampleRuns.collect { ex ->
+  tasks.register("runExample${ex.name}", JavaExec) {
+    group = "verification"
+    description = "Run the ${ex.name} example as a smoke test"
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = "com.xilinx.rapidwright.examples.${ex.name}"
+    jvmArgs application.applicationDefaultJvmArgs
+    def exWorkingDir = file("${buildDir}/examples/${ex.name}")
+    workingDir = exWorkingDir
+    // Without this, FileTools.getRapidWrightPath() falls back to build/classes/java.
+    // Examples using the timing model then can't find the repo's timing data directory.
+    environment 'RAPIDWRIGHT_PATH', projectDir.toString()
+    dependsOn initSubmodules
+    doFirst {
+      project.mkdir(exWorkingDir)
+      if (ex.args) {
+        args = ex.args.call()
+      }
+    }
+  }
+}
+
+task runExamples {
+  group = "verification"
+  description = "Run the examples listed in exampleRuns as smoke tests"
+  dependsOn exampleTasks
+}
+
 task testJar(type: Jar) {
-    classifier = 'tests'
+    archiveClassifier = 'tests'
     from sourceSets.test.output
     dependsOn project.tasks.findByName('testFixturesJar')
     dependsOn project.tasks.findByName('jar')
@@ -143,6 +224,10 @@ task testLsf(type: JavaExec) {
   mainClass = "com.xilinx.rapidwright.util.lsf.LaunchTestsOnLsf"
   workingDir = file("build/test-lsf")
   args project.tasks.findByName('testJar').getArchiveFile().get()
+  // Estimated test durations (e.g. build/test-lsf/test-durations.txt kept from an earlier run), to balance the jobs
+  if (project.hasProperty('lsfTestDurations')) {
+    systemProperty 'rapidwright.test.durationsIn', file(project.property('lsfTestDurations')).absolutePath
+  }
   doFirst {
     project.mkdir(workingDir)
   }

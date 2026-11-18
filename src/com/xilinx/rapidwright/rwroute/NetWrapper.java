@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -27,7 +27,10 @@ package com.xilinx.rapidwright.rwroute;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.device.Node;
 
 /**
  * A wrapper class of {@link Net} with additional information for the router.
@@ -44,14 +47,18 @@ public class NetWrapper{
     private float yCenter;
     /** The half-perimeter wirelength */
     private short doubleHpwl;
+    boolean noAltSourceFound;
+    private RouteNode sourceRnode;
+    private RouteNode altSourceRnode;
 
     public NetWrapper(int id, Net net) {
         this.id = id;
         this.net = net;
         connections = new ArrayList<>();
+        noAltSourceFound = false;
     }
 
-    public void computeHPWLAndCenterCoordinates(int[] nextLagunaColumn, int[] prevLagunaColumn) {
+    public void computeHPWLAndCenterCoordinates(RouteNodeGraph routingGraph) {
         int xMin = Integer.MAX_VALUE;
         int yMin = Integer.MAX_VALUE;
         int xMax = Integer.MIN_VALUE;
@@ -60,8 +67,10 @@ public class NetWrapper{
         int ySum = 0;
         int count = 0;
         boolean sourceRnodeAdded = false;
+        boolean crossSLR = false;
         for (Connection connection : connections) {
             if (connection.isDirect()) continue;
+            crossSLR |= connection.isCrossSLR();
             if (!sourceRnodeAdded) {
                 short x = connection.getSourceRnode().getEndTileXCoordinate();
                 short y = connection.getSourceRnode().getEndTileYCoordinate();
@@ -69,15 +78,6 @@ public class NetWrapper{
                 yMin = Integer.min(yMin, y);
                 xMax = Integer.max(xMax, x);
                 yMax = Integer.max(yMax, y);
-
-                if (connection.isCrossSLR()) {
-                    // For SLR-crossing connections, ensure it contains at least one Laguna column
-                    int nextLaguna = nextLagunaColumn[xMin];
-                    int prevLaguna = prevLagunaColumn[xMax];
-                    xMin = (short) Math.min(xMin, prevLaguna);
-                    xMax = (short) Math.max(xMax, nextLaguna);
-                }
-
                 xSum += x;
                 ySum += y;
                 sourceRnodeAdded = true;
@@ -92,6 +92,16 @@ public class NetWrapper{
             xSum += x;
             ySum += y;
             count++;
+        }
+
+        if (crossSLR) {
+            // As for each connection's bounding box (see Connection.computeConnectionBoundingBox()): for nets with an
+            // SLR-crossing connection, ensure it contains at least one column from which super long lines can cross
+            // SLRs (Laguna on UltraScale/UltraScale+, SLL on Versal), and is at least as high as a super long line
+            int widenedXMin = routingGraph.getCrossingWidenedXMin(xMin, xMax);
+            xMax = routingGraph.getCrossingWidenedXMax(xMin, xMax);
+            xMin = widenedXMin;
+            yMax = Math.max(yMax, yMin + routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
         }
 
         doubleHpwl = (short) ((xMax - xMin + 1 + yMax - yMin + 1) * 2);
@@ -128,4 +138,82 @@ public class NetWrapper{
         return id;
     }
 
+    public RouteNode getSourceRnode() {
+        return sourceRnode;
+    }
+
+    public void setSourceRnode(RouteNode sourceRnode) {
+        this.sourceRnode = sourceRnode;
+    }
+
+    public SitePinInst getOrCreateAlternateSource(RouteNodeGraph routingGraph) {
+        if (noAltSourceFound) {
+            return null;
+        }
+
+        SitePinInst altSource = net.getAlternateSource();
+        if (altSource == null) {
+            altSource = DesignTools.getLegalAlternativeOutputPin(net);
+            if (altSource == null) {
+                noAltSourceFound = true;
+                return null;
+            }
+
+            net.addPin(altSource);
+            DesignTools.routeAlternativeOutputSitePin(net, altSource);
+        }
+        if (altSourceRnode == null) {
+            Node altSourceNode = RouterHelper.projectOutputPinToINTNode(altSource);
+            if (altSourceNode == null) {
+                noAltSourceFound = true;
+                return null;
+            }
+            routingGraph.checkSourceSideKnown(altSourceNode);
+
+            if (routingGraph.isPreserved(altSourceNode)) {
+                noAltSourceFound = true;
+                return null;
+            }
+
+            altSourceRnode = routingGraph.getOrCreate(altSourceNode, RouteNodeType.EXCLUSIVE_SOURCE);
+        }
+        assert(altSourceRnode != null);
+        return altSource;
+    }
+
+    public RouteNode getAltSourceRnode() {
+        return altSourceRnode;
+    }
+
+    public boolean hasMultipleDrivers(int sequence) {
+        for (Connection connection : connections) {
+            List<RouteNode> rnodes = connection.getRnodes();
+            if (rnodes.isEmpty()) {
+                continue;
+            }
+
+            // Nodes run from the sink to the source, which has no driver (and may drive
+            // the first node of each connection's route differently)
+            RouteNode driver = rnodes.get(rnodes.size() - 1);
+            for (int i = rnodes.size() - 2; i >= 0; i--) {
+                assert(driver != null);
+                RouteNode rnode = rnodes.get(i);
+                if (rnode.isVisited(sequence)) {
+                    // Rnode has already been visited by a prior connection;
+                    // check if driver is same as this connection
+                    RouteNode prev = rnode.getPrev();
+                    if (prev != driver) {
+                        return true;
+                    }
+                } else {
+                    // Rnode has not been visited by this net yet,
+                    // set initial prev
+                    rnode.setVisited(sequence);
+                    rnode.setPrev(driver);
+                }
+                driver = rnode;
+            }
+        }
+        return false;
+    }
 }

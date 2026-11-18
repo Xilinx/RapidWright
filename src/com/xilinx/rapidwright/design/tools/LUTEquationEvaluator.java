@@ -70,6 +70,9 @@ public class LUTEquationEvaluator {
     }
 
     public boolean eval(int row) {
+        if (equation == null) {
+            return false;
+        }
         pos = 0;
         setRow(row);
         nextChar();

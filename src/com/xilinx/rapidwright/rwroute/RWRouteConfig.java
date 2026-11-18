@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -48,7 +48,7 @@ public class RWRouteConfig {
     private short extensionXIncrement;
     /** Wirelength-driven weighting factor */
     private float wirelengthWeight;
-    /** Timing-driven weighting factor */
+    /** Timing weight: a connection's delay is weighted its criticality * (1 - timingWeight) per 100ps */
     private float timingWeight;
     /** The multiplier for timing weight update along iterations */
     private float timingMultiplier;
@@ -94,6 +94,18 @@ public class RWRouteConfig {
     private boolean lutRoutethru;
     /* true to enable GND -> VCC optimization for LUT inputs */
     private boolean invertGndToVccForLutInputs;
+    /* true to use HUS */
+    private boolean hus;
+    /* The value of alpha in HUS*/
+    private float husAlpha;
+    /* The value of Beta in HUS*/
+    private float husBeta;
+    /* The threshold for determining whether a case is a congested design in HUS */
+    private float husInitialCongestedThreshold;
+    /* The threshold for determining whether to start using historical-centric updating in HUS */
+    private float husActivateThreshold;
+    /* PBlock within which RWRoute must stay within */
+    private String pblock;
 
     /** Constructs a Configuration Object */
     public RWRouteConfig(String[] arguments) {
@@ -111,8 +123,8 @@ public class RWRouteConfig {
         criticalityExponent = 3;
         minRerouteCriticality = 0.85f;
         reroutePercentage = (short) 3;
-        initialPresentCongestionFactor = 0.5f;
-        presentCongestionMultiplier = 2f;
+        initialPresentCongestionFactor = 2f;
+        presentCongestionMultiplier = 1.3f;
         historicalCongestionFactor = 1f;
         timingDriven = true;
         clkRouteTiming = null;
@@ -125,6 +137,11 @@ public class RWRouteConfig {
         lutPinSwapping = false;
         lutRoutethru = false;
         invertGndToVccForLutInputs = true;
+        hus = false;
+        husAlpha = 1.1f;
+        husBeta = 2f;
+        husInitialCongestedThreshold = 0.5f;
+        husActivateThreshold = 0.4f;
         if (arguments != null) {
             parseArguments(arguments);
         }
@@ -232,6 +249,24 @@ public class RWRouteConfig {
                 break;
             case "--noInvertGndToVccForLutInputs":
                 setInvertGndToVccForLutInputs(false);
+                break;
+            case "--hus":
+                setHus(true);
+                break;
+            case "--husAlpha":
+                setHusAlpha(Float.parseFloat(arguments[++i]));
+                break;
+            case "--husBeta":
+                setHusBeta(Float.parseFloat(arguments[++i]));
+                break;
+            case "--husInitialCongestedThreshold":
+                setHusInitialCongestedThreshold(Float.parseFloat(arguments[++i]));
+                break;
+            case "--husActivateThreshold":
+                setHusActivateThreshold(Float.parseFloat(arguments[++i]));
+                break;
+            case "--pblock":
+                setPBlock(arguments[++i]);
                 break;
             default:
                 throw new IllegalArgumentException("ERROR: RWRoute argument '" + arg + "' not recognized.");
@@ -406,20 +441,27 @@ public class RWRouteConfig {
     }
 
     /**
-     * Gets the timing-driven weighting factor used in the cost function.
-     * It should be within [0, 1]. The greater it is, the faster the router will run, at the cost of a greater critical path delay.
+     * Gets the timing weight, which sets how much a connection's delay counts against its congestion and wirelength:
+     * its delay, both that of the path so far and the estimate of what is still to come, is weighted its criticality
+     * times (1 - timingWeight) per 100ps, while its congestion and wirelength are weighted (1 - criticality) (see
+     * {@link #getCriticalityExponent()}).
+     * It should be within [0, 1]. The greater it is, the faster the router will run, at the cost of a greater critical
+     * path delay. E.g. on four UltraScale+ designs (bnn, optical-flow, boom_medium_routed and vtr_mcml), 0 gave a
+     * critical path delay about 1.5% lower than the default, for about 10% more routing time; above about 0.5, it was
+     * about 2% higher.
      * Default: 0.35. Can be modified by using "--timingWeight" option, e.g. "--timingWeight 0.4".
-     * @return The timing-driven weighting factor used in the cost function
+     * @return The timing weight.
      */
     public float getTimingWeight() {
         return timingWeight;
     }
 
     /**
-     * Sets the timing-driven weighting factor used in the cost function.
-     * It should be within [0, 1]. The greater it is, the faster the router will run, at the cost of a greater critical path delay.
+     * Sets the timing weight (see {@link #getTimingWeight()}).
+     * It should be within [0, 1]. The greater it is, the faster the router will run, at the cost of a greater critical
+     * path delay.
      * Default: 0.35. Can be modified by using "--timingWeight" option, e.g. "--timingWeight 0.4".
-     * @param timingWeight The timing-driven weighting factor used in the cost function.
+     * @param timingWeight The timing weight.
      */
     public void setTimingWeight(float timingWeight) {
         if (timingWeight < 0 || timingWeight > 1)
@@ -438,8 +480,8 @@ public class RWRouteConfig {
 
     /**
      * Sets the multiplier for timingWeight. This is an experimental feature for future adaptive timingWeight.
-     * The idea is to have less timingWeight in early routing iterations for faster runtime and put more weight on the timing cost
-     * in late iterations for better timing performance.
+     * The timing weight is multiplied by it at each timing update, up to 1. As delay is weighted (1 - timingWeight) (see
+     * {@link #getTimingWeight()}), a multiplier greater than 1 puts less weight on delay in later routing iterations.
      * Currently, the default timingMultiplier is 1.
      * Can be modified by using "--timingMultiplier" option, e.g. "--timingMultiplier 1.02".
      * @param timingMultiplier A multiplier greater than 1 to increase timingWeight along routing iterations.
@@ -475,7 +517,13 @@ public class RWRouteConfig {
     /**
      * Gets the criticality exponent that is used in calculating connections' criticalities to
      * spread the criticalities of less critical connections and more critical connections apart.
-     * It should be greater than 1. Default: 3.
+     * A connection's criticality is what weighs its delay against its congestion and wirelength (see
+     * {@link #getTimingWeight()}): the lower the exponent, the more critical a near-critical connection, and so the
+     * lower the critical path delay, at the cost of wirelength and runtime. E.g. on four UltraScale+ designs (bnn,
+     * optical-flow, boom_medium_routed and vtr_mcml), 2 with a timing weight of 0 gave a critical path delay about 2.6%
+     * lower than the defaults, for 1.5% more wirelength and 1.23 times the routing time; 1.25 with a timing weight of 0,
+     * about 4.6% lower, for 4.5% more wirelength and 1.65 times the routing time.
+     * It should be at least 1. Default: 3.
      * Can be modified by using "--criticalityExponent" option, e.g. "--criticalityExponent 5".
      * @return The criticality exponent.
      */
@@ -485,8 +533,9 @@ public class RWRouteConfig {
 
     /**
      * Sets the criticality exponent that is used in calculating connections' criticalities to
-     * spread the criticalities of less critical connections and more critical connections apart.
-     * It should be greater than 1. Default: 3.
+     * spread the criticalities of less critical connections and more critical connections apart
+     * (see {@link #getCriticalityExponent()}).
+     * It should be at least 1. Default: 3.
      * Can be modified by using "--criticalityExponent" option, e.g. "--criticalityExponent 5".
      * @param criticalityExponent
      */
@@ -542,7 +591,7 @@ public class RWRouteConfig {
 
     /**
      * Gets the initial present congestion cost penalty factor.
-     * It should be greater than 0. Default: 0.5.
+     * It should be greater than 0. Default: 2.
      * Can be modified by using "--initialPresentCongestionFactor" option, e.g. "--initialPresentCongestionFactor 1".
      * @return The initial present congestion cost penalty factor.
      */
@@ -552,7 +601,7 @@ public class RWRouteConfig {
 
     /**
      * Sets the initial present congestion cost penalty factor.
-     * It should be greater than 0. Default: 0.5.
+     * It should be greater than 0. Default: 2.
      * Can be modified by using "--initialPresentCongestionFactor" option, e.g. "--initialPresentCongestionFactor 1".
      * @param initialPresentCongestionFactor The value to set.
      */
@@ -564,7 +613,7 @@ public class RWRouteConfig {
 
     /**
      * Gets the present congestion factor multiplier.
-     * It should be greater than 1. Default: 2.
+     * It should be greater than 1. Default: 1.3.
      * Can be modified by using "--presentCongestionMultiplier" option, e.g. "--presentCongestionMultiplier 3".
      * @return
      */
@@ -574,7 +623,7 @@ public class RWRouteConfig {
 
     /**
      * Sets the present congestion factor multiplier.
-     * It should be greater than 1. Default: 2.
+     * It should be greater than 1. Default: 1.3.
      * Can be modified by using "--presentCongestionMultiplier" option, e.g. "--presentCongestionMultiplier 3".
      * @param presentCongestionMultiplier
      */
@@ -886,6 +935,120 @@ public class RWRouteConfig {
         this.verbose = verbose;
     }
 
+    /** Checks if the hybrid updating strategy (HUS) is enabled.
+     *  HUS will, once its user-configurable thresholds are met, slow down the growth of present costs of used nodes and
+     *  instead increases the growth of overused nodes' historical costs.
+     *  Default: false.
+     */
+    public boolean isHus() {
+        return hus;
+    }
+
+    /**
+     * Sets whether hybrid updating strategy (HUS) is enabled.
+     * HUS will, once its user-configurable thresholds are met, slow down the growth of present costs of used nodes and
+     *  instead increases the growth of overused nodes' historical costs.
+     * Default: false.
+     * @param hus true to enable the hybrid updating strategy (HUS)
+     */
+    public void setHus(boolean hus) {
+        this.hus = hus;
+    }
+
+    /**
+     * Gets the value of alpha in the hybrid updating strategy (HUS)
+     * Default: 1.1
+     * @return the value of alpha in the hybrid updating strategy (HUS)
+     */
+    public float getHusAlpha() {
+        return husAlpha;
+    }
+
+    /**
+     * Sets the value of alpha in the hybrid updating strategy (HUS)
+     * Default: 1.1
+     * @param husAlpha the value of alpha in the hybrid updating strategy (HUS)
+     */
+    public void setHusAlpha(float husAlpha) {
+        this.husAlpha = husAlpha;
+    }
+
+    /**
+     * Gets the value of beta in the hybrid updating strategy (HUS)
+     * Default: 2.0
+     * @return the value of beta in the hybrid updating strategy (HUS)
+     */
+    public float getHusBeta() {
+        return husBeta;
+    }
+
+    /**
+     * Sets the value of beta in the hybrid updating strategy (HUS)
+     * Default: 2.0
+     * @param husBeta the value of beta in the hybrid updating strategy (HUS)
+     */
+    public void setHusBeta(float husBeta) {
+        this.husBeta = husBeta;
+    }
+
+    /**
+     * Gets the threshold (number of overused nodes at the end of routing iteration 1 divided by
+     * total number of connections to be routed) above which a design is congested enough to consider HUS
+     * Default: 0.5
+     * @return the threshold for determining whether a design is congested enough to consider HUS
+     */
+    public float getHusInitialCongestedThreshold() {
+        return husInitialCongestedThreshold;
+    }
+
+    /**
+     * Sets the threshold (number of overused nodes at the end of routing iteration 1 divided by
+     * total number of connections to be routed) above which a design is congested enough to consider HUS
+     * Default: 0.5
+     * @param husInitialCongestedThreshold the threshold for determining whether a design is congested enough to consider HUS
+     */
+    public void setHusInitialCongestedThreshold(float husInitialCongestedThreshold) {
+        this.husInitialCongestedThreshold = husInitialCongestedThreshold;
+    }
+
+    /**
+     * Gets the threshold (number of congested connections at the end of the routing iteration divided by
+     * total number of connections to be routed) below which HUS will be activated
+     * Default: 0.4
+     * @return the threshold for determining whether to activate HUS
+     */
+    public float getHusActivateThreshold() {
+        return husActivateThreshold;
+    }
+
+    /**
+     * Sets the threshold (number of congested connections at the end of the routing iteration divided by
+     * total number of connections to be routed) below which HUS will be activated
+     * Default: 0.4
+     * @param husActivateThreshold the threshold for determining whether to activate HUS
+     */
+    public void setHusActivateThreshold(float husActivateThreshold) {
+        this.husActivateThreshold = husActivateThreshold;
+    }
+
+    /**
+     * Sets the PBlock (e.g. SLICE_X0Y0:SLICE_X60Y119) which RWRoute must route within.
+     * Default: null (no PBlock)
+     * @param pblock String describing the PBlock which RWRoute must route within.
+     */
+    public void setPBlock(String pblock) {
+        this.pblock = pblock;
+    }
+
+    /**
+     * Gets the PBlock (e.g. SLICE_X0Y0:SLICE_X60Y119) which RWRoute must route within.
+     * Default: null (no PBlock)
+     * @returns pblock String describing the PBlock which RWRoute must route within.
+     */
+    public String getPBlock() {
+        return pblock;
+    }
+
     @Override
     public String toString() {
         StringBuilder s = new StringBuilder();
@@ -922,6 +1085,13 @@ public class RWRouteConfig {
         s.append(MessageGenerator.formatString("Historical congestion factor: ", historicalCongestionFactor));
         s.append(MessageGenerator.formatString("LUT pin swapping: ", isLutPinSwapping()));
         s.append(MessageGenerator.formatString("LUT routethrus: ", isLutRoutethru()));
+        s.append(MessageGenerator.formatString("Use Hybrid Updating Strategy: ", isHus()));
+        if (isHus()) {
+            s.append(MessageGenerator.formatString("HUS alpha: ", husAlpha));
+            s.append(MessageGenerator.formatString("HUS beta: ", husBeta));
+            s.append(MessageGenerator.formatString("HUS initial congested threshold: ", husInitialCongestedThreshold));
+            s.append(MessageGenerator.formatString("HUS activate threshold: ", husActivateThreshold));
+        }
 
         return s.toString();
     }

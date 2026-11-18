@@ -29,6 +29,8 @@ import java.util.Objects;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.design.Module;
+import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.BELPin;
@@ -42,7 +44,7 @@ import org.jetbrains.annotations.NotNull;
  *
  * Created on: Sep 12, 2017
  */
-public class EDIFHierPortInst {
+public class EDIFHierPortInst implements Comparable<EDIFHierPortInst> {
 
     @NotNull
     private final EDIFHierCellInst hierarchicalInst;
@@ -71,6 +73,15 @@ public class EDIFHierPortInst {
     }
 
     /**
+     * Gets the full instance, including the instance of the EDIFPortInst.
+     * 
+     * @return
+     */
+    public EDIFHierCellInst getFullHierarchicalInst() {
+        return hierarchicalInst.getChild(portInst.getCellInst());
+    }
+
+    /**
      * Gets the net on the port inst
      * @return The net on the port inst
      */
@@ -88,10 +99,13 @@ public class EDIFHierPortInst {
             return hierarchicalInst.getFullHierarchicalInstName();
         }
 
-        EDIFCellInst topCellInst = portInst.getCellInst().getCellType().getLibrary().getNetlist().getTopCellInst();
-        if (portInst.getCellInst() == topCellInst) {
-            //Outward side of top
-            return "";
+        EDIFLibrary library = portInst.getCellInst().getCellType().getLibrary();
+        if (!library.isHDIPrimitivesLibrary()) {
+            EDIFCellInst topCellInst = library.getNetlist().getTopCellInst();
+            if (portInst.getCellInst() == topCellInst) {
+                // Outward side of top
+                return "";
+            }
         }
 
         StringBuilder sb = new StringBuilder();
@@ -195,6 +209,17 @@ public class EDIFHierPortInst {
     }
 
     /**
+     * Gets the routed site pin if this port is on a placed leaf cell and its' site is routed
+     * @param module The current module
+     * @return The connected site pin to the connected to this cell pin.
+     */
+    public SitePinInst getRoutedSitePinInst(Module module) {
+        Cell cell = getPhysicalCell(module);
+        if (cell == null) return null;
+        return cell.getSitePinFromPortInst(getPortInst(), null);
+    }
+
+    /**
      * Gets the physical cell to which this port instance has been placed
      * @param design The design corresponding to the implementation of this port instance's netlist
      * @return The placed physical cell mapped for this port instance or null if none could be found
@@ -202,6 +227,17 @@ public class EDIFHierPortInst {
     public Cell getPhysicalCell(Design design) {
         String cellName = getFullHierarchicalInstName();
         Cell cell = design.getCell(cellName);
+        return cell;
+    }
+
+    /**
+     * Gets the physical cell to which this port instance has been placed
+     * @param module The module corresponding to the implementation of this port instance's netlist
+     * @return The placed physical cell mapped for this port instance or null if none could be found
+     */
+    public Cell getPhysicalCell(Module module) {
+        String cellName = getFullHierarchicalInstName();
+        Cell cell = module.getCell(cellName);
         return cell;
     }
 
@@ -215,6 +251,21 @@ public class EDIFHierPortInst {
         if (cell == null) return null;
         BELPin belPin = cell.getBELPin(this);
         return new Pair<>(cell.getSiteInst(), belPin);
+    }
+    
+    /**
+     * If the site wire adjacent to the belpin occupied by the port instance is
+     * populated with a physical net, this method will return it.
+     * 
+     * @param design The current design.
+     * @return The physical net if the bel pin is routed.
+     */
+    public Net getRoutedPhysicalNet(Design design) {
+        Cell cell = getPhysicalCell(design);
+        if (cell == null) return null;
+        BELPin belPin = cell.getBELPin(this);
+        SiteInst si = cell.getSiteInst();
+        return si != null ? si.getNetFromSiteWire(belPin.getSiteWireName()) : null;
     }
 
     /**
@@ -267,5 +318,10 @@ public class EDIFHierPortInst {
 
     public EDIFCell getParentCell() {
         return hierarchicalInst.getCellType();
+    }
+
+    @Override
+    public int compareTo(EDIFHierPortInst o) {
+        return this.toString().compareTo(o.toString());
     }
 }

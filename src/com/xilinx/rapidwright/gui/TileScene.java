@@ -416,6 +416,9 @@ public class TileScene extends QGraphicsScene{
         return tmp;
     }
 
+    public QPointF getTilePoint(Tile tile) {
+        return new QPointF(getDrawnTileX(tile) * tileSize, getDrawnTileY(tile) * tileSize);
+    }
 
     public Design getDesign() {
         return design;

@@ -79,7 +79,7 @@ public class RTLStubGenerator {
             for (int i=0; i < ports.length; i++) {
                 EDIFPort p = ports[i];
                 String dir = p.getDirection().name().toLowerCase();
-                String range = p.getWidth() == 1 ? "" : "[" + p.getLeft() + ":" + p.getRight() +"]";
+                String range = p.isBus() ? "[" + p.getLeft() + ":" + p.getRight() + "]" : "";
                 out.write(("  " + dir + " " + range + p.getBusName() + ";\n").getBytes());
             }
             out.write("endmodule\n".getBytes());
@@ -101,7 +101,7 @@ public class RTLStubGenerator {
                 EDIFPort p = ports[i];
                 String dir = p.getDirection().name().toLowerCase().replace("put", "");
                 String type = " STD_LOGIC";
-                if (p.getWidth() > 1) {
+                if (p.isBus()) {
                     String endian = p.getLeft() > p.getRight() ? " downto " : " to ";
                     type = " STD_LOGIC_VECTOR ( " + p.getLeft() + endian + p.getRight() + " )";
                 }

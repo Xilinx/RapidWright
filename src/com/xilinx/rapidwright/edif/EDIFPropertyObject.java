@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 
 /**
  * All EDIF netlist objects that can possess properties inherit from this
@@ -41,7 +42,37 @@ import java.util.Map.Entry;
  */
 public class EDIFPropertyObject extends EDIFName {
 
-    private Map<String,EDIFPropertyValue> properties;
+    /**
+     * Maximum number of entries kept in the compact array representation before
+     * the backing store is promoted to a {@link HashMap}. Chosen comfortably
+     * above the typical EDIF object property count (the overwhelming majority
+     * have fewer than 8) so promotion only affects rare large-property objects
+     * (e.g. transceiver primitives), while bounding the worst-case linear-scan
+     * length.
+     */
+    static final int PROMOTE_THRESHOLD = 16;
+
+    /**
+     * Inlined property storage. Rather than holding a separate map object per
+     * netlist object (which would cost an extra object header + reference for
+     * every property-bearing object), the properties are stored directly in this
+     * single field, which is one of:
+     * <ul>
+     *   <li>{@code null} - no properties;</li>
+     *   <li>an {@code Object[]} of alternating key/value entries
+     *       ({@code [k0, v0, k1, v1, ...]}) - the memory-compact representation
+     *       used for small property sets (lookup is a linear scan); or</li>
+     *   <li>a {@code HashMap<String,EDIFPropertyValue>} - used once the entry
+     *       count exceeds {@link #PROMOTE_THRESHOLD}, restoring amortized O(1)
+     *       access for the rare large-property objects.</li>
+     * </ul>
+     * {@link #getPropertiesMap()} exposes a lightweight {@link EDIFPropertyMap}
+     * view over this field that implements the full {@link Map} contract.
+     *
+     * This storage is not thread-safe (neither was the previous map); a single
+     * EDIF object's properties are only ever mutated by one thread during parsing.
+     */
+    private Object propertyData;
 
     public EDIFPropertyObject(String name) {
         super(name);
@@ -49,11 +80,16 @@ public class EDIFPropertyObject extends EDIFName {
 
     public EDIFPropertyObject(EDIFPropertyObject obj) {
         super(obj);
-        properties = obj.createDuplicatePropertiesMap();
+        copyPropertiesFrom(obj);
     }
 
     protected EDIFPropertyObject() {
 
+    }
+
+    @SuppressWarnings("unchecked")
+    private static HashMap<String, EDIFPropertyValue> asMap(Object d) {
+        return (HashMap<String, EDIFPropertyValue>) d;
     }
 
     /**
@@ -127,8 +163,27 @@ public class EDIFPropertyObject extends EDIFName {
      * @return The old property value or null if none existed
      */
     public EDIFPropertyValue removeProperty(String key) {
-        if (properties == null) return null;
-        return properties.remove(key);
+        Object d = propertyData;
+        if (d == null) return null;
+        if (d instanceof HashMap) {
+            return asMap(d).remove(key);
+        }
+        Object[] a = (Object[]) d;
+        for (int i = 0; i < a.length; i += 2) {
+            if (a[i].equals(key)) {
+                EDIFPropertyValue old = (EDIFPropertyValue) a[i + 1];
+                if (a.length == 2) {
+                    propertyData = null;
+                } else {
+                    Object[] n = new Object[a.length - 2];
+                    System.arraycopy(a, 0, n, 0, i);
+                    System.arraycopy(a, i + 2, n, i, a.length - i - 2);
+                    propertyData = n;
+                }
+                return old;
+            }
+        }
+        return null;
     }
 
     /**
@@ -138,44 +193,168 @@ public class EDIFPropertyObject extends EDIFName {
      * @return Old property value for the provided key
      */
     public EDIFPropertyValue addProperty(String key, EDIFPropertyValue value) {
-        if (properties == null) properties = getNewMap();
-        return properties.put(key, value);
+        Objects.requireNonNull(key, "EDIF property key cannot be null");
+        Object d = propertyData;
+        if (d == null) {
+            propertyData = new Object[] { key, value };
+            return null;
+        }
+        if (d instanceof HashMap) {
+            return asMap(d).put(key, value);
+        }
+        Object[] a = (Object[]) d;
+        for (int i = 0; i < a.length; i += 2) {
+            if (a[i].equals(key)) {
+                EDIFPropertyValue old = (EDIFPropertyValue) a[i + 1];
+                a[i + 1] = value;
+                return old;
+            }
+        }
+        // New key. Promote to a HashMap first if we would exceed the compact threshold.
+        if ((a.length >> 1) >= PROMOTE_THRESHOLD) {
+            HashMap<String, EDIFPropertyValue> m = new HashMap<>(a.length);
+            for (int i = 0; i < a.length; i += 2) {
+                m.put((String) a[i], (EDIFPropertyValue) a[i + 1]);
+            }
+            m.put(key, value);
+            propertyData = m;
+            return null;
+        }
+        Object[] n = new Object[a.length + 2];
+        System.arraycopy(a, 0, n, 0, a.length);
+        n[a.length] = key;
+        n[a.length + 1] = value;
+        propertyData = n;
+        return null;
     }
 
     public EDIFPropertyValue getProperty(String key) {
-        if (properties == null) return null;
-        return properties.get(key);
+        Object d = propertyData;
+        if (d == null) return null;
+        if (d instanceof HashMap) {
+            return asMap(d).get(key);
+        }
+        Object[] a = (Object[]) d;
+        for (int i = 0; i < a.length; i += 2) {
+            if (a[i].equals(key)) {
+                return (EDIFPropertyValue) a[i + 1];
+            }
+        }
+        return null;
     }
 
     /**
-     * Creates a completely new copy of the map
-     * @return
+     * Gets the number of properties on this object without materializing a map.
+     * @return The number of properties.
+     */
+    public int getPropertyCount() {
+        Object d = propertyData;
+        if (d == null) return 0;
+        if (d instanceof HashMap) return asMap(d).size();
+        return ((Object[]) d).length >> 1;
+    }
+
+    /**
+     * Package-private raw accessor used by the {@link EDIFPropertyMap} view. The
+     * returned object is {@code null}, an {@code Object[]} of alternating
+     * key/value entries, or a {@code HashMap}.
+     */
+    protected Object getRawPropertyData() {
+        return propertyData;
+    }
+
+    /**
+     * Package-private bulk clear used by the {@link EDIFPropertyMap} view.
+     */
+    protected void clearProperties() {
+        propertyData = null;
+    }
+
+    /**
+     * Creates a completely new copy of the properties (with copied values).
+     * @return A new map of the properties, or null if this object has none.
      */
     public Map<String, EDIFPropertyValue> createDuplicatePropertiesMap() {
-        if (properties == null) return null;
-        Map<String, EDIFPropertyValue> newMap = new HashMap<>();
-        for (Entry<String, EDIFPropertyValue> e : properties.entrySet()) {
-            newMap.put(e.getKey(), new EDIFPropertyValue(e.getValue()));
+        Object d = propertyData;
+        if (d == null) return null;
+        Map<String, EDIFPropertyValue> newMap = new HashMap<>(getPropertyCount() * 2);
+        if (d instanceof HashMap) {
+            for (Entry<String, EDIFPropertyValue> e : asMap(d).entrySet()) {
+                newMap.put(e.getKey(), new EDIFPropertyValue(e.getValue()));
+            }
+        } else {
+            Object[] a = (Object[]) d;
+            for (int i = 0; i < a.length; i += 2) {
+                newMap.put((String) a[i], new EDIFPropertyValue((EDIFPropertyValue) a[i + 1]));
+            }
         }
         return newMap;
     }
 
-    /**
-     * Get all properties in native format
-     */
-    public Map<String, EDIFPropertyValue> getPropertiesMap() {
-        if (properties == null) {
-            return Collections.emptyMap();
+    private void copyPropertiesFrom(EDIFPropertyObject obj) {
+        Object d = obj.propertyData;
+        if (d == null) return;
+        if (d instanceof HashMap) {
+            for (Entry<String, EDIFPropertyValue> e : asMap(d).entrySet()) {
+                addProperty(e.getKey(), new EDIFPropertyValue(e.getValue()));
+            }
+        } else {
+            Object[] a = (Object[]) d;
+            for (int i = 0; i < a.length; i += 2) {
+                addProperty((String) a[i], new EDIFPropertyValue((EDIFPropertyValue) a[i + 1]));
+            }
         }
-        return properties;
     }
 
     /**
-     * Set all properties
+     * Get all properties in native format.  Returns a live {@link Map} view over
+     * this object's inlined property storage (mutations write through). An empty,
+     * immutable map is returned when this object has no properties.
+     */
+    public Map<String, EDIFPropertyValue> getPropertiesMap() {
+        if (propertyData == null) {
+            return Collections.emptyMap();
+        }
+        return new EDIFPropertyMap(this);
+    }
+
+    /**
+     * Set all properties.  The entries of the provided map are copied into this
+     * object's inlined storage (the map reference itself is not retained).
+     *
+     * <p>The provided map is read in full <i>before</i> this object's existing
+     * storage is replaced, so it is safe to pass this object's own live
+     * {@link #getPropertiesMap()} view (it is detected and treated as a no-op).
+     *
      * @param properties the properties to set
      */
     public void setPropertiesMap(Map<String, EDIFPropertyValue> properties) {
-        this.properties = properties;
+        // Passing this object's own live view is a no-op (the data is already ours).
+        if (properties instanceof EDIFPropertyMap && ((EDIFPropertyMap) properties).isViewOf(this)) {
+            return;
+        }
+        if (properties == null || properties.isEmpty()) {
+            propertyData = null;
+            return;
+        }
+        // Build the new backing from the source first; only then replace our own
+        // storage. This keeps the operation correct even if 'properties' aliases
+        // this object's current data (e.g. another live view of this object).
+        int n = properties.size();
+        if (n > PROMOTE_THRESHOLD) {
+            HashMap<String, EDIFPropertyValue> m = new HashMap<>(n * 2);
+            m.putAll(properties);
+            propertyData = m;
+        } else {
+            Object[] a = new Object[n * 2];
+            int i = 0;
+            for (Entry<String, EDIFPropertyValue> e : properties.entrySet()) {
+                a[i++] = e.getKey();
+                a[i++] = e.getValue();
+            }
+            // Defensive against a source whose size() and entrySet() disagree.
+            propertyData = (i == a.length) ? a : java.util.Arrays.copyOf(a, i);
+        }
     }
 
     public static final byte[] EXPORT_CONST_PROP_START = "(property ".getBytes(StandardCharsets.UTF_8);
@@ -184,8 +363,8 @@ public class EDIFPropertyObject extends EDIFName {
     public static final byte[] EXPORT_CONST_PROP_END = ")\n".getBytes(StandardCharsets.UTF_8);
 
     public void exportEDIFProperties(OutputStream os, byte[] indent, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException{
-        if (properties == null) return;
-        for (Entry<String, EDIFPropertyValue> e : EDIFTools.sortIfStable(properties, stable)) {
+        if (propertyData == null) return;
+        for (Entry<String, EDIFPropertyValue> e : EDIFTools.sortIfStable(getPropertiesMap(), stable)) {
             try {
                 os.write(indent);
                 os.write(EXPORT_CONST_PROP_START);

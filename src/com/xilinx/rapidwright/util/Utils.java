@@ -1,7 +1,7 @@
 /*
  * Original work: Copyright (c) 2010-2011 Brigham Young University
  * Modified work: Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -55,11 +55,13 @@ public class Utils{
 
     private static Set<TileTypeEnum> lagunas;
 
+    private static Set<TileTypeEnum> clocking;
+
     private static Set<SiteTypeEnum> lockedSiteTypes;
 
     private static Set<SiteTypeEnum> moduleSiteTypes;
 
-    private static Set<SiteTypeEnum> sliceTypes;
+    public static Set<SiteTypeEnum> sliceTypes;
 
     public static Set<SiteTypeEnum> dspTypes;
 
@@ -70,6 +72,10 @@ public class Utils{
     public static Set<SiteTypeEnum> uramTypes;
 
     public static Set<SiteTypeEnum> sliceDspBramUramTypes;
+
+    public static Set<SiteTypeEnum> psTypes;
+
+    public static Set<SiteTypeEnum> nocTypes;
 
     /**
      * Returns a SiteTypeEnum enum based on the given string. If such
@@ -168,12 +174,24 @@ public class Utils{
         return lagunas.contains(type);
     }
 
+    public static boolean isClocking(TileTypeEnum type) {
+        return clocking.contains(type);
+    }
+
     public static boolean isLockedSiteType(SiteTypeEnum type) {
         return lockedSiteTypes.contains(type);
     }
 
     public static boolean isModuleSiteType(SiteTypeEnum type) {
         return moduleSiteTypes.contains(type);
+    }
+
+    public static boolean isPSSiteType(SiteTypeEnum type) {
+        return psTypes.contains(type);
+    }
+
+    public static boolean isNOCSiteType(SiteTypeEnum type) {
+        return nocTypes.contains(type);
     }
 
     public static Set<TileTypeEnum> getIntTileTypes() {
@@ -204,12 +222,24 @@ public class Utils{
         return lagunas;
     }
 
+    public static Set<TileTypeEnum> getClockingTileTypes() {
+        return clocking;
+    }
+
     public static Set<SiteTypeEnum> getLockedSiteTypes() {
         return lockedSiteTypes;
     }
 
     public static Set<SiteTypeEnum> getModuleSiteTypes() {
         return moduleSiteTypes;
+    }
+
+    public static Set<SiteTypeEnum> getPSTypes() {
+        return psTypes;
+    }
+
+    public static Set<SiteTypeEnum> getNOCTypes() {
+        return nocTypes;
     }
 
     public static boolean isSLICE(SiteInst s) {
@@ -236,11 +266,25 @@ public class Utils{
         return iobTypes.contains(s.getSiteTypeEnum());
     }
 
+    public static boolean isPS(SiteInst s) {
+        return psTypes.contains(s.getSiteTypeEnum());
+    }
+
     public static boolean isIOB(SiteTypeEnum s) {
         return iobTypes.contains(s);
     }
 
+    public static boolean isPS(SiteTypeEnum s) {
+        return psTypes.contains(s);
+    }
 
+    public static boolean isNOC(SiteInst s) {
+        return nocTypes.contains(s.getSiteTypeEnum());
+    }
+
+    public static boolean isNOC(SiteTypeEnum s) {
+        return nocTypes.contains(s);
+    }
 
     static{
         clbs = EnumSet.of(
@@ -317,9 +361,11 @@ public class Utils{
             TileTypeEnum.INT_L,
             //TileTypeEnum.INT_L_SLV,
             //TileTypeEnum.INT_L_SLV_FLY,
-            TileTypeEnum.INT_R
+            TileTypeEnum.INT_R,
             //TileTypeEnum.INT_R_SLV,
             //TileTypeEnum.INT_R_SLV_FLY,
+            TileTypeEnum.SLL,               // Versal
+            TileTypeEnum.SLL2               // Versal (e.g. xcvp1902)
         );
 
         urams = EnumSet.of(
@@ -338,9 +384,18 @@ public class Utils{
                 TileTypeEnum.LAGUNA_TILE    // UltraScale
         );
 
+        clocking = EnumSet.noneOf(TileTypeEnum.class);
+        for (TileTypeEnum type : TileTypeEnum.values()) {
+            String typeName = type.toString();
+            if (typeName.startsWith("CMT_") || typeName.startsWith("CLK_") || typeName.startsWith("RCLK_")) {
+                clocking.add(type);
+            }
+        }
+
         lockedSiteTypes = EnumSet.of(
             SiteTypeEnum.CONFIG_SITE,
-            SiteTypeEnum.BUFG
+            SiteTypeEnum.BUFG,
+            SiteTypeEnum.BUFGCE 
         );
 
         sliceTypes = EnumSet.of(
@@ -384,6 +439,9 @@ public class Utils{
             SiteTypeEnum.IOB,
             SiteTypeEnum.IOBM,
             SiteTypeEnum.IOBS,
+            SiteTypeEnum.HDIOB,
+            SiteTypeEnum.HDIOB_M,
+            SiteTypeEnum.HDIOB_S,
             SiteTypeEnum.HPIOB,
             SiteTypeEnum.HPIOB_M,
             SiteTypeEnum.HPIOB_S,
@@ -394,7 +452,8 @@ public class Utils{
             SiteTypeEnum.HPIOBDIFFOUTBUF,
             SiteTypeEnum.HRIO,
             SiteTypeEnum.HRIODIFFINBUF,
-            SiteTypeEnum.HRIODIFFOUTBUF
+            SiteTypeEnum.HRIODIFFOUTBUF,
+            SiteTypeEnum.XPIOB
         );
 
         uramTypes = EnumSet.of(
@@ -413,6 +472,30 @@ public class Utils{
             // SiteTypeEnum.PS7
         );
         moduleSiteTypes.addAll(sliceDspBramUramTypes);
+
+        psTypes = EnumSet.noneOf(SiteTypeEnum.class);
+        psTypes.add(SiteTypeEnum.PS7);
+        psTypes.add(SiteTypeEnum.PS8);
+        psTypes.add(SiteTypeEnum.PS9);
+        psTypes.add(SiteTypeEnum.PS11);
+
+        nocTypes = EnumSet.of(
+            SiteTypeEnum.NOC_HBM_BLI_SCAN,
+            SiteTypeEnum.NOC_NCRB,
+            SiteTypeEnum.NOC_NCRB_SSIT,
+            SiteTypeEnum.NOC_NIDB,
+            SiteTypeEnum.NOC_NMU128,
+            SiteTypeEnum.NOC_NMU512,
+            SiteTypeEnum.NOC_NMU_HBM2E,
+            SiteTypeEnum.NOC_NPP_RPTR,
+            SiteTypeEnum.NOC_NPS4,
+            SiteTypeEnum.NOC_NPS5555,
+            SiteTypeEnum.NOC_NPS6,
+            SiteTypeEnum.NOC_NPS7575,
+            SiteTypeEnum.NOC_NPS_VNOC,
+            SiteTypeEnum.NOC_NSU128,
+            SiteTypeEnum.NOC_NSU512
+        );
     }
 
 }

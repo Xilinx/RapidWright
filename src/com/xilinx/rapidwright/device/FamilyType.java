@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Advanced Micro Devices, Inc.
@@ -27,7 +27,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Wed May 01 19:03:12 MDT 2024
+ * Generated on: Wed Nov 11 16:04:54 MST 2026
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  *
  * Set of all Supported Xilinx families in RapidWright
@@ -40,7 +40,9 @@ public enum FamilyType {
         ARTIX7L,
         ARTIXUPLUS,
         ASPARTAN7,
+        ASPARTANUPLUS,
         AVERSALAIEDGE,
+        AVERSALAIEDGE2,
         AZYNQ,
         AZYNQUPLUS,
         KINTEX7,
@@ -54,9 +56,13 @@ public enum FamilyType {
         QKINTEXUPLUS,
         QRKINTEXU,
         QRVERSALAICORE,
+        QRVERSALAIEDGE,
         QVERSALAICORE,
+        QVERSALAIEDGE,
+        QVERSALAIEDGE2,
         QVERSALPREMIUM,
         QVERSALPRIME,
+        QVERSALPRIME2,
         QVIRTEX7,
         QVIRTEXUPLUS,
         QVIRTEXUPLUSHBM,
@@ -64,12 +70,17 @@ public enum FamilyType {
         QZYNQUPLUS,
         QZYNQUPLUSRFSOC,
         SPARTAN7,
+        SPARTANUPLUS,
         VERSAL,
         VERSALAICORE,
         VERSALAIEDGE,
+        VERSALAIEDGE2,
         VERSALHBM,
         VERSALPREMIUM,
+        VERSALPREMIUM2,
         VERSALPRIME,
+        VERSALPRIME2,
+        VERSALRF,
         VIRTEX7,
         VIRTEXU,
         VIRTEXUPLUS,

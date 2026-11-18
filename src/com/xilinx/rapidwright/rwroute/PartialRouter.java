@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -27,32 +27,31 @@ package com.xilinx.rapidwright.rwroute;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
+import com.xilinx.rapidwright.design.NetTools;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
-import com.xilinx.rapidwright.device.IntentCode;
+import com.xilinx.rapidwright.device.ClockRegion;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
-import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.router.UltraScaleClockRouting;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
 import com.xilinx.rapidwright.timing.TimingManager;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
 import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
-import com.xilinx.rapidwright.util.RuntimeTracker;
+import com.xilinx.rapidwright.util.Pair;
 
 /**
  * A class extending {@link RWRoute} for partial routing.
@@ -70,33 +69,35 @@ public class PartialRouter extends RWRoute {
 
     protected Map<Net, List<SitePinInst>> netToPins;
 
-    protected class RouteNodeGraphPartial extends RouteNodeGraph {
+    /** Connections whose routing was recovered from their net's existing routing (see setPIPsOfNets()) */
+    protected Set<Connection> recoveredConnections;
 
-        public RouteNodeGraphPartial(RuntimeTracker setChildrenTimer, Design design, RWRouteConfig config) {
-            super(setChildrenTimer, design, config);
+    protected static class RouteNodeGraphPartial extends RouteNodeGraph {
+
+        public RouteNodeGraphPartial(Design design, RWRouteConfig config) {
+            super(design, config);
         }
 
         @Override
-        protected boolean isExcluded(Node parent, Node child) {
+        protected boolean isExcluded(RouteNode parent, Node child) {
             // Routing part of an existing (preserved) route are never excluded
-            if (isPartOfExistingRoute(parent, child)) {
+            if (isPartOfExistingRoute(this, parent, child)) {
                 return false;
             }
             return super.isExcluded(parent, child);
         }
     }
 
-    protected class RouteNodeGraphPartialTimingDriven extends RouteNodeGraphTimingDriven {
-        public RouteNodeGraphPartialTimingDriven(RuntimeTracker rnodesTimer,
-                                                 Design design,
+    protected static class RouteNodeGraphPartialTimingDriven extends RouteNodeGraphTimingDriven {
+        public RouteNodeGraphPartialTimingDriven(Design design,
                                                  RWRouteConfig config,
-                                                 DelayEstimatorBase delayEstimator) {
-            super(rnodesTimer, design, config, delayEstimator);
+                                                 DelayEstimatorBase<InterconnectInfo> delayEstimator) {
+            super(design, config, delayEstimator);
         }
 
         @Override
-        protected boolean isExcluded(Node parent, Node child) {
-            if (isPartOfExistingRoute(parent, child)) {
+        protected boolean isExcluded(RouteNode parent, Node child) {
+            if (isPartOfExistingRoute(this, parent, child)) {
                 return false;
             }
             return super.isExcluded(parent, child);
@@ -107,6 +108,7 @@ public class PartialRouter extends RWRoute {
         super(design, config);
         this.softPreserve = softPreserve;
         partiallyPreservedNets = new HashSet<>();
+        recoveredConnections = new HashSet<>();
         netToPins = pinsToRoute.stream()
                 .filter((spi) -> !spi.isOutPin())
                 .collect(Collectors.groupingBy(SitePinInst::getNet));
@@ -124,9 +126,29 @@ public class PartialRouter extends RWRoute {
         // routeDesignWithUserDefinedArguments() which needs to infer pinsToRoute.
     }
 
+    /**
+     * Gets the nets to time: those with pins to route, and those that never leave their site (no sink site pins,
+     * e.g. a LUT driving the flop beside it), which are never routed but lie on the timing paths of routed
+     * connections (without them, such paths would stop at, or restart from, the intra-site net). Only the latter in
+     * the sites of the former's pins are taken: any other is cut off from those paths by nets that are not timed.
+     */
     @Override
     protected Collection<Net> getTimingNets() {
-        return Collections.unmodifiableSet(netToPins.keySet());
+        Set<Net> timingNets = new LinkedHashSet<>(netToPins.keySet());
+        Set<SiteInst> siteInsts = new LinkedHashSet<>();
+        for (Net net : netToPins.keySet()) {
+            for (SitePinInst spi : net.getPins()) {
+                siteInsts.add(spi.getSiteInst());
+            }
+        }
+        for (SiteInst si : siteInsts) {
+            for (Net net : si.getNetToSiteWiresMap().keySet()) {
+                if (net.getSinkPins().isEmpty()) {
+                    timingNets.add(net);
+                }
+            }
+        }
+        return timingNets;
     }
 
     /**
@@ -141,23 +163,26 @@ public class PartialRouter extends RWRoute {
      * @param end End Node of arc.
      * @return True if arc is part of an existing route.
      */
-    protected boolean isPartOfExistingRoute(Node start, Node end) {
+    protected static boolean isPartOfExistingRoute(RouteNodeGraph routingGraph, RouteNode start, Node end) {
         // End node can only be part of existing route if it is in the graph already
         RouteNode endRnode = routingGraph.getNode(end);
-        if (endRnode == null)
-            return false;
-
-        // If end node has been visited already
-        if (endRnode.isVisited(connectionsRouted)) {
-            // Visited possibly from a different arc uphill of end, or possibly from
-            // the same start -> end arc during prepareRouteConnection()
+        if (endRnode == null) {
             return false;
         }
 
-        // Presence of a prev pointer means that only that arc is allowed to enter this end node
+        // Presence of a prev pointer means that:
+        //   (a) end node has been visited before
+        //   (b) only that arc is allowed to enter this end node
+        // Note that this must not depend on whether either node has been visited by the current search: the result
+        // decides whether end is one of start's children, which RouteNode.getChildren() computes once and caches for
+        // every later search (and may compute outside of any search, e.g. for estimateDelayOfConnections(), when no
+        // node has been visited and so every node appears to have been visited by the same, non-existent, search),
+        // and whether start can drive end when end is a sink, which RWRoute.isPushableSinkDriver() asks (through
+        // RouteNodeGraph.isExcluded(), uncached) during a search, in either mode.
+        // A node already visited by the current search is skipped by exploreAndExpand() anyway.
         RouteNode prev = endRnode.getPrev();
         if (prev != null) {
-            if (prev.equals(start) && routingGraph.isPreserved(end)) {
+            if (prev == start && routingGraph.isPreserved(end)) {
                 // Arc matches start node and end node is preserved
                 // This implies that both start and end nodes must be preserved for the same net
                 // (which assumedly is the net we're currently routing, and is asserted upstream)
@@ -174,24 +199,26 @@ public class PartialRouter extends RWRoute {
     protected RouteNodeGraph createRouteNodeGraph() {
         if (config.isTimingDriven()) {
             /* An instantiated delay estimator that is used to calculate delay of routing resources */
-            DelayEstimatorBase estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
-            return new RouteNodeGraphPartialTimingDriven(rnodesTimer, design, config, estimator);
+            DelayEstimatorBase<InterconnectInfo> estimator = new DelayEstimatorBase<InterconnectInfo>(
+                    design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
+            return new RouteNodeGraphPartialTimingDriven(design, config, estimator);
         } else {
-            return new RouteNodeGraphPartial(rnodesTimer, design, config);
+            return new RouteNodeGraphPartial(design, config);
         }
     }
 
     @Override
     protected TimingManager createTimingManager(ClkRouteTiming clkTiming, Collection<Net> timingNets) {
         final boolean isPartialRouting = true;
-        return new TimingManager(design, routerTimer, config, clkTiming, timingNets, isPartialRouting);
+        return new TimingManager(design, routerTimer, config, clkTiming, timingNets, isPartialRouting,
+                routingGraph.getDelayEstimator());
     }
 
     @Override
     protected int getNumIndirectConnectionPins() {
         int totalSitePins = 0;
         for (Connection connection : indirectConnections) {
-            totalSitePins += (connection.getSink().isRouted() && !connection.isCongested()) ? 0 : 1;
+            totalSitePins += (connection.isRouted() && !connection.isCongested()) ? 0 : 1;
         }
         return totalSitePins;
     }
@@ -200,239 +227,94 @@ public class PartialRouter extends RWRoute {
     protected int getNumConnectionsCrossingSLRs() {
         int numCrossingSLRs = 0;
         for (Connection c : indirectConnections) {
-            numCrossingSLRs += (!c.isCrossSLR() || (c.getSink().isRouted() && !c.isCongested())) ? 0 : 1;
+            numCrossingSLRs += (!c.isCrossSLR() || (c.isRouted() && !c.isCongested())) ? 0 : 1;
         }
         return numCrossingSLRs;
     }
 
     @Override
-    protected NodeStatus getGlobalRoutingNodeStatus(Net net, Node node) {
-        Net preservedNet = routingGraph.getPreservedNet(node);
-        if (preservedNet == net) {
-            return NodeStatus.INUSE;
-        }
-        if (preservedNet != null) {
-            if (!softPreserve) {
-                return NodeStatus.UNAVAILABLE;
-            }
-
-            // Do not steal from other global nets, since we can't tell if they
-            // can be re-routed
-            if (preservedNet.isClockNet() || preservedNet.isStaticNet()) {
-                return NodeStatus.UNAVAILABLE;
-            }
-
-            // Do not steal PINBOUNCEs from preserved nets that serve as
-            // a used site pin
-            if (node.getIntentCode() == IntentCode.NODE_PINBOUNCE) {
-                SitePin sitePin = node.getSitePin();
-                SiteInst si = (sitePin != null) ? design.getSiteInstFromSite(sitePin.getSite()) : null;
-                Net netOnSiteWire = (si != null) ? si.getNetFromSiteWire(sitePin.getPinName()) : null;
-                if (netOnSiteWire != null) {
-                    assert(netOnSiteWire == preservedNet);
-                    return NodeStatus.UNAVAILABLE;
-                }
-            }
-        }
-
-        RouteNode rnode = routingGraph.getNode(node);
-        if (rnode != null) {
-            if (!softPreserve) {
-                return NodeStatus.UNAVAILABLE;
-            }
-
-            if (rnode.getType() == RouteNodeType.PINFEED_I) {
-                // Node must be a sink pin for a non-global net
-                return NodeStatus.UNAVAILABLE;
-            }
-        }
-
-        return NodeStatus.AVAILABLE;
-    }
-
-    @Override
     protected void routeGlobalClkNets() {
+        Map<Integer, Set<ClockRegion>> usedRoutingTracks = new HashMap<>();
         if (clkNets.isEmpty())
             return;
 
-        for (Net clk : clkNets) {
+        for (Net clk : getClkNetsInRoutingOrder()) {
             List<SitePinInst> clkPins = netToPins.get(clk);
             if (clkPins == null || clkPins.isEmpty()) {
                 continue;
             }
 
             if (!clk.hasPIPs()) {
-                super.routeGlobalClkNet(clk);
+                super.routeGlobalClkNet(clk, usedRoutingTracks);
             } else {
                 System.out.println("INFO: Routing " + clkPins.size() + " pins of clock " + clk + " (non timing-driven)");
-                Function<Node, NodeStatus> gns = (node) -> this.getGlobalRoutingNodeStatus(clk, node);
+                Function<Node, NodeStatus> gns = (node) -> getGlobalRoutingNodeStatus(clk, node);
                 UltraScaleClockRouting.incrementalClockRouter(clk, clkPins, gns);
                 preserveNet(clk, false);
-            }
-        }
-
-        List<Net> unpreserveNets = unpreserveCongestedNets(clkNets);
-        if (!unpreserveNets.isEmpty()) {
-            System.out.println("INFO: Unpreserving " + unpreserveNets.size() + " nets due to clock congestion");
-            for (Net net : unpreserveNets) {
-                System.out.println("\t" + net);
             }
         }
     }
 
     @Override
-    protected void routeStaticNets() {
-        if (staticNetAndRoutingTargets.isEmpty())
-            return;
+    protected Set<Net> ensureSinkRoutability() {
+        // With all routingGraph.preserveAsync() calls having completed,
+        // now check that no sinks are preserved by another net
+        // (e.g. a pin was moved from one net to the other, but
+        // its old routing was not ripped up and got preserved)
+        // if so, unpreserve that blocking net
+        Set<Net> unpreserveNets = new HashSet<>();
+        for (Connection connection : indirectConnections) {
+            if (connection.hasAltSinks()) {
+                // Skip connections that have alternate sinks
+                continue;
+            }
+            Net net = connection.getNet();
+            Net preservedNet;
+            assert((preservedNet = routingGraph.getPreservedNet(connection.getSourceRnode())) == null || preservedNet == net);
 
-        super.routeStaticNets();
-
-        List<Net> unpreserveNets = unpreserveCongestedNets(staticNetAndRoutingTargets.keySet());
-        if (!unpreserveNets.isEmpty()) {
-            System.out.println("INFO: Unpreserving " + unpreserveNets.size() + " nets due to static net congestion");
-            for (Net net : unpreserveNets) {
-                System.out.println("\t" + net);
+            RouteNode sinkRnode = connection.getSinkRnode();
+            assert(sinkRnode.getType().isAnyExclusiveSink());
+            preservedNet = routingGraph.getPreservedNet(sinkRnode);
+            if (preservedNet != null && preservedNet != net) {
+                if (preservedNet.isStaticNet()) {
+                    System.err.println("ERROR: Unable to unpreserve " + preservedNet + " to allow " + connection.getSink().getSitePinName() + " to be reached. Expect unrouteable connection.");
+                    continue;
+                }
+                unpreserveNets.add(preservedNet);
             }
         }
-    }
 
-    private List<Net> unpreserveCongestedNets(Collection<Net> globalNets) {
-        if (!softPreserve) {
-            return Collections.emptyList();
-        }
-
-        // Even though route{GlobalClk,Static}Nets() has called preserveNet() for all its nets,
-        // it will not overwrite those nodes which have already been preserved by other nets.
-        // Discover such occurrences so that the entire 'victim' net can be correctly
-        // unpreserved (thus re-routed) and re-preserve the global.
-        List<Net> unpreserveNets = new ArrayList<>();
-        for (Net net : globalNets) {
-            for (PIP pip : net.getPIPs()) {
-                for (Node node : Arrays.asList(pip.getStartNode(), pip.getEndNode())) {
-                    Net preservedNet = routingGraph.getPreservedNet(node);
-                    if (preservedNet == net) {
+        if (!unpreserveNets.isEmpty()) {
+            System.out.println("INFO: Unpreserving " + unpreserveNets.size() + " nets to ensure sink routability");
+            for (Net net : unpreserveNets) {
+                System.out.println("\t" + net);
+                assert(!net.isStaticNet());
+                NetWrapper netWrapper = unpreserveNet(net);
+                for (Connection connection : netWrapper.getConnections()) {
+                    List<RouteNode> rnodes = connection.getRnodes();
+                    if (rnodes.size() < 3) {
                         continue;
                     }
-                    if (preservedNet == null) {
-                        // Assume this node has already been unpreserved
-                    } else if (RouterHelper.isRoutableNetWithSourceSinks(preservedNet)) {
-                        unpreserveNet(preservedNet);
-                        unpreserveNets.add(preservedNet);
-                    }
+                    // Look for overused exclusive sinks within
+                    // this connection's used nodes (except for the first and last used node,
+                    // corresponding to source and sink)
+                    for (RouteNode rnode : rnodes.subList(1, rnodes.size() - 1)) {
+                        if (!rnode.getType().isAnyExclusiveSink() || !rnode.isOverUsed()) {
+                            continue;
+                        }
 
-                    // Preserve node for global net
-                    Net oldNet = routingGraph.preserve(node, net);
-                    if (oldNet != null) {
-                        // oldNet/preservedNet is not a routable net (e.g. driven by hier port)
-                        assert(oldNet == preservedNet);
-                        assert(!RouterHelper.isRoutableNetWithSourceSinks(preservedNet));
-                    }
-
-                    // RouteNode must only exist if the net has been unpreserved
-                    RouteNode rnode = routingGraph.getNode(node);
-                    if (rnode != null) {
-                        // Clear its prev pointer so that it doesn't get misinterpreted
-                        // by RouteNodeGraph.mustInclude as being part of an existing route
-                        assert (rnode.getPrev() != null);
-                        rnode.clearPrev();
-
-                        // Increment this RouteNode with a null net (since global nets have
-                        // no corresponding NetWrapper) in order to flag it as being irreversibly
-                        // used by a global net thus forcing the non-global to find another path
-                        rnode.incrementUser(null);
-                    } else {
-                        assert(oldNet != null);
+                        // If an overused exclusive sink is found -- it must also be used
+                        // by the net to which that sink belongs to, so rip up this connection's
+                        // routing
+                        ripUp(connection);
+                        connection.resetRoute();
+                        connection.setRouted(false);
+                        break;
                     }
                 }
             }
         }
         return unpreserveNets;
-    }
-
-    @Override
-    protected void determineRoutingTargets() {
-        super.determineRoutingTargets();
-
-        // Go through all nets to be routed
-        Map<RouteNode, RouteNode> stashedPrev = new HashMap<>();
-        for (Map.Entry<Net, NetWrapper> e : nets.entrySet()) {
-            Net net = e.getKey();
-            NetWrapper netWrapper = e.getValue();
-
-            // Temporarily stash the prev pointer of all sink nodes ahead of recovering routing
-            // (it's possible for another connection to use a bounce node, but now that node is
-            // needed as a site pin)
-            for (Connection connection : netWrapper.getConnections()) {
-                Consumer<RouteNode> action = (rnode) -> {
-                    if (rnode == null) {
-                        return;
-                    }
-                    RouteNode prev = rnode.getPrev();
-                    if (prev == null) {
-                        return;
-                    }
-                    stashedPrev.put(rnode, prev);
-                    rnode.clearPrev();
-                };
-                action.accept(connection.getSinkRnode());
-                connection.getAltSinkRnodes().forEach(action);
-            }
-
-            // Create all nodes used by this net and set its previous pointer so that:
-            // (a) the routing for each connection can be recovered by
-            //      finishRouteConnection()
-            // (b) RouteNode.setChildren() will know to only allow this incoming
-            //     arc on these nodes
-            for (PIP pip : net.getPIPs()) {
-                Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
-                Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
-
-                // Do not include arcs that the router wouldn't explore
-                // e.g. those that leave the INT tile, since we project pins to their INT tile
-                if (routingGraph.isExcludedTile(end))
-                    continue;
-
-                RouteNode rstart = getOrCreateRouteNode(start, null);
-                RouteNode rend = getOrCreateRouteNode(end, null);
-                assert (rend.getPrev() == null);
-                rend.setPrev(rstart);
-            }
-
-            // Use the prev pointers to attempt to recover routing for all indirect connections
-            for (Connection connection : netWrapper.getConnections()) {
-                if (connection.isDirect()) {
-                    continue;
-                }
-                RouteNode sourceRnode = connection.getSourceRnode();
-                RouteNode sinkRnode = connection.getSinkRnode();
-                assert(sourceRnode.getType() == RouteNodeType.PINFEED_O);
-                assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
-
-                // Even though this connection is not expected to have any routing yet,
-                // perform a rip up anyway in order to release any exclusive sinks
-                // ahead of finishRouteConnection()
-                assert(connection.getRnodes().isEmpty());
-                connection.getSink().setRouted(false);
-                ripUp(connection);
-
-                finishRouteConnection(connection, sinkRnode);
-                if (!connection.getSink().isRouted() && connection.getAltSinkRnodes().isEmpty()) {
-                    // Undo what ripUp() did for this connection which has a single exclusive sink
-                    sinkRnode.incrementUser(connection.getNetWrapper());
-                    sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
-                }
-            }
-
-            // Restore prev to avoid assertions firing
-            for (Map.Entry<RouteNode, RouteNode> e2 : stashedPrev.entrySet()) {
-                RouteNode rnode = e2.getKey();
-                RouteNode prev = e2.getValue();
-                rnode.setPrev(prev);
-            }
-            stashedPrev.clear();
-        }
-
-        routingGraph.resetExpansion();
     }
 
     @Override
@@ -455,8 +337,17 @@ public class PartialRouter extends RWRoute {
 
     @Override
     protected void addStaticNetRoutingTargets(Net staticNet) {
-        preserveNet(staticNet, true);
         if (staticNet.hasPIPs()) {
+            // Preserve only the static net's PIPs and its output pins; its input pins will be
+            // preserved by routeStaticNets()
+            List<SitePinInst> outputPins = new ArrayList<>();
+            for (SitePinInst spi : staticNet.getPins()) {
+                if (!spi.isOutPin()) {
+                    continue;
+                }
+                outputPins.add(spi);
+            }
+            routingGraph.preserveAsync(staticNet, outputPins);
             numPreservedStaticNets++;
         }
 
@@ -475,8 +366,12 @@ public class PartialRouter extends RWRoute {
 
     @Override
     protected void preserveNet(Net net, boolean async) {
-        List<SitePinInst> pinsToRoute = netToPins.get(net);
-        // Only preserve those pins that are not to be routed
+        List<SitePinInst> pinsToRoute = null;
+        if (!net.isStaticNet()) {
+            // For signal nets, only preserve those pins that are not to be routed
+            // All sink pins must be preserved for static nets since the static router does not resolve conflicts
+            pinsToRoute = netToPins.get(net);
+        }
         List<SitePinInst> pinsToPreserve;
         if (pinsToRoute == null) {
             pinsToPreserve = net.getPins();
@@ -496,6 +391,108 @@ public class PartialRouter extends RWRoute {
         }
     }
 
+    /**
+     * Recovers those arcs of a net's routing that Vivado has fixed in place, ahead of
+     * setPrevBetweenProjectedPins(). Does nothing by default, since only PartialDFXRouter makes
+     * use of such arcs.
+     * @param net The net to examine.
+     */
+    protected void setPrevOnFixedArcs(Net net) {
+    }
+
+    /**
+     * Recovers those arcs of a net's routing that lie between the nodes its connections were
+     * projected onto. Each subtree of the net's routing is walked from its root; the walk only
+     * begins collecting once a source node (that of any connection, or the net's alternate
+     * source) is encountered, and an arc is only collected if a sink node (that of any
+     * connection, or any of its alternate sinks) lies at or below it. Arcs outside that span --
+     * those of the projection tails at either end, and those of any branch reaching no sink --
+     * are of no use to the router, since assignNodesToConnections() recovers both tails
+     * separately.
+     * Each such arc has a RouteNode created for both of its nodes, and the previous pointer of
+     * the driven node set to the driver.
+     * @param netWrapper The wrapper holding the net's connections.
+     */
+    private void setPrevBetweenProjectedPins(NetWrapper netWrapper) {
+        Net net = netWrapper.getNet();
+        // Recover the arcs Vivado has fixed in place first, since the walk below must not
+        // overwrite the previous pointers they carry
+        setPrevOnFixedArcs(net);
+        // The nodes at which the walk becomes active, and those at which it terminates
+        Set<Node> sourceNodes = new HashSet<>();
+        Set<Node> sinkNodes = new HashSet<>();
+        for (Connection connection : netWrapper.getConnections()) {
+            if (connection.isDirect()) {
+                continue;
+            }
+            sourceNodes.add(connection.getSourceRnode());
+            sinkNodes.add(connection.getSinkRnode());
+            sinkNodes.addAll(connection.getAltSinkRnodes());
+        }
+
+        SitePinInst altSource = net.getAlternateSource();
+        Node altSourceNode = (altSource != null) ? altSource.getConnectedNode() : null;
+        for (NetTools.NodeTree root : NetTools.getNodeTrees(net)) {
+            if (root.equals(altSourceNode) && !root.fanouts.isEmpty()) {
+                // Part of this net is routed from its alternate source, so activate the walk
+                // there -- but at the node that source projects onto, not at the pin node itself:
+                // the arcs of that projection tail are no part of any connection, and a prev
+                // pointer on the projected node would send saveRouting()'s backtracking (which
+                // stops only at a null prev, not at the connection's source) past that source.
+                if (netWrapper.getOrCreateAlternateSource(routingGraph) != null) {
+                    // Must precede the walk of this very subtree, since on architectures where an
+                    // output pin projects onto its own node this node is that very root
+                    sourceNodes.add(netWrapper.getAltSourceRnode());
+                }
+            }
+
+            setPrevOnPathsToSinks(root, sourceNodes.contains(root), sourceNodes, sinkNodes);
+        }
+    }
+
+    /**
+     * Recursively sets the previous pointer on every arc of the given subtree that lies on a path
+     * down to a sink node, once the walk has been activated by a source node.
+     * @param node Root of the subtree to descend.
+     * @param active True if a source node has already been reached at or above this node.
+     * @param sourceNodes The nodes at which the walk becomes active.
+     * @param sinkNodes The nodes at which the walk terminates.
+     * @return True if this node is a sink, or if a sink lies below it.
+     */
+    private boolean setPrevOnPathsToSinks(NetTools.NodeTree node,
+                                          boolean active,
+                                          Set<Node> sourceNodes,
+                                          Set<Node> sinkNodes) {
+        // PartialRouter assumes that nets are not multiply driven, so this routing is a forest:
+        // every node is reached exactly once and no visited set is necessary
+        boolean onPathToSink = sinkNodes.contains(node);
+        for (NetTools.NodeTree fanout : node.fanouts) {
+            assert(!fanout.multiplyDriven);
+            // A source activates the walk on arrival, so that the arcs below it are collected
+            boolean fanoutActive = active || sourceNodes.contains(fanout);
+            boolean fanoutOnPathToSink = setPrevOnPathsToSinks(fanout, fanoutActive, sourceNodes, sinkNodes);
+            onPathToSink |= fanoutOnPathToSink;
+
+            // Note that a sink is not necessarily a leaf -- routing carries on through a
+            // NODE_PINBOUNCE sink when the net bounces off that pin to reach another sink below
+            // it, and every node on that continuation needs a prev pointer too, or
+            // finishRouteConnection() could not recover the branch and the connection would be
+            // re-routed into its own preserved sink node
+            if (active && fanoutOnPathToSink) {
+                RouteNode rstart = routingGraph.getOrCreate(node);
+                RouteNode rend = routingGraph.getOrCreate(fanout);
+                if (rend.isArcLocked()) {
+                    // setPrevOnFixedArcs() got here first, and must agree
+                    assert(rend.getPrev() == rstart);
+                } else {
+                    assert(rend.getPrev() == null);
+                    rend.setPrev(rstart);
+                }
+            }
+        }
+        return onPathToSink;
+    }
+
     @Override
     protected void addNetConnectionToRoutingTargets(Net net) {
         List<SitePinInst> pinsToRoute = netToPins.get(net);
@@ -509,12 +506,98 @@ public class PartialRouter extends RWRoute {
             if (partiallyPreserved) {
                 partiallyPreservedNets.add(netWrapper);
             }
+
+            if (net.hasPIPs()) {
+                // Create all nodes between the projected source and sink nodes of this net's
+                // connections and set their previous pointer so that:
+                // (a) the routing for each connection can be recovered by
+                //      finishRouteConnection()
+                // (b) RouteNode.setChildren() will know to only allow this incoming
+                //     arc on these nodes
+                setPrevBetweenProjectedPins(netWrapper);
+
+                // Use the prev pointers to attempt to recover routing for all indirect connections
+                for (Connection connection : netWrapper.getConnections()) {
+                    if (connection.isDirect()) {
+                        continue;
+                    }
+
+                    RouteNode sinkRnode = connection.getSinkRnode();
+                    finishRouteConnection(connection, sinkRnode);
+                    if (connection.isRouted()) {
+                        recoveredConnections.add(connection);
+                    }
+                }
+            }
         }
 
         if (net.hasPIPs()) {
             preserveNet(net, true);
             numPreservedWire++;
             numPreservedRoutableNets++;
+        }
+    }
+
+    @Override
+    protected boolean saveRouting(Connection connection, RouteNode rnode) {
+        if (super.saveRouting(connection, rnode)) {
+            return true;
+        }
+
+        List<RouteNode> rnodes = connection.getRnodes();
+        RouteNode sourceRnode = rnodes.get(rnodes.size() - 1);
+        assert(sourceRnode != connection.getSourceRnode()); // Would have returned already
+        if (sourceRnode == rnode) {
+            // No back-tracking beyond the first node
+            assert(rnodes.size() == 1);
+            return false;
+        }
+        assert(rnodes.size() > 1);
+
+        // Check if alternate source exists (without creating one if it doesn't)
+        if (connection.getNet().getAlternateSource() != null) {
+            Pair<SitePinInst,RouteNode> altSourceAndRnode = connection.getOrCreateAlternateSource(routingGraph);
+            assert(altSourceAndRnode != null);
+            RouteNode altSourceRnode = altSourceAndRnode.getSecond();
+            if (sourceRnode == altSourceRnode) {
+                // We backtracked to the alternate source
+                SitePinInst altSource = altSourceAndRnode.getFirst();
+                connection.setSource(altSource);
+                connection.setSourceRnode(altSourceRnode);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    protected void finishRouteConnection(Connection connection, RouteNode rnode) {
+        super.finishRouteConnection(connection, rnode);
+
+        if (!connection.isRouted()) {
+            connection.resetRoute();
+        }
+    }
+
+    /**
+     * As {@link RWRoute#setPIPsOfNets()}, which sets each net's PIPs from its connections' routing alone, and so drops
+     * the existing routing of any connection that was routed before (recovered from its net's routing) but could not
+     * be routed again: warns of each such sink.
+     */
+    @Override
+    protected void setPIPsOfNets() {
+        super.setPIPsOfNets();
+
+        int lost = 0;
+        for (Connection connection : recoveredConnections) {
+            if (!connection.isRouted()) {
+                System.out.println("WARNING: Sink " + connection.getSink() + " of net " + connection.getNet() +
+                        " was routed before but is not now; its existing routing has been removed");
+                lost++;
+            }
+        }
+        if (lost > 0) {
+            System.out.println("WARNING: " + lost + " sinks that were routed before are not now");
         }
     }
 
@@ -582,8 +665,10 @@ public class PartialRouter extends RWRoute {
         return unpreserveNets.size();
     }
 
-    protected void unpreserveNet(Net net) {
-        Set<RouteNode> rnodes = new HashSet<>();
+    protected NetWrapper unpreserveNet(Net net) {
+        assert(!net.getName().equals(Net.Z_NET));
+
+        Set<Node> nodes = new HashSet<>();
         NetWrapper netWrapper = nets.get(net);
         if (netWrapper != null) {
             // Net already exists -- any unrouted connection will cause the
@@ -593,83 +678,76 @@ public class PartialRouter extends RWRoute {
             boolean removed = partiallyPreservedNets.remove(netWrapper);
             assert(removed);
 
-            // Collect all nodes used by this net
+            // Collect all nodes used by this net. Note that every one of them was preserved by
+            // preserveNet(), including those outside the span covered by
+            // setPrevBetweenProjectedPins() -- the projection tails at either end, and any branch
+            // continuing beyond a sink -- for which no RouteNode will have been created; all of
+            // them must be released here for preserving and unpreserving to stay symmetric
             for (PIP pip : net.getPIPs()) {
                 Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
                 Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
 
-                // Do not include arcs that the router wouldn't explore
-                // e.g. those that leave the INT tile, since we project pins to their INT tile
-                if (routingGraph.isExcludedTile(end))
+                if (pip.isPIPFixed()) {
+                    // Do not unpreserve locked nodes
                     continue;
+                }
 
-                // Since net already exists, all the nodes it uses must already
-                // have been created
-                RouteNode rstart = routingGraph.getNode(start);
-                assert (rstart != null);
-                boolean rstartAdded = rnodes.add(rstart);
+                boolean startAdded = nodes.add(start);
                 boolean startPreserved = routingGraph.unpreserve(start);
-                assert(rstartAdded == startPreserved);
+                assert(startAdded == startPreserved);
 
-                RouteNode rend = routingGraph.getNode(end);
-                assert (rend != null);
-                boolean rendAdded = rnodes.add(rend);
+                boolean endAdded = nodes.add(end);
                 boolean endPreserved = routingGraph.unpreserve(end);
-                assert(rendAdded == endPreserved);
+                assert(endAdded == endPreserved);
 
-                // Check the prev pointer is consistent with PIP
-                assert(rend.getPrev() == rstart);
+                // Check the prev pointer is consistent with PIP, for those arcs inside the
+                // projected source-to-sink span that setPrevBetweenProjectedPins() set one for;
+                // no RouteNode exists for the nodes outside it
+                RouteNode rend = routingGraph.getNode(end);
+                assert(rend == null || rend.getPrev() == routingGraph.getNode(start));
             }
         } else {
             // Net needs to be created
             netWrapper = createNetWrapperAndConnections(net);
 
-            // Collect all nodes used by this net
+            // Collect all nodes used by this net, releasing everything preserveNet() preserved
             for (PIP pip : net.getPIPs()) {
                 Node start = (pip.isReversed()) ? pip.getEndNode() : pip.getStartNode();
                 Node end = (pip.isReversed()) ? pip.getStartNode() : pip.getEndNode();
 
-                // Do not include arcs that the router wouldn't explore
-                // e.g. those that leave the INT tile, since we project pins to their INT tile
-                if (routingGraph.isExcludedTile(end))
+                if (pip.isPIPFixed()) {
+                    // Do not unpreserve locked nodes
+                    RouteNode rend = routingGraph.getNode(end);
+                    assert(rend == null);
                     continue;
+                }
 
+                boolean startAdded = nodes.add(start);
                 boolean startPreserved = routingGraph.unpreserve(start);
+                assert(startAdded == startPreserved);
+
+                boolean endAdded = nodes.add(end);
                 boolean endPreserved = routingGraph.unpreserve(end);
-
-                RouteNode rstart = getOrCreateRouteNode(start, null);
-                RouteNode rend = getOrCreateRouteNode(end, null);
-                boolean rstartAdded = rnodes.add(rstart);
-                boolean rendAdded = rnodes.add(rend);
-                assert(rstartAdded == startPreserved);
-                assert(rendAdded == endPreserved);
-
-                // Also set the prev pointer according to the PIP
-                assert (rend.getPrev() == null);
-                rend.setPrev(rstart);
+                assert(endAdded == endPreserved);
             }
 
-            // Try and use prev pointers to recover the routing for each connection
+            // Only those nodes between the projected source and sink nodes of this net's
+            // connections are of use to the router, so create just those and set their previous
+            // pointer according to the PIP
+            setPrevBetweenProjectedPins(netWrapper);
+
+            // Try and use prev pointers to recover the routing for each indirect connection; direct
+            // connections (e.g. those through dedicated resources) are routed by routeDirectConnections()
             for (Connection connection : netWrapper.getConnections()) {
-                assert(!connection.isDirect());
+                if (connection.isDirect()) {
+                    continue;
+                }
                 RouteNode sourceRnode = connection.getSourceRnode();
                 RouteNode sinkRnode = connection.getSinkRnode();
-                assert(sourceRnode.getType() == RouteNodeType.PINFEED_O);
-                assert(sinkRnode.getType() == RouteNodeType.PINFEED_I);
-
-                // Even though this connection is not expected to have any routing yet,
-                // perform a rip up anyway in order to release any exclusive sinks
-                // ahead of finishRouteConnection()
-                assert(connection.getRnodes().isEmpty());
-                connection.getSink().setRouted(false);
-                ripUp(connection);
+                assert(sourceRnode.getType() == RouteNodeType.EXCLUSIVE_SOURCE);
+                assert(sinkRnode.getType().isAnyExclusiveSink());
 
                 finishRouteConnection(connection, sinkRnode);
-                if (!connection.getSink().isRouted() && connection.getAltSinkRnodes().isEmpty()) {
-                    // Undo what ripUp() did for this connection which has a single exclusive sink
-                    sinkRnode.incrementUser(connection.getNetWrapper());
-                    sinkRnode.updatePresentCongestionCost(presentCongestionFactor);
-                }
             }
 
             netToPins.put(net, net.getSinkPins());
@@ -679,20 +757,21 @@ public class PartialRouter extends RWRoute {
                 timingManager.getTimingGraph().addNetDelayEdges(net);
                 timingManager.setTimingEdgesOfConnections(netWrapper.getConnections());
                 for (Connection netnewConnection : netWrapper.getConnections()) {
+                    if (netnewConnection.isDirect()) {
+                        continue;
+                    }
                     netnewConnection.updateRouteDelay();
                 }
             }
         }
 
-        routingGraph.resetExpansion();
-
-        for (RouteNode rnode : rnodes) {
+        for (Node node : nodes) {
             // Check already unpreserved above
-            assert(!routingGraph.isPreserved(rnode));
+            assert(!routingGraph.isPreserved(node));
 
-            // Each rnode should be added as a child to all of its parents
+            // Each node should be added as a child to all of its parents
             // that already exist
-            for (Node uphill : rnode.getAllUphillNodes()) {
+            for (Node uphill : node.getAllUphillNodes()) {
                 RouteNode parent = routingGraph.getNode(uphill);
                 if (parent == null)
                     continue;
@@ -705,41 +784,66 @@ public class PartialRouter extends RWRoute {
 
         numPreservedWire--;
         numPreservedRoutableNets--;
+        return netWrapper;
     }
 
     @Override
     protected boolean handleUnroutableConnection(Connection connection) {
-        boolean hasAltOutput = super.handleUnroutableConnection(connection);
-        if (hasAltOutput)
+        enlargeBoundingBox(connection);
+        if (routeIteration == 1 && swapOutputPin(connection)) {
             return true;
-        if (softPreserve) {
-            if (routeIteration == 2) {
-                unpreserveNetsAndReleaseResources(connection);
-                return true;
-            }
         }
+        if (softPreserve && (
+                // First iteration, without alternate source
+                (routeIteration == 1 && connection.getNet().getAlternateSource() == null) ||
+                // Second iteration, with alternate source
+                (routeIteration == 2 && connection.getNet().getAlternateSource() != null))
+        ) {
+             int netsUnpreserved = unpreserveNetsAndReleaseResources(connection);
+             if (netsUnpreserved > 0) {
+                 return true;
+             }
+        }
+        abandonConnectionIfUnroutable(connection);
         return false;
     }
 
     /**
-     * Partially routes a {@link Design} instance; specifically, all nets with no routing PIPs already present.
+     * Partially routes all unrouted sinks in a {@link Design} instance; fully-routed sinks will have their routing preserved.
      * @param design The {@link Design} instance to be routed.
      * @param args An array of string arguments, can be null.
      * If null, the design will be routed in the full timing-driven routing mode with default a {@link RWRouteConfig} instance.
+     * The "--softPreserve" argument, if present, is consumed here (and not forwarded to {@link RWRouteConfig})
+     * to allow routed nets to be unrouted and subsequently rerouted in order to improve routability.
      * For more options of the configuration, please refer to the {@link RWRouteConfig} class.
      * @return Routed design.
      */
     public static Design routeDesignWithUserDefinedArguments(Design design, String[] args) {
         boolean softPreserve = false;
+        if (args != null) {
+            // Splice out every occurrence, since RWRouteConfig would not recognize this argument.
+            // No copying occurs when absent (the common case)
+            for (int i = 0; i < args.length; i++) {
+                if (!args[i].equals("--softPreserve")) {
+                    continue;
+                }
+                softPreserve = true;
+                String[] filtered = new String[args.length - 1];
+                System.arraycopy(args, 0, filtered, 0, i);
+                System.arraycopy(args, i + 1, filtered, i, filtered.length - i);
+                args = filtered;
+                i--;
+            }
+        }
         List<SitePinInst> pinsToRoute = null;
 
-        // Instantiates a RWRouteConfig Object and parses the arguments.
         // Uses the default configuration if basic usage only.
         return routeDesignWithUserDefinedArguments(design, args, pinsToRoute, softPreserve);
     }
 
     /**
-     * Partially routes a {@link Design} instance; specifically, all nets with no routing PIPs already present.
+     * Partially routes all given sinks in a {@link Design} instance; fully-routed sinks will have their routing preserved
+     * if "softPreserve" is false, otherwise such sinks may be lazily-rerouted when attempting to route other congested sinks.
      * @param design The {@link Design} instance to be routed.
      * @param args An array of string arguments, can be null.
      * If null, the design will be routed in the full timing-driven routing mode with default a {@link RWRouteConfig} instance.
@@ -764,7 +868,7 @@ public class PartialRouter extends RWRoute {
             System.out.println("WARNING: Masking nodes across RCLK for partial routing could result in routability problems.");
         }
 
-        return routeDesign(design, new PartialRouter(design, config, pinsToRoute, softPreserve));
+        return routeDesign(new PartialRouter(design, config, pinsToRoute, softPreserve));
     }
 
     /**
@@ -847,12 +951,13 @@ public class PartialRouter extends RWRoute {
     /**
      * The main interface of {@link PartialRouter} that reads in a {@link Design} checkpoint,
      * and parses the arguments for the {@link RWRouteConfig} object of the router.
-     * Specifically, all nets with no routing PIPs already present will be partially routed.
+     * Specifically, only unrouted sinks will be tackled; all routed sinks will have their routing preserved
+     * and not be re-routed.
      * @param args An array of strings that are used to create a {@link RWRouteConfig} object for the router.
      */
     public static void main(String[] args) {
         if (args.length < 2) {
-            System.out.println("USAGE: <input.dcp> <output.dcp>");
+            System.out.println("USAGE: <input.dcp> <output.dcp> [--softPreserve]");
             return;
         }
         // Reads the output directory and set the output design checkpoint file name

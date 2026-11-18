@@ -41,7 +41,7 @@ import java.util.Map.Entry;
  *
  * Created on: Oct 30, 2017
  */
-public class EDIFHierCellInst {
+public class EDIFHierCellInst implements Comparable<EDIFHierCellInst> {
     private final EDIFCellInst[] cellInsts;
 
     private EDIFHierCellInst(EDIFCellInst[] cellInsts, int newLength, EDIFCellInst relativeChild) {
@@ -342,5 +342,31 @@ public class EDIFHierCellInst {
             }
         }
         return true;
+    }
+
+    /**
+     * Ensures that all ancestor instances are uniquified (one instance per cell
+     * type). If any ancestor instance is not uniquified, it will make the instance
+     * unique by creating a copy of the cell (in the same library) and referencing
+     * the copy to the ancestor instance.
+     */
+    public void ensureAncestorsAreUniquified() {
+        for (int i = cellInsts.length - 1; i > 0; i--) {
+            if (!cellInsts[i].isUniquified()) {
+                EDIFCell orig = cellInsts[i].getCellType();
+                // Don't unique-ify primitives or macros
+                if (orig.isPrimitive() || orig.isMacro()) {
+                    continue;
+                }
+                String newCellTypeName = orig.getName() + EDIFTools.getUniqueSuffix();
+                EDIFCell copy = new EDIFCell(orig.getLibrary(), orig, newCellTypeName);
+                cellInsts[i].setCellType(copy);
+            }
+        }
+    }
+
+    @Override
+    public int compareTo(EDIFHierCellInst o) {
+        return this.toString().compareTo(o.toString());
     }
 }

@@ -331,7 +331,7 @@ public class TestPhysNetlistWriter {
             inputDesign = null;
 
             Assertions.assertTrue(LUTTools.swapLutPinsFromPIPs(outputDesign) > 0);
-            DesignTools.updatePinsIsRouted(outputDesign);
+            Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(outputDesign));
             TestRWRoute.assertAllSourcesRoutedFlagSet(outputDesign);
             TestRWRoute.assertAllPinsRouted(outputDesign);
             VivadoToolsHelper.assertFullyRouted(outputDesign);

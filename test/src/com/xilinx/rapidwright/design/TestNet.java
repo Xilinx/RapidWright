@@ -37,8 +37,8 @@ import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 public class TestNet {
     @Test
-    void testSetPinsMultiSrc() {
-        Design d = new Design("testSetPinsMultiSrc", Device.KCU105);
+    void testSetPinsDualSrc() {
+        Design d = new Design("testSetPinsDualSrc", Device.KCU105);
         SiteInst si = d.createSiteInst("SLICE_X32Y73");
 
         Net net = new Net("foo");
@@ -53,6 +53,25 @@ public class TestNet {
     }
 
     @Test
+    void testSetPinsMultiSrc() {
+        Design d = new Design("testSetPinsMultiSrc", "xcvc1902");
+        SiteInst si = d.createSiteInst("SLICE_X249Y83");
+
+        Net net = new Net("foo");
+        List<SitePinInst> pins = Arrays.asList(
+                new SitePinInst("H_O", si),
+                new SitePinInst("HQ", si),
+                new SitePinInst("HQ2", si)
+        );
+
+        Assertions.assertTrue(net.setPins(pins));
+        Assertions.assertEquals(pins.get(0), net.getSource());
+        Assertions.assertEquals(pins.get(1), net.getAlternateSource());
+        Assertions.assertSame(pins.get(2), net.getAlternateSources().get(1));
+        Assertions.assertEquals(pins.subList(1, 3).toString(), net.getAlternateSources().toString());
+    }
+
+    @Test
     void testSetPinsMultiSrcStatic() {
         Design d = new Design("testSetPinsMultiSrcStatic", Device.KCU105);
         SiteInst si = d.createSiteInst("SLICE_X32Y73");
@@ -60,13 +79,37 @@ public class TestNet {
         Net net = d.getVccNet();
         List<SitePinInst> pins = Arrays.asList(
                 new SitePinInst("A_O", si),
-                new SitePinInst("B_O", si),
+                new SitePinInst("BMUX", si),
                 new SitePinInst("C_O", si)
         );
 
         Assertions.assertTrue(net.setPins(pins));
-        Assertions.assertNull(net.getSource());
-        Assertions.assertNull(net.getAlternateSource());
+        Assertions.assertSame(pins.get(0), net.getSource());
+        Assertions.assertSame(pins.get(1), net.getAlternateSource());
+        Assertions.assertSame(pins.get(2), net.getAlternateSources().get(1));
+        Assertions.assertEquals(pins.subList(1, 3).toString(), net.getAlternateSources().toString());
+    }
+
+    @Test
+    void testAddPinsMultiSrcStatic() {
+        Design d = new Design("testSetPinsMultiSrcStatic", "xcvc1902");
+        SiteInst si = d.createSiteInst("SLICE_X249Y83");
+
+        Net net = d.getVccNet();
+        List<SitePinInst> pins = Arrays.asList(
+                new SitePinInst("F_O", si),
+                new SitePinInst("GQ", si),
+                new SitePinInst("H_O", si)
+        );
+        for (SitePinInst spi : pins) {
+            Assertions.assertTrue(net.addPin(spi));
+        }
+
+        Assertions.assertTrue(net.setPins(pins));
+        Assertions.assertSame(pins.get(0), net.getSource());
+        Assertions.assertSame(pins.get(1), net.getAlternateSource());
+        Assertions.assertSame(pins.get(2), net.getAlternateSources().get(1));
+        Assertions.assertEquals(pins.subList(1, 3).toString(), net.getAlternateSources().toString());
     }
 
     @Test
@@ -222,6 +265,31 @@ public class TestNet {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"updateName", "setName", "rename"})
+    public void testNameChangeInvalidatesLogicalHierNet(String method) {
+        Design design = new Design("top", Device.KCU105);
+        Net net = design.createNet("net");
+        Assertions.assertNotNull(net.getLogicalHierNet());
+
+        switch (method) {
+        case "updateName":
+            Assertions.assertTrue(net.updateName("newNet"));
+            break;
+        case "setName":
+            net.setName("newNet");
+            break;
+        case "rename":
+            Assertions.assertTrue(net.rename("newNet"));
+            break;
+        default:
+            throw new RuntimeException("Unexpected method: " + method);
+        }
+
+        Assertions.assertEquals("newNet", net.getName());
+        Assertions.assertNull(net.getLogicalHierNet());
+    }
+
     @Test
     public void testCreatePinDuplicate() {
         Design d = new Design("testCreatePinDuplicate", Device.AWS_F1);
@@ -291,9 +359,12 @@ public class TestNet {
         boolean samePin = altPinName.equals(pinName);
         SitePinInst spi1 = new SitePinInst(pinName, si);
         Assertions.assertTrue(net.addPin(spi1));
-        SitePinInst spi2 = new SitePinInst(altPinName, si);
-        Assertions.assertEquals(samePin, spi1.equals(spi2));
-        Assertions.assertEquals(!samePin, net.addPin(spi2));
+
+        SitePinInst spi2 = null;
+        if (!samePin) {
+            spi2 = new SitePinInst(altPinName, si);
+            Assertions.assertTrue(net.addPin(spi2));
+        }
 
         Assertions.assertSame(spi1, net.getSource());
         if (samePin) {
@@ -320,10 +391,7 @@ public class TestNet {
         net.setAlternateSource(spi2);
         Assertions.assertSame(spi2, net.getAlternateSource());
 
-        SitePinInst spi3 = new SitePinInst(altPinName, si);
-        Assertions.assertEquals(spi2, spi3);
-
-        Assertions.assertThrows(RuntimeException.class, () -> net.setSource(spi3));
+        Assertions.assertThrows(RuntimeException.class, () -> net.setSource(spi2));
     }
 
     @Test
@@ -332,15 +400,13 @@ public class TestNet {
         SiteInst si = design.createSiteInst(design.getDevice().getSite("SLICE_X0Y0"));
         Net net = design.createNet("net");
         String pinName = "H_O";
-        SitePinInst spi1 = new SitePinInst(pinName, si);
-        Assertions.assertTrue(net.addPin(spi1));
-        SitePinInst spi2 = new SitePinInst(pinName, si);
-        Assertions.assertEquals(spi1, spi2);
+        SitePinInst spi = new SitePinInst(pinName, si);
+        Assertions.assertTrue(net.addPin(spi));
 
-        net.setSource(spi1);
-        Assertions.assertSame(spi1, net.getSource());
+        net.setSource(spi);
+        Assertions.assertSame(spi, net.getSource());
 
-        Assertions.assertThrows(RuntimeException.class, () -> net.setAlternateSource(spi2));
+        Assertions.assertThrows(RuntimeException.class, () -> net.setAlternateSource(spi));
     }
 
     @Test
@@ -353,5 +419,14 @@ public class TestNet {
         net0.connect(f7mux0, "I1");
 
         Assertions.assertEquals("I1", net0.getLogicalNet().getPortInst(f7mux0.getEDIFCellInst(), "I1").getName());
+    }
+
+    @Test
+    public void testSingleClockNetSource() {
+        Design design = RapidWrightDCP.loadDCP("bug349.dcp");
+        Net net = design.getNet("CLK_BUFG_BOT_R_X60Y48_BUFGCTRL_X0Y0_O");
+        SitePinInst bufg_o = design.getSiteInstFromSiteName("BUFGCTRL_X0Y0").getSitePinInst("O");
+        Assertions.assertSame(bufg_o, net.getSource());
+        Assertions.assertNull(net.getAlternateSource());
     }
 }

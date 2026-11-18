@@ -25,18 +25,26 @@ package com.xilinx.rapidwright.util.lsf;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
 
 import com.xilinx.rapidwright.support.LargeTest;
+import com.xilinx.rapidwright.support.TestDurationsListener;
+import com.xilinx.rapidwright.support.TestShardFilter;
 import org.junit.platform.engine.FilterResult;
 import org.junit.platform.engine.TestDescriptor;
 import org.junit.platform.engine.TestTag;
 import org.junit.platform.engine.UniqueId;
+import org.junit.platform.engine.support.descriptor.MethodSource;
 import org.junit.platform.launcher.Launcher;
 import org.junit.platform.launcher.LauncherDiscoveryRequest;
 import org.junit.platform.launcher.PostDiscoveryFilter;
@@ -50,10 +58,16 @@ import org.junit.platform.reporting.legacy.xml.LegacyXmlReportGeneratingListener
 /**
  * JUnit test runner that runs a specific subset of tests. Output is written to the current directory.
  *
- * If called with no parameters: Runs all tests not tagged as LSF
- * If called with one parameter: Run that specific test identified by unique ID
+ * Arguments: the tests jar, then either a test's unique ID (to run that test only) or an empty string (to run all
+ * tests not tagged as LSF tests). With an empty string, two more optional arguments are accepted: a file listing the
+ * test classes and test method keys (see {@link TestShardFilter#getMethodKey}) to run, one per line, so that the tests
+ * not tagged as LSF tests can be split between several jobs; and a file to write each test method's duration to
+ * (see {@link TestDurationsListener}).
  */
 public class RunTest {
+    /** File in the working directory that this runner writes its start and end times (in ms) to */
+    public static final String RUN_TIMES_FILE = "run-times.txt";
+
     public static boolean isLsfTest(Set<TestTag> tags) {
         return tags.stream().anyMatch(t -> t.getName().equals(LargeTest.LARGE_TEST));
     }
@@ -67,9 +81,27 @@ public class RunTest {
 
 
 
-    private void executeTests(PrintWriter out, Predicate<TestDescriptor> discoveryFilter, UniqueId filterName, Path testsJar) {
+    /**
+     * @param units Test classes and test method keys.
+     * @return Whether this descriptor is a test method listed in units, or belongs to a test class listed in units.
+     *         Descriptors that are not test methods (e.g. classes) are included, so that their tests can be.
+     */
+    public static boolean isInUnits(TestDescriptor descriptor, Set<String> units) {
+        Optional<MethodSource> source = TestShardFilter.getTestMethodSource(descriptor);
+        Optional<String> className = TestShardFilter.getTopLevelClassName(descriptor);
+        if (!source.isPresent() || !className.isPresent()) {
+            return true;
+        }
+        return units.contains(className.get()) || units.contains(TestShardFilter.getMethodKey(source.get()));
+    }
+
+    private void executeTests(PrintWriter out, Predicate<TestDescriptor> discoveryFilter, UniqueId filterName,
+                              Path testsJar, String durationsFile) {
         Launcher launcher = LauncherFactory.create();
         SummaryGeneratingListener summaryListener = registerListeners(out, launcher, filterName);
+        if (durationsFile != null) {
+            launcher.registerTestExecutionListeners(new TestDurationsListener(durationsFile));
+        }
 
         LauncherDiscoveryRequest discoveryRequest = LaunchTestsOnLsf.getLauncherDiscoveryRequestBuilder(testsJar)
                         .filters((PostDiscoveryFilter) descriptor -> {
@@ -110,11 +142,19 @@ public class RunTest {
     }
 
     public static void main(String[] args) throws IOException {
+        Path runTimes = Paths.get(RUN_TIMES_FILE);
+        Files.write(runTimes, Arrays.asList("start " + System.currentTimeMillis()), StandardCharsets.UTF_8);
         Predicate<TestDescriptor> discoveryFilter;
         Path testsJar = Paths.get(args[0]);
         UniqueId filterArg = args[1].isEmpty() ? null : UniqueId.parse(args[1]);
+        String durationsFile = null;
         if (filterArg == null) {
-            discoveryFilter = (TestDescriptor descriptor) -> !RunTest.isLsfTest(descriptor.getTags());
+            Set<String> units = args.length > 2 && !args[2].isEmpty()
+                    ? new HashSet<>(Files.readAllLines(Paths.get(args[2]), StandardCharsets.UTF_8))
+                    : null;
+            durationsFile = args.length > 3 && !args[3].isEmpty() ? args[3] : null;
+            discoveryFilter = (TestDescriptor descriptor) -> !RunTest.isLsfTest(descriptor.getTags())
+                    && (units == null || isInUnits(descriptor, units));
         } else {
             discoveryFilter = (TestDescriptor descriptor) -> filterArg.hasPrefix(descriptor.getUniqueId());
             //Filtering tests in discovery only works on method level.
@@ -122,9 +162,11 @@ public class RunTest {
             LsfInterceptor.ENABLED = true;
             LsfInterceptor.allowedId = filterArg.toString();
         }
-        new RunTest().executeTests(new PrintWriter(System.out), discoveryFilter, filterArg, testsJar);
+        new RunTest().executeTests(new PrintWriter(System.out), discoveryFilter, filterArg, testsJar, durationsFile);
 
         XmlReportPatcher.fixOutputXmls(Paths.get("."));
+        Files.write(runTimes, Arrays.asList("end " + System.currentTimeMillis()), StandardCharsets.UTF_8,
+                StandardOpenOption.APPEND);
     }
 
 

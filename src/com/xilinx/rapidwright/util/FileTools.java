@@ -63,13 +63,17 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.zip.CRC32;
+import java.util.zip.CheckedInputStream;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.InflaterInputStream;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
 
@@ -127,6 +131,8 @@ public class FileTools {
     public static final String PART_DB_PATH = DATA_FOLDER_NAME + File.separator + "parts.db";
     /** Location of the cell pins default data file */
     public static final String CELL_PIN_DEFAULTS_FILE_NAME = DATA_FOLDER_NAME + File.separator + "cell_pin_defaults.dat";
+    /** Location of the Versal VDISTR Tree paths for clock routing */
+    public static final String VERSAL_VDISTR_TREES_FILE_NAME = DATA_FOLDER_NAME + File.separator + "versal_vdistr_trees.dat";
     /** Location of cached routethru helper files */
     public static final String ROUTETHRU_FOLDER_NAME = DATA_FOLDER_NAME + File.separator + "routeThrus";
     /** Common instance of the Kryo class for serialization purposes */
@@ -143,7 +149,7 @@ public class FileTools {
     /** Part Database File Version */
     public static final int PART_DB_FILE_VERSION = 1;
     /** Unisim Data File Version */
-    public static final int UNISIM_DATA_FILE_VERSION = 1;
+    public static final int UNISIM_DATA_FILE_VERSION = 2;
     /** Base URL for download data files */
     public static final String RAPIDWRIGHT_DATA_URL = "http://data.rapidwright.io/";
     /** Suffix added to data file names to capture md5 status */
@@ -1125,6 +1131,12 @@ public class FileTools {
         return expectedFiles;
     }
 
+    /** Number of times the download of a data file is tried before giving up */
+    private static final int DATA_FILE_DOWNLOAD_ATTEMPTS = 5;
+
+    /** Delay before the second try of a data file download, doubled before each further try */
+    private static final long DATA_FILE_DOWNLOAD_RETRY_DELAY_MS = 1000;
+
     /**
      * Downloads the specified data file and version according to
      * {@link #DATA_VERSION_FILE}. This will overwrite any existing file locally of
@@ -1139,23 +1151,71 @@ public class FileTools {
         String md5 = getCurrentDataVersion(fileName);
         String url = RAPIDWRIGHT_DATA_URL + getContainerName(fileName) + "/" +
                     md5;
-        String dstFileName = getRapidWrightPath() + File.separator + fileName;
-        String downloadedMD5 = _downloadDataFile(url, dstFileName);
-        if (!md5.equals(downloadedMD5)) {
-            System.err.println("WARNING: Download validation of file " + fileName + " failed.  Trying again...");
-            downloadedMD5 = _downloadDataFile(url, dstFileName);
-            if (!md5.equals(downloadedMD5)) {
-                throw new RuntimeException("ERROR: Failed to reliably download file: " + fileName);
-            }
-        }
-        FileTools.writeStringToTextFile(downloadedMD5, dstFileName + MD5_DATA_FILE_SUFFIX);
+        Path dst = Paths.get(getRapidWrightPath(), fileName);
+        String downloadedMD5 = downloadDataFile(url, dst, md5, DATA_FILE_DOWNLOAD_ATTEMPTS,
+                DATA_FILE_DOWNLOAD_RETRY_DELAY_MS);
+        FileTools.writeStringToTextFile(downloadedMD5, dst + MD5_DATA_FILE_SUFFIX);
         return downloadedMD5;
     }
 
-    private static String _downloadDataFile(String url, String dstFileName) {
-        Installer.downloadFile(url, dstFileName);
-        String downloadedMD5 = Installer.calculateMD5OfFile(dstFileName);
-        return downloadedMD5;
+    /**
+     * Downloads a file and validates it by its md5sum, trying again (after a delay that doubles
+     * each time) if the download fails or is not valid. A download can end early without any
+     * error (e.g. if the server closes the connection), so the md5sum is the only reliable check.
+     * The file is downloaded to a temporary file next to the destination, which replaces the
+     * destination only once it is valid: so the destination is never left partly written, and
+     * other processes that download the same file at the same time do not corrupt each other's
+     * downloads.
+     *
+     * @param url          The URL of the file
+     * @param dst          The local file to download to
+     * @param expectedMD5  The md5sum of the file
+     * @param attempts     The number of times to try the download
+     * @param retryDelayMs The delay in milliseconds before the second try
+     * @return The md5sum of the downloaded file, equal to expectedMD5
+     * @throws RuntimeException If no try downloaded a valid file
+     */
+    static String downloadDataFile(String url, Path dst, String expectedMD5, int attempts,
+                                   long retryDelayMs) {
+        String failure = null;
+        for (int attempt = 1; attempt <= attempts; attempt++) {
+            if (attempt > 1) {
+                System.err.println("WARNING: Download of " + url + " failed (" + failure
+                        + "), trying again (" + attempt + " of " + attempts + ")...");
+                try {
+                    Thread.sleep(retryDelayMs << (attempt - 2));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("ERROR: Interrupted while downloading " + url, e);
+                }
+            }
+            // A unique name, created as any other file (Files.createTempFile() would restrict its
+            // permissions to its owner)
+            Path tmp = dst.resolveSibling("." + dst.getFileName() + "." + UUID.randomUUID() + ".part");
+            try {
+                long bytes = Installer.downloadFile(url, tmp.toString());
+                String downloadedMD5 = Installer.calculateMD5OfFile(tmp);
+                if (expectedMD5.equals(downloadedMD5)) {
+                    Files.move(tmp, dst, StandardCopyOption.REPLACE_EXISTING,
+                            StandardCopyOption.ATOMIC_MOVE);
+                    return downloadedMD5;
+                }
+                failure = "downloaded " + bytes + " bytes with md5sum " + downloadedMD5
+                        + ", expected md5sum " + expectedMD5;
+            } catch (IOException e) {
+                failure = e.toString();
+            } catch (UncheckedIOException e) {
+                failure = e.getMessage() + ": " + e.getCause();
+            } finally {
+                try {
+                    Files.deleteIfExists(tmp);
+                } catch (IOException e) {
+                    // Leave it, as it is only a temporary file
+                }
+            }
+        }
+        throw new RuntimeException("ERROR: Failed to reliably download file " + dst + " from "
+                + url + " after " + attempts + " attempts (last failure: " + failure + ")");
     }
 
     /**
@@ -1501,6 +1561,7 @@ public class FileTools {
 
     public static Pair<InputStream,Long> getInputStreamFromZipFile(String zipFileName, String fileEndsWith) {
         try {
+            @SuppressWarnings("resource")
             final ZipFile zip = new ZipFile(zipFileName);
             Enumeration<? extends ZipEntry> entries = zip.entries();
             ZipEntry match = null;
@@ -1581,10 +1642,14 @@ public class FileTools {
 
     /**
      * A generic method to run a command from the system command line.
-     * @param command The command to execute.  This method blocks until the command finishes.
-     * @param verbose When true, it will first print to std.out the command and also all of the
-     * command's output (both std.out and std.err) to std.out.
-     * @return The return value of the process if it terminated, if there was a problem it returns null.
+     *
+     * @param command The command to execute. This method blocks until the command
+     *                finishes.
+     * @param verbose When true, it will first print to std.out the command and also
+     *                all of the command's output (both std.out and std.err) to
+     *                std.out.
+     * @return The return value of the process if it terminated, if there was a
+     *         problem it returns null.
      */
     public static Integer runCommand(String command, boolean verbose) {
         return runCommand(command, verbose, null, null);
@@ -1610,6 +1675,73 @@ public class FileTools {
      */
     public static Integer runCommand(String command, boolean verbose, String[] environ, File runDir) {
         if (verbose) System.out.println(command);
+        int returnValue = 0;
+        Process p = null;
+        try {
+            p = Runtime.getRuntime().exec(command, environ, runDir);
+            StreamGobbler input = new StreamGobbler(p.getInputStream(), verbose);
+            StreamGobbler err = new StreamGobbler(p.getErrorStream(), verbose);
+            input.start();
+            err.start();
+            returnValue = p.waitFor();
+        } catch (IOException e) {
+            e.printStackTrace();
+            MessageGenerator.briefError("ERROR: In running the command \"" + command + "\"");
+            return null;
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            MessageGenerator.briefError("ERROR: The command was interrupted: \"" + command + "\"");
+            return null;
+        } finally {
+            if (p != null) p.destroyForcibly();
+        }
+        return returnValue;
+    }
+
+    /**
+     * A generic method to run a command from the system command line.
+     *
+     * @param command The command (as an array of strings) to execute. This method
+     *                blocks until the command finishes.
+     * @param verbose When true, it will first print to std.out the command and also
+     *                all of the command's output (both std.out and std.err) to
+     *                std.out.
+     * @return The return value of the process if it terminated, if there was a
+     *         problem it returns null.
+     */
+    public static Integer runCommand(String[] command, boolean verbose) {
+        return runCommand(command, verbose, null, null);
+    }
+
+    /**
+     * A generic method to run a command from the system command line.
+     *
+     * @param command The command (as an array of strings) to execute. This method
+     *                blocks until the command finishes.
+     * @param verbose When true, it will first print to std.out the command and also
+     *                all of the command's output (both std.out and std.err) to
+     *                std.out.
+     * @param environ array of strings, each element of which has environment
+     *                variable settings in the format name=value, or null if the
+     *                subprocess should inherit the environment of the current
+     *                process.
+     * @param runDir  the working directory of the subprocess, or null if the
+     *                subprocess should inherit the working directory of the current
+     *                process.
+     * @return The return value of the process if it terminated, if there was a
+     *         problem it returns null.
+     */
+    public static Integer runCommand(String[] command, boolean verbose, String[] environ, File runDir) {
+        if (verbose) {
+            for (String c : command) {
+                if (c.contains(" ")) {
+                    System.out.print(" \"" + c.replace("\"", "\\\"") + "\"");
+                } else {
+                    System.out.print(" " + c);
+                }
+            }
+            System.out.println();
+        }
         int returnValue = 0;
         Process p = null;
         try {
@@ -1865,17 +1997,27 @@ public class FileTools {
     }
 
     /**
+     * Gets the full path to an executable if it is set in the PATH
+     * environment variable. Works for Windows and Linux.
+     * @param exe Executable to search for (e.g. vivado)
+     * @return Full path to executable, or throws RuntimeException if not found.
+     */
+    public static String getExecutablePath(String exe) {
+        String[] cmd = new String[]{isWindows() ? "where" : "which", exe};
+        final List<String> fullOutput = execCommandGetOutput(true, cmd);
+        if (fullOutput.isEmpty() || fullOutput.get(0).contains("INFO:") || fullOutput.get(0).contains("which: no")) {
+            throw new RuntimeException("ERROR: Couldn't find " + exe + " on PATH");
+        }
+        return fullOutput.get(0).trim().replace("\\", "/");
+    }
+
+    /**
      * Gets the full path to the vivado executable if it is set in the PATH
      * environment variable. Works for Windows and Linux.
      * @return Full path to vivado executable, or throws RuntimeException if not found.
      */
     public static String getVivadoPath() {
-        String[] cmd = new String[]{isWindows() ? "where" : "which",isWindows() ? "vivado.bat" : "vivado"};
-        final List<String> fullOutput = execCommandGetOutput(true, cmd);
-        if (fullOutput.isEmpty() || fullOutput.get(0).contains("INFO:") || fullOutput.get(0).contains("which: no")) {
-            throw new RuntimeException("ERROR: Couldn't find vivado on PATH");
-        }
-        return fullOutput.get(0).trim().replace("\\", "/");
+        return getExecutablePath(isWindows() ? "vivado.bat" : "vivado");
     }
 
     private static String currentOS = null;
@@ -1891,16 +2033,21 @@ public class FileTools {
         return getOSName().startsWith("Windows");
     }
 
+    public static boolean isLinux() {
+        return getOSName().startsWith("Linux");
+    }
+
     public static void unzipFile(String zipFileName, String destDirectory) {
         File destDir = new File(destDirectory);
         byte[] buffer = new byte[1024*16];
         if (!destDir.exists()) {
             destDir.mkdirs();
         }
-        try (FileInputStream fis = new FileInputStream(zipFileName);
-            ZipInputStream zin = new ZipInputStream(fis)) {
-            ZipEntry e;
-            while ((e = zin.getNextEntry()) != null) {
+        // A ZipFile, which reads each entry's sizes from the central directory, rather than a ZipInputStream, which
+        // before Java 23 misreads ZIP64 (8-byte) sizes in the data descriptor after an entry under 4 GB, as some ZIP
+        // files are written (https://bugs.openjdk.org/browse/JDK-8303866)
+        try (ZipFile zip = new ZipFile(zipFileName)) {
+            for (ZipEntry e : Collections.list(zip.entries())) {
                 String destFilePath = destDirectory + File.separator + e.getName();
                 if (e.isDirectory()) {
                     new File(destFilePath).mkdirs();
@@ -1908,11 +2055,18 @@ public class FileTools {
                     File currFile = new File(destFilePath);
                     String parentName = currFile.getParentFile().getAbsolutePath();
                     makeDirs(parentName);
-                    try (FileOutputStream fos = new FileOutputStream(destFilePath);
+                    try (CheckedInputStream zin = new CheckedInputStream(zip.getInputStream(e), new CRC32());
+                        FileOutputStream fos = new FileOutputStream(destFilePath);
                         BufferedOutputStream bos = new BufferedOutputStream(fos)) {
                         int read;
                         while ( (read = zin.read(buffer)) != -1) {
                             bos.write(buffer,0,read);
+                        }
+                        // Unlike a ZipInputStream, a ZipFile does not check an entry's CRC
+                        if (e.getCrc() != -1 && zin.getChecksum().getValue() != e.getCrc()) {
+                            throw new ZipException("invalid entry CRC for " + e.getName() + " (expected 0x"
+                                    + Long.toHexString(e.getCrc()) + " but got 0x"
+                                    + Long.toHexString(zin.getChecksum().getValue()) + ")");
                         }
                     }
                 }
@@ -1992,7 +2146,7 @@ public class FileTools {
                     while ((e = zip.getNextEntry()) != null) {
                         String name = e.getName();
                         if (name.startsWith(folderName)) {
-                            if (!e.isDirectory()) {
+                            if (!e.isDirectory() && !name.endsWith(".class")) {
                                 String fileName = outputPath + File.separator + e.getName();
                                 System.out.println("Unpacking " + fileName);
                                 File newFile = new File(fileName);

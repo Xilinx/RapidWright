@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Advanced Micro Devices, Inc.
@@ -27,7 +27,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Wed May 17 23:03:43 2023
+ * Generated on: Wed Nov 11 16:44:19 MST 2026
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  *
  * Enumeration of IOBankType type for all valid devices within Vivado.
@@ -39,7 +39,12 @@ public enum IOBankType {
     BT_HIGH_PERFORMANCE,
     BT_HIGH_RANGE,
     BT_MGT,
+    BT_MMI,
     BT_NO_USER_IO,
     BT_PSS,
+    BT_X5,
+    BT_X5IO,
     BT_XP,
+    BT_XP5,
+    UNKNOWN
 }

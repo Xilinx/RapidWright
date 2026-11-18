@@ -79,7 +79,7 @@ public class HandPlacer extends QMainWindow {
     Device device;
     private QComboBox netViewCombo;
 
-    private static String title = "Hand HMPlacer";
+    private static String title = "Hand Placer";
 
     private String currOpenFileName = null;
 

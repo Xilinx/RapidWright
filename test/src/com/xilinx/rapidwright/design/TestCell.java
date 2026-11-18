@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -23,8 +23,12 @@
 
 package com.xilinx.rapidwright.design;
 
+import java.util.Arrays;
+import java.util.List;
 
+import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.VivadoTools;
@@ -32,8 +36,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-
-import java.util.List;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestCell {
     @ParameterizedTest
@@ -43,6 +46,8 @@ public class TestCell {
             "xcvu3p,SLICE_X0Y0,CARRY8,DI[2],DI2,'[C1, C2, C3, C4, C5]'",
             "xcvu3p,SLICE_X1Y0,CARRY8,S[7],S7,'[H1, H2, H3, H4, H5, H6]'",  // SLICEM
             "xcvu3p,SLICE_X1Y0,CARRY8,DI[3],DI3,'[D1, D2, D3, D4, D5]'",
+            // Versal input pins
+            "xcvp1502,SLICE_X148Y0,B6LUT,I1,A1,'[B1]'",
 
             // Output pins (single logical pin has options to drive many site pins)
             "xcvu3p,SLICE_X0Y0,E6LUT,O,O6,'[E_O, EMUX]'",
@@ -63,9 +68,50 @@ public class TestCell {
         List<String> sitePinNames = cell.getAllCorrespondingSitePinNames(logicalPinName, considerLutRoutethru);
         Assertions.assertEquals(expectedSitePins, sitePinNames.toString());
     }
+
+    @ParameterizedTest
+    @CsvSource({
+            "false,[G5]",
+            "true,'[G5, G1, G2, G3, G4, G6]'",
+    })
+    public void testGetAllCorrespondingSitePinNamesLUTRouteThru(boolean considerLutRoutethru, String expectedSitePins) {
+        Design d = new Design("testGetAllCorrespondingSitePinNamesLUTRouteThru", Device.KCU105);
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X32Y73"));
+        Cell cell = d.createAndPlaceCell("f7mux", Unisim.MUXF7, si.getSiteName() + "/F7MUX_GH");
+
+        Net netS = d.createNet("netS");
+        Assertions.assertTrue(si.routeIntraSiteNet(netS, si.getBELPin("GX", "GX"),
+                si.getBELPin("F7MUX_GH", "S0")));
+        List<String> sitePinNames = cell.getAllCorrespondingSitePinNames("S", considerLutRoutethru);
+        Assertions.assertEquals("[GX]", sitePinNames.toString());
+
+        Net net1 = d.createNet("net1");
+        Assertions.assertTrue(si.routeIntraSiteNet(net1, si.getBELPin("G5", "G5"),
+                si.getBELPin("F7MUX_GH", "1")));
+        sitePinNames = cell.getAllCorrespondingSitePinNames("I1", considerLutRoutethru);
+        Assertions.assertEquals(expectedSitePins, sitePinNames.toString());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            // Versal input pins
+            "xcvp1502,SLICE_X148Y0,BFF,D,D,BX",
+    })
+    public void testGetCorrespondingSitePinName(String deviceName,
+                                                String siteName,
+                                                String belName,
+                                                String logicalPinName,
+                                                String physicalPinName,
+                                                String expectedSitePin) {
+        Device device = Device.getDevice(deviceName);
+        Cell cell = new Cell("cell", device.getSite(siteName).getBEL(belName));
+        cell.addPinMapping(physicalPinName, logicalPinName);
+        String sitePinName = cell.getCorrespondingSitePinName(logicalPinName);
+        Assertions.assertEquals(expectedSitePin, sitePinName);
+    }
     
     @Test
-    public void testGetCorrespondingSitePinName() {
+    public void testGetCorrespondingSitePinNameDualLut() {
         Device device = Device.getDevice("xcvu3p");
         Design design = new Design("testDesign", device.getName());
         Cell cell = design.createAndPlaceCell("testFF", Unisim.FDRE, "SLICE_X10Y10/GFF");
@@ -108,6 +154,62 @@ public class TestCell {
 
         if (FileTools.isVivadoOnPath()) {
             Assertions.assertEquals(0, VivadoTools.reportRouteStatus(d).netsWithRoutingErrors);
+        }
+    }
+
+    @Test
+    public void testUpdateNameResetsLogicalInst() {
+        Design design = new Design("testUpdateNameResetsLogicalInst", Device.KCU105);
+        Cell cell = design.createAndPlaceCell("myFF", Unisim.FDRE, "SLICE_X32Y73/AFF");
+
+        // Cell.getEDIFHierCellInst() lazily resolves -- and caches -- the hierarchical
+        // logical cell instance matching the cell's current name
+        EDIFHierCellInst ehci = cell.getEDIFHierCellInst();
+        Assertions.assertNotNull(ehci);
+        Assertions.assertEquals("myFF", ehci.getFullHierarchicalInstName());
+
+        Assertions.assertTrue(cell.updateName("myFF_renamed"));
+        Assertions.assertEquals("myFF_renamed", cell.getName());
+
+        // Renaming must invalidate that cache; since the netlist contains no logical
+        // cell instance by the new name, it must now resolve to null
+        Assertions.assertNull(cell.getEDIFHierCellInst());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testGetSitePinFromLogicalPin(boolean createAX) {
+        Design design = new Design("top", Device.PYNQ_Z1);
+        SiteInst si = design.createSiteInst("SLICE_X1Y0");
+        Net net = design.createNet("net");
+        SitePinInst a3 = net.createPin("A3", si);
+        SitePinInst ax = createAX ? net.createPin("AX", si) : null;
+
+        Cell ff = design.createAndPlaceCell("ff", Unisim.FDRE, "SLICE_X1Y0/AFF");
+
+        BELPin ffD = ff.getBEL().getPin("D");
+        for (SitePinInst spi : Arrays.asList(ax, a3)) {
+            if (spi == null) {
+                continue;
+            }
+
+            Assertions.assertNull(DesignTools.getRoutedSitePin(ff, net, "D"));
+            if (createAX) {
+                // Without intra-site routing, the existing AX pin is a valid default for D.
+                Assertions.assertSame(ax, ff.getSitePinFromLogicalPin("D", null));
+            } else {
+                // An unrouted A3 pin is not selected by inferring a LUT route-through.
+                Assertions.assertNull(ff.getSitePinFromLogicalPin("D", null));
+            }
+
+            BELPin bp = spi.getBELPin();
+            Assertions.assertTrue(si.routeIntraSiteNet(net, bp, ffD));
+
+            Assertions.assertEquals(bp.getName(), DesignTools.getRoutedSitePin(ff, net, "D"));
+            // Follow the actual route, including A3 when AX also exists (PR #473).
+            Assertions.assertSame(spi, ff.getSitePinFromLogicalPin("D", null));
+
+            Assertions.assertTrue(si.unrouteIntraSiteNet(bp, ffD));
         }
     }
 }

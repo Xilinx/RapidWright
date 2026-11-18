@@ -30,12 +30,11 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
 import com.xilinx.rapidwright.design.Cell;
+import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.Unisim;
 
 /**
@@ -47,7 +46,8 @@ public class EDIFNet extends EDIFPropertyObject {
 
     private EDIFCell parentCell;
 
-    private EDIFPortInstList portInsts;
+    /** null or a non-empty sorted array (see {@link EDIFPortInstArray}) */
+    private EDIFPortInst[] portInsts;
 
     public EDIFNet(String name, EDIFCell parentCell) {
         super(name);
@@ -83,11 +83,10 @@ public class EDIFNet extends EDIFPropertyObject {
      * @param deferSort The EDIFPortInstList maintains a sorted list of EDIFPortInst 
      * objects and sorts them upon insertion.  Setting this flag to true will skip a sort addition
      * but the caller is responsible to conclude a batch of additions with a call to 
-     * {@link EDIFPortInstList#reSortList()}.  This is useful when a large number of EDIFPortInsts 
+     * {@link EDIFCell#sortEDIFPortInstLists()}.  This is useful when a large number of EDIFPortInsts 
      * will be added consecutively (such as parsing a netlist).
      */
     public void addPortInst(EDIFPortInst portInst, boolean deferSort) {
-        if (portInsts == null) portInsts = new EDIFPortInstList();
         boolean isParentCellNonNull = parentCell != null;
         EDIFCellInst inst = portInst.getCellInst();
         if (isParentCellNonNull && inst == null) {
@@ -99,10 +98,9 @@ public class EDIFNet extends EDIFPropertyObject {
             trackChanges(EDIFChangeType.PORT_INST_ADD, inst, portInst.getName());
         }
         if (deferSort) {
-            portInsts.deferSortAdd(portInst);
+            portInsts = EDIFPortInstArray.deferSortAdd(portInsts, portInst);
         } else {
-            boolean added = portInsts.add(portInst);
-            assert(added);
+            portInsts = EDIFPortInstArray.add(portInsts, portInst);
         }
     }
 
@@ -188,7 +186,7 @@ public class EDIFNet extends EDIFPropertyObject {
      *                     objects and sorts them upon insertion.  Setting this flag to 
      *                     true will skip a sort addition but the caller is responsible 
      *                     to conclude a batch of additions with a call to 
-     *                     {@link EDIFPortInstList#reSortList()}.  This is useful when 
+     *                     {@link EDIFCell#sortEDIFPortInstLists()}.  This is useful when 
      *                     a large number of EDIFPortInsts.
      * @return The newly created port instance or null if none could be created on
      *         the cell or cell instance.
@@ -241,8 +239,23 @@ public class EDIFNet extends EDIFPropertyObject {
      * Gets the sorted ArrayList of EDIFPortInsts on this net as a collection.
      * @return The collection of EDIFPortInsts on this net.
      */
-    public Collection<EDIFPortInst> getPortInsts() {
-        return portInsts == null ? Collections.emptyList() : portInsts;
+    public List<EDIFPortInst> getPortInsts() {
+        // Always a (live) view, also when empty: a single allocation site lets the JIT
+        // scalar-replace the view in loops such as for (EDIFPortInst pi : getPortInsts())
+        return new PortInstView();
+    }
+
+    /** Live list view over {@link #portInsts}. */
+    private final class PortInstView extends EDIFPortInstArray.View {
+        @Override
+        EDIFPortInst[] store() {
+            return portInsts;
+        }
+
+        @Override
+        void store(EDIFPortInst[] s) {
+            portInsts = s;
+        }
     }
 
     public void rename(String newName) {
@@ -278,8 +291,7 @@ public class EDIFNet extends EDIFPropertyObject {
      * @return The port instance connected to this net, or null if none exists.
      */
     public EDIFPortInst getPortInst(EDIFCellInst inst, String portInstName) {
-        if (portInsts == null) return null;
-        return portInsts.get(inst, portInstName);
+        return EDIFPortInstArray.get(portInsts, inst, portInstName);
     }
 
     /**
@@ -335,8 +347,11 @@ public class EDIFNet extends EDIFPropertyObject {
             // This does not explicitly track the port instance index, in most cases the name should be sufficient.
             trackChanges(EDIFChangeType.PORT_INST_REMOVE, inst, portInstName);
         }
-        EDIFPortInst tmp = portInsts.remove(inst, portInstName);
-        if (tmp != null) tmp.setParentNet(null);
+        int idx = EDIFPortInstArray.indexOf(portInsts, inst, portInstName);
+        if (idx < 0) return null;
+        EDIFPortInst tmp = EDIFPortInstArray.get(portInsts, idx);
+        portInsts = EDIFPortInstArray.removeAt(portInsts, idx);
+        tmp.setParentNet(null);
         return tmp;
     }
 
@@ -355,8 +370,32 @@ public class EDIFNet extends EDIFPropertyObject {
         parentCell.trackChange(EDIFChangeType.NET_ADD, getName());
     }
 
+    /**
+     * @return A new {@link EDIFPortInstList} holding a snapshot of this net's port instances, or
+     * null if the net has none. The port instances are no longer stored in an EDIFPortInstList, so
+     * changes to the returned list are NOT reflected in this net.
+     * @deprecated Use {@link #getPortInsts()} (a live view).
+     */
+    @Deprecated
     protected EDIFPortInstList getEDIFPortInstList() {
-        return portInsts;
+        return EDIFPortInstArray.toList(portInsts);
+    }
+
+    /** Number of port instances on this net (same as getPortInsts().size()). */
+    public int getPortInstCount() {
+        return EDIFPortInstArray.size(portInsts);
+    }
+
+    /**
+     * Sorts the port instances after a batch of deferred-sort additions and trims unused capacity.
+     */
+    void sortPortInsts() {
+        portInsts = EDIFPortInstArray.sort(portInsts);
+    }
+
+    /** Trims the unused capacity of the port instance storage (keeps the order). */
+    void trimPortInsts() {
+        portInsts = EDIFPortInstArray.trim(portInsts);
     }
 
     /**
@@ -410,6 +449,29 @@ public class EDIFNet extends EDIFPropertyObject {
     }
 
     /**
+     * Checks if this net is a GND or VCC net and if so returns the appropriate
+     * NetType. If it is not a static net, it returns NetType.UNKNOWN.
+     * 
+     * @return The static source type or UNKNOWN if it is not a static net.
+     */
+    public NetType getPhysStaticSourceType() {
+        if (getName().equals(EDIFTools.LOGICAL_GND_NET_NAME))
+            return NetType.GND;
+        if (getName().equals(EDIFTools.LOGICAL_VCC_NET_NAME))
+            return NetType.VCC;
+        for (EDIFPortInst portInst : getSourcePortInsts(false)) {
+            String cellType = portInst.getCellInst().getCellType().getName();
+            if (cellType.equals(Unisim.GND.name())) {
+                return NetType.GND;
+            }
+            if (cellType.equals(Unisim.VCC.name())) {
+                return NetType.VCC;
+            }
+        }
+        return NetType.UNKNOWN;
+    }
+
+    /**
      * Checks if the net has all port instances (terminals) within the parent cell.
      * 
      * @return True if all port instances are internal to this net's parent cell,
@@ -442,7 +504,7 @@ public class EDIFNet extends EDIFPropertyObject {
             p.writeEDIFExport(os, EXPORT_CONST_PORT_INDENT, cache);
         }
         os.write(EXPORT_CONST_JOINED_END); // joined end
-        if (getPropertiesMap().size() > 0) {
+        if (getPropertyCount() > 0) {
             os.write('\n');
             exportEDIFProperties(os, EXPORT_CONST_PROP_INDENT, cache, stable);
         }

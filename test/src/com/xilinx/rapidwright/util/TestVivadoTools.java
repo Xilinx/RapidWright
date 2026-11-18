@@ -44,8 +44,7 @@ public class TestVivadoTools {
 
         List<String> log = VivadoTools.runTcl(tempDir.resolve("outputLog.log"), "exit", true);
 
-        List<String> results = VivadoTools.searchVivadoLog(log, "INFO");
-        Assertions.assertTrue(results.get(0).contains("Exiting Vivado"));
+        assertVivadoLogContains(log, "Exiting Vivado");
     }
 
     @Test
@@ -88,6 +87,40 @@ public class TestVivadoTools {
                 "blah"
         ));
         Assertions.assertFalse(rrs.isFullyRouted());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testReportPlaceStatus(boolean fromDisk) {
+        Assumptions.assumeTrue(FileTools.isVivadoOnPath());
+
+        Path dcp = RapidWrightDCP.getPath("picoblaze_partial.dcp");
+        ReportPlaceStatusResult rps;
+        if (fromDisk) {
+            rps = VivadoTools.reportPlaceStatus(dcp);
+        } else {
+            Design d = Design.readCheckpoint(dcp);
+            rps = VivadoTools.reportPlaceStatus(d);
+        }
+
+        Assertions.assertEquals(121177, rps.logicalCells);
+        Assertions.assertEquals(0, rps.unplacedCells);
+        Assertions.assertEquals(121177, rps.placedCells);
+        Assertions.assertEquals(10452, rps.usedSites);
+        Assertions.assertEquals(6921, rps.sitesWithRouteThrus);
+        Assertions.assertEquals(108, rps.sitesWithInvertedInputs);
+        Assertions.assertEquals(0, rps.sitesWithErrors);
+        Assertions.assertTrue(rps.isFullyPlaced());
+    }
+
+    @Test
+    public void testReportPlaceStatusInvalid() {
+        ReportPlaceStatusResult rps = new ReportPlaceStatusResult(Arrays.asList(
+                "foo",
+                "bar",
+                "blah"
+        ));
+        Assertions.assertFalse(rps.isFullyPlaced());
     }
 
     @Test
