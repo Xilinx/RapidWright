@@ -1791,7 +1791,9 @@ public class EDIFNetlist extends EDIFName {
      * whole, and changes to the netlist are followed without calling
      * {@link #resetParentNetMap()}. This can be called from several threads at the same time, as
      * long as no thread changes the netlist meanwhile.
-     * @param netAlias A net in the netlist.
+     * @param netAlias A net in the netlist. Only the parent cells along its hierarchy are checked
+     * (see below): a net that was removed from its cell with port insts left on it, or a net of
+     * another netlist, has the parent net that a search starting from it finds.
      * @return The physical/parent net or null if the net has no source, or is not a net of the
      * netlist: a net of the former cell of a cell instance that was given another cell, for
      * example.
@@ -1832,7 +1834,10 @@ public class EDIFNetlist extends EDIFName {
      * Gets the map of all canonical net for every net alias.  This corresponds to the driving net
      * in the netlist and/or the physical net name.
      *
-     * This is the same as of {@link #getParentNetMap()}, but converted to Strings.
+     * This is the same as of {@link #getParentNetMap()}, but converted to Strings. Looking up a
+     * name finds the net of that name as {@link #getHierNetFromName(String)} does, like
+     * {@link #getParentNetName(String)}. Iterating over the map, or asking for its size, throws
+     * an IllegalStateException if two nets that have a parent net have the same hierarchical name.
      * @return the map
      */
     public Map<String, String> getParentNetMapNames() {

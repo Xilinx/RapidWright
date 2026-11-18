@@ -548,6 +548,12 @@ final class EDIFNetConnectivity {
                             b.addUnconnected(portCell);
                         }
                     }
+                    if (below != null) {
+                        // The net that the cell has for the port is not on it. It is once it gets
+                        // the port inst, of which only the net is told if it is in another cell
+                        // by then (one that shares the nets of this cell)
+                        b.addBelow(null, below);
+                    }
                     continue;
                 }
                 if (b.connect(inst, name, below)) {
@@ -555,6 +561,10 @@ final class EDIFNetConnectivity {
                     // with: only then is this the connectivity above that of the net inside
                     b.addBelow(name.equals(portInst.getName()) ? inst : null, below);
                     b.addSources(portInst, below, below.sourceCount);
+                } else {
+                    // Counted for the net on another port of the instance, which does that if it
+                    // has the port inst for it: this depends on the net inside in any case
+                    b.addBelow(null, below);
                 }
             }
         }

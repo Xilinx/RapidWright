@@ -639,6 +639,55 @@ public class TestEDIFParentNets {
     }
 
     /**
+     * A pin of a leaf cell instance has the direction of the port of its port inst, which is a
+     * port of another cell if the instance was given the leaf cell without updating its port
+     * insts. A change of that direction is followed, also after a port of that other cell got
+     * its net inside the cell, whichever was looked up first: the net on the pin, or the net on
+     * that port of an instance of the other cell.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testPortDirectionOfFormerCell(boolean otherNetFirst) {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("top");
+        EDIFCell top = netlist.getTopCell();
+        EDIFCell driver = new EDIFCell(netlist.getWorkLibrary(), "driver");
+        EDIFPort driverO = driver.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFCell sink = new EDIFCell(netlist.getWorkLibrary(), "sink");
+        EDIFPort sinkI = sink.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCell leaf = new EDIFCell(netlist.getWorkLibrary(), "leaf");
+        leaf.createPort("P", EDIFDirection.INPUT, 1);
+        EDIFCell former = new EDIFCell(netlist.getWorkLibrary(), "former");
+        EDIFPort formerP = former.createPort("P", EDIFDirection.INPUT, 1);
+        EDIFPort formerQ = former.createPort("Q", EDIFDirection.OUTPUT, 1);
+        EDIFNet inside = former.createNet("inside");
+        inside.createPortInst(driverO, former.createChildCellInst("d", driver));
+        EDIFCellInst x = top.createChildCellInst("x", former);
+        EDIFNet net = top.createNet("net");
+        net.createPortInst(formerP, x);
+        net.createPortInst(sinkI, top.createChildCellInst("s", sink));
+        x.setCellTypeRaw(leaf);
+        EDIFNet out = top.createNet("out");
+        out.createPortInst(formerQ, top.createChildCellInst("y", former));
+        out.createPortInst(sinkI, top.createChildCellInst("s2", sink));
+
+        EDIFHierNet hierNet = netlist.getHierNetFromName("net");
+        EDIFHierNet outNet = netlist.getHierNetFromName("out");
+        if (otherNetFirst) {
+            Assertions.assertNull(netlist.getParentNet(outNet));
+        }
+        Assertions.assertNull(netlist.getParentNet(hierNet));
+        Assertions.assertNull(netlist.getParentNet(outNet));
+
+        inside.createPortInst(formerQ);
+        Assertions.assertEquals(netlist.getHierNetFromName("y/inside"), netlist.getParentNet(outNet));
+        Assertions.assertNull(netlist.getParentNet(hierNet));
+
+        formerP.setDirection(EDIFDirection.OUTPUT);
+        Assertions.assertEquals(hierNet, netlist.getParentNet(hierNet));
+        Assertions.assertEquals("[s/I, x/P]", netlist.getPhysicalPins(hierNet).toString());
+    }
+
+    /**
      * A port inst that is given another index is on that bit of its port, whatever its name.
      */
     @Test
@@ -862,6 +911,251 @@ public class TestEDIFParentNets {
         Assertions.assertEquals(insideNet, netlist.getParentNet(out2Net));
         Assertions.assertEquals("[u/d2/O, s2/I]", netlist.getPhysicalPins(insideNet).toString());
         Assertions.assertEquals(4, netlist.getParentNetMap().size());
+    }
+
+    /**
+     * A shallow copy of a cell shares its nets and cell instances, also when it has none: the
+     * first net that one of the two cells gets makes the other one a cell with contents too, and
+     * removing the last one makes it a leaf cell again.
+     */
+    @Test
+    public void testSharedCellGetsContents() {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("top");
+        EDIFCell top = netlist.getTopCell();
+        EDIFCell driver = new EDIFCell(netlist.getWorkLibrary(), "driver");
+        EDIFCell sink = new EDIFCell(netlist.getWorkLibrary(), "sink");
+        EDIFPort sinkI = sink.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCell cell = new EDIFCell(netlist.getWorkLibrary(), "shared");
+        EDIFPort cellO = cell.createPort("O", EDIFDirection.OUTPUT, 1);
+        // A cell that had a net keeps its (empty) collection of nets, which a copy then shares
+        cell.removeNet(cell.createNet("removed"));
+        EDIFCell copy = new EDIFCell(EDIFTools.createNewNetlist("other").getWorkLibrary(), cell);
+        EDIFNet out = top.createNet("out");
+        out.createPortInst(cellO, top.createChildCellInst("u", cell));
+        out.createPortInst(sinkI, top.createChildCellInst("s", sink));
+
+        EDIFHierNet outNet = netlist.getHierNetFromName("out");
+        Assertions.assertEquals(outNet, netlist.getParentNet(outNet));
+        Assertions.assertEquals("[s/I, u/O]", netlist.getPhysicalPins(outNet).toString());
+
+        EDIFNet inside = copy.createNet("inside");
+        Assertions.assertFalse(cell.isLeafCellOrBlackBox());
+        Assertions.assertNull(netlist.getParentNet(outNet));
+        Assertions.assertNull(netlist.getPhysicalPins(outNet));
+
+        // With a cell instance of its own, the copy still has contents without the net
+        copy.createChildCellInst("d", driver);
+        Assertions.assertNull(netlist.getParentNet(outNet));
+        copy.removeNet(inside);
+        Assertions.assertFalse(copy.isLeafCellOrBlackBox());
+        Assertions.assertTrue(cell.isLeafCellOrBlackBox());
+        Assertions.assertEquals(outNet, netlist.getParentNet(outNet));
+        Assertions.assertEquals("[s/I, u/O]", netlist.getPhysicalPins(outNet).toString());
+    }
+
+    /**
+     * A port of a cell that gets its net inside the cell through a shallow copy of the cell is
+     * connected in the cell too, which shares the nets and the ports of its copy.
+     */
+    @Test
+    public void testSharedCellPortConnectedThroughCopy() {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("top");
+        EDIFCell top = netlist.getTopCell();
+        EDIFCell driver = new EDIFCell(netlist.getWorkLibrary(), "driver");
+        EDIFPort driverO = driver.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFCell sink = new EDIFCell(netlist.getWorkLibrary(), "sink");
+        EDIFPort sinkI = sink.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCell cell = new EDIFCell(netlist.getWorkLibrary(), "shared");
+        EDIFPort cellO = cell.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFPort cellO2 = cell.createPort("O2", EDIFDirection.OUTPUT, 1);
+        EDIFNet local = cell.createNet("local");
+        local.createPortInst(cellO);
+        local.createPortInst(driverO, cell.createChildCellInst("d", driver));
+        EDIFCell copy = new EDIFCell(EDIFTools.createNewNetlist("other").getWorkLibrary(), cell);
+        EDIFCellInst u = top.createChildCellInst("u", cell);
+        EDIFNet out = top.createNet("out");
+        out.createPortInst(cellO, u);
+        out.createPortInst(sinkI, top.createChildCellInst("s", sink));
+        EDIFNet out2 = top.createNet("out2");
+        out2.createPortInst(cellO2, u);
+        out2.createPortInst(sinkI, top.createChildCellInst("s2", sink));
+
+        EDIFHierNet out2Net = netlist.getHierNetFromName("out2");
+        Assertions.assertEquals(netlist.getHierNetFromName("u/local"), netlist.getParentNet(netlist.getHierNetFromName("out")));
+        Assertions.assertNull(netlist.getParentNet(out2Net));
+
+        EDIFNet inside = copy.createNet("inside");
+        inside.createPortInst(driverO, copy.createChildCellInst("d2", driver));
+        Assertions.assertNull(netlist.getParentNet(out2Net));
+        inside.createPortInst(cellO2);
+        EDIFHierNet insideNet = netlist.getHierNetFromName("u/inside");
+        Assertions.assertSame(inside, insideNet.getNet());
+        Assertions.assertEquals(insideNet, netlist.getParentNet(out2Net));
+        Assertions.assertEquals("[u/d2/O, s2/I]", netlist.getPhysicalPins(insideNet).toString());
+    }
+
+    /**
+     * The same for two cells that share the nets on their ports, but each have their own ports:
+     * the port that gets its net is not a port of the cell that is instantiated.
+     */
+    @Test
+    public void testSharedCellPortConnectedThroughCopyWithOwnPorts() {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("top");
+        EDIFCell top = netlist.getTopCell();
+        EDIFCell driver = new EDIFCell(netlist.getWorkLibrary(), "driver");
+        EDIFPort driverO = driver.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFCell sink = new EDIFCell(netlist.getWorkLibrary(), "sink");
+        EDIFPort sinkI = sink.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCell cell = new EDIFCell(netlist.getWorkLibrary(), "shared");
+        EDIFCellInst d = cell.createChildCellInst("d", driver);
+        // The cell has a net on a port before it has ports: on a port of a first copy
+        EDIFNet seed = cell.createNet("seed");
+        EDIFCell first = new EDIFCell(EDIFTools.createNewNetlist("first").getWorkLibrary(), cell);
+        seed.createPortInst(first.createPort("S", EDIFDirection.INPUT, 1));
+        EDIFCell copy = new EDIFCell(EDIFTools.createNewNetlist("other").getWorkLibrary(), cell);
+        EDIFPort cellO = cell.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFPort copyO = copy.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFNet out = top.createNet("out");
+        out.createPortInst(cellO, top.createChildCellInst("u", cell));
+        out.createPortInst(sinkI, top.createChildCellInst("s", sink));
+
+        EDIFHierNet outNet = netlist.getHierNetFromName("out");
+        Assertions.assertNull(netlist.getParentNet(outNet));
+
+        EDIFNet inside = copy.createNet("inside");
+        inside.createPortInst(driverO, d);
+        inside.createPortInst(copyO);
+        EDIFHierNet insideNet = netlist.getHierNetFromName("u/inside");
+        Assertions.assertSame(inside, insideNet.getNet());
+        Assertions.assertEquals(insideNet, netlist.getParentNet(outNet));
+        Assertions.assertEquals("[u/d/O, s/I]", netlist.getPhysicalPins(insideNet).toString());
+    }
+
+    /**
+     * A net that a cell still has for one of its ports gets the port inst for it back after it
+     * became a net of a shallow copy of the cell, which is then the cell that is told.
+     */
+    @Test
+    public void testSharedCellNetGetsPortInstInCopy() {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("top");
+        EDIFCell top = netlist.getTopCell();
+        EDIFCell driver = new EDIFCell(netlist.getWorkLibrary(), "driver");
+        EDIFPort driverO = driver.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFCell sink = new EDIFCell(netlist.getWorkLibrary(), "sink");
+        EDIFPort sinkI = sink.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCell cell = new EDIFCell(netlist.getWorkLibrary(), "shared");
+        EDIFPort cellO = cell.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFNet local = cell.createNet("local");
+        local.createPortInst(driverO, cell.createChildCellInst("d", driver));
+        // The copy shares the nets of the cell, but not yet the nets on its ports
+        EDIFCell copy = new EDIFCell(EDIFTools.createNewNetlist("other").getWorkLibrary(), cell);
+        EDIFPortInst port = local.createPortInst(cellO);
+        EDIFNet out = top.createNet("out");
+        out.createPortInst(cellO, top.createChildCellInst("u", cell));
+        out.createPortInst(sinkI, top.createChildCellInst("s", sink));
+
+        EDIFHierNet outNet = netlist.getHierNetFromName("out");
+        EDIFHierNet localNet = netlist.getHierNetFromName("u/local");
+        Assertions.assertEquals(localNet, netlist.getParentNet(outNet));
+
+        local.removePortInst(port);
+        copy.addNet(cell.removeNet(local));
+        Assertions.assertSame(copy, local.getParentCell());
+        Assertions.assertNull(netlist.getParentNet(outNet));
+        local.addPortInst(port);
+        Assertions.assertEquals(localNet, netlist.getParentNet(outNet));
+        Assertions.assertEquals("[u/d/O, s/I]", netlist.getPhysicalPins(localNet).toString());
+    }
+
+    /**
+     * A port inst that is added to a net through its list of port insts
+     * ({@link EDIFNet#getPortInsts()}) is followed as one added with
+     * {@link EDIFNet#addPortInst(EDIFPortInst)}: here, the net is on the port of its cell again.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"add", "add at index", "set"})
+    public void testPortInstAddedThroughList(String how) {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("top");
+        EDIFCell top = netlist.getTopCell();
+        EDIFCell driver = new EDIFCell(netlist.getWorkLibrary(), "driver");
+        EDIFPort driverO = driver.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFCell sink = new EDIFCell(netlist.getWorkLibrary(), "sink");
+        EDIFPort sinkI = sink.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCell child = new EDIFCell(netlist.getWorkLibrary(), "child");
+        EDIFPort childA = child.createPort("A", EDIFDirection.OUTPUT, 1);
+        EDIFPort childO = child.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFNet local = child.createNet("local");
+        EDIFPortInst other = local.createPortInst(childA);
+        EDIFPortInst port = local.createPortInst(childO);
+        local.createPortInst(driverO, child.createChildCellInst("d", driver));
+        EDIFNet out = top.createNet("out");
+        out.createPortInst(childO, top.createChildCellInst("u", child));
+        out.createPortInst(sinkI, top.createChildCellInst("s", sink));
+
+        EDIFHierNet outNet = netlist.getHierNetFromName("out");
+        EDIFHierNet localNet = netlist.getHierNetFromName("u/local");
+        Assertions.assertEquals(localNet, netlist.getParentNet(outNet));
+        Assertions.assertEquals("[u/d/O, s/I]", netlist.getPhysicalPins(localNet).toString());
+
+        List<EDIFPortInst> portInsts = local.getPortInsts();
+        int index = portInsts.indexOf(port);
+        local.removePortInst(port);
+        Assertions.assertNull(netlist.getParentNet(outNet));
+        Assertions.assertEquals("[u/d/O]", netlist.getPhysicalPins(localNet).toString());
+
+        if (how.equals("add")) {
+            portInsts.add(port);
+        } else if (how.equals("add at index")) {
+            portInsts.add(index, port);
+        } else {
+            portInsts.set(portInsts.indexOf(other), port);
+        }
+        Assertions.assertEquals(localNet, netlist.getParentNet(outNet));
+        Assertions.assertEquals("[u/d/O, s/I]", netlist.getPhysicalPins(localNet).toString());
+    }
+
+    /**
+     * The same when the net outside finds the net inside through a net on another port of the
+     * cell instance, which was removed from the list of port insts of that net only: that net
+     * no longer leads to the net inside.
+     */
+    @Test
+    public void testPortInstAddedThroughListWithStalePortInst() {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("top");
+        EDIFCell top = netlist.getTopCell();
+        EDIFCell driver = new EDIFCell(netlist.getWorkLibrary(), "driver");
+        EDIFPort driverO = driver.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFCell sink = new EDIFCell(netlist.getWorkLibrary(), "sink");
+        EDIFPort sinkI = sink.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCell child = new EDIFCell(netlist.getWorkLibrary(), "child");
+        EDIFPort childA = child.createPort("A", EDIFDirection.INPUT, 1);
+        EDIFPort childB = child.createPort("B", EDIFDirection.INPUT, 1);
+        EDIFPort childC = child.createPort("C", EDIFDirection.OUTPUT, 1);
+        EDIFNet local = child.createNet("local");
+        EDIFPortInst port = local.createPortInst(childA);
+        local.createPortInst(childB);
+        local.createPortInst(childC);
+        EDIFCellInst u = top.createChildCellInst("u", child);
+        EDIFNet in = top.createNet("in");
+        in.createPortInst(driverO, top.createChildCellInst("d", driver));
+        in.createPortInst(childA, u);
+        EDIFNet other = top.createNet("other");
+        EDIFPortInst otherPortInst = other.createPortInst(childB, u);
+        EDIFNet out = top.createNet("out");
+        out.createPortInst(childC, u);
+        out.createPortInst(sinkI, top.createChildCellInst("s", sink));
+
+        EDIFHierNet inNet = netlist.getHierNetFromName("in");
+        EDIFHierNet outNet = netlist.getHierNetFromName("out");
+        Assertions.assertEquals(inNet, netlist.getParentNet(outNet));
+
+        local.removePortInst(port);
+        Assertions.assertTrue(other.getPortInsts().remove(otherPortInst));
+        Assertions.assertSame(other, otherPortInst.getNet());
+        Assertions.assertNull(netlist.getParentNet(outNet));
+        local.getPortInsts().add(port);
+        Assertions.assertEquals(inNet, netlist.getParentNet(outNet));
+        Assertions.assertEquals("[d/O, s/I]", netlist.getPhysicalPins(inNet).toString());
     }
 
     /**
