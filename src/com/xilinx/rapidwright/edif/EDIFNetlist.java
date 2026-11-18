@@ -1763,8 +1763,9 @@ public class EDIFNetlist extends EDIFName {
      * The returned list also includes the provided net.
      * @param initialNet The net to use as a starting point in the search.
      * @return A list of all electrically connected nets in the netlist that are equivalent.
-     * @throws RuntimeException If the net has more than one source, or has connections but no
-     * source.
+     * @throws RuntimeException If the net has more than one source, has connections but no
+     * source, or is not a net of the netlist: a net of the former cell of a cell instance that
+     * was given another cell, for example.
      */
     public List<EDIFHierNet> getNetAliases(EDIFHierNet initialNet) {
         return parentNets.getNetAliases(initialNet);
@@ -1791,7 +1792,9 @@ public class EDIFNetlist extends EDIFName {
      * {@link #resetParentNetMap()}. This can be called from several threads at the same time, as
      * long as no thread changes the netlist meanwhile.
      * @param netAlias A net in the netlist.
-     * @return The physical/parent net or null if the net has no source.
+     * @return The physical/parent net or null if the net has no source, or is not a net of the
+     * netlist: a net of the former cell of a cell instance that was given another cell, for
+     * example.
      * @throws RuntimeException If the net has more than one source.
      */
     public EDIFHierNet getParentNet(EDIFHierNet netAlias) {

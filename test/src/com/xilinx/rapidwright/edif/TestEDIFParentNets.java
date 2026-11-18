@@ -865,6 +865,182 @@ public class TestEDIFParentNets {
     }
 
     /**
+     * True if a cell instance of a hierarchical net, or its net, is in another cell than that of
+     * the cell instance above it: the net was made before that cell instance was given another
+     * cell.
+     */
+    static boolean isOfFormerCell(EDIFHierNet net) {
+        List<EDIFCellInst> insts = net.getHierarchicalInst().getFullHierarchy();
+        EDIFCell cell = insts.get(0).getCellType();
+        for (EDIFCellInst inst : insts.subList(1, insts.size())) {
+            EDIFCell parent = inst.getParentCell();
+            if (parent != null && parent != cell && cell.getCellInst(inst.getName()) != inst) {
+                return true;
+            }
+            cell = inst.getCellType();
+        }
+        EDIFCell parent = net.getNet().getParentCell();
+        return parent != null && parent != cell && cell.getNet(net.getNet().getName()) != net.getNet();
+    }
+
+    /** A net that is not a net of the netlist has no parent net, no physical pins and no aliases. */
+    private static void assertNotInNetlist(EDIFNetlist netlist, EDIFHierNet net, String context) {
+        Assertions.assertNull(parent(netlist, net), () -> context + ": parent net of " + net);
+        Assertions.assertNull(netlist.getParentNetMap().get(net), () -> context + ": " + net);
+        Assertions.assertFalse(netlist.getParentNetMap().containsKey(net), () -> context + ": " + net);
+        Assertions.assertNull(netlist.getPhysicalPins(net), () -> context + ": pins of " + net);
+        Assertions.assertNull(netlist.getPhysicalNetPinMap().get(net), () -> context + ": " + net);
+        Assertions.assertThrows(RuntimeException.class, () -> netlist.getNetAliases(net), () -> context + ": " + net);
+    }
+
+    /**
+     * A hierarchical net made before one of its cell instances was given another cell is not a
+     * net of the netlist anymore, as its cell instances below that one and its net are those of
+     * the former cell: it has no parent net, as when it is looked up in a map of the nets of the
+     * netlist. If the other cell and its contents are equal to the former ones, the net stands
+     * for the equal net of the netlist.
+     */
+    @Test
+    public void testNetOfFormerCell() {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("top");
+        EDIFLibrary work = netlist.getWorkLibrary();
+        EDIFCell top = netlist.getTopCell();
+        EDIFCell driver = new EDIFCell(work, "driver");
+        EDIFPort driverO = driver.createPort("O", EDIFDirection.OUTPUT, 1);
+        EDIFCell sink = new EDIFCell(work, "sink");
+        EDIFPort sinkI = sink.createPort("I", EDIFDirection.INPUT, 1);
+
+        // The net q of core is driven in it, its net d from outside
+        EDIFCell core = new EDIFCell(work, "core");
+        EDIFPort coreQ = core.createPort("q", EDIFDirection.OUTPUT, 1);
+        EDIFPort coreD = core.createPort("d", EDIFDirection.INPUT, 1);
+        EDIFNet q = core.createNet("q");
+        q.createPortInst(driverO, core.createChildCellInst("drv", driver));
+        q.createPortInst(sinkI, core.createChildCellInst("l", sink));
+        q.createPortInst(coreQ);
+        EDIFNet d = core.createNet("d");
+        d.createPortInst(coreD);
+        d.createPortInst(sinkI, core.createChildCellInst("ld", sink));
+
+        // Two instances of a cell that has an instance of core
+        EDIFCell mid = new EDIFCell(work, "mid");
+        EDIFPort midQ = mid.createPort("q", EDIFDirection.OUTPUT, 1);
+        EDIFPort midD = mid.createPort("d", EDIFDirection.INPUT, 1);
+        EDIFCellInst c = mid.createChildCellInst("c", core);
+        EDIFNet midNetQ = mid.createNet("q");
+        midNetQ.createPortInst(coreQ, c);
+        midNetQ.createPortInst(midQ);
+        EDIFNet midNetD = mid.createNet("d");
+        midNetD.createPortInst(midD);
+        midNetD.createPortInst(coreD, c);
+        for (int i = 0; i < 2; i++) {
+            EDIFCellInst m = top.createChildCellInst("m" + i, mid);
+            EDIFNet out = top.createNet("q" + i);
+            out.createPortInst(midQ, m);
+            out.createPortInst(sinkI, top.createChildCellInst("s" + i, sink));
+            EDIFNet in = top.createNet("d" + i);
+            in.createPortInst(driverO, top.createChildCellInst("t" + i, driver));
+            in.createPortInst(midD, m);
+        }
+
+        Map<String, EDIFHierNet> before = new HashMap<>();
+        for (EDIFHierNet net : getAllHierNets(netlist)) {
+            before.put(net.getHierarchicalNetName(), net);
+        }
+        Assertions.assertEquals(12, before.size());
+        assertSameAsReference(netlist, new ArrayList<>(before.values()), "initial");
+        Assertions.assertEquals(before.get("m0/c/q"), netlist.getParentNet(before.get("q0")));
+        Assertions.assertEquals("[m0/c/q, m0/q, q0]", netlist.getNetAliases(before.get("m0/c/q")).toString());
+        Assertions.assertEquals("[m0/c/drv/O, m0/c/l/I, s0/I]", netlist.getPhysicalPins(before.get("m0/c/q")).toString());
+        Assertions.assertEquals(before.get("d0"), netlist.getParentNet(before.get("m0/c/d")));
+
+        // m0 gets a cell of its own: the nets of mid, and what is below its instance of core,
+        // are not below m0 anymore
+        EDIFCellInst m0 = top.getCellInst("m0");
+        EDIFCell mid2 = new EDIFCell(work, mid, "mid_2");
+        m0.setCellType(mid2);
+        for (String name : new String[] {"m0/q", "m0/d", "m0/c/q", "m0/c/d"}) {
+            EDIFHierNet net = before.get(name);
+            Assertions.assertTrue(isOfFormerCell(net), name);
+            assertNotInNetlist(netlist, net, "m0 copied");
+            EDIFHierNet now = netlist.getHierNetFromName(name);
+            Assertions.assertNotEquals(net, now);
+            Assertions.assertEquals(name, now.getHierarchicalNetName());
+        }
+        for (String name : new String[] {"q0", "d0", "q1", "d1", "m1/q", "m1/d", "m1/c/q", "m1/c/d"}) {
+            Assertions.assertFalse(isOfFormerCell(before.get(name)), name);
+        }
+        EDIFHierNet nowQ = netlist.getHierNetFromName("m0/c/q");
+        Assertions.assertEquals(nowQ, netlist.getParentNet(before.get("q0")));
+        Assertions.assertEquals(nowQ, netlist.getParentNet(netlist.getHierNetFromName("m0/q")));
+        Assertions.assertEquals(before.get("m1/c/q"), netlist.getParentNet(before.get("q1")));
+        Assertions.assertSame(before.get("m1/c/q"), netlist.getParentNet(before.get("m1/c/q")));
+        Assertions.assertEquals("[m0/c/drv/O, m0/c/l/I, s0/I]", netlist.getPhysicalPins(nowQ).toString());
+        assertSameAsReference(netlist, getAllHierNets(netlist), "m0 copied");
+
+        // The instance of core in that cell gets a cell of its own too, whose net q has another
+        // driver
+        EDIFHierNet nowD = netlist.getHierNetFromName("m0/c/d");
+        Assertions.assertEquals(before.get("d0"), netlist.getParentNet(nowD));
+        EDIFCell core2 = new EDIFCell(work, core, "core_2");
+        EDIFNet q2 = core2.getNet("q");
+        q2.removePortInst(core2.getCellInst("drv").getPortInst("O"));
+        q2.createPortInst(driverO, core2.createChildCellInst("drv2", driver));
+        mid2.getCellInst("c").setCellType(core2);
+        Assertions.assertTrue(isOfFormerCell(nowQ));
+        assertNotInNetlist(netlist, nowQ, "m0/c copied");
+        assertNotInNetlist(netlist, nowD, "m0/c copied");
+        EDIFHierNet q0 = before.get("q0");
+        Assertions.assertEquals(netlist.getHierNetFromName("m0/c/q"), netlist.getParentNet(q0));
+        Assertions.assertEquals("[m0/c/drv2/O, m0/c/l/I, s0/I]",
+                netlist.getPhysicalPins(netlist.getParentNet(q0)).toString());
+        Assertions.assertEquals(before.get("d0"), netlist.getParentNet(netlist.getHierNetFromName("m0/c/d")));
+        assertSameAsReference(netlist, getAllHierNets(netlist), "m0/c copied");
+
+        // A cell that is equal to core (it has its name, in a library of the same name), with
+        // equal contents: the nets below m1/c stand for its nets
+        EDIFNetlist other = EDIFTools.createNewNetlist("other");
+        EDIFCell twin = new EDIFCell(other.getWorkLibrary(), core, "core");
+        Assertions.assertEquals(core, twin);
+        c.setCellType(twin);
+        EDIFHierNet oldQ = before.get("m1/c/q");
+        Assertions.assertSame(core, oldQ.getNet().getParentCell());
+        EDIFHierNet twinQ = netlist.getHierNetFromName("m1/c/q");
+        Assertions.assertSame(twin, twinQ.getNet().getParentCell());
+        Assertions.assertEquals(oldQ, twinQ);
+        for (EDIFHierNet net : new EDIFHierNet[] {oldQ, before.get("m1/q"), before.get("q1")}) {
+            EDIFHierNet parentNet = netlist.getParentNet(net);
+            Assertions.assertEquals(twinQ, parentNet);
+            Assertions.assertSame(twin, parentNet.getNet().getParentCell());
+            Assertions.assertSame(parentNet.getNet(), netlist.getParentNetMap().get(net).getNet());
+        }
+        List<EDIFHierNet> aliases = netlist.getNetAliases(oldQ);
+        Assertions.assertEquals("[m1/c/q, m1/q, q1]", aliases.toString());
+        Assertions.assertSame(twin, aliases.get(0).getNet().getParentCell());
+        List<EDIFHierPortInst> pins = netlist.getPhysicalPins(oldQ);
+        Assertions.assertEquals("[m1/c/drv/O, m1/c/l/I, s1/I]", pins.toString());
+        Assertions.assertSame(twin, pins.get(0).getPortInst().getCellInst().getParentCell());
+        Assertions.assertSame(pins, netlist.getPhysicalNetPinMap().get(oldQ));
+        Assertions.assertEquals(before.get("d1"), netlist.getParentNet(before.get("m1/c/d")));
+        assertSameAsReference(netlist, getAllHierNets(netlist), "twin");
+
+        // A cell that shares the contents of mid: the cell instance in it is that of mid
+        EDIFCell shared = new EDIFCell(other.getWorkLibrary(), mid);
+        EDIFCellInst m2 = top.createChildCellInst("m2", shared);
+        EDIFNet out2 = top.createNet("q2");
+        out2.createPortInst(midQ, m2);
+        out2.createPortInst(sinkI, top.createChildCellInst("s2", sink));
+        EDIFHierNet sharedQ = netlist.getHierNetFromName("m2/c/q");
+        Assertions.assertSame(c, sharedQ.getHierarchicalInst().getInst());
+        Assertions.assertSame(mid, c.getParentCell());
+        Assertions.assertFalse(isOfFormerCell(sharedQ));
+        Assertions.assertSame(sharedQ, netlist.getParentNet(sharedQ));
+        Assertions.assertEquals(sharedQ, netlist.getParentNet(netlist.getHierNetFromName("q2")));
+        Assertions.assertEquals("[m2/c/drv/O, m2/c/l/I, s2/I]", netlist.getPhysicalPins(sharedQ).toString());
+        assertSameAsReference(netlist, getAllHierNets(netlist), "shared");
+    }
+
+    /**
      * A random netlist: cells that instantiate leaf cells and each other, with nets that connect
      * their ports and the pins of their instances at random, so that it has nets passing through
      * cells, unconnected ports, nets with several sources, and cells instantiated more than once.
@@ -1165,6 +1341,7 @@ public class TestEDIFParentNets {
         EDIFNetlist netlist = r.netlist;
         assertSameAsReference(netlist, getAllHierNets(netlist), "initial");
         int changes = 0;
+        int formerCellNets = 0;
         for (int step = 0; step < 400; step++) {
             // Look up some of the nets, so that each change meets another part of them recorded
             List<EDIFHierNet> nets = getAllHierNets(netlist);
@@ -1197,7 +1374,15 @@ public class TestEDIFParentNets {
                     changes++;
                 }
             }
-            assertSameAsReference(netlist, getAllHierNets(netlist), "seed " + seed + " step " + step + " after " + change);
+            String context = "seed " + seed + " step " + step + " after " + change;
+            assertSameAsReference(netlist, getAllHierNets(netlist), context);
+            // What was a net before the changes, and is now in the former cell of a cell instance
+            for (EDIFHierNet net : nets) {
+                if (isOfFormerCell(net)) {
+                    assertNotInNetlist(netlist, net, context);
+                    formerCellNets++;
+                }
+            }
 
             if (keepConsistent && step % 20 == 0) {
                 // All nets at once
@@ -1219,5 +1404,7 @@ public class TestEDIFParentNets {
             }
         }
         Assertions.assertTrue(changes > 300);
+        // Not every seed gives a cell instance with nets below it another cell
+        Assertions.assertTrue(formerCellNets > 0 || seed > 2);
     }
 }

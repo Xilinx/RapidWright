@@ -172,10 +172,12 @@ final class EDIFParentNets {
      * Finds the parent net of a net: the net of its source, which is a leaf cell output pin, a
      * top-level input port or, if it has neither, a top-level inout port.
      * @param net A hierarchical net of the netlist.
-     * @return The parent net, or null if the net has no source.
+     * @return The parent net, or null if the net has no source or is not a net of the netlist
+     * (see {@link #getCurrent(EDIFHierNet)}).
      * @throws RuntimeException If the net has more than one source.
      */
     EDIFHierNet getParentNet(EDIFHierNet net) {
+        net = getCurrent(net);
         if (net == null) {
             return null;
         }
@@ -186,6 +188,84 @@ final class EDIFParentNets {
             EDIFHierPortInst source = search(net, null, null);
             return (source != null) ? source.getHierarchicalNet() : null;
         }
+    }
+
+    /**
+     * Gets the net of the netlist that a hierarchical net stands for. As the key of a map of the
+     * nets of the netlist would, a hierarchical net stands for the net that is equal to it: the
+     * net itself, unless one of its cell instances or the net is in another cell than that of the
+     * cell instance above it. That is the case once a cell instance was given another cell, for
+     * the hierarchical nets made before of what is in its former cell.
+     * @param hierNet A hierarchical net, or null.
+     * @return The net itself, the net of the netlist that is equal to it, or null if there is
+     * none.
+     */
+    private static EDIFHierNet getCurrent(EDIFHierNet hierNet) {
+        if (hierNet == null) {
+            return null;
+        }
+        // From the net up: each comparison is on its own, which is faster than following the
+        // cells down from the top
+        EDIFCellInst[] insts = hierNet.getHierarchicalInst().getCellInstArray();
+        int level = insts.length - 1;
+        boolean isCurrent = isIn(hierNet.getNet().getParentCell(), insts[level].getCellType());
+        for (; level > 0 && isCurrent; level--) {
+            isCurrent = isIn(insts[level].getParentCell(), insts[level - 1].getCellType());
+        }
+        return isCurrent ? hierNet : findCurrent(hierNet);
+    }
+
+    /**
+     * True if a cell instance or a net with this parent cell is taken to be in a cell: it is, or
+     * it has none (a cell instance that was removed from its cell).
+     */
+    private static boolean isIn(EDIFCell parentCell, EDIFCell cell) {
+        return parentCell == cell || parentCell == null;
+    }
+
+    /**
+     * Looks up, by their names, the cell instances and the net of a hierarchical net that are in
+     * another cell than that of the cell instance above them.
+     * @return See {@link #getCurrent(EDIFHierNet)}.
+     */
+    private static EDIFHierNet findCurrent(EDIFHierNet hierNet) {
+        EDIFHierCellInst hierInst = hierNet.getHierarchicalInst();
+        EDIFCellInst[] insts = hierInst.getCellInstArray();
+        EDIFCellInst[] current = null;
+        EDIFCell cell = insts[0].getCellType();
+        for (int i = 1; i < insts.length; i++) {
+            EDIFCellInst inst = insts[i];
+            if (!isIn(inst.getParentCell(), cell)) {
+                // A cell that shares the contents of another has the cell instances and nets of
+                // that cell
+                EDIFCellInst found = cell.getCellInst(inst.getName());
+                if (found != inst) {
+                    if (found == null || !found.equals(inst)) {
+                        return null;
+                    }
+                    if (current == null) {
+                        current = insts.clone();
+                    }
+                    current[i] = found;
+                    inst = found;
+                }
+            }
+            cell = inst.getCellType();
+        }
+        EDIFNet net = hierNet.getNet();
+        if (!isIn(net.getParentCell(), cell)) {
+            EDIFNet found = cell.getNet(net.getName());
+            if (found != net) {
+                if (found == null || !found.equals(net)) {
+                    return null;
+                }
+                net = found;
+            }
+        }
+        if (current == null && net == hierNet.getNet()) {
+            return hierNet;
+        }
+        return new EDIFHierNet((current != null) ? EDIFHierCellInst.createRelative(current) : hierInst, net);
     }
 
     /**
@@ -293,10 +373,16 @@ final class EDIFParentNets {
      * Gets all nets that are connected to a net, including the net itself.
      * @param net A hierarchical net of the netlist.
      * @return The nets, the given net first.
-     * @throws RuntimeException If the net has more than one source, or has connections but no
-     * source.
+     * @throws RuntimeException If the net has more than one source, has connections but no
+     * source, or is not a net of the netlist (see {@link #getCurrent(EDIFHierNet)}).
      */
     List<EDIFHierNet> getNetAliases(EDIFHierNet net) {
+        EDIFHierNet current = getCurrent(net);
+        if (current == null) {
+            throw new RuntimeException("ERROR: " + net + " is not a net of the netlist: "
+                    + "one of its cell instances was given another cell.");
+        }
+        net = current;
         List<EDIFHierNet> aliases = new ArrayList<>();
         EDIFHierPortInst source = search(net, aliases, null);
         if (source == null && net.getNet().getPortInstCount() != 0) {
@@ -312,6 +398,7 @@ final class EDIFParentNets {
      * is not a parent net. The list is kept, and must not be changed.
      */
     List<EDIFHierPortInst> getPhysicalPins(EDIFHierNet parentNet) {
+        parentNet = getCurrent(parentNet);
         if (parentNet == null) {
             return null;
         }
