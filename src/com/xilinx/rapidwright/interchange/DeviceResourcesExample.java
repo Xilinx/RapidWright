@@ -31,21 +31,28 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
 public class DeviceResourcesExample {
 
     public static final String SKIP_ROUTE_RESOURCES_OPTION = "--skip_route_resources";
+    public static final String VERIFY_OPTION = "--verify";
 
     public static void main(String[] args) throws IOException {
-        if (args.length != 1 && args.length != 2) {
-            System.out.println("USAGE: <device name> [" + SKIP_ROUTE_RESOURCES_OPTION + "]");
+        if (args.length < 1 || args.length > 3) {
+            System.out.println("USAGE: <device name> [" + SKIP_ROUTE_RESOURCES_OPTION + "] [" + VERIFY_OPTION + "]");
             System.out.println("   Example dump of device information for interchange format.");
             return;
         }
 
         boolean skipRouteResources = false;
-        if (args.length == 2 && args[1].equals(SKIP_ROUTE_RESOURCES_OPTION)) {
-            skipRouteResources = true;
+        boolean verify = false;
+        for (int i = 1; i < args.length; i++) {
+            if (args[i].equals(SKIP_ROUTE_RESOURCES_OPTION)) {
+                skipRouteResources = true;
+            } else if (args[i].equals(VERIFY_OPTION)) {
+                verify = true;
+            }
         }
 
         CodePerfTracker t = new CodePerfTracker("Device Resources Dump: " + args[0]);
-        t.useGCToTrackMemory(true);
+        t.setReportingCurrOSMemUsage(true);
+        t.setTrackOSMemUsage(true);
 
         // Create device resource file if it doesn't exist
         String capnProtoFileName = args[0] + ".device";
@@ -56,10 +63,12 @@ public class DeviceResourcesExample {
         DeviceResourcesWriter.writeDeviceResourcesFile(args[0], device, t, capnProtoFileName, skipRouteResources);
         Device.releaseDeviceReferences();
 
-        t.start("Verify file");
-        // Verify device resources
-        DeviceResourcesVerifier.verifyDeviceResources(capnProtoFileName, args[0]);
+        if (verify) {
+            // Verify device resources
+            DeviceResourcesVerifier.verifyDeviceResources(capnProtoFileName, args[0], t);
+        }
 
-        t.stop().printSummary();
+        t.printSummary();
+        System.out.println("Device resources file '" + capnProtoFileName + "' written successfully");
     }
 }
