@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -23,11 +23,26 @@
 
 package com.xilinx.rapidwright.edif;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -141,8 +156,12 @@ class TestEDIFNetlist {
 
         testNetlist.expandMacroUnisims(part.getSeries());
 
-        Assertions.assertNotSame(obufdsCell, testNetlist.getHDIPrimitivesLibrary().getCell("OBUFDS"));
+        // Primitives are expanded in place, while the macro that collapsing removed is added anew
+        Assertions.assertSame(obufdsCell, testNetlist.getHDIPrimitivesLibrary().getCell("OBUFDS"));
         Assertions.assertNotSame(obufdsDualBufCell, testNetlist.getHDIPrimitivesLibrary().getCell("OBUFDS_DUAL_BUF"));
+        Assertions.assertSame(obufdsCell, wontBeExpanded.getCellType());
+        Assertions.assertSame(testNetlist.getHDIPrimitivesLibrary().getCell("OBUFDS_DUAL_BUF"),
+                willBeExpanded.getCellType());
     }
 
     @Test
@@ -195,10 +214,10 @@ class TestEDIFNetlist {
 
         testNetlist.expandMacroUnisims(part.getSeries());
 
-        // Expanded cell must not be the same cell as before, and be a copy
-        // of the macro library's cell
+        // Expanded cell must be the same cell as before, expanded in place with a copy
+        // of the contents of the macro library's cell
         EDIFCell expandedCell = netlistPrimLibrary.getCell(macroName);
-        Assertions.assertNotSame(expandedCell, cell);
+        Assertions.assertSame(expandedCell, cell);
         Assertions.assertNotSame(expandedCell, macroCell);
         Assertions.assertEquals(8, expandedCell.getCellInsts().size());
         for (EDIFCellInst eci : expandedCell.getCellInsts()) {
@@ -214,7 +233,7 @@ class TestEDIFNetlist {
         testNetlist.collapseMacroUnisims(part.getSeries());
 
         EDIFCell collapsedCell = netlistPrimLibrary.getCell(macroName);
-        Assertions.assertNotSame(collapsedCell, cell);
+        Assertions.assertSame(collapsedCell, cell);
         Assertions.assertTrue(collapsedCell.getCellInsts().isEmpty());
 
         // Check original macro cell wasn't affected
@@ -315,9 +334,30 @@ class TestEDIFNetlist {
         dstNetlist.copyCellAndSubCells(srcNetlist.getTopCell());
 
         RuntimeException e = Assertions.assertThrows(RuntimeException.class,
-                () -> dstNetlist.copyCellAndSubCells(srcNetlist.getTopCell()));
+                () -> dstNetlist.copyCellAndSubCells(srcNetlist.getTopCell(),
+                        /* uniquifyCollisions= */false));
         Assertions.assertEquals("ERROR: Destination netlist already contains EDIFCell named 'picoblaze_top' in library 'work'",
                 e.getMessage());
+
+        Assertions.assertEquals(dstNetlist.getHDIPrimitivesLibrary().getCellMap().size(),
+                srcNetlist.getHDIPrimitivesLibrary().getCellMap().size());
+        Assertions.assertEquals(dstNetlist.getWorkLibrary().getCellMap().size() - 1,
+                srcNetlist.getWorkLibrary().getCellMap().size());
+
+        dstNetlist.copyCellAndSubCells(srcNetlist.getTopCell(), /* uniquifyCollisions= */true);
+
+        Assertions.assertEquals(dstNetlist.getHDIPrimitivesLibrary().getCellMap().size(),
+                srcNetlist.getHDIPrimitivesLibrary().getCellMap().size());
+        Assertions.assertEquals(dstNetlist.getWorkLibrary().getCellMap().size() - 1,
+                2 * srcNetlist.getWorkLibrary().getCellMap().size());
+
+        dstNetlist.copyCellAndSubCells(srcNetlist.getTopCell(), /* uniquifyCollisions= */true);
+
+        Assertions.assertEquals(dstNetlist.getHDIPrimitivesLibrary().getCellMap().size(),
+                srcNetlist.getHDIPrimitivesLibrary().getCellMap().size());
+        Assertions.assertEquals(dstNetlist.getWorkLibrary().getCellMap().size() - 1,
+                3 * srcNetlist.getWorkLibrary().getCellMap().size());
+
     }
 
     @ParameterizedTest
@@ -411,6 +451,185 @@ class TestEDIFNetlist {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testExportEDIFLibraryOrder(boolean stable, @TempDir Path path) throws IOException {
+        final EDIFNetlist origNetlist = EDIFTools.createNewNetlist("test");
+        EDIFCell top = origNetlist.getTopCell();
+
+        // A library added after the work library (and sorting after it by name), holding a cell
+        // instantiated by the work library's top cell, as when cells are merged in from another netlist
+        EDIFLibrary otherLib = origNetlist.addLibrary(new EDIFLibrary("z_lib"));
+        EDIFCell sub = new EDIFCell(otherLib, "sub");
+        EDIFPort subPort = sub.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFCellInst subInst = top.createChildCellInst("sub_inst", sub);
+        EDIFPort topPort = top.createPort("I", EDIFDirection.INPUT, 1);
+        EDIFNet net = top.createNet("I");
+        net.createPortInst(topPort);
+        net.createPortInst(subPort, subInst);
+
+        // A library that nothing depends upon, added last
+        EDIFLibrary unusedLib = origNetlist.addLibrary(new EDIFLibrary("a_lib"));
+        new EDIFCell(unusedLib, "unused");
+
+        Path tempFile = path.resolve("test.edf");
+        origNetlist.exportEDIF(tempFile, stable);
+
+        // A cell's library must be written before any instance of it
+        String edif = new String(Files.readAllBytes(tempFile));
+        int otherLibIdx = edif.indexOf("(Library z_lib");
+        int workLibIdx = edif.indexOf("(Library " + EDIFTools.EDIF_LIBRARY_WORK_NAME);
+        int unusedLibIdx = edif.indexOf("(Library a_lib");
+        Assertions.assertTrue(otherLibIdx >= 0 && workLibIdx >= 0 && unusedLibIdx >= 0);
+        Assertions.assertTrue(otherLibIdx < workLibIdx);
+        if (stable) {
+            // Libraries without dependencies between them are written in name order
+            Assertions.assertTrue(unusedLibIdx < otherLibIdx);
+        }
+
+        EDIFNetlist testNetlist = EDIFTools.readEdifFile(tempFile);
+        EDIFNetlistComparator comparer = new EDIFNetlistComparator();
+        Assertions.assertEquals(0, comparer.compareNetlists(origNetlist, testNetlist));
+    }
+
+    private static EDIFNetlist createNetlistWithLibraries(String... libNames) {
+        EDIFNetlist netlist = new EDIFNetlist("test");
+        netlist.getHDIPrimitivesLibrary();
+        for (String libName : libNames) {
+            netlist.addLibrary(new EDIFLibrary(libName));
+        }
+        return netlist;
+    }
+
+    private static List<String> getLibraryNamesInExportOrder(EDIFNetlist netlist, boolean stable) {
+        return netlist.getLibrariesInExportOrder(stable).stream()
+                .map(EDIFLibrary::getName)
+                .collect(Collectors.toList());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testLibrariesInExportOrderTieBreak(boolean stable) {
+        EDIFNetlist netlist = createNetlistWithLibraries("z", "b", "a");
+        EDIFCell leaf = new EDIFCell(netlist.getLibrary("a"), "leaf");
+        new EDIFCell(netlist.getLibrary("b"), "top").createChildCellInst("leaf_i", leaf);
+        new EDIFCell(netlist.getLibrary("z"), "unused");
+
+        // Once a is written, b is ready and must be chosen before z by name (if stable) or
+        // after z by order added
+        List<String> expected = stable
+                ? Arrays.asList(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME, "a", "b", "z")
+                : Arrays.asList(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME, "z", "a", "b");
+        Assertions.assertEquals(expected, getLibraryNamesInExportOrder(netlist, stable));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testLibrariesInExportOrderCellNameCollision(boolean stable, @TempDir Path path) {
+        EDIFNetlist netlist = createNetlistWithLibraries("a", "b", "c");
+        EDIFCell leaf = new EDIFCell(netlist.getLibrary("a"), "leaf");
+        EDIFCell shared = new EDIFCell(netlist.getLibrary("b"), "shared");
+        shared.createChildCellInst("leaf_i", leaf);
+        // c has its own cell named 'shared', but instantiates b's
+        new EDIFCell(netlist.getLibrary("c"), "shared");
+        EDIFCell top = new EDIFCell(netlist.getLibrary("c"), "top");
+        top.createChildCellInst("shared_i", shared);
+        EDIFDesign design = new EDIFDesign("test");
+        design.setTopCell(top);
+        netlist.setDesign(design);
+
+        EDIFLibrary c = netlist.getLibrary("c");
+        Assertions.assertEquals(Arrays.asList(shared), c.getExternallyReferencedCells());
+        Assertions.assertEquals(new HashSet<>(Arrays.asList(netlist.getLibrary("b"))),
+                new HashSet<>(c.getExternallyReferencedLibraries()));
+
+        List<String> expected = Arrays.asList(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME, "a", "b", "c");
+        Assertions.assertEquals(expected, getLibraryNamesInExportOrder(netlist, stable));
+
+        Path tempFile = path.resolve("test.edf");
+        netlist.exportEDIF(tempFile, stable);
+        EDIFNetlist testNetlist = EDIFTools.readEdifFile(tempFile);
+        EDIFNetlistComparator comparer = new EDIFNetlistComparator();
+        Assertions.assertEquals(0, comparer.compareNetlists(netlist, testNetlist));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testLibrariesInExportOrderAbsentLibrary(boolean stable) {
+        EDIFNetlist netlist = createNetlistWithLibraries("z", "a");
+        EDIFCell leaf = new EDIFCell(netlist.getLibrary("z"), "leaf");
+        EDIFCell top = new EDIFCell(netlist.getLibrary("a"), "top");
+        top.createChildCellInst("leaf_i", leaf);
+        // A library that is not part of the netlist cannot be waited for
+        EDIFCell absent = new EDIFCell(new EDIFLibrary("absent"), "absent");
+        top.createChildCellInst("absent_i", absent);
+
+        List<String> expected = Arrays.asList(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME, "z", "a");
+        Assertions.assertEquals(expected, getLibraryNamesInExportOrder(netlist, stable));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testLibrariesInExportOrderManyInstances(boolean stable) {
+        EDIFNetlist netlist = createNetlistWithLibraries("c", "b", "a");
+        EDIFCell aLeaf = new EDIFCell(netlist.getLibrary("a"), "a_leaf");
+        EDIFCell bLeaf = new EDIFCell(netlist.getLibrary("b"), "b_leaf");
+        // Enough instances that c's cells are split between several dependency tasks, with
+        // each dependency found by a different task
+        EDIFCell wideA = new EDIFCell(netlist.getLibrary("c"), "wide_a");
+        EDIFCell wideB = new EDIFCell(netlist.getLibrary("c"), "wide_b");
+        for (int i = 0; i < 100000; i++) {
+            wideA.createChildCellInst("a_leaf_" + i, aLeaf);
+            wideB.createChildCellInst("b_leaf_" + i, bLeaf);
+        }
+
+        List<String> expected = stable
+                ? Arrays.asList(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME, "a", "b", "c")
+                : Arrays.asList(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME, "b", "a", "c");
+        Assertions.assertEquals(expected, getLibraryNamesInExportOrder(netlist, stable));
+    }
+
+    private static EDIFNetlist createNetlistWithLibraryCycle() {
+        // b depends on a, while c and d depend on each other
+        EDIFNetlist netlist = createNetlistWithLibraries("a", "b", "c", "d");
+        EDIFCell leaf = new EDIFCell(netlist.getLibrary("a"), "a_leaf");
+        new EDIFCell(netlist.getLibrary("b"), "ready").createChildCellInst("leaf_i", leaf);
+        EDIFCell cLeaf = new EDIFCell(netlist.getLibrary("c"), "c_leaf");
+        EDIFCell dLeaf = new EDIFCell(netlist.getLibrary("d"), "d_leaf");
+        new EDIFCell(netlist.getLibrary("c"), "c_parent").createChildCellInst("d_i", dLeaf);
+        new EDIFCell(netlist.getLibrary("d"), "d_parent").createChildCellInst("c_i", cLeaf);
+        return netlist;
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testLibrariesInExportOrderCycle(boolean stable) {
+        EDIFNetlist netlist = createNetlistWithLibraryCycle();
+        RuntimeException e = Assertions.assertTimeoutPreemptively(Duration.ofSeconds(10),
+                () -> Assertions.assertThrows(RuntimeException.class,
+                        () -> netlist.getLibrariesInExportOrder(stable)));
+        Assertions.assertTrue(e.getMessage().contains("Circular dependency"));
+        Assertions.assertTrue(e.getMessage().contains("[c, d]"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testExportEDIFLibraryCycle(boolean stable, @TempDir Path path) throws IOException {
+        EDIFNetlist netlist = createNetlistWithLibraryCycle();
+        Path tempFile = path.resolve("test.edf");
+        // Libraries that cannot be ordered are still written, after those that can
+        Assertions.assertTimeoutPreemptively(Duration.ofSeconds(10),
+                () -> netlist.exportEDIF(tempFile, stable));
+
+        String edif = new String(Files.readAllBytes(tempFile));
+        int prevIdx = -1;
+        for (String libName : Arrays.asList("a", "b", "c", "d")) {
+            int idx = edif.indexOf("(Library " + libName + "\n");
+            Assertions.assertTrue(idx > prevIdx);
+            prevIdx = idx;
+        }
+    }
+
     @Test
     public void testBussedPortNamingCollision(@TempDir Path path) {
         final EDIFNetlist origNetlist = EDIFTools.createNewNetlist("test");
@@ -448,6 +667,169 @@ class TestEDIFNetlist {
         Assertions.assertEquals(port0.getWidth(), testPort0.getWidth());
         EDIFPort testPort1 = testTopCell.getNet(net1.getName()).getPortInst(null, portName + "[0]").getPort();
         Assertions.assertEquals(port1.getWidth(), testPort1.getWidth());
+    }
+
+    @Test
+    public void testBussedPortReNamingCollision(@TempDir Path path) {
+        final EDIFNetlist origNetlist = EDIFTools.createNewNetlist("test");
+
+        EDIFCell top = origNetlist.getTopCell();
+
+        EDIFCellInst ff = top.createChildCellInst("ff", Design.getPrimitivesLibrary().getCell("FDRE"));
+        origNetlist.getHDIPrimitivesLibrary().addCell(ff.getCellType());
+
+        String portName = "unfortunate_name";
+
+        // Create two bussed ports with a common root name, one having a trailing '_' underscore
+        EDIFPort port0 = top.createPort(portName + "[2:0]", EDIFDirection.INOUT, 3);
+        EDIFPort port1 = top.createPort(portName + "_[1:0]", EDIFDirection.INOUT, 2);
+        // And for good measure, throw in a single-bit port too with the same root
+        EDIFPort port2 = top.createPort(portName, EDIFDirection.INOUT, 1);
+
+        EDIFNet net0 = top.createNet("net0");
+        net0.createPortInst(port0, 0);
+        net0.createPortInst("D", ff);
+
+        EDIFNet net1 = top.createNet("net1");
+        net1.createPortInst(port1, 1);
+        net1.createPortInst("R", ff);
+        
+        EDIFNet net2 = top.createNet("net2");
+        net2.createPortInst(port2);
+        net2.createPortInst("Q", ff);
+
+        Path tempFile = path.resolve("test.edf");
+        origNetlist.exportEDIF(tempFile);
+
+        // Check using EDIFNetlistComparator
+        EDIFNetlist testNetlist = EDIFTools.readEdifFile(tempFile);
+        EDIFNetlistComparator comparer = new EDIFNetlistComparator();
+        Assertions.assertEquals(0, comparer.compareNetlists(origNetlist, testNetlist));
+    }
+
+    @Test
+    public void testFindParentNet() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        EDIFNetlist netlist = design.getNetlist();
+        List<EDIFHierNet> nets = new ArrayList<>();
+        List<EDIFHierCellInst> insts = new ArrayList<>(netlist.getAllDescendants("", null, false));
+        insts.add(netlist.getTopHierCellInst());
+        for (EDIFHierCellInst inst : insts) {
+            for (EDIFNet net : inst.getCellType().getNets()) {
+                nets.add(inst.getNet(net.getName()));
+            }
+        }
+
+        // Without the parent net map, which it must not build
+        netlist.resetParentNetMap();
+        Map<EDIFHierNet, EDIFHierNet> found = new HashMap<>();
+        for (EDIFHierNet net : nets) {
+            found.put(net, netlist.findParentNet(net));
+        }
+        Assertions.assertFalse(netlist.isParentNetMapBuilt());
+
+        // Nor change the physical pins recorded so far
+        EDIFHierNet seed = nets.stream().map(found::get).filter(n -> n != null).findFirst().get();
+        netlist.getNetAliases(seed);
+        Map<EDIFHierNet, List<EDIFHierPortInst>> physicalNetPins = new HashMap<>(netlist.getPhysicalNetPinMap());
+        List<EDIFHierPortInst> physicalGndPins = new ArrayList<>(netlist.getPhysicalGndPins());
+        List<EDIFHierPortInst> physicalVccPins = new ArrayList<>(netlist.getPhysicalVccPins());
+        Assertions.assertFalse(physicalNetPins.isEmpty());
+        for (EDIFHierNet net : nets) {
+            Assertions.assertEquals(found.get(net), netlist.findParentNet(net), net.toString());
+        }
+        Assertions.assertFalse(netlist.isParentNetMapBuilt());
+        Assertions.assertEquals(physicalNetPins, netlist.getPhysicalNetPinMap());
+        Assertions.assertEquals(physicalGndPins, netlist.getPhysicalGndPins());
+        Assertions.assertEquals(physicalVccPins, netlist.getPhysicalVccPins());
+
+        netlist.resetParentNetMap();
+        int withParent = 0;
+        for (EDIFHierNet net : nets) {
+            EDIFHierNet parent = netlist.getParentNet(net);
+            Assertions.assertEquals(parent, found.get(net), net.toString());
+            if (parent != null) withParent++;
+        }
+        Assertions.assertTrue(withParent > 1000);
+        // With the map built, it is used
+        Assertions.assertEquals(netlist.getParentNet(nets.get(0)), netlist.findParentNet(nets.get(0)));
+    }
+
+    /**
+     * Builds a netlist with a net 'wire' in instance 'u' that is connected to a leaf cell input
+     * and, through ports of 'u', to one top-level port per entry of topPortDirections (each on its
+     * own top-level net 'n0', 'n1', ...), and is driven by the given number of leaf cell outputs.
+     * Checks that the parent net of every alias of 'u/wire' is the expected one ("none" for no
+     * parent, "throws" for multiple sources), looked up from any alias before or after building the
+     * parent net map.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "'INOUT INOUT', 1, u/wire",
+            "'INPUT INOUT', 0, n0",
+            "'INOUT INPUT', 0, n1",
+            "'INOUT', 1, u/wire",
+            "'INOUT', 0, n0",
+            "'OUTPUT', 0, none",
+            "'INOUT INOUT', 0, throws",
+            "'INPUT INPUT', 0, throws",
+            "'', 2, throws",
+    })
+    public void testFindParentNetSources(String topPortDirections, int leafDrivers, String expected) {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("top");
+        EDIFCell top = netlist.getTopCell();
+        EDIFCell child = new EDIFCell(netlist.getWorkLibrary(), "child");
+        EDIFNet wire = child.createNet("wire");
+        EDIFCellInst u = top.createChildCellInst("u", child);
+        String[] directions = topPortDirections.isEmpty() ? new String[0] : topPortDirections.split(" ");
+        for (int i = 0; i < directions.length; i++) {
+            EDIFDirection dir = EDIFDirection.valueOf(directions[i]);
+            EDIFPort childPort = child.createPort("p" + i, dir, 1);
+            wire.createPortInst(childPort);
+            EDIFNet net = top.createNet("n" + i);
+            net.createPortInst(top.createPort("io" + i, dir, 1));
+            net.createPortInst(childPort, u);
+        }
+        EDIFCell driver = new EDIFCell(netlist.getWorkLibrary(), "driver");
+        EDIFPort o = driver.createPort("O", EDIFDirection.OUTPUT, 1);
+        for (int i = 0; i < leafDrivers; i++) {
+            wire.createPortInst(o, child.createChildCellInst("d" + i, driver));
+        }
+        EDIFCell sink = new EDIFCell(netlist.getWorkLibrary(), "sink");
+        wire.createPortInst(sink.createPort("I", EDIFDirection.INPUT, 1), child.createChildCellInst("s", sink));
+
+        List<EDIFHierNet> aliases = new ArrayList<>();
+        aliases.add(netlist.getHierNetFromName("u/wire"));
+        for (int i = 0; i < directions.length; i++) {
+            aliases.add(netlist.getHierNetFromName("n" + i));
+        }
+
+        if (expected.equals("throws")) {
+            for (EDIFHierNet alias : aliases) {
+                netlist.resetParentNetMap();
+                Assertions.assertThrows(RuntimeException.class, () -> netlist.findParentNet(alias), alias.toString());
+                Assertions.assertFalse(netlist.isParentNetMapBuilt());
+                netlist.resetParentNetMap();
+                Assertions.assertThrows(RuntimeException.class, () -> netlist.getParentNet(alias), alias.toString());
+            }
+            return;
+        }
+
+        EDIFHierNet expectedParent = expected.equals("none") ? null : netlist.getHierNetFromName(expected);
+        // Starting from each alias, before and after building the map from that alias
+        for (EDIFHierNet start : aliases) {
+            netlist.resetParentNetMap();
+            for (EDIFHierNet alias : aliases) {
+                Assertions.assertEquals(expectedParent, netlist.findParentNet(alias), alias.toString());
+            }
+            Assertions.assertFalse(netlist.isParentNetMapBuilt());
+            Assertions.assertEquals(expectedParent, netlist.getParentNet(start), start.toString());
+            Assertions.assertTrue(netlist.isParentNetMapBuilt());
+            for (EDIFHierNet alias : aliases) {
+                Assertions.assertEquals(expectedParent, netlist.getParentNet(alias), alias.toString());
+                Assertions.assertEquals(expectedParent, netlist.findParentNet(alias), alias.toString());
+            }
+        }
     }
 
     @Test
@@ -547,8 +929,12 @@ class TestEDIFNetlist {
     public void testRAM32X1SExpansion(String unisim, String expected) {
         EDIFNetlist n = EDIFTools.createNewNetlist("test");
 
-        EDIFCell macro = n.getHDIPrimitivesLibrary().addCell(Design.getUnisimCell(Unisim.valueOf(unisim)));
-        n.getTopCell().createChildCellInst("inst", macro);
+        // A shallow copy of the unisim cell, which shares its ports
+        EDIFCell unisimCell = Design.getUnisimCell(Unisim.valueOf(unisim));
+        EDIFCell macro = n.getHDIPrimitivesLibrary().addCell(unisimCell);
+        EDIFCellInst macroInst = n.getTopCell().createChildCellInst("inst", macro);
+        EDIFPortInst o = n.getTopCell().createNet("o").createPortInst("O", macroInst);
+        Assertions.assertSame(unisimCell, o.getPort().getParentCell());
 
         Assertions.assertNull(n.getCellInstFromHierName("inst/SP"));
 
@@ -556,6 +942,23 @@ class TestEDIFNetlist {
         EDIFCellInst inst = n.getCellInstFromHierName("inst/SP");
         Assertions.assertNotNull(inst);
         Assertions.assertEquals(expected, inst.getProperty("IS_CLK_INVERTED").getValue());
+
+        // The macro is expanded with ports of its own, which its instance refers to
+        Assertions.assertSame(macro, macroInst.getCellType());
+        for (EDIFPort port : macro.getPorts()) {
+            Assertions.assertSame(macro, port.getParentCell(), port.getName());
+        }
+        Assertions.assertSame(macro.getPort("O"), o.getPort());
+        Assertions.assertNotNull(macro.getPort("O").getInternalNet());
+        Assertions.assertSame(macro.getPort("O").getInternalNet(), o.getInternalNet());
+
+        // The unisim cell is left as it was
+        Assertions.assertTrue(unisimCell.isLeafCellOrBlackBox());
+        Assertions.assertTrue(unisimCell.getInternalNetMap().isEmpty());
+        for (EDIFPort port : unisimCell.getPorts()) {
+            Assertions.assertSame(unisimCell, port.getParentCell(), port.getName());
+        }
+        Assertions.assertEquals(macro.getPorts().size(), unisimCell.getPorts().size());
     }
 
     @ParameterizedTest
@@ -599,6 +1002,229 @@ class TestEDIFNetlist {
             Assertions.assertEquals("[ob/N/O]", netlist.getPhysicalPins("ob/OB").toString());
             Assertions.assertEquals(null, netlist.getPhysicalPins("o2_n"));
             Assertions.assertEquals("[ob/P/O]", netlist.getPhysicalPins("ob/O").toString());
+        }
+    }
+
+    @Test
+    public void testExpandMacroUnisimsWithoutPartName() {
+        EDIFNetlist netlist = new EDIFNetlist("test");
+        netlist.setDesign(new EDIFDesign("top"));
+        // A netlist whose design carries no PART property has nothing to expand
+        // against, and must report that rather than dereferencing a null part name
+        Assertions.assertFalse(netlist.expandMacroUnisims());
+    }
+
+    @Test
+    public void testExpandMacroUnisimsWithUnknownPartName() {
+        EDIFNetlist netlist = new EDIFNetlist("test");
+        EDIFDesign design = new EDIFDesign("top");
+        netlist.setDesign(design);
+        design.addProperty(EDIFTools.EDIF_PART_PROP, "xcNotARealPart");
+        // PartNameTools.getPart() throws for an unidentifiable part; the documented
+        // contract here is to return false instead
+        Assertions.assertFalse(netlist.expandMacroUnisims());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testRemoveUnusedCells(boolean allWorkLibraries) {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("test");
+        EDIFLibrary work = netlist.getWorkLibrary();
+        EDIFLibrary other = netlist.addLibrary(new EDIFLibrary("other"));
+        EDIFCell top = netlist.getTopCell();
+
+        // top instantiates a twice; a instantiates b and the leaf (black box) f; b instantiates d,
+        // from the other library. c and e are not instantiated anywhere
+        EDIFCell a = new EDIFCell(work, "a");
+        EDIFCell b = new EDIFCell(work, "b");
+        EDIFCell c = new EDIFCell(work, "c");
+        EDIFCell f = new EDIFCell(work, "f");
+        EDIFCell d = new EDIFCell(other, "d");
+        EDIFCell e = new EDIFCell(other, "e");
+        top.createChildCellInst("a0", a);
+        top.createChildCellInst("a1", a);
+        a.createChildCellInst("b", b);
+        a.createChildCellInst("f", f);
+        b.createChildCellInst("d", d);
+        // An unused cell can still instantiate used ones
+        c.createChildCellInst("b", b);
+
+        if (allWorkLibraries) {
+            netlist.removeUnusedCellsFromAllWorkLibraries();
+        } else {
+            netlist.removeUnusedCellsFromWorkLibrary();
+        }
+
+        for (EDIFCell cell : new EDIFCell[] {top, a, b, f}) {
+            Assertions.assertSame(cell, work.getCell(cell.getName()));
+        }
+        Assertions.assertNull(work.getCell("c"));
+        Assertions.assertSame(d, other.getCell("d"));
+        // Only the work library is cleaned up otherwise
+        Assertions.assertEquals(allWorkLibraries ? null : e, other.getCell("e"));
+    }
+
+    /**
+     * The parent net and physical pin maps are built on first use. Threads that use them for the
+     * first time at the same time must all see the complete maps.
+     */
+    @Test
+    public void testParentNetMapsConcurrentFirstUse() throws Exception {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        EDIFNetlist netlist = design.getNetlist();
+        Map<EDIFHierNet, EDIFHierNet> expectedParents = new HashMap<>(netlist.getParentNetMap());
+        Map<EDIFHierNet, List<EDIFHierPortInst>> expectedPins = new HashMap<>(netlist.getPhysicalNetPinMap());
+        List<EDIFHierNet> aliases = new ArrayList<>(expectedParents.keySet());
+        Assertions.assertFalse(aliases.isEmpty());
+
+        final int numThreads = 8;
+        ExecutorService pool = Executors.newFixedThreadPool(numThreads);
+        try {
+            for (int iteration = 0; iteration < 20; iteration++) {
+                netlist.resetParentNetMap();
+                CountDownLatch ready = new CountDownLatch(numThreads);
+                CountDownLatch start = new CountDownLatch(1);
+                List<Future<Integer>> futures = new ArrayList<>();
+                for (int t = 0; t < numThreads; t++) {
+                    // Each thread starts at a different net; half of them use the physical pin map first
+                    final int offset = t * aliases.size() / numThreads;
+                    final boolean pinsFirst = (t % 2) == 1;
+                    futures.add(pool.submit(() -> {
+                        ready.countDown();
+                        start.await();
+                        int mismatches = 0;
+                        for (int i = 0; i < aliases.size(); i++) {
+                            EDIFHierNet alias = aliases.get((offset + i) % aliases.size());
+                            EDIFHierNet expectedParent = expectedParents.get(alias);
+                            if (pinsFirst && expectedParent != null) {
+                                if (!Objects.equals(expectedPins.get(expectedParent), netlist.getPhysicalPins(expectedParent))) {
+                                    mismatches++;
+                                }
+                            }
+                            if (!Objects.equals(expectedParent, netlist.getParentNet(alias))) {
+                                mismatches++;
+                            }
+                        }
+                        return mismatches;
+                    }));
+                }
+                ready.await();
+                start.countDown();
+                for (Future<Integer> f : futures) {
+                    Assertions.assertEquals(0, f.get(60, TimeUnit.SECONDS), "iteration " + iteration);
+                }
+                Assertions.assertEquals(expectedParents, netlist.getParentNetMap());
+                Assertions.assertEquals(expectedPins, netlist.getPhysicalNetPinMap());
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    /**
+     * Until the parent net map is built, getNetAliases() records the physical pins of the parent
+     * nets it finds. Threads reading the physical pins at the same time must only see the complete
+     * pins of each parent net, and the pins of each parent net must be recorded only once.
+     */
+    @Test
+    public void testNetAliasesConcurrentWithPhysicalPinReaders() throws Exception {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        EDIFNetlist netlist = design.getNetlist();
+        Map<EDIFHierNet, EDIFHierNet> expectedParents = new HashMap<>(netlist.getParentNetMap());
+        Map<EDIFHierNet, List<EDIFHierPortInst>> expectedPinLists = new HashMap<>(netlist.getPhysicalNetPinMap());
+        Map<EDIFHierNet, Set<EDIFHierPortInst>> expectedPins = new HashMap<>();
+        expectedPinLists.forEach((parent, pins) -> expectedPins.put(parent, new HashSet<>(pins)));
+        List<EDIFHierPortInst> expectedGndPins = new ArrayList<>(netlist.getPhysicalGndPins());
+        List<EDIFHierPortInst> expectedVccPins = new ArrayList<>(netlist.getPhysicalVccPins());
+        Assertions.assertFalse(expectedGndPins.isEmpty());
+        Assertions.assertFalse(expectedVccPins.isEmpty());
+        List<EDIFHierNet> aliases = new ArrayList<>(expectedParents.keySet());
+
+        // Once the parent net map is built, getNetAliases() changes none of the physical pins
+        for (EDIFHierNet alias : aliases) {
+            netlist.getNetAliases(alias);
+        }
+        Assertions.assertEquals(expectedPinLists, netlist.getPhysicalNetPinMap());
+        Assertions.assertEquals(expectedGndPins, netlist.getPhysicalGndPins());
+        Assertions.assertEquals(expectedVccPins, netlist.getPhysicalVccPins());
+
+        final int numWriters = 4;
+        final int numReaders = 4;
+        ExecutorService pool = Executors.newFixedThreadPool(numWriters + numReaders);
+        try {
+            for (int iteration = 0; iteration < 20; iteration++) {
+                netlist.resetParentNetMap();
+                // Record one parent net first, so that the readers do not build the parent net map
+                Set<EDIFHierNet> recorded = ConcurrentHashMap.newKeySet();
+                netlist.getNetAliases(aliases.get(0));
+                recorded.add(expectedParents.get(aliases.get(0)));
+                AtomicInteger writersLeft = new AtomicInteger(numWriters);
+                CountDownLatch ready = new CountDownLatch(numWriters + numReaders);
+                CountDownLatch start = new CountDownLatch(1);
+                List<Future<Integer>> futures = new ArrayList<>();
+                for (int t = 0; t < numWriters; t++) {
+                    final int offset = t * aliases.size() / numWriters;
+                    futures.add(pool.submit(() -> {
+                        ready.countDown();
+                        start.await();
+                        try {
+                            for (int i = 0; i < aliases.size(); i++) {
+                                EDIFHierNet alias = aliases.get((offset + i) % aliases.size());
+                                netlist.getNetAliases(alias);
+                                recorded.add(expectedParents.get(alias));
+                            }
+                        } finally {
+                            writersLeft.decrementAndGet();
+                        }
+                        return 0;
+                    }));
+                }
+                for (int t = 0; t < numReaders; t++) {
+                    futures.add(pool.submit(() -> {
+                        ready.countDown();
+                        start.await();
+                        int mismatches = 0;
+                        boolean writing;
+                        do {
+                            writing = writersLeft.get() > 0;
+                            for (Map.Entry<EDIFHierNet, List<EDIFHierPortInst>> e : netlist.getPhysicalNetPinMap().entrySet()) {
+                                if (!expectedPins.get(e.getKey()).equals(new HashSet<>(e.getValue()))) {
+                                    mismatches++;
+                                }
+                            }
+                            // The pins of parent nets that getNetAliases() returned for are recorded
+                            for (EDIFHierNet parent : recorded) {
+                                List<EDIFHierPortInst> pins = netlist.getPhysicalPins(parent);
+                                if (pins == null || !expectedPins.get(parent).equals(new HashSet<>(pins))) {
+                                    mismatches++;
+                                }
+                            }
+                            for (List<EDIFHierPortInst> staticPins : Arrays.asList(netlist.getPhysicalGndPins(),
+                                    netlist.getPhysicalVccPins())) {
+                                for (EDIFHierPortInst p : staticPins) {
+                                    if (p == null) {
+                                        mismatches++;
+                                    }
+                                }
+                            }
+                        } while (writing);
+                        return mismatches;
+                    }));
+                }
+                ready.await();
+                start.countDown();
+                for (Future<Integer> f : futures) {
+                    Assertions.assertEquals(0, f.get(60, TimeUnit.SECONDS), "iteration " + iteration);
+                }
+                Assertions.assertFalse(netlist.isParentNetMapBuilt());
+                Assertions.assertEquals(expectedPins.keySet(), netlist.getPhysicalNetPinMap().keySet());
+                Assertions.assertEquals(expectedGndPins.size(), netlist.getPhysicalGndPins().size(), "iteration " + iteration);
+                Assertions.assertEquals(new HashSet<>(expectedGndPins), new HashSet<>(netlist.getPhysicalGndPins()));
+                Assertions.assertEquals(expectedVccPins.size(), netlist.getPhysicalVccPins().size(), "iteration " + iteration);
+                Assertions.assertEquals(new HashSet<>(expectedVccPins), new HashSet<>(netlist.getPhysicalVccPins()));
+            }
+        } finally {
+            pool.shutdownNow();
         }
     }
 }

@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2018-2022, Xilinx, Inc.
- * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -26,6 +26,7 @@ package com.xilinx.rapidwright.design.tools;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -55,6 +56,7 @@ import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
 
 
@@ -116,6 +118,15 @@ public class LUTTools {
     public static String getCompanionLUTName(String lutName) {
         String[] belNames = getLUTBELNames(lutName.charAt(0));
         return belNames[(lutName.charAt(1) == '6') ? 1 : 0];
+    }
+
+    /**
+     * Gets the companion netlist cell type.  For example, a LUT5 will return a LUT6 and vice versa.
+     * @param cell The netlist cell type.
+     * @return The companion cell type 
+     */
+    public static String getCompanionLUTName(EDIFCell cell) {
+        return cell.getName().equals("LUT5") ? "LUT6" : (cell.getName().equals("LUT6") ? "LUT5" : null);
     }
 
     /**
@@ -203,11 +214,35 @@ public class LUTTools {
      */
     public static int getLUTSize(EDIFCellInst c) {
         if (!isCellALUT(c)) return 0;
-        return Character.getNumericValue(c.getCellType().getName().charAt(3));
+        String cellType = c.getCellType().getName();
+        return cellType.startsWith("LUTCY") ? 5 : Character.getNumericValue(cellType.charAt(3));
+    }
+
+    /**
+     * If the provided cell instance is a LUT, it will return the LUT input count.
+     * If it is not a LUT, it will return 0.
+     * 
+     * @param c The LUT cell
+     * @return The number of LUT inputs or 0 if cell is not a LUT.
+     */
+    public static int getLUTSize(EDIFHierCellInst c) {
+        return getLUTSize(c.getInst());
+    }
+
+    /**
+     * Given a LUT BEL, get the size of the LUT (generally 5 or 6). If the BEL is
+     * not a LUT type, it returns -1.
+     * 
+     * @param bel The BEL to query
+     * @return The size of the LUT, or -1 if the BEL is not a LUT.
+     */
+    public static int getLUTSize(BEL bel) {
+        return bel.isLUT() ? (bel.getName().charAt(1) - '0') : -1;
     }
 
     /**
      * Extracts the length value from the INIT String (16, in 16'hA8A2)
+     * 
      * @param init The init string.
      * @return The init length.
      */
@@ -353,7 +388,8 @@ public class LUTTools {
             boolean result = b.eval(i);
             if (result) init = setBit(init,i);
         }
-        return length + "'h" + Long.toUnsignedString(init, 16).toUpperCase();
+        int initLength = Integer.max(1, length >>> 2);
+        return length + "'h" + String.format("%0" + initLength + "x", init).toUpperCase();
     }
 
     /**
@@ -389,9 +425,9 @@ public class LUTTools {
      */
     public static String getLUTEquation(Cell c) {
         if (c.isRoutethru()) {
-            Set<Entry<String, String>> entrySet = c.getPinMappingsP2L().entrySet();
-            assert (entrySet.size() == 1);
-            return "O" + c.getBELName().charAt(1) + "=" + entrySet.iterator().next().getKey();
+            BELPin rtEntry = c.getFirstPhysicalPinMapping().getFirst();
+            assert (c.getUsedPhysicalPinsCount() == 1);
+            return "O" + c.getBELName().charAt(1) + "=" + rtEntry.getName();
         }
         return getLUTEquation(c.getEDIFCellInst());
     }
@@ -402,16 +438,29 @@ public class LUTTools {
      * @return The equation following LUT equation syntax or null if cell is not configured.
      */
     public static String getLUTEquation(EDIFCellInst i) {
-        String init = i.getProperty(LUT_INIT).getValue();
+        EDIFPropertyValue prop = i.getProperty(LUT_INIT);
+        String init = prop == null ? null : prop.getValue();
         if (init == null) return null;
         return getLUTEquation(init);
     }
 
+    /**
+     * Reads the init string in this LUT and creates an equivalent (non-optimal)
+     * equation.
+     * 
+     * @param i The LUT instance
+     * @return The equation following LUT equation syntax or null if cell is not
+     *         configured.
+     */
+    public static String getLUTEquation(EDIFHierCellInst i) {
+        return getLUTEquation(i.getInst());
+    }
 
     /**
-     * Creates a (dumb, non-reduced) boolean logic equation compatible
-     * with Vivado's LUT Equation Editor from an INIT string.
-     * TODO - Enhance with a logic minimization method such as Quine-McCluskey method.
+     * Creates a (dumb, non-reduced) boolean logic equation compatible with Vivado's
+     * LUT Equation Editor from an INIT string. TODO - Enhance with a logic
+     * minimization method such as Quine-McCluskey method.
+     * 
      * @param init The existing INIT string configuring a LUT.
      * @return A Vivado LUT Equation Editor compatible equation.
      */
@@ -469,6 +518,33 @@ public class LUTTools {
             }
 
         }
+    }
+
+    /**
+     * Given a placed LUT cell, this method will find and return the fastest unmapped
+     * physical LUT input pin available for use, where unmapped means that it does
+     * not already participate in any pin mappings on the given LUT cell or its
+     * companion LUT cell if one exists.
+     *
+     * @param lut The current LUT to query for a free physical pin.
+     * @return The fastest available unmapped LUT input pin compatible with the current
+     *         placement.
+     */
+    public static String getUnmappedPhysicalLUTInputPin(Cell lut) {
+        if (isCellALUT(lut) && lut.isPlaced()) {
+            Cell oLUT = LUTTools.getCompanionLUTCell(lut);
+            Map<String, String> pinMap = oLUT == null ? Collections.emptyMap() : oLUT.getPinMappingsP2L();
+            int start = getLUTSize(lut.getBEL());
+            start = start == 6 && oLUT != null ? 5 : start;
+            // Search starting at the fastest LUT inputs first
+            for (int i = start; i >= 1; i--) {
+                String physName = "A" + i;
+                if (lut.getLogicalPinMapping(physName) == null && pinMap.get(physName) == null) {
+                    return physName;
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -594,7 +670,7 @@ public class LUTTools {
             String oldPhysicalPin = oPins[i];
             String newPhysicalPin = ePins[i];
             Cell c = emptySlots.get(newPhysicalPin).getCell();
-            String newNetPinName = c.getSiteWireNameFromPhysicalPin(newPhysicalPin);
+            String newNetPinName = c.getBELName().substring(0, 1) + newPhysicalPin.charAt(1);
             // Handles special cases
             if (c.getLogicalPinMapping(oldPhysicalPin) == null) {
                 Cell neighborLUT = emptySlots.get(newPhysicalPin).checkForCompanionCell();
@@ -635,13 +711,14 @@ public class LUTTools {
         Queue<SitePinInst> q = new LinkedList<>();
         for (PinSwap ps : copyOnWritePinSwaps) {
             Cell cell = ps.getCell();
-            String oldSitePinName = cell.getSiteWireNameFromPhysicalPin(ps.getOldPhysicalName());
+            String oldSitePinName = cell.getBELName().substring(0, 1) + ps.getOldPhysicalName().charAt(1);
             SiteInst si = cell.getSiteInst();
             SitePinInst pinToMove = si.getSitePinInst(oldSitePinName);
             q.add(pinToMove);
             if (pinToMove == null) {
                 continue;
             }
+            si.unrouteIntraSiteNet(pinToMove.getBELPin(), cell.getBEL().getPin(ps.getOldPhysicalName()));
             pinToMove.setSiteInst(null,true);
             // Removes pin mappings to prepare for new pin mappings
             cell.removePinMapping(ps.getOldPhysicalName());
@@ -671,7 +748,9 @@ public class LUTTools {
                 continue;
             }
             pinToMove.setPinName(ps.getNewNetPinName());
-            pinToMove.setSiteInst(cell.getSiteInst());
+            SiteInst si = cell.getSiteInst();
+            pinToMove.setSiteInst(si);
+            si.routeIntraSiteNet(pinToMove.getNet(), pinToMove.getBELPin(), cell.getBEL().getPin(ps.getNewPhysicalName()));
         }
 
         assert(q.isEmpty());

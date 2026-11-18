@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -32,8 +32,10 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.timing.TimingEdge;
 import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
+import com.xilinx.rapidwright.util.Pair;
 
 /**
  * A Connection instance represents a pair of source-sink {@link SitePinInst} instances of a {@link Net} instance.
@@ -49,7 +51,6 @@ public class Connection implements Comparable<Connection>{
      * They are created based on the INT tile nodes the source and sink SitePinInsts connect to, respectively.
      */
     private RouteNode sourceRnode;
-    private RouteNode altSourceRnode;
     private RouteNode sinkRnode;
     private List<RouteNode> altSinkRnodes;
     /**
@@ -82,8 +83,9 @@ public class Connection implements Comparable<Connection>{
 
     /** To indicate if the route delay of a connection has been patched up, when there are consecutive long nodes */
     private boolean dlyPatched;
-    /** true to indicate that a connection cross SLRs */
-    private boolean crossSLR;
+    /** true to indicate that a connection cross SLRs in given direction */
+    private boolean crossSLRnorth;
+    private boolean crossSLRsouth;
     /** List of nodes assigned to a connection to form the path for generating PIPs */
     private List<Node> nodes;
 
@@ -95,7 +97,8 @@ public class Connection implements Comparable<Connection>{
         rnodes = new ArrayList<>();
         this.netWrapper = netWrapper;
         netWrapper.addConnection(this);
-        crossSLR = !source.getTile().getSLR().equals(sink.getTile().getSLR());
+        crossSLRnorth = false;
+        crossSLRsouth = false;
     }
 
     /**
@@ -111,11 +114,10 @@ public class Connection implements Comparable<Connection>{
      * and for cross SLR connections the location of Laguna columns.
      * @param boundingBoxExtensionX To indicate the extension on top of the minimum bounding box in the horizontal direction.
      * @param boundingBoxExtensionY To indicate the extension on top of the minimum bounding box in the vertical direction.
-     * @param nextLagunaColumn Array mapping arbitrary tile columns to the next Laguna column
-     * @param prevLagunaColumn Array mapping arbitrary tile columns to the previous Laguna column
+     * @param routingGraph A RouteNodeGraph object for additional context.
      */
     public void computeConnectionBoundingBox(short boundingBoxExtensionX, short boundingBoxExtensionY,
-                                             int[] nextLagunaColumn, int[] prevLagunaColumn) {
+                                             RouteNodeGraph routingGraph) {
         short xMin, xMax, yMin, yMax;
         short xNetCenter = (short) Math.ceil(netWrapper.getXCenter());
         short yNetCenter = (short) Math.ceil(netWrapper.getYCenter());
@@ -125,16 +127,12 @@ public class Connection implements Comparable<Connection>{
         yMin = minOfThree(sourceRnode.getEndTileYCoordinate(), sinkRnode.getEndTileYCoordinate(), yNetCenter);
 
         if (isCrossSLR()) {
-            // For SLR-crossing connections, ensure the bounding box width contains at least one Laguna column
-            // before bounding box extension
-            int nextLaguna = nextLagunaColumn[xMin];
-            int prevLaguna = prevLagunaColumn[xMax];
-            if (nextLaguna != Integer.MAX_VALUE) {
-                xMax = (short) Math.max(xMax, nextLaguna);
-            }
-            if (prevLaguna != Integer.MIN_VALUE) {
-                xMin = (short) Math.min(xMin, prevLaguna);
-            }
+            // For SLR-crossing connections, ensure the bounding box width contains at least one column from which
+            // super long lines can cross SLRs (Laguna on UltraScale/UltraScale+, SLL on Versal) before bounding box
+            // extension
+            short widenedXMin = (short) routingGraph.getCrossingWidenedXMin(xMin, xMax);
+            xMax = (short) routingGraph.getCrossingWidenedXMax(xMin, xMax);
+            xMin = widenedXMin;
         }
 
         xMaxBB = (short) (xMax + boundingBoxExtensionX);
@@ -144,17 +142,19 @@ public class Connection implements Comparable<Connection>{
 
         if (isCrossSLR()) {
             // Equivalently, ensure that cross-SLR connections are at least as high as a SLL;
-            // if necessary, expand the sink side of the bounding box
-            short heightMinusSLL = (short) ((yMaxBB - yMinBB - 1) - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
+            // if necessary, expand the sink side of the bounding box.
+            // The bounding box excludes its edges (see RouteNode.isInConnectionBoundingBox()), so an SLL
+            // from row y to row y + SLL length fits only if yMinBB < y and y + SLL length < yMaxBB
+            short heightMinusSLL = (short) ((yMaxBB - yMinBB - 2) - routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES);
             if (heightMinusSLL < 0) {
                 if (sourceRnode.getEndTileYCoordinate() <= sinkRnode.getEndTileYCoordinate()) {
                     // Upwards
-                    short newYMaxBB = (short) (yMin + RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES + 1);
+                    short newYMaxBB = (short) (Math.max(yMin, yMinBB + 1) + routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES + 1);
                     assert(newYMaxBB > yMaxBB);
                     yMaxBB = newYMaxBB;
                 } else {
                     // Downwards
-                    short newYMinBB = (short) (yMax - RouteNodeGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - 1);
+                    short newYMinBB = (short) (Math.min(yMax, yMaxBB - 1) - routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES - 1);
                     assert(newYMinBB < yMinBB);
                     yMinBB = newYMinBB;
                 }
@@ -190,7 +190,11 @@ public class Connection implements Comparable<Connection>{
         // normalized correctly.
         assert(minSlack >= 0);
 
-        float tempCriticality  = (1 - minSlack / maxDelay);
+        // At least 0 (and at most 1, as minSlack is not negative): a connection none of whose paths reaches a timing
+        // endpoint (see TimingGraph.setTimingRequirementTopologicalOrder()), or that has no timing edges, is left with
+        // minSlack at Float.MAX_VALUE, and so a base far below -1, which Math.pow() raises to NaN for an exponent that
+        // is not an integer, and (cast to float) to plus infinity for an even one
+        float tempCriticality = Math.max(0f, 1 - minSlack / maxDelay);
 
         tempCriticality = (float) Math.pow(tempCriticality, criticalityExponent) * maxCriticality;
 
@@ -205,19 +209,6 @@ public class Connection implements Comparable<Connection>{
     public boolean isCongested() {
         for (RouteNode rn : getRnodes()) {
             if (rn.isOverUsed()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Checks if a connection is routed through any rnodes that have multiple drivers.
-     * @return
-     */
-    public boolean useRnodesWithMultiDrivers() {
-        for (RouteNode rn : getRnodes()) {
-            if (rn.hasMultiDrivers()) {
                 return true;
             }
         }
@@ -273,7 +264,6 @@ public class Connection implements Comparable<Connection>{
 
     public void resetRoute() {
         getRnodes().clear();
-        sink.setRouted(false);
     }
 
     public RouteNode getSourceRnode() {
@@ -284,24 +274,50 @@ public class Connection implements Comparable<Connection>{
         sourceRnode = sourceNode;
     }
 
-    public RouteNode getAltSourceRnode() {
-        return altSourceRnode;
-    }
-
-    public void setAltSourceRnode(RouteNode altSourceNode) {
-        altSourceRnode = altSourceNode;
-    }
-
     public RouteNode getSinkRnode() {
         return sinkRnode;
     }
 
     public void setSinkRnode(RouteNode sinkRnode) {
         this.sinkRnode = sinkRnode;
+
+        assert(sourceRnode != null);
+        if (!sourceRnode.getTile().getSLR().equals(sinkRnode.getTile().getSLR())) {
+            if (sourceRnode.getTile().getTileYCoordinate() < sinkRnode.getTile().getTileYCoordinate()) {
+                crossSLRnorth = true;
+                assert(!crossSLRsouth);
+            } else {
+                assert(!crossSLRnorth);
+                crossSLRsouth = true;
+            }
+        } else {
+            assert(!crossSLRnorth);
+            assert(!crossSLRsouth);
+        }
     }
 
     public List<RouteNode> getAltSinkRnodes() {
         return altSinkRnodes == null ? Collections.emptyList() : altSinkRnodes;
+    }
+
+    public boolean hasAltSinks() {
+        return altSinkRnodes != null && !altSinkRnodes.isEmpty();
+    }
+
+    /**
+     * Checks whether this connection's sink (and any alternate, LUT pin swapping, sinks, which are in the same INT tile
+     * and on the same side) is driven only by INODEs: an INT tile pin (NODE_PINFEED: an UltraScale/UltraScale+ IMUX;
+     * NODE_PINBOUNCE: a bypass or bounce; NODE_IMUX: a Versal IMUX) other than an UltraScale/UltraScale+ CTRL pin
+     * (NODE_PINFEED, but driven by INT_NODE_GLOBAL_*), as found on xcvu9p, xcku040, xcvc1902 and xcv80.
+     * @return True if so.
+     */
+    public boolean isSinkDrivenByINodes() {
+        if (sinkRnode.getType() == RouteNodeType.EXCLUSIVE_SINK_CTRL ||
+                sinkRnode.getTile().getTileTypeEnum() != TileTypeEnum.INT) {
+            return false;
+        }
+        IntentCode ic = sinkRnode.getIntentCode();
+        return ic == IntentCode.NODE_PINFEED || ic == IntentCode.NODE_PINBOUNCE || ic == IntentCode.NODE_IMUX;
     }
 
     public void addAltSinkRnode(RouteNode sinkRnode) {
@@ -310,9 +326,8 @@ public class Connection implements Comparable<Connection>{
         } else {
             assert(!altSinkRnodes.contains(sinkRnode));
         }
-        assert(sinkRnode.getType() == RouteNodeType.PINFEED_I ||
-               // Can be a WIRE if node is not exclusive a sink
-               sinkRnode.getType() == RouteNodeType.WIRE);
+        // Alternate sinks by their nature cannot be exclusive
+        assert(!sinkRnode.getType().isAnyExclusiveSink());
         altSinkRnodes.add(sinkRnode);
     }
 
@@ -356,11 +371,16 @@ public class Connection implements Comparable<Connection>{
         return this.netWrapper;
     }
 
+    public Net getNet() {
+        return netWrapper.getNet();
+    }
+
     public SitePinInst getSource() {
         return source;
     }
 
     public void setSource(SitePinInst source) {
+        assert(source != null);
         this.source = source;
     }
 
@@ -409,11 +429,19 @@ public class Connection implements Comparable<Connection>{
     }
 
     public boolean isCrossSLR() {
-        return crossSLR;
+        return crossSLRnorth || crossSLRsouth;
+    }
+
+    public boolean isCrossSLRnorth() {
+        return crossSLRnorth;
+    }
+
+    public boolean isCrossSLRsouth() {
+        return crossSLRsouth;
     }
 
     public List<Node> getNodes() {
-        return nodes;
+        return nodes == null ? Collections.emptyList() : nodes;
     }
 
     public void setNodes(List<Node> nodes) {
@@ -435,23 +463,14 @@ public class Connection implements Comparable<Connection>{
     }
 
     @Override
-    public int compareTo(Connection arg0) {
-        if (this == arg0)
-            return 0;
-        if (netWrapper.getConnections().size() > arg0.getNetWrapper().getConnections().size()) {
-            return 1;
-        } else if (netWrapper.getConnections().size() == arg0.getNetWrapper().getConnections().size()) {
-            if (this.getHpwl() > arg0.getHpwl()) {
-                return 1;
-            } else if (getHpwl() == arg0.getHpwl()) {
-                if (hashCode() > arg0.hashCode()) {
-                    return -1;
-                }
-            }
-        } else {
-            return -1;
+    public int compareTo(Connection that) {
+        // 1st priority: descending net fanout
+        int comp = Integer.compare(that.getNetWrapper().getConnections().size(), this.getNetWrapper().getConnections().size());
+        if (comp != 0) {
+            return comp;
         }
-        return -1;
+        // 2nd priority: ascending HPWL
+        return Short.compare(this.getHpwl(), that.getHpwl());
     }
 
     public String bbRectangleString() {
@@ -470,9 +489,9 @@ public class Connection implements Comparable<Connection>{
         s.append(", ");
         s.append(String.format("net fanout = %3s", netWrapper.getConnections().size()));
         s.append(", ");
-        s.append(String.format("source = %s", getSource().getName()));
+        s.append(String.format("source = %s", getSource().getSitePinName()));
         s.append(", ");
-        s.append("sink = " + getSink().getName());
+        s.append("sink = " + getSink().getSitePinName());
         s.append(", ");
         s.append(String.format("delay = %4d ", (short)(getTimingEdges() == null? 0:getTimingEdges().get(0).getNetDelay())));
         s.append(", ");
@@ -481,30 +500,57 @@ public class Connection implements Comparable<Connection>{
         return s.toString();
     }
 
-    public void setAllTargets(boolean target) {
-        if (sinkRnode.countConnectionsOfUser(netWrapper) == 0 ||
-            sinkRnode.getIntentCode() == IntentCode.NODE_PINBOUNCE) {
-            // Since this connection will have been ripped up, only mark a node
-            // as a target if it's not already used by this net.
-            // This prevents -- for the case where the same net needs to be routed
-            // to the same LUT more than once -- the illegal case of the same
-            // physical pin servicing more than one logical pin
-            sinkRnode.setTarget(target);
-        } else {
-            assert(altSinkRnodes != null && !altSinkRnodes.isEmpty());
+    public void setAllTargets(RWRoute.ConnectionState state) {
+        // With LUT pin swapping (the only source of alternate sinks), a net that drives several
+        // inputs of the same LUT has several connections whose candidate pins overlap, and another
+        // of them may already be routed to one of this connection's pins (including its original
+        // one). Each LUT input needs its own pin, so such a pin is not a target -- even though
+        // routing otherwise lets connections of the same net share nodes.
+        if (!hasAltSinks() || sinkRnode.countConnectionsOfUser(netWrapper) == 0) {
+            sinkRnode.markTarget(state);
         }
         if (altSinkRnodes != null) {
             for (RouteNode rnode : altSinkRnodes) {
-                // Same condition as above: only allow this as an alternate sink
-                // if it's not already in use by the current net to prevent the case
-                // where the same physical pin services more than one logical pin
-                if (rnode.countConnectionsOfUser(netWrapper) == 0 ||
-                    // Except if it is not a PINFEED_I
-                    rnode.getType() != RouteNodeType.PINFEED_I) {
-                    assert(rnode.getIntentCode() != IntentCode.NODE_PINBOUNCE);
-                    rnode.setTarget(target);
+                assert(!rnode.getType().isAnyExclusiveSink());
+                assert(rnode.getIntentCode() != IntentCode.NODE_PINBOUNCE);
+                if (rnode.countConnectionsOfUser(netWrapper) > 0) {
+                    continue;
                 }
+                rnode.markTarget(state);
             }
         }
+        // Each LUT pin carries one signal, and this connection's candidate pins are its LUT's
+        // swappable pins that are not preserved (for other nets): this net's other connections
+        // into the LUT cannot occupy all of them, since this connection needs one too
+        assert(!state.targets.isEmpty());
+    }
+
+    protected Pair<SitePinInst,RouteNode> getOrCreateAlternateSource(RouteNodeGraph routingGraph) {
+        SitePinInst altSource = netWrapper.getOrCreateAlternateSource(routingGraph);
+        if (altSource == null) {
+            return null;
+        }
+
+        Net net = netWrapper.getNet();
+        RouteNode altSourceRnode;
+        if (source.equals(net.getSource())) {
+            altSourceRnode = netWrapper.getAltSourceRnode();
+        } else {
+            assert(source.equals(net.getAlternateSource()));
+            altSource = net.getSource();
+            assert(altSource != null);
+            altSourceRnode = netWrapper.getSourceRnode();
+        }
+
+        assert(altSourceRnode != null);
+        return new Pair<>(altSource, altSourceRnode);
+    }
+
+    public boolean isRouted() {
+        return sink.isRouted();
+    }
+
+    public void setRouted(boolean isRouted) {
+        sink.setRouted(isRouted);
     }
 }

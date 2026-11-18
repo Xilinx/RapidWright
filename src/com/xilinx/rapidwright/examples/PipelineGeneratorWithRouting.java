@@ -337,8 +337,22 @@ public class PipelineGeneratorWithRouting {
 
                     if (i == 0) prevSite = currSlice;
 
-                    if (j == 0) inputNet.createPortInst(inputPort, (width - 1) - i);
-                    if (j == depth - 1) outputNet.createPortInst(outputPort, (width - 1) - i);
+                    if (j == 0) {
+                        if (inputPort.isBus()) {
+                            inputNet.createPortInst(inputPort, (width - 1) - i);
+                        } else {
+                            inputNet.createPortInst(inputPort);
+                        }
+
+                    }
+                    if (j == depth - 1) {
+                        if (outputPort.isBus()) {
+                            outputNet.createPortInst(outputPort, (width - 1) - i);
+                        } else {
+                            outputNet.createPortInst(outputPort);
+                        }
+
+                    }
 
                     clkNet.getLogicalNet().createPortInst("C", ffCell);
                     rstNet.getLogicalNet().createPortInst("R", ffCell);

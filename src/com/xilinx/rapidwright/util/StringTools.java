@@ -301,6 +301,25 @@ public class StringTools {
         }
     }
 
+    /**
+     * Light-weight helper method to get the value of an option in an array of
+     * arguments. For example, if option is '--option' and args is {"in.dcp",
+     * "out.dcp", "--option=value"}, this method will return 'value'.
+     * 
+     * @param option The name of the option to search for
+     * @param args   The list or arguments (usually from main())
+     * @return The value of the option or null if it was not found
+     */
+    public static String getOptionValue(String option, String[] args) {
+        for (String arg : args) {
+            if (arg.startsWith(option)) {
+                int idx = arg.indexOf('=');
+                return arg.substring(idx + 1).trim();
+            }
+        }
+        return null;
+    }
+
     public static void main(String[] args) {
         String[] tests = new String[] {
             "ARCHITECTURE",

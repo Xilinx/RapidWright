@@ -45,7 +45,19 @@ public enum ComponentType {
     AIE_NSU,
     DDRC,
     PCIE_NMU,
-    PCIE_NSU;
+    PCIE_NSU,
+    HBM_NMU,
+    HBM_NSU, 
+    HBMMC,
+    // Versal Gen 2 (NoC2) client types
+    PL_NMU_2,
+    PL_NSU_2,
+    PS_CCI_NMU_2,
+    RPU_NMU_2,
+    PMC_NMU_2,
+    AIE_NSU_2,
+    MMI_NMU_2,
+    DDR5E;
 
     private static Map<String,ComponentType> map;
 
@@ -57,6 +69,12 @@ public enum ComponentType {
     }
 
     public static ComponentType stringToValue(String s) {
-        return map.get(s);
+        ComponentType type = map.get(s);
+        if (type == null) {
+            throw new RuntimeException("Unrecognized ComponentType: '" + s 
+                    + "', please report/issue a PR to update "
+                    + ComponentType.class.getCanonicalName());
+        }
+        return type;
     }
 }

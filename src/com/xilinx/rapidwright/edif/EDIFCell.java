@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2017-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, 2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,11 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
+
+import com.xilinx.rapidwright.design.Design;
+import com.xilinx.rapidwright.device.PartNameTools;
+import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.util.CompactStringMap;
 
 /**
  * Represent a logical cell in an EDIF netlist.  Can
@@ -53,13 +59,51 @@ public class EDIFCell extends EDIFPropertyObject {
 
     private EDIFLibrary library;
 
-    private Map<String, EDIFCellInst> instances;
+    // Name-keyed maps without per-entry objects: instances, nets and ports derive their keys from
+    // the values (an object must be removed before it is renamed, then added back), while the
+    // internal port map stores its keys (port inst names) alongside the nets
+    private InstanceMap instances;
 
-    private Map<String, EDIFNet> nets;
+    private NetMap nets;
 
-    private Map<String, EDIFPort> ports;
+    private PortMap ports;
 
-    private Map<String, EDIFNet> internalPortMap;
+    private CompactStringMap<EDIFNet> internalPortMap;
+
+    // One final class per map type, so that the JIT compiler can inline keyOf() into lookups
+    private static final class InstanceMap extends CompactStringMap<EDIFCellInst> {
+        InstanceMap() {
+            super(true);
+        }
+
+        @Override
+        protected String keyOf(EDIFCellInst value) {
+            return value.getName();
+        }
+    }
+
+    private static final class NetMap extends CompactStringMap<EDIFNet> {
+        NetMap() {
+            super(true);
+        }
+
+        @Override
+        protected String keyOf(EDIFNet value) {
+            return value.getName();
+        }
+    }
+
+    private static final class PortMap extends CompactStringMap<EDIFPort> {
+        PortMap() {
+            super(true);
+        }
+
+        /** Ports are keyed by bus name, keeping the open bracket of a bus, see {@link #addPort(EDIFPort)} */
+        @Override
+        protected String keyOf(EDIFPort value) {
+            return value.getBusName(true);
+        }
+    }
 
     private EDIFName view = DEFAULT_VIEW;
 
@@ -76,6 +120,16 @@ public class EDIFCell extends EDIFPropertyObject {
     public EDIFCell(EDIFLibrary lib, String name) {
         super(name);
         if (lib != null) lib.addCell(this);
+    }
+
+    /**
+     * Shallow Copy constructor - Creates a new EDIFCell object, EDIFCell
+     * contents point to orig.
+     *
+     * @param orig The original cell
+     */
+    public EDIFCell(EDIFCell orig) {
+        this(null, orig);
     }
 
     /**
@@ -104,8 +158,27 @@ public class EDIFCell extends EDIFPropertyObject {
      */
     public EDIFCell(EDIFLibrary lib, EDIFCell orig, String newCellName) {
         super(newCellName);
+        deepCopyInit(lib, orig, newCellName, true);
+    }
+
+    /**
+     * Full Deep Copy Constructor with rename and optional inclusion of nets and
+     * insts
+     *
+     * @param lib                 Destination library of the new cell
+     * @param orig                Prototype of the original cell
+     * @param newCellName         Name of the new cell copy
+     * @param includeNetsAndInsts In the deep copy, include copies of all the nets
+     *                            and instances
+     */
+    public EDIFCell(EDIFLibrary lib, EDIFCell orig, String newCellName, boolean includeNetsAndInsts) {
+        super(newCellName);
+        deepCopyInit(lib, orig, newCellName, includeNetsAndInsts);
+    }
+
+    private void deepCopyInit(EDIFLibrary lib, EDIFCell orig, String newCellName, boolean includeNetsAndInsts) {
         if (lib != null) lib.addCell(this);
-        if (orig.instances != null) {
+        if (includeNetsAndInsts && orig.instances != null) {
             for (Entry<String, EDIFCellInst> e : orig.instances.entrySet()) {
                 addCellInst(new EDIFCellInst(e.getValue(), this));
             }
@@ -115,7 +188,7 @@ public class EDIFCell extends EDIFPropertyObject {
                 addPort(new EDIFPort(e.getValue()));
             }
         }
-        if (orig.nets != null) {
+        if (includeNetsAndInsts && orig.nets != null) {
             for (Entry<String, EDIFNet> e : orig.nets.entrySet()) {
                 EDIFNet net = addNet(new EDIFNet(e.getValue()));
                 for (EDIFPortInst prototype : e.getValue().getPortInsts()) {
@@ -165,7 +238,7 @@ public class EDIFCell extends EDIFPropertyObject {
      * @return The instance added to the cell.
      */
     public EDIFCellInst addCellInst(EDIFCellInst instance) {
-        if (instances == null) instances = getNewMap();
+        if (instances == null) instances = new InstanceMap();
         instance.setParentCell(this);
         EDIFCellInst collision = instances.put(instance.getName(), instance);
         if (collision != null && instance != collision) {
@@ -184,8 +257,12 @@ public class EDIFCell extends EDIFPropertyObject {
      * @return The instance added to the cell.
      */
     public EDIFCellInst addCellInstUniqueName(EDIFCellInst instance) {
-        if (instances == null) instances = getNewMap();
+        if (instances == null) instances = new InstanceMap();
         instance.setParentCell(this);
+        if (instances.get(instance.getName()) == instance) {
+            // Already in this cell: renaming it in place would desynchronize the instance map
+            return instance;
+        }
         while (instances.containsKey(instance.getName())) {
             instance.setName(instance.getName() + "_" + getLibrary().getNetlist().nameSpaceUniqueCount++);
         }
@@ -205,7 +282,7 @@ public class EDIFCell extends EDIFPropertyObject {
      * @return The net that was added.
      */
     public EDIFNet addNet(EDIFNet net) {
-        if (nets == null) nets = getNewMap();
+        if (nets == null) nets = new NetMap();
         net.setParentCell(this);
         EDIFNet collision = nets.put(net.getName(), net);
         if (collision != null && net != collision) {
@@ -247,7 +324,7 @@ public class EDIFCell extends EDIFPropertyObject {
      * @return The port that was added.
      */
     public EDIFPort addPort(EDIFPort port) {
-        if (ports == null) ports = getNewMap();
+        if (ports == null) ports = new PortMap();
         port.setParentCell(this);
         EDIFPort collision = ports.put(port.getBusName(true), port);
         if (collision != null && port != collision) {
@@ -280,7 +357,7 @@ public class EDIFCell extends EDIFPropertyObject {
     /**
      * Given a port instance name (not including the name of the cell instance),
      * gets the associated port.
-     * 
+     *
      * @param portInstName
      * @return
      */
@@ -291,6 +368,40 @@ public class EDIFCell extends EDIFPropertyObject {
             port = ports.get(portInstName.substring(0, portInstName.lastIndexOf('[') + 1));
         }
         return port;
+    }
+
+    /**
+     * Rename port with name currName to newName.
+     *
+     * @param currName The current name of the port that will be renamed.
+     * @param newName The new name of the port after renaming.
+     */
+    public void renamePort(String currName, String newName) {
+        if (currName.equals(newName)) {
+            return;
+        }
+
+        EDIFPort port = getPortByPortInstName(currName);
+
+        if (port == null) {
+            throw new RuntimeException("Attempting to rename port " + currName
+                    + " that does not exist on cell " + getName());
+        }
+
+        EDIFPort newPort = new EDIFPort(newName, port.getDirection(), port.getWidth());
+        addPort(newPort);
+
+        for (int i : port.getBitBlastedIndices()) {
+            EDIFPortInst portInst = port.getInternalPortInstFromIndex(i);
+            if (portInst == null) {
+                continue;
+            }
+            EDIFNet net = removeInternalPortMapEntry(portInst.getFullName());
+            net.removePortInst(portInst);
+            net.createPortInst(newPort, newPort.isBus() ? i : -1);
+            addInternalPortMapEntry(newPort.getPortInstNameFromPort(i), net);
+        }
+        removePort(port);
     }
 
     public EDIFCellInst createCellInst(String name, EDIFCell parent) {
@@ -327,7 +438,14 @@ public class EDIFCell extends EDIFPropertyObject {
     }
 
     public void rename(String newName) {
+        EDIFLibrary lib = getLibrary();
+        if (lib != null) {
+            lib.removeCell(this);
+        }
         setName(newName);
+        if (lib != null) {
+            lib.addCell(this);
+        }
     }
 
     /**
@@ -423,7 +541,7 @@ public class EDIFCell extends EDIFPropertyObject {
      * @param internalNet  The net inside this cell to match with the port ref name.
      */
     public void addInternalPortMapEntry(String portInstName, EDIFNet internalNet) {
-        if (internalPortMap == null) internalPortMap = getNewMap();
+        if (internalPortMap == null) internalPortMap = new CompactStringMap<>();
         internalPortMap.put(portInstName, internalNet);
     }
 
@@ -436,6 +554,31 @@ public class EDIFCell extends EDIFPropertyObject {
     public EDIFNet removeInternalPortMapEntry(String portInstName) {
         if (internalPortMap == null) return null;
         return internalPortMap.remove(portInstName);
+    }
+
+    /**
+     * Gives this leaf cell its own copies of its ports if it shares them with another cell, as a
+     * shallow copy does (see {@link #EDIFCell(EDIFLibrary, EDIFCell)}), so that contents can be
+     * added to it without modifying the other cell. Port instances that refer to the shared ports
+     * are not updated.
+     * @return A map from each shared port to its copy, or null if the cell's ports were its own.
+     */
+    Map<EDIFPort, EDIFPort> unshareLeafCellPorts() {
+        if (!isLeafCellOrBlackBox()) {
+            throw new IllegalStateException("Cell " + getName() + " is not a leaf cell");
+        }
+        if (ports == null || ports.values().stream().allMatch(p -> p.getParentCell() == this)) {
+            return null;
+        }
+        PortMap sharedPorts = ports;
+        ports = null;
+        // A leaf cell has no nets, so any internal port map it has is shared with the other cell
+        internalPortMap = null;
+        Map<EDIFPort, EDIFPort> copies = new IdentityHashMap<>();
+        for (EDIFPort port : sharedPorts.values()) {
+            copies.put(port, addPort(new EDIFPort(port)));
+        }
+        return copies;
     }
 
     public Map<String, EDIFNet> getInternalNetMap() {
@@ -477,7 +620,18 @@ public class EDIFCell extends EDIFPropertyObject {
      * @param library the library to set
      */
     public void setLibrary(EDIFLibrary library) {
+        if (library == null) {
+            throw new RuntimeException("ERROR: library argument cannot be null.");
+        }
+        if (this.library != null && this.library != library) {
+            throw new RuntimeException("ERROR: EDIFCell is already attached to a library. Call EDIFLibrary.removeCell() first.");
+        }
+
         this.library = library;
+    }
+
+    public void clearLibrary() {
+        this.library = null;
     }
 
     public boolean hasContents() {
@@ -486,6 +640,25 @@ public class EDIFCell extends EDIFPropertyObject {
 
     public boolean isPrimitive() {
         return getLibrary().getName().equals(EDIFTools.EDIF_LIBRARY_HDI_PRIMITIVES_NAME) && isLeafCellOrBlackBox();
+    }
+
+    public boolean isMacro() {
+        EDIFNetlist n = getLibrary().getNetlist();
+        String partName = EDIFTools.getPartName(n);
+        Series s = partName != null ? PartNameTools.getPart(partName).getSeries() : null;
+        return s == null ? false : Design.getMacroPrimitives(s).containsCell(this);
+    }
+
+    public boolean isStaticSource() {
+        return isPrimitive() && (isVCCSource() || isGNDSource());
+    }
+
+    public boolean isVCCSource() {
+        return getName().equals("VCC");
+    }
+
+    public boolean isGNDSource() {
+        return getName().equals("GND");
     }
 
     public boolean isLeafCellOrBlackBox() {
@@ -498,22 +671,71 @@ public class EDIFCell extends EDIFPropertyObject {
      * @return True if the ports on each cell match each other, false otherwise.
      */
     public boolean hasCompatibleInterface(EDIFCell cell) {
-        Map<String,EDIFPort> portMap = new HashMap<>(ports);
-        if (portMap.size() != cell.getPortMap().size()) return false;
+        return hasCompatibleInterface(cell, false);
+    }
 
+    /**
+     * Checks if all the port on the provided cell match and are equal to the ports on this cell.
+     * @param cell The other cell to check against.
+     * @param allowResolvedInouts If true, an inout port on this cell also matches an input or output
+     *                            port on the other cell, as when a black box with inout ports is to be
+     *                            filled by a cell whose port directions were resolved (Vivado accepts
+     *                            this when populating a black box).
+     * @return True if the ports on each cell match each other, false otherwise.
+     */
+    public boolean hasCompatibleInterface(EDIFCell cell, boolean allowResolvedInouts) {
+        return getInterfaceMismatches(cell, allowResolvedInouts).isEmpty();
+    }
+
+    /**
+     * Lists every way in which the ports on the provided cell fail to match the ports on this cell,
+     * as {@link #hasCompatibleInterface(EDIFCell, boolean)} checks them: a port on the provided
+     * cell that this cell lacks, a port whose name, width or direction differs from its
+     * counterpart's, and a port on this cell that the provided cell lacks.
+     * @param cell The other cell to check against.
+     * @param allowResolvedInouts As for {@link #hasCompatibleInterface(EDIFCell, boolean)}.
+     * @return One description per mismatched port, empty if the interfaces match.
+     */
+    public List<String> getInterfaceMismatches(EDIFCell cell, boolean allowResolvedInouts) {
+        Map<String,EDIFPort> portMap = new HashMap<>(ports);
+        List<String> mismatches = new ArrayList<>();
         for (EDIFPort port : cell.getPorts()) {
             EDIFPort match = portMap.remove(port.getBusName(true));
             if (match == null) {
                 match = portMap.remove(port.getName());
                 if (match == null) {
-                    return false;
+                    mismatches.add("port " + port.getName() + " doesn't exist on " + getName());
+                    continue;
                 }
             }
-            if (!Objects.equals(port.getName(), match.getName())) return false;
-            if (!Objects.equals(port.getWidth(), match.getWidth())) return false;
-            if (!Objects.equals(port.getDirection(), match.getDirection())) return false;
+            if (!Objects.equals(port.getName(), match.getName())
+                    || !Objects.equals(port.getWidth(), match.getWidth())
+                    || !isCompatibleDirection(match, port, allowResolvedInouts)) {
+                mismatches.add("port " + port.getName() + " mismatch in name/direction/width: "
+                        + match.getName() + " " + match.getDirection() + " width "
+                        + match.getWidth() + " on " + getName() + ", "
+                        + port.getName() + " " + port.getDirection() + " width " + port.getWidth()
+                        + " on " + cell.getName());
+            }
         }
-        return portMap.isEmpty();
+        for (String portName : portMap.keySet()) {
+            mismatches.add("port " + portName + " is missing on " + cell.getName());
+        }
+        return mismatches;
+    }
+
+    /**
+     * Checks if a port's direction matches that of the corresponding port on another cell.
+     * @param port A port on the cell being checked, such as a black box.
+     * @param other The corresponding port on the other cell.
+     * @param allowResolvedInouts If true, port being an inout also matches other being an input or
+     *                            output, though not any other direction.
+     * @return True if the directions match.
+     */
+    private static boolean isCompatibleDirection(EDIFPort port, EDIFPort other, boolean allowResolvedInouts) {
+        if (Objects.equals(port.getDirection(), other.getDirection())) return true;
+        return allowResolvedInouts && port.getDirection() == EDIFDirection.INOUT
+                && (other.isInput() || other.isOutput());
     }
 
     /**
@@ -548,9 +770,40 @@ public class EDIFCell extends EDIFPropertyObject {
     public static final byte[] EXPORT_CONST_CELL_END = "   )\n".getBytes(StandardCharsets.UTF_8);
     public static final byte[] EXPORT_CONST_PROP_INDENT = "           ".getBytes(StandardCharsets.UTF_8);
 
+    /**
+     * Writes this cell as EDIF, as it is (see {@link #exportEDIF(OutputStream, EDIFWriteLegalNameCache, boolean,
+     * EDIFCollapsedView)}).
+     * <p>
+     * Netlists are not written with this method, but with the 4-argument one, so overriding this method has no
+     * effect when a netlist is written: override that one instead.
+     * @param os The stream to write to.
+     * @param cache The cache of legal EDIF names.
+     * @param stable If true, the contents of this cell are written in sorted order.
+     */
     public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable) throws IOException {
+        exportEDIF(os, cache, stable, null);
+    }
+
+    /**
+     * Writes this cell as EDIF, as it is in the given view of the netlist with its macros collapsed.
+     * @param os The stream to write to.
+     * @param cache The cache of legal EDIF names.
+     * @param stable If true, the contents of this cell are written in sorted order.
+     * @param collapsedView The view of the netlist with its macros collapsed, or null to write this
+     *                      cell as it is. Netlists are written with this method (see
+     *                      {@link EDIFNetlist#exportEDIF(OutputStream, boolean)}), so it is this
+     *                      method, and not the 3-argument one, that a subclass must override to change
+     *                      how its cells are written as part of a netlist.
+     */
+    public void exportEDIF(OutputStream os, EDIFWriteLegalNameCache<?> cache, boolean stable,
+            EDIFCollapsedView collapsedView) throws IOException {
         os.write(EXPORT_CONST_CELL_BEGIN);
-        exportEDIFName(os, cache);
+        if (collapsedView == null) {
+            exportEDIFName(os, cache);
+        } else {
+            String name = collapsedView.getName(this);
+            exportSomeEDIFName(os, name, cache.getEDIFRename(name));
+        }
         os.write(EXPORT_CONST_CELLTYPE);
         view.exportEDIFName(os, cache);
         os.write(EXPORT_CONST_VIEWTYPE);
@@ -558,17 +811,17 @@ public class EDIFCell extends EDIFPropertyObject {
             port.exportEDIF(os, cache, stable);
         }
         os.write(EXPORT_CONST_INTERFACE_END); // Interface end
-        if (hasContents()) {
+        if (hasContents() && (collapsedView == null || !collapsedView.isCollapsed(this))) {
             os.write(EXPORT_CONST_CONTENTS);
             for (EDIFCellInst i : EDIFTools.sortIfStable(getCellInsts(), stable)) {
-                i.exportEDIF(os, cache, stable);
+                i.exportEDIF(os, cache, stable, collapsedView);
             }
             for (EDIFNet n : EDIFTools.sortIfStable(getNets(), stable)) {
                 n.exportEDIF(os, cache, stable);
             }
             os.write(EXPORT_CONST_CONTENTS_END); // Contents end
         }
-        if (getPropertiesMap().size() > 0) {
+        if (getPropertyCount() > 0) {
             os.write('\n');
             exportEDIFProperties(os, EXPORT_CONST_PROP_INDENT, cache, stable);
         }
@@ -650,14 +903,34 @@ public class EDIFCell extends EDIFPropertyObject {
         return null;
     }
 
+    /**
+     * Sorts the port instances of all nets and cell instances of this cell, after a batch of
+     * deferred-sort additions (see {@link EDIFNet#addPortInst(EDIFPortInst, boolean)}). This also
+     * trims their unused capacity.
+     */
     public void sortEDIFPortInstLists() {
         for (EDIFNet net : getNets()) {
-            EDIFPortInstList list = net.getEDIFPortInstList();
-            if (list != null) list.reSortList();
+            net.sortPortInsts();
         }
         for (EDIFCellInst inst : getCellInsts()) {
-            EDIFPortInstList list = inst.getEDIFPortInstList();
-            if (list != null) list.reSortList();
+            inst.sortPortInsts();
+        }
+    }
+
+    /**
+     * Trims the backing capacity of the port instance storage of all nets and
+     * cell instances of this cell down to their current size. The arrays are
+     * built via incremental insertion (which leaves unused capacity slack),
+     * so calling this after a netlist is fully
+     * loaded reclaims that slack. This is purely a memory optimization and does
+     * not change the contents of any list.
+     */
+    public void trimEDIFPortInstLists() {
+        for (EDIFNet net : getNets()) {
+            net.trimPortInsts();
+        }
+        for (EDIFCellInst inst : getCellInsts()) {
+            inst.trimPortInsts();
         }
     }
 
@@ -672,7 +945,8 @@ public class EDIFCell extends EDIFPropertyObject {
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), library);
+        // Same value as Objects.hash(super.hashCode(), library), without boxing the int or allocating varargs
+        return 31 * (31 + super.hashCode()) + Objects.hashCode(library);
     }
 
     /**
@@ -701,6 +975,34 @@ public class EDIFCell extends EDIFPropertyObject {
      */
     public boolean isUniquified() {
         return getNonHierInstantiationCount() <= 1;
+    }
+
+    /**
+     * Checks if this cell and the provided cell have the same set of ports.
+     * Port names that are the same except for starting with EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE ("[]") are
+     * considered equivalent for the purpose of cells having a matching set of ports.
+     *
+     * @param other The other cell to match against.
+     * @return True if the set of ports on both this cell and the other cell match
+     *         exactly. False otherwise.
+     */
+    public boolean matchesInterface(EDIFCell other) {
+        if (getPorts().size() != other.getPorts().size()) {
+            return false;
+        }
+        Map<String, EDIFPort> otherPorts = other.getPortMap();
+        for (EDIFPort port : getPorts()) {
+            EDIFPort otherPort = otherPorts.get(port.getBusName(true));
+            if (otherPort == null) {
+                otherPort = otherPorts.get(EDIFTools.VIVADO_PRESERVE_PORT_INTERFACE
+                        + port.getBusName(true));
+            }
+            if (otherPort == null || port.getWidth() != otherPort.getWidth()
+                    || port.getDirection() != otherPort.getDirection()) {
+                return false;
+            }
+        }
+        return true;
     }
 }
 

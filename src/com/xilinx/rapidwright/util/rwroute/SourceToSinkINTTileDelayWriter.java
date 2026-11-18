@@ -1,7 +1,7 @@
 /*
  *
  * Copyright (c) 2021 Ghent University.
- * Copyright (c) 2022, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022, 2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Yun Zhou, Ghent University.
@@ -64,12 +64,15 @@ public class SourceToSinkINTTileDelayWriter {
         if (net == null) {
             System.err.println("ERROR: Cannot find net under name " + args[2]);
             return;
+        } else if (net.isStaticNet()) {
+            System.err.println("ERROR: No route delays to report for static net " + net.getName());
+            return;
         } else if (!net.hasPIPs()) {
             System.err.println("ERROR: No PIPs found of net " + net.getName());
             return;
         }
 
-        Map<Pair<SitePinInst, Node>, Short> sourceToSinkINTDelays = RouterHelper.getSourceToSinkINTNodeDelays(net, estimator);
+        Map<SitePinInst, Pair<Node,Short>> sourceToSinkINTDelays = RouterHelper.getSourceToSinkINTNodeDelays(net, estimator);
 
         String outputFile = args[3].endsWith("/")? args[3] : args[3] + "/";
         outputFile += inputDcpName.replace(".dcp", "_getDelayToSinkINT.txt");
@@ -79,19 +82,19 @@ public class SourceToSinkINTTileDelayWriter {
 
             if (writeAllSinkDelay) {
                 System.out.println("INFO: Write delay from source to all sink to file \n      " + outputFile);
-                for (Entry<Pair<SitePinInst, Node>, Short> sinkINTNodeDelay : sourceToSinkINTDelays.entrySet()) {
-                    Node node = sinkINTNodeDelay.getKey().getSecond();
-                    Short delay = sinkINTNodeDelay.getValue();
+                for (Entry<SitePinInst, Pair<Node,Short>> sinkINTNodeDelay : sourceToSinkINTDelays.entrySet()) {
+                    Node node = sinkINTNodeDelay.getValue().getFirst();
+                    Short delay = sinkINTNodeDelay.getValue().getSecond();
                     myWriter.write(node + " \t\t" + delay + "\n");
                     System.out.printf(String.format("      %-50s %5d\n", node, delay));
                 }
 
             } else {
                 System.out.println("INFO: Write delay from source to IMUX node of CLK_IN to file \n      " + outputFile);
-                for (Entry<Pair<SitePinInst, Node>, Short> sinkINTNodeDelay : sourceToSinkINTDelays.entrySet()) {
-                    Node node = sinkINTNodeDelay.getKey().getSecond();
-                    Short delay = sinkINTNodeDelay.getValue();
-                    if (sinkINTNodeDelay.getKey().getFirst().toString().contains("CLK_IN")) {
+                for (Entry<SitePinInst, Pair<Node,Short>> sinkINTNodeDelay : sourceToSinkINTDelays.entrySet()) {
+                    Node node = sinkINTNodeDelay.getValue().getFirst();
+                    Short delay = sinkINTNodeDelay.getValue().getSecond();
+                    if (sinkINTNodeDelay.getKey().toString().contains("CLK_IN")) {
                         myWriter.write(node + " \t\t" + delay + "\n");
                     }
                 }

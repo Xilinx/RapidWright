@@ -24,22 +24,20 @@ package com.xilinx.rapidwright.design;
 
 import java.nio.file.Path;
 
-import com.xilinx.rapidwright.edif.EDIFNetlist;
-import com.xilinx.rapidwright.edif.EDIFTools;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.util.VivadoTools;
-import com.xilinx.rapidwright.util.VivadoToolsHelper;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
+import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
 public class TestDCPSave {
 
@@ -72,15 +70,15 @@ public class TestDCPSave {
         c1.addPinMapping("A3", "I2");
         c1.addPinMapping("A4", "I3");
         c1.addPinMapping("A5", "I4");
-        c1.addPinMapping("O6", "O");
-        c1.addPinMapping("GE", "GE");
+        c1.addPinMapping("O5", "O");
 
+        c2.addPinMapping("GE", "GE");
         c2.addPinMapping("A1", "I0");
         c2.addPinMapping("A2", "I1");
         c2.addPinMapping("A3", "I2");
         c2.addPinMapping("A4", "I3");
         c2.addPinMapping("A5", "I4");
-        c2.addPinMapping("O5", "O");
+        c2.addPinMapping("O6", "O");
 
         if (detachNetlist) {
             EDIFTools.writeEDIFFile(tempDir.resolve("tmp.edf"), n, d.getPartName());

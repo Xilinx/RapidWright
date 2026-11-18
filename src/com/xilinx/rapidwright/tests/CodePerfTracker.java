@@ -296,7 +296,7 @@ public class CodePerfTracker {
      * reported by the OS. 
      */
     public void setTrackOSMemUsage(boolean trackOSMemUsage) {
-        if (trackOSMemUsage && !FileTools.isWindows()) {
+        if (trackOSMemUsage && FileTools.isLinux()) {
             String id = ManagementFactory.getRuntimeMXBean().getName();
             int idx = id.indexOf('@');
             if (idx > 0) {

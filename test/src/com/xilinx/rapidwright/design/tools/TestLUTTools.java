@@ -24,9 +24,16 @@
 package com.xilinx.rapidwright.design.tools;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -34,25 +41,21 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
-import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.PIP;
-import com.xilinx.rapidwright.rwroute.RWRoute;
-import com.xilinx.rapidwright.rwroute.TestRWRoute;
-import com.xilinx.rapidwright.support.LargeTest;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.util.VivadoToolsHelper;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.rwroute.RWRoute;
+import com.xilinx.rapidwright.rwroute.TestRWRoute;
+import com.xilinx.rapidwright.support.LargeTest;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
 public class TestLUTTools {
 
@@ -90,9 +93,14 @@ public class TestLUTTools {
         SiteInst si = design.createSiteInst("SLICE_X0Y0");
         // Create and place on both A6LUT and A5LUT
         Cell cell6 = design.createAndPlaceCell("lut6", Unisim.LUT2, "SLICE_X0Y0/A6LUT");
-        cell6.getPinMappingsP2L().clear(); // Clear default pin mappings
+        // Clear default pin mappings
+        for (String physPin : cell6.getUsedPhysicalPins()) {
+            cell6.removePinMapping(physPin);
+        }
         Cell cell5 = design.createAndPlaceCell("lut5", Unisim.LUT2, "SLICE_X0Y0/A5LUT");
-        cell5.getPinMappingsP2L().clear();
+        for (String physPin : cell5.getUsedPhysicalPins()) {
+            cell5.removePinMapping(physPin);
+        }
 
         // Net with a single sink pin used by both LUTs that needs swapping
         Net netNeedsPinSwap = design.createNet("netNeedsPinSwap");
@@ -138,9 +146,8 @@ public class TestLUTTools {
             "bnn.dcp,false,true",
             "bnn.dcp,true,false",
             "bnn.dcp,true,true",
-            "optical-flow.dcp,false,false",
-            "optical-flow.dcp,false,true",
-            "optical-flow.dcp,true,false",
+            // The other optical-flow combinations route exactly as TestRWRoute and TestPhysNetlistWriter
+            // already do, so only route it once here, with both options enabled
             "optical-flow.dcp,true,true",
     })
     @LargeTest(max_memory_gb = 8)
@@ -170,5 +177,81 @@ public class TestLUTTools {
         } finally {
             System.setProperty("rapidwright.rwroute.lutPinSwapping.deferIntraSiteRoutingUpdates", "false");
         }
+    }
+
+    @Test
+    public void testGetLUTSize() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        Cell lutcy1 = design.getCell("processor/address_loop[0].lsb_pc.pc_muxcy_CARRY4_CARRY8_LUT6CY_7/LUTCY1_INST");
+        Assertions.assertEquals(5, LUTTools.getLUTSize(lutcy1));
+        Cell lutcy2 = design.getCell("processor/address_loop[0].lsb_pc.pc_muxcy_CARRY4_CARRY8_LUT6CY_7/LUTCY2_INST");
+        Assertions.assertEquals(5, LUTTools.getLUTSize(lutcy2));
+        EDIFHierCellInst lut6cy = design.getNetlist()
+                .getHierCellInstFromName("processor/address_loop[0].lsb_pc.pc_muxcy_CARRY4_CARRY8_LUT6CY_7");
+        Assertions.assertEquals(0, LUTTools.getLUTSize(lut6cy));
+        EDIFHierCellInst lut6_2 = design.getNetlist().getHierCellInstFromName("processor/address_loop[4].output_data.pc_vector_mux_lut");
+        Assertions.assertEquals(0, LUTTools.getLUTSize(lut6_2));
+    }
+
+    @Test
+    public void testSwapMultipleLutPinsVersal() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        SiteInst si = design.getSiteInstFromSiteName("SLICE_X140Y3");
+        SitePinInst spiF6 = si.getSitePinInst("F6");
+        Net f6 = spiF6.getNet();
+        Assertions.assertEquals("processor/pc_mode1_lut/O5", f6.getName());
+        Assertions.assertSame(f6, si.getNetFromSiteWire("F6"));
+        Assertions.assertTrue(si.getCell("F6_IMR").isRoutethru());
+        Assertions.assertSame(f6, si.getNetFromSiteWire("F6_IMR_Q"));
+
+        SitePinInst spiF3 = si.getSitePinInst("F3");
+        Net f3 = spiF3.getNet();
+        Assertions.assertEquals("processor/address_loop[4].output_data.pc_vector_mux_lut/O6", f3.getName());
+        Assertions.assertSame(f3, si.getNetFromSiteWire("F3"));
+        Assertions.assertTrue(si.getCell("F3_IMR").isRoutethru());
+        Assertions.assertSame(f3, si.getNetFromSiteWire("F3_IMR_Q"));
+
+        SitePinInst spiF1 = si.getSitePinInst("F1");
+        Net f1 = spiF1.getNet();
+        Assertions.assertEquals("processor/address[5]", f1.getName());
+        Assertions.assertSame(f1, si.getNetFromSiteWire("F1"));
+        Assertions.assertTrue(si.getCell("F1_IMR").isRoutethru());
+        Assertions.assertSame(f1, si.getNetFromSiteWire("F1_IMR_Q"));
+
+        Map<SitePinInst, String> oldPinToNewPins = new HashMap<>();
+        oldPinToNewPins.put(spiF6, "F3");
+        oldPinToNewPins.put(spiF3, "F1");
+        oldPinToNewPins.put(spiF1, "F6");
+        LUTTools.swapMultipleLutPins(oldPinToNewPins);
+
+        spiF6 = si.getSitePinInst("F6");
+        Assertions.assertSame(f1, spiF6.getNet());
+        Assertions.assertSame(f1, si.getNetFromSiteWire("F6"));
+        Assertions.assertTrue(si.getCell("F6_IMR").isRoutethru());
+        Assertions.assertSame(f1, si.getNetFromSiteWire("F6_IMR_Q"));
+
+        spiF3 = si.getSitePinInst("F3");
+        Assertions.assertSame(f6, spiF3.getNet());
+        Assertions.assertSame(f6, si.getNetFromSiteWire("F3"));
+        Assertions.assertTrue(si.getCell("F3_IMR").isRoutethru());
+        Assertions.assertSame(f6, si.getNetFromSiteWire("F3_IMR_Q"));
+
+        spiF1 = si.getSitePinInst("F1");
+        Assertions.assertSame(f3, spiF1.getNet());
+        Assertions.assertSame(f3, si.getNetFromSiteWire("F1"));
+        Assertions.assertTrue(si.getCell("F1_IMR").isRoutethru());
+        Assertions.assertSame(f3, si.getNetFromSiteWire("F1_IMR_Q"));
+    }
+    
+    @ParameterizedTest
+    @CsvSource({
+            "O=I0 & !I1 & I2 & !I3 + !I0 & I1 & I2 & !I3 + I0 & !I1 & !I2 & I3 + !I0 & I1 & !I2 & I3,16'h0660,4",
+            "O=I0 & !I1 + !I0 & I1,4'h6,2",
+            "O=!I0 & !I1 & !I2 & !I3 + I0 & I1 & !I2 & !I3 + !I0 & !I1 & I2 & I3 + I0 & I1 & I2 & I3,16'h9009,4",
+            "O=I0 & I1 & I2 & I3 & I4 & I5,64'h8000000000000000,6",
+            "O=!I0 & !I1 & !I2 & !I3 & !I4 & !I5,64'h0000000000000001,6",
+    })
+    public void testGetLUTInitFromEquation(String equation, String init, int lutSize) {
+        Assertions.assertEquals(init, LUTTools.getLUTInitFromEquation(equation, lutSize));
     }
 }

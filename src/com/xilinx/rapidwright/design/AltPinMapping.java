@@ -27,6 +27,14 @@
 package com.xilinx.rapidwright.design;
 
 /**
+ * An AltPinMapping is used on routethru cells when the routethru fans out to
+ * more than one sink. For example in UltraScale{,+}, a routethru LUT6 can drive
+ * both a CARRY8 and a FDRE input at the same time. The routethru cell will
+ * carry the same name as the FDRE cell and also the FDRE type, but will also
+ * include an AltPinMapping that has the name of the CARRY8 cell (altCellName),
+ * the AltPinMapping will have the CARRY8 type (altCellType) and it will have
+ * the logical pin name on the CARRY8 cell (logicalName).
+ * 
  * Created on: Jun 21, 2017
  */
 public class AltPinMapping {

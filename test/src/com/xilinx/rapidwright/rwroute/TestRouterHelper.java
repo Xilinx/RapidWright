@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023-2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Advanced Micro Devices, Inc.
@@ -27,12 +27,20 @@ import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.TestDesignHelper;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
+import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.support.rwroute.RouterHelperSupport;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
+import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import com.xilinx.rapidwright.util.Pair;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -44,27 +52,75 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 
 public class TestRouterHelper {
     @ParameterizedTest
     @CsvSource({
-            "SLICE_X0Y0,COUT,null",
-            "SLICE_X0Y299,COUT,null",
-            "SLICE_X0Y0,A_O,CLEL_R_X0Y0/CLE_CLE_L_SITE_0_A_O",
-            "GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,null",
-            "IOB_X1Y95,I,INT_INTF_L_IO_X72Y109/LOGIC_OUTS_R23"
+            "xcvu3p,SLICE_X0Y0,COUT,null",
+            "xcvu3p,SLICE_X0Y299,COUT,null",
+            "xcvu3p,SLICE_X0Y0,A_O,CLEL_R_X0Y0/CLE_CLE_L_SITE_0_A_O",
+            "xcvu3p,GTYE4_CHANNEL_X0Y12,TXOUTCLK_INT,null",
+            "xcvu3p,IOB_X1Y95,I,INT_INTF_L_IO_X72Y109/LOGIC_OUTS_R23",
+            "xcvu3p,IOB_X1Y80,I,INT_INTF_L_IO_X72Y92/LOGIC_OUTS_R22",
+            "xcvu3p,IOB_X1Y179,I,INT_INTF_L_CMT_X72Y208/LOGIC_OUTS_R18",
+            "xcvu3p,IOB_X1Y75,I,INT_INTF_L_CMT_X72Y88/LOGIC_OUTS_R18",
+            "xcvu3p,IOB_X1Y184,I,INT_INTF_L_IO_X72Y212/LOGIC_OUTS_R22",
+            "xcvu3p,MMCM_X0Y0,LOCKED,INT_INTF_L_IO_X36Y54/LOGIC_OUTS_R0",
+            "xcvp1002,MMCM_X2Y0,LOCKED,BLI_CLE_BOT_CORE_X27Y0/LOGIC_OUTS_D23"
     })
-    public void testProjectOutputPinToINTNode(String siteName, String pinName, String nodeAsString) {
-        Design design = new Design("design", "xcvu3p");
+    public void testProjectOutputPinToINTNode(String partName, String siteName, String pinName, String nodeAsString) {
+        Design design = new Design("design", partName);
         SiteInst si = design.createSiteInst(siteName);
         SitePinInst spi = new SitePinInst(pinName, si);
         Assertions.assertEquals(nodeAsString, String.valueOf(RouterHelper.projectOutputPinToINTNode(spi)));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcvu3p,MMCM_X0Y0,PSEN,INT_X36Y56/IMUX_W0",
+            "xcvu3p,BUFGCE_X0Y58,CLK_IN,INT_X36Y151/IMUX_W34",
+            // CLK_IN is also fed by many MMCM/PLL outputs and clock routing tracks of its CMT tile
+            "xcku9p-ffve900-2-e,BUFGCE_X0Y72,CLK_IN,INT_X65Y211/IMUX_E24",
+            "xcvp1002,MMCM_X2Y0,PSEN,INT_X27Y0/IMUX_B_W24"
+    })
+    public void testProjectInputPinToINTNode(String partName, String siteName, String pinName, String nodeAsString) {
+        Design design = new Design("design", partName);
+        SiteInst si = design.createSiteInst(siteName);
+        SitePinInst spi = new SitePinInst(pinName, si);
+        Assertions.assertEquals(nodeAsString, String.valueOf(RouterHelper.projectInputPinToINTNode(spi)));
+    }
+
+    /**
+     * The OUTB_B_IN input of a slave IOB is fed only by the OUTB_B output of its master (e.g. the inverted output of
+     * a differential output buffer). That output pin's node is also reachable through a routethru of the master site
+     * (from its OP input, itself fed from the fabric through a bitslice routethru), so while the master's OUTB_B is
+     * not in use the input still projects onto that fabric node; once it is in use, the input is fed by it directly
+     * and must not project onto an INT tile node at all.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "true,null",
+            "false,INT_X36Y271/IMUX_W16"
+    })
+    public void testProjectInputPinToINTNodeFromUsedSiteOutput(boolean masterOutputUsed, String nodeAsString) {
+        Design design = new Design("design", "xcvu3p");
+        SiteInst master = design.createSiteInst("IOB_X0Y234");
+        SiteInst slave = design.createSiteInst("IOB_X0Y235");
+        Net net = design.createNet("outb");
+        if (masterOutputUsed) {
+            net.createPin("OUTB_B", master);
+        }
+        SitePinInst sink = net.createPin("OUTB_B_IN", slave);
+        Assertions.assertEquals(nodeAsString, String.valueOf(RouterHelper.projectInputPinToINTNode(sink)));
+        // The master's own OP input (fed from the fabric through a bitslice routethru) still projects
+        SitePinInst op = design.createNet("op").createPin("OP", master);
+        Assertions.assertEquals("INT_X36Y271/IMUX_W16", String.valueOf(RouterHelper.projectInputPinToINTNode(op)));
     }
 
     @ParameterizedTest
@@ -209,8 +265,7 @@ public class TestRouterHelper {
         SitePinInst p = new SitePinInst("TX_T_OUT", si);
         Node intNode = RouterHelper.projectOutputPinToINTNode(p);
 
-        // FIXME: Known broken --  https://github.com/Xilinx/RapidWright/issues/558
-        Assertions.assertNotEquals(Objects.toString(intNode), "INT_INTF_L_CMT_X182Y90/LOGIC_OUTS_R19");
+        Assertions.assertEquals(intNode.toString(), "INT_INTF_L_CMT_X182Y90/LOGIC_OUTS_R19");
     }
 
     @ParameterizedTest
@@ -222,12 +277,16 @@ public class TestRouterHelper {
         Assertions.assertEquals("O=!I0", LUTTools.getLUTEquation(cell));
 
         Net gndNet = design.getGndNet();
-        gndNet.createPin("A6", cell.getSiteInst());
+        SitePinInst spi = gndNet.connect(cell, "I0");
+
+        EDIFCellInst eci = cell.getEDIFCellInst();
+        EDIFPortInst epi = eci.getPortInst("I0");
+        Assertions.assertTrue(epi.getNet().isGND());
 
         // Check A6 was inverted, and it was moved off gndNet
         Set<SitePinInst> invertedPins = RouterHelper.invertPossibleGndPinsToVccPins(design, gndNet.getPins(), invertLutInputs);
         if (invertLutInputs) {
-            Assertions.assertEquals("[IN SLICE_X0Y0.A6]", invertedPins.toString());
+            Assertions.assertEquals("[" + spi + "]", invertedPins.toString());
         } else {
             Assertions.assertTrue(invertedPins.isEmpty());
         }
@@ -235,22 +294,27 @@ public class TestRouterHelper {
 
         Net targetNet = invertLutInputs ? design.getVccNet() : design.getGndNet();
         Net sourceNet = !invertLutInputs ? design.getVccNet() : design.getGndNet();
-        Assertions.assertEquals("[IN SLICE_X0Y0.A6]", targetNet.getPins().toString());
+        Assertions.assertEquals("[" + spi + "]", targetNet.getPins().toString());
         Assertions.assertTrue(sourceNet.getPins().isEmpty());
         if (invertLutInputs) {
             // Must have moved onto vccNet, and the LUT mask inverted
             Assertions.assertEquals("O=I0", LUTTools.getLUTEquation(cell));
+
+            // Check logical connection too
+            Assertions.assertTrue(epi.getNet().isVCC());
 
             // Now undo this optimization by going from VCC pin back to GND pin
             RouterHelperSupport.invertVccLutPinsToGndPins(design, invertedPins);
 
             // Check that pin is back on the original VCC net
             Assertions.assertTrue(targetNet.getPins().isEmpty());
-            Assertions.assertEquals("[IN SLICE_X0Y0.A6]", sourceNet.getPins().toString());
+            Assertions.assertEquals("[" + spi + "]", sourceNet.getPins().toString());
         }
 
         // Check that LUT equation is back to normal
         Assertions.assertEquals("O=!I0", LUTTools.getLUTEquation(cell));
+        Assertions.assertTrue(spi.getNet().isGNDNet());
+        Assertions.assertTrue(epi.getNet().isGND());
     }
 
     @ParameterizedTest
@@ -307,5 +371,207 @@ public class TestRouterHelper {
 
         // If not flattening/uniquifying, there must be no inverted pins
         Assertions.assertEquals(!flatten || !uniquify, invertedPins.isEmpty());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "xcvp1002,XPIO_NIBBLE_SC_1_X9Y0/XPIO_IOBPAIR_5_RXOUT_M_PIN,CMT_MMCM_X11Y0/CMT_MMCM_TOP_0_CLKIN1_PIN",
+            "xcvp1002,CMT_MMCM_X11Y0/CMT_MMCM_TOP_0_CLKOUT0_PIN,CLK_REBUF_BUFGS_HSR_CORE_X8Y0/CLK_BUFGCE_59_I_PIN",
+    })
+    public void testFindPathBetweenNodes(String partName, String sourceNodeName, String sinkNodeName) {
+        Device device = Device.getDevice(partName);
+        Node sourceNode = device.getNode(sourceNodeName);
+        Node sinkNode = device.getNode(sinkNodeName);
+
+        List<Node> path = RouterHelper.findPathBetweenNodes(sourceNode, sinkNode);
+        Assertions.assertTrue(path.size() > 2);
+    }
+
+    @Test
+    public void testFindPathBetweenAdjacentNodesIsModifiable() {
+        // A direct connection between adjacent nodes; RouteFixer clears and rebuilds the nodes of
+        // every connection of a net that it fixes
+        Device device = Device.getDevice("xcvp1002");
+        Node sourceNode = device.getNode("CMT_MMCM_X11Y0/CMT_MMCM_TOP_0_CLKOUT0_PIN");
+        Node sinkNode = sourceNode.getAllDownhillNodes().get(0);
+
+        List<Node> path = RouterHelper.findPathBetweenNodes(sourceNode, sinkNode);
+        Assertions.assertEquals(Arrays.asList(sinkNode, sourceNode), path);
+        path.clear();
+        path.add(sinkNode);
+        Assertions.assertEquals(1, path.size());
+    }
+
+    /**
+     * Checks that {@link RouterHelper#getSourceToSinkINTNodeDelays} accumulates delay in
+     * source-to-sink order, rather than in {@link Net#getPIPs()} order which
+     * {@link Net#setPIPs(Set)} leaves unspecified, and that it follows bidirectional PIPs in the
+     * direction that {@link PIP#isReversed()} gives rather than the direction the device declares.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            // Sink pin, the INT tile node it projects to, its expected delay, and whether to
+            // reverse the order that the net's PIPs are given in
+            "B3,INT_X54Y135/IMUX_W25,178,false",
+            "B3,INT_X54Y135/IMUX_W25,178,true",
+            "D5,INT_X54Y135/IMUX_W31,174,false",
+            "D5,INT_X54Y135/IMUX_W31,174,true",
+            "H3,INT_X54Y135/IMUX_W33,178,false",
+            "H3,INT_X54Y135/IMUX_W33,178,true",
+            // A1 is the only sink reached through the reversed PIP below; walking that PIP in the
+            // direction the device declares for it instead loses the two nodes ahead of it, and
+            // under-reports A1 as 204ps
+            "A1,INT_X54Y136/IMUX_W10,269,false",
+            "A1,INT_X54Y136/IMUX_W10,269,true"
+    })
+    public void testGetSourceToSinkINTNodeDelays(String sinkPinName, String sinkNodeName,
+                                                 short expectedDelay, boolean reversePipOrder) {
+        Design design = new Design("design", "xcvu3p");
+        Device device = design.getDevice();
+
+        // A net taken from a Vivado-routed design, listed here in topological order, that fans out
+        // to four sinks and that uses one bidirectional PIP in the reverse of the direction that
+        // the device declares for it
+        String[] pips = new String[]{
+                "INT_X54Y135/INT.LOGIC_OUTS_W30->>INT_NODE_IMUX_60_INT_OUT1",
+                "INT_X54Y135/INT.INT_NODE_IMUX_60_INT_OUT1->>BYPASS_W14",
+                "INT_X54Y135/INT.BYPASS_W14->>INT_NODE_IMUX_50_INT_OUT1",
+                "INT_X54Y135/INT.INT_NODE_IMUX_50_INT_OUT1->>BYPASS_W10",
+                "INT_X54Y135/INT.BYPASS_W10->>INT_NODE_IMUX_41_INT_OUT1",
+                "INT_X54Y135/INT.INT_NODE_IMUX_41_INT_OUT1->>IMUX_W25",
+                "INT_X54Y135/INT.BYPASS_W10->>INT_NODE_IMUX_41_INT_OUT0",
+                "INT_X54Y135/INT.INT_NODE_IMUX_41_INT_OUT0->>IMUX_W31",
+                "INT_X54Y135/INT.BYPASS_W10->>INT_NODE_IMUX_40_INT_OUT0",
+                "INT_X54Y135/INT.INT_NODE_IMUX_40_INT_OUT0->>IMUX_W33",
+                "INT_X54Y135/INT.INT_NODE_IMUX_50_INT_OUT0<<->>BYPASS_W14",
+                "INT_X54Y135/INT.INT_NODE_IMUX_50_INT_OUT0->>BOUNCE_W_13_FT0",
+                "INT_X54Y136/INT.BOUNCE_W_BLN_13_FT1->>INT_NODE_IMUX_62_INT_OUT0",
+                "INT_X54Y136/INT.INT_NODE_IMUX_62_INT_OUT0->>BYPASS_W5",
+                "INT_X54Y136/INT.BYPASS_W5->>INT_NODE_IMUX_48_INT_OUT0",
+                "INT_X54Y136/INT.INT_NODE_IMUX_48_INT_OUT0->>IMUX_W10"
+        };
+        if (reversePipOrder) {
+            // Any permutation must give the same result; reversing puts every PIP ahead of its driver
+            Collections.reverse(Arrays.asList(pips));
+        }
+        Net net = TestDesignHelper.createTestNet(design, "net", pips);
+
+        // PIP.toString() does not capture that a bidirectional PIP is used in reverse
+        for (PIP pip : net.getPIPs()) {
+            if (pip.toString().equals("INT_X54Y135/INT.INT_NODE_IMUX_50_INT_OUT0<<->>BYPASS_W14")) {
+                pip.setIsReversed(true);
+            }
+        }
+
+        SiteInst si135 = design.createSiteInst("SLICE_X84Y135");
+        SiteInst si136 = design.createSiteInst("SLICE_X84Y136");
+        net.createPin("EQ", si135);
+        for (String pinName : new String[]{"B3", "D5", "H3"}) {
+            net.createPin(pinName, si135);
+        }
+        net.createPin("A1", si136);
+
+        DelayEstimatorBase<InterconnectInfo> estimator = new DelayEstimatorBase<>(device, new InterconnectInfo(), false, 0);
+        Map<SitePinInst, Pair<Node,Short>> sinkNodeDelays = RouterHelper.getSourceToSinkINTNodeDelays(net, estimator);
+        Assertions.assertEquals(net.getSinkPins().size(), sinkNodeDelays.size());
+
+        Pair<Node,Short> nodeDelay = null;
+        for (Map.Entry<SitePinInst, Pair<Node,Short>> e : sinkNodeDelays.entrySet()) {
+            if (e.getKey().getName().equals(sinkPinName)) {
+                nodeDelay = e.getValue();
+                break;
+            }
+        }
+        Assertions.assertNotNull(nodeDelay);
+        Assertions.assertEquals(sinkNodeName, nodeDelay.getFirst().toString());
+        Assertions.assertEquals(expectedDelay, (short) nodeDelay.getSecond());
+    }
+
+    /**
+     * Sinks without a complete source-to-sink path on a partially routed net are omitted
+     * so that callers can estimate their delays.
+     */
+    @Test
+    public void testGetSourceToSinkINTNodeDelaysOnPartiallyRoutedNet() {
+        Design design = new Design("partially_routed_net", "xcvu3p");
+        Device device = design.getDevice();
+        Net net = design.createNet("net");
+        SitePinInst source = net.createPin("EQ", design.createSiteInst("SLICE_X84Y135"));
+        SitePinInst sink = net.createPin("A1", design.createSiteInst("SLICE_X84Y136"));
+        PIP sinkPip = device.getPIP("INT_X54Y136/INT.INT_NODE_IMUX_48_INT_OUT0->>IMUX_W10");
+        net.setPIPs(Collections.singletonList(sinkPip));
+
+        // This partially routed net has a PIP reaching the sink but no path from the source.
+        Assertions.assertEquals(sink.getConnectedNode(), sinkPip.getEndNode());
+        Assertions.assertNotEquals(source.getConnectedNode(), sinkPip.getStartNode());
+
+        DelayEstimatorBase<InterconnectInfo> estimator =
+                new DelayEstimatorBase<>(device, new InterconnectInfo(), false, 0);
+        Map<SitePinInst, Pair<Node, Short>> sinkNodeDelays =
+                RouterHelper.getSourceToSinkINTNodeDelays(net, estimator);
+        Assertions.assertFalse(sinkNodeDelays.containsKey(sink),
+                "An unreachable sink on a partially routed net must not have a routed delay");
+    }
+
+    /**
+     * A constant source has no route delay that this model describes, so rather than return one
+     * (the sink pinfeed delay, which is all that a static net's routing would accumulate) a static
+     * net is rejected outright.
+     */
+    @Test
+    public void testGetSourceToSinkINTNodeDelaysRejectsStaticNet() {
+        Design design = new Design("static_sink_delay", "xcvu3p");
+        Net net = design.getVccNet();
+        SiteInst site = design.createSiteInst("SLICE_X84Y136");
+        net.createPin("A1", site);
+        net.setPIPs(Collections.singletonList(design.getDevice().getPIP("INT_X54Y136/INT.VCC_WIRE->>IMUX_W10")));
+
+        DelayEstimatorBase<InterconnectInfo> estimator =
+                new DelayEstimatorBase<>(design.getDevice(), new InterconnectInfo(), false, 0);
+        RuntimeException e = Assertions.assertThrows(RuntimeException.class,
+                () -> RouterHelper.getSourceToSinkINTNodeDelays(net, estimator));
+        Assertions.assertEquals("ERROR: Cannot compute route delays of static net " + net.getName(),
+                e.getMessage());
+    }
+
+    /**
+     * A direct connection (e.g. COUT -> CIN) projects onto no INT tile node, so the sink's own
+     * node stands in for one and no route delay is accumulated. When its PIP is present the sink
+     * is reached and reported with a zero delay; when it is absent the sink is unreached and
+     * omitted, leaving a caller free to estimate a delay for it.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testGetSourceToSinkINTNodeDelaysOnDirectConnection(boolean routed) {
+        Design design = new Design("direct_connection", "xcvu3p");
+        Device device = design.getDevice();
+        Net net = design.createNet("carry");
+        SitePinInst source = net.createPin("COUT", design.createSiteInst("SLICE_X84Y135"));
+        SitePinInst sink = net.createPin("CIN", design.createSiteInst("SLICE_X84Y136"));
+        PIP directPip = device.getPIP("CLEM_X54Y136/CLEM.CLE_CLE_M_SITE_0_CIN->CLE_CLE_M_SITE_0_CIN_PIN");
+        Assertions.assertEquals(source.getConnectedNode(), directPip.getStartNode());
+        Assertions.assertEquals(sink.getConnectedNode(), directPip.getEndNode());
+        // A direct connection is exactly one that does not project onto an INT tile node
+        Assertions.assertNull(RouterHelper.projectInputPinToINTNode(sink));
+        if (routed) {
+            net.setPIPs(Collections.singletonList(directPip));
+        }
+
+        DelayEstimatorBase<InterconnectInfo> estimator =
+                new DelayEstimatorBase<>(device, new InterconnectInfo(), false, 0);
+        Map<SitePinInst, Pair<Node, Short>> sinkNodeDelays =
+                RouterHelper.getSourceToSinkINTNodeDelays(net, estimator);
+
+        Pair<Node, Short> sinkNodeDelay = sinkNodeDelays.get(sink);
+        if (routed) {
+            Assertions.assertNotNull(sinkNodeDelay,
+                    "A routed direct connection must be reported as reached");
+            // No INT tile node is walked through, so the sink node stands in for its INT node
+            Assertions.assertEquals(sink.getConnectedNode(), sinkNodeDelay.getFirst());
+            Assertions.assertEquals((short) 0, sinkNodeDelay.getSecond().shortValue());
+        } else {
+            Assertions.assertNull(sinkNodeDelay,
+                    "An unrouted direct connection must not have a routed delay");
+        }
     }
 }

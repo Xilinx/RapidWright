@@ -86,7 +86,7 @@ public class EDIFPortInst implements Comparable<EDIFPortInst> {
      * @param deferSort The EDIFPortInstList maintains a sorted list of EDIFPortInst
      * objects and sorts them upon insertion.  Setting this flag to true will skip a sort addition
      * but the caller is responsible to conclude a batch of additions with a call to
-     * {@link EDIFPortInstList#reSortList()}.  This is useful when a large number of EDIFPortInsts
+     * {@link EDIFCell#sortEDIFPortInstLists()}.  This is useful when a large number of EDIFPortInsts
      * will be added consecutively (such as parsing a netlist).
      */
     public EDIFPortInst(EDIFPort port, EDIFNet parentNet, EDIFCellInst cellInst, boolean deferSort) {
@@ -117,7 +117,7 @@ public class EDIFPortInst implements Comparable<EDIFPortInst> {
      * @param deferSort The EDIFPortInstList maintains a sorted list of EDIFPortInst 
      * objects and sorts them upon insertion.  Setting this flag to true will skip a sort addition
      * but the caller is responsible to conclude a batch of additions with a call to 
-     * {@link EDIFPortInstList#reSortList()}.  This is useful when a large number of EDIFPortInsts 
+     * {@link EDIFCell#sortEDIFPortInstLists()}.  This is useful when a large number of EDIFPortInsts 
      * will be added consecutively (such as parsing a netlist).
      */
     public EDIFPortInst(EDIFPort port, EDIFNet parentNet, int index, EDIFCellInst cellInst,
@@ -125,6 +125,10 @@ public class EDIFPortInst implements Comparable<EDIFPortInst> {
         if (index == -1 && port.isBus()) {
             throw new RuntimeException("ERROR: Use a different constructor, "
                     + "need index for bussed port " + port.getName());
+        }
+        if (index != -1 && !port.isBus()) {
+            throw new RuntimeException("ERROR: Use a different constructor, " + "port "
+                    + port.getName() + " is not a bus, cannot index into a single bit signal.");
         }
         if (cellInst != null) {
             if (!port.equals(cellInst.getPort(port.getBusName(true)))) {
@@ -219,7 +223,7 @@ public class EDIFPortInst implements Comparable<EDIFPortInst> {
      * @param deferSort The EDIFPortInstList maintains a sorted list of EDIFPortInst 
      * objects and sorts them upon insertion.  Setting this flag to true will skip a sort addition
      * but the caller is responsible for conclude a batch of additions with a call to 
-     * {@link EDIFPortInstList#reSortList()}.  This is useful when a large number of EDIFPortInsts 
+     * {@link EDIFCell#sortEDIFPortInstLists()}.  This is useful when a large number of EDIFPortInsts 
      * will be added consecutively (such as parsing a netlist).
      */
     public void setCellInst(EDIFCellInst cellInst, boolean deferSort) {
@@ -314,7 +318,7 @@ public class EDIFPortInst implements Comparable<EDIFPortInst> {
         }
         else {
             os.write(EXPORT_CONST_MEMBER);
-            os.write(cache.getLegalEDIFName(getPort().getBusName(true)));
+            os.write(getPort().getBusEDIFRename(cache));
             os.write(' ');
             os.write(Integer.toString(index).getBytes(StandardCharsets.UTF_8));
             os.write(')');

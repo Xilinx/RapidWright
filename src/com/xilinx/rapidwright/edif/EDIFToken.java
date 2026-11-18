@@ -44,7 +44,8 @@ class EDIFToken {
 
     @Override
     public int hashCode() {
-        return Objects.hash(text, byteOffset);
+        // Same value as Objects.hash(text, byteOffset), without boxing the long or allocating varargs
+        return 31 * (31 + text.hashCode()) + Long.hashCode(byteOffset);
     }
 
     @Override

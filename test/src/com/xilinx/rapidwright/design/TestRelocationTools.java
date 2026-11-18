@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -23,11 +23,13 @@
 
 package com.xilinx.rapidwright.design;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -38,6 +40,7 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.Tile;
+import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
@@ -46,6 +49,8 @@ import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
 import com.xilinx.rapidwright.util.VivadoTools;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -69,6 +74,7 @@ public class TestRelocationTools {
             }
         }
 
+        EDIFNetlist netlist1 = design1.getNetlist();
         for (Pair<ModuleInst,Site> e : newSite) {
             ModuleInst mi = e.getFirst();
             Site ds = e.getSecond();
@@ -90,10 +96,17 @@ public class TestRelocationTools {
             }
 
             for (Net n2 : mi.getNets()) {
-                Net n1 = design1.getNet(n2.getName());
-                if (n1 == null && n2.getName().startsWith(mi.getName() + EDIFTools.EDIF_HIER_SEP)) {
-                    // Retry without ModuleInst hierarchy in case it was flattened
-                    n1 = design1.getNet(n2.getName().substring(mi.getName().length() + 1));
+                boolean n2IsSpecial = n2.isStaticNet() || n2.isUsedNet();
+                Net n1;
+                if (n2IsSpecial) {
+                    n1 = design1.getNet(n2.getName());
+                } else {
+                    String n1Name = netlist1.getParentNetName(n2.getName());
+                    if (n1Name == null) {
+                        // Retry without ModuleInst hierarchy in case it was flattened
+                        n1Name = netlist1.getParentNetName(n2.getName().substring(mi.getName().length() + 1));
+                    }
+                    n1 = design1.getNet(n1Name);
                 }
                 Assertions.assertNotNull(n1);
 
@@ -104,6 +117,10 @@ public class TestRelocationTools {
                 }
 
                 Set<PIP> p1 = new HashSet<>(n1.getPIPs());
+                if (!n2IsSpecial) {
+                    Design design2 = n2.getDesign();
+                    n2 = design2.getNet(design2.getNetlist().getParentNetName(n2.getName()));
+                }
                 Set<PIP> p2 = new HashSet<>(n2.getPIPs());
                 if (!n1.isStaticNet()) {
                     Assertions.assertEquals(p1, p2);
@@ -252,4 +269,44 @@ public class TestRelocationTools {
         );
     }
 
+    @Test
+    public void testRelocationTools(@TempDir Path dir) {
+        Design d = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235_2022_1.dcp");
+        d.getNet("clk").unroute();
+        Path dcpName = dir.resolve("picoblaze_unrouted_clk.dcp");
+        d.writeCheckpoint(dcpName);
+        
+        int xOffset = 0;
+        int yOffset = 5;
+        
+        Path outputDCP = dir.resolve("output.dcp");
+
+        // Smoke test for valid location report mode
+        RelocationTools.main(new String[] { dcpName.toString() });
+
+        RelocationTools.main(new String[] {dcpName.toString(), outputDCP.toString(), 
+                        Integer.toString(xOffset), Integer.toString(yOffset)});
+        
+        Design testOutput = Design.readCheckpoint(outputDCP);
+        
+        for (SiteInst s : d.getSiteInsts()) {
+            Tile origin = s.getTile();
+            Tile relocated = origin.getTileXYNeighbor(xOffset, yOffset);
+            Site relocatedSite = relocated.getSites()[s.getSite().getSiteIndexInTile()];
+            SiteInst relocatedSiteInst = testOutput.getSiteInstFromSite(relocatedSite);
+            Assertions.assertNotNull(relocatedSiteInst);
+            Assertions.assertEquals(relocatedSiteInst.getCells().size(), s.getCells().size());
+        }
+    }
+
+    @Test
+    public void testGetValidRelocationOptions() {
+        Design d = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235_2022_1.dcp");
+        d.getNet("clk").unroute();
+        
+        Pair<Site, Map<Integer, Site>> relocOptions = RelocationTools.getValidRelocationOptions(d);
+
+        Assertions.assertNotNull(relocOptions);
+        Assertions.assertEquals(215, relocOptions.getSecond().size());
+    }
 }

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2021-2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2023, 2025-2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Xilinx Research Labs.
@@ -23,11 +23,15 @@
 
  package com.xilinx.rapidwright.design;
 
-import com.xilinx.rapidwright.device.Device;
-import com.xilinx.rapidwright.router.RouteNode;
-import com.xilinx.rapidwright.support.RapidWrightDCP;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+
+import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
+import com.xilinx.rapidwright.router.RouteNode;
+import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 public class TestSitePinInst {
     // https://github.com/Xilinx/RapidWright/issues/454
@@ -77,6 +81,60 @@ public class TestSitePinInst {
 
         // Check that the sitewire is untouched
         Assertions.assertEquals(net2, si.getNetFromSiteWire(spi2.getSiteWireName()));
+    }
+
+    @Test
+    public void testGetBELPin() {
+        Design d = new Design("test", "xc7a200tsbg484-1");
+        Cell c = d.createAndPlaceCell("testRAMB18E1", Unisim.RAMB18E1, "RAMB18_X0Y58/RAMB18E1");
+        Assertions.assertEquals(SiteTypeEnum.RAMB18E1, c.getSiteInst().getSiteTypeEnum());
+        SitePinInst spi = new SitePinInst(true, "DO18", c.getSiteInst());
+        Net n = d.createNet("debug_net");
+        n.addPin(spi);
+
+        Module m = new Module(d);
+        String portName = "DO18_debug";
+        m.addPort(new Port(portName, spi));
+
+        Design full = new Design("top", m.getDevice().getName());
+        ModuleInst mi = full.createModuleInst("stuff", m);
+        mi.getPort(portName);
+
+        Assertions.assertTrue(n.removePin(spi));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "FMUX,true,true,D6",
+            "FMUX,false,false,D6",
+            "FMUX,true,false,D6",
+            "FMUX,true,false,D5",
+            "FMUX,true,false,",
+            "FMUX,false,true,CY",
+            "FMUX,false,true,",
+            "F_O,false,true,F7F8"
+    })
+    public void testSetRoutedTracksSiteInstChanges(String pinName, boolean initialRouted, boolean routed, String sitePIPPin) {
+        Design d = new Design("testSetRoutedTracksSiteInstChanges", Device.AWS_F1);
+        SiteInst si = d.createSiteInst("SLICE_X32Y73");
+
+        Net net = d.createNet("net");
+        SitePinInst spi = net.createPin(pinName, si);
+        spi.setRouted(initialRouted);
+
+        if (sitePIPPin != null) {
+            si.addSitePIP("OUTMUXF", sitePIPPin);
+        }
+
+        d.setTrackingChanges(true);
+        Assertions.assertTrue(d.getModifiedSiteInsts().isEmpty());
+
+        // Only when the OUTMUXF SitePIP is set does flipping the routed state
+        // of the FMUX pin need to be tracked as a SiteInst modification
+        spi.setRouted(routed);
+
+        Assertions.assertEquals(initialRouted != routed && sitePIPPin != null && pinName.endsWith("MUX"),
+                d.getModifiedSiteInsts().contains(si));
     }
 
 }

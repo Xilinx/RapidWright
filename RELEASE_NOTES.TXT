@@ -1,3 +1,554 @@
+============= RapidWright 2026.1.2-beta released on 2026-11-11 ================
+Notes:
+  - [LaunchTestsOnLsf] Run test jobs only on hosts with free /tmp space (#1530)
+  - [TestDCPLoad] Restore the readable-EDIF auto-generate flag after tests (#1529)
+  - [RWRoute] Allow PartialDFXRouter's non-local sinks in sink X assertion (#1528)
+  - [DesignTools] makePhysNetNamesConsistent(): parents of unresolved names from cell pins; populateBlackBox() rename speed (#1527)
+  - [RWRoute] Drop alternate sinks preserved for another net, after awaiting (#1526)
+  - [DesignTools] populateBlackBox(): prefix routethru names once (#1480)
+  - [RWRoute] Faster, tighter search; SLR-crossing, congestion, timing-model and PartialRouter fixes (#1501)
+  - [EDIFNetlist] Keep macros expanded in memory, collapse only when writing (#1484)
+  - [GitHub Actions] Balance the test shards with durations from master's last run (#1523)
+  - [LaunchTestsOnLsf] Split the regular tests into balanced LSF jobs (#1522)
+  - [GitHub Actions] Split the Java tests into 6 balanced shards per configuration (#1521)
+  - [UltraScaleClockRouting] Drive the clock root's row from the distribution going up (#1520)
+  - [GlobalSignalRouting] Only route constants through free Versal IRI sites (#1519)
+  - [VersalClockRouting] Route clock regions missing from the VDISTR trees (#1516)
+  - [UltraScaleClockRouting] Retry routing tracks and clock roots for the distribution (#1517)
+  - [Tests] Cut CI test time: release cached devices, fewer optical-flow routes (#1518)
+  - [VersalClockRouting] Route clocks to hard block clock inputs and from BUFG_GTs (#1509)
+  - [UltraScaleClockRouting] Route clocks to BITSLICE_RX_TX FIFO clock inputs (#1515)
+  - [GlobalSignalRouting] Skip used Versal slice outputs as static sources (#1502)
+  - [UltraScaleClockRouting] Avoid the clock tracks of clocks already routed (#1500)
+  - [RWRoute] Route clock inputs driven through dedicated paths directly (#1499)
+  - [EDIFNetlist] Build lazily created maps before publishing them (#1497)
+  - [GlobalSignalRouting] Route constants to IO output pins through site routethrus (#1495)
+  - [RouteNodeGraph] Handle the CLE_BC_CORE_MX tiles of Versal devices (#1514)
+  - [EDIF] Compact EDIFCell maps and port inst arrays (about 20% less heap) (#1490)
+  - [GlobalSignalRouting] Route Versal clocks from BUFGCTRL and BUFGCE_DIV sources (#1513)
+  - [DesignTools] Skip XPHY cells without a logical cell in updateVersalXPHYPinsForDMC() (#1510)
+  - [DesignTools] Fix ConcurrentModificationException in createCeClkOfRoutethruFFToVCC() (#1508)
+  - [RWRoute] Support Versal devices without CLE_BC_CORE tiles (xcvp1902) (#1505)
+  - [RWRoute] Share the INT tile sink node of sinks of the same net (#1507)
+  - [GlobalSignalRouting] Route UltraScale clocks to MMCM clock inputs (#1506)
+  - [EdifCellLookup] Look up wildcard cell names without rescanning every child (#1503)
+  - [GlobalSignalRouting] Route UltraScale+ clocks to PS8 clock inputs (#1504)
+  - [UltraScaleClockRouting] Drive each row buffer of a clock only once (#1492)
+  - [RWRoute] Make SLR-crossing bounding boxes tall enough for an SLL (#1493)
+  - [RouterHelper] Find the INT node of a BUFGCE CLK_IN in a CMT tile (#1498)
+  - [DesignTools] Skip unconnected logical pins in getPortInstsFromSitePinInst() (#1496)
+  - [DesignTools] Skip unplaced cells in createCeSrRstPinsToVCC() (#1494)
+  - [VersalClockRouting] Route clock buffer inputs cascaded from a clock net (#1491)
+  - Write EDIF as parallel pieces; ParallelismTools joinOrdered()/joinUnordered() and chunking (#1475)
+  - [RWRoute] Fix timing-driven LUT pin swapping crashes on routethrus and distributed RAMs (#1489)
+  - [Timing] Describe a source pin driven through a routethru cell (#1488)
+  - [TestEDIFPortInstListTrim] Compare stable EDIF exports (#1485)
+  - [RWRoute] Timing-driven LUT pin swapping with LUT logic delays (#1482)
+  - [RWRoute] LUT pin swapping when net drives >1 input of same LUT (#1481)
+  - [CombineDcps] Add a command-line tool to combine a design with implementations of its black boxes (#1465)
+  - [ConstraintTools] Scope get_ports to the black box in merged constraints (#1463)
+  - [DesignTools] populateBlackBox(): carry over the circuits' BEL attributes (#1464)
+  - [DesignTools] Drop the evicted SiteInst workaround the master merge restored
+  - [ConstraintTools] Add addBlackBoxConstraints() (#1457)
+  - [DesignTools] populateBlackBox(): replace site instances that only lock BELs (#1451)
+  - [DesignTools] Accept black box inouts resolved by the filling circuit (#1450)
+  - [DesignTools] fullyUnplaceCell(): alternate site types, in-site loads (#1479)
+  - [NOCDesign] Match NoC solution paths by slave port; add AIE_NSU_2 and MMI_NMU_2 (#1478)
+  - [DesignTools] populateBlackBox(): keep each PIP once on merged nets (#1454)
+  - [NOCDesign] Support Versal Gen 2 (NoC2) traffic and solutions (#1476)
+  - [DesignTools] populateBlackBox(): drop a circuit's empty context nets (#1452)
+  - [Params] Read RW_ZSTD_COMPRESSION_LEVEL from its own parameter (#1469)
+  - [DesignTools] populateBlackBox(): re-point site routing of a circuit's other static nets (#1453)
+  - [ParallelismTools] Cleanup usage in EDIF export, DesignTools, RWRoute (#1466)
+  - [ParallelEDIFParser] Faster, leaner parsing of large EDIFs (#1460)
+  - [ParallelismTools] Move to common ForkJoinPool (#1447)
+  - [ParallelismTools] Fix trySteal() to not be O(N) per call (#1445)
+  - [SiteInst] Tests for SiteInst tracking changes (#1443)
+  - [Net] Tests for Net tracking changes (#1442)
+  - [NOCDesign] Write and read NOC traffic of a design without NOC clients (#1462)
+  - [EDIFNetlist] Write libraries in dependency order in exportEDIF() (#1449)
+  - [DesignTools] populateBlackBox() to not return modified nets (#1441)
+  - [EDIFNetlist] Add findParentNet() to look up one parent net without the map (#1456)
+  - [EDIFNetlist] Walk cell definitions to find unused cells (#1455)
+  - [DesignTools] Rework populateBlackBox() batching, net merging, and reporting (#1424)
+  - Cut DCP load heap by about 30%: compact Net/Cell/SiteInst storage and Design maps
+  - [Cell][Device] Build lazily created pin and clock region maps before publishing them
+  - Fix four DCP read/write bugs
+  - [Design] Thread-safe change tracking
+  - Stream and parallelize DCP writing
+  - [Design] placeCell(): do not tie A6 to VCC when the 6LUT of the pair uses it
+  - Reader, writer and SiteInst fixes for Vivado-like route status
+  - [Cell] Rename a cell's routethrus and alternate pin mappings in updateName()
+  - [HierSepNetResolver] Use the values that invokeAll() now returns
+  - [Device] Save the device cache file atomically
+  - [Net] Skip site wire map rebuilds in updateName() and rename()
+  - [SiteInst] Key tracked originals by site; never leave removed SiteInsts modified
+  - [ZipDeflaterOutputStream] Use the JDK's CRC32
+  - [Net] When tracked, leave modified set + and routing behind
+  - [BELAttrDB] Look up BEL attribute nets without the parent net map
+
+API Additions:
+
+
+============= RapidWright 2026.1.1-beta released on 2026-09-30 ================
+Notes: 
+  - Have tests preserve edif gen flag (#1438)
+  - [DesignTools] Improve createMissingSitePinInsts() (#1429)
+  - [RouterHelper] getSourceToSinkINTNodeDelays() only for fully routed (#1434)
+  - [TestCell] Add testUpdateNameResetsLogicalInst() (#1409)
+  - [TestNet] Check name changes invalidate cached logical hier net (#1425)
+  - [TestSitePinInst] Add testSetRoutedTracksSiteInstChanges() (#1427)
+  - [TestDesign] Add test{Add,Create}SiteInstDuplicate() (#1432)
+  - [Examples] Run example programs as smoke tests in CI (#1435)
+  - Test for module relocation in modular SLRs (#1399)
+  - [TestDesign] Add testTrack{SiteInst,Net}Changes() (#1411)
+  - [CodePerfTracker] Only track OS memory usage on Linux (#1433)
+  - [PartialRouter] Allow partially-routed nets using RCLK tiles (#1426)
+  - [PartialRouter] Only recover arcs between projected pins (#1412)
+  - [DesignTools] Make makePhysNetNamesConsistent() deterministic (#1413)
+  - [NetlistBrowser] Speed up the NetlistBrowser schematic viewer (#1420)
+  - [EDIFParser] Accept cell properties ahead of the view (#1421)
+  - Edif tokenizer max length config and standaloneJar task fix (#1422)
+  - [EDIFParser] Accept author and optional program in (written ...) (#1418)
+  - [EDIFTools] Detect gzipped EDIF by content, not file name (#1414)
+  - [EDIFNetlist] Guard expandMacroUnisims() against a missing part name (#1416)
+  - Resolves new Net(null) with getParentNetName() (#1417)
+  - [EDIFParser] Key cell reference map by legal library name (#1415)
+  - [ModuleInst] Fix connect(NetType) removing the wrong pin; assert removals (#1410)
+  - [DesignTools] populateBlackBox() to evict clobbered STATIC_SOURCEs (#1408)
+  - Experimental fix for random bin/rapidwright deletion (#1396)
+  - TimingAndWirelengthReport and RouterHelper fixes (#1405)
+  - [Timing] Fixes for unrouted and post-routed designs (#1402)
+  - [PartialRouter] Preserve LUT routethru arcs when unpreserving nets (#1404)
+  - [PartialRouter] main() to accept optional --softPreserve argument (#1403)
+  - Module Metadata: Implicit connections (#1395)
+  - Add FlopTreeTools for SLR-crossing flop-tree/chain insertion (#1393)
+  - Harden InlineFlopTools inline-flop removal and add parseSideMap overload (#1381)
+  - Add RegisterInitTools for reading/writing FF INIT values (#1380)
+  - Add ConstraintTools.getClockNetsFromXDC (#1379)
+  - Add null-safety guards in design/EDIF utilities (#1378)
+  - Fix for handling module relocation in Modular SLRs
+  - [Design] addSiteInst() to use != over !equals() for collision check
+  - [SitePinInst] track setRouted() false -> true change for ?MUX pins
+  - [SiteInst][Net] Track when new objs are added; make empty copies
+  - [Net] setName() to invalidate logicalHierNet 
+  - [Cell] setName() to invalidate logical EDIFHierCellInst
+  - Correctly calculates bitstream header length & fixes FDRI/MFWR packet parsing 
+  - Fixes a MFWR packet missing decode issue
+  - Add createBUFGCE() support for Series 7 and Versal
+
+API Additions:
+  - com.xilinx.rapidwright.device.Tile "public int getSLRIndex()"
+  
+API Removals:
+
+
+============= RapidWright 2026.1.0-beta released on 2026-06-30 ================
+Notes: 
+  - 2026.1.0 Vivado DCP and device compatibility
+  - Fix tests to be Java 8 compatible (#1390)
+  - Add ReportPlaceStatusResult, with VivadoTools.reportPlaceStatus() (#1389)
+  - Fixes some testing failures related to api-lib fixes (#1388)
+  - 2026.1.0 VTree updates; includes all 3 modes of USER_CLOCK_VTREE_TYPE (#1385)
+  - Remove unnecessary reporting in NOC json (#1386)
+  - NOC Design representation classes (#1382)
+  - [EDIFNetlist] Mem Optimizations - Trim PortInsts & Property Map Storage (#1383)
+  - Fix Clock Routing for IOB pin (#1377)
+  - [RWRoute] Check and extend highest base wire for preservedMap (#1375)
+  - Update RapidWrightDCP to new url under Xilinx org (#1376)
+  - Fixes an issue in Cell.getSitePinFromLogicalPin() 
+
+API Additions:
+  - com.xilinx.rapidwright.device.Device "public int getIDCode()"
+  - com.xilinx.rapidwright.device.SLR "public int getIDCode()"
+
+API Removals:
+  - com.xilinx.rapidwright.bitstream "public static int createIDCode(int devIDCode, int revision)"
+  - com.xilinx.rapidwright.bitstream "public static Integer getIDCode(String partName)"
+
+============= RapidWright 2025.2.2-beta released on 2026-06-04 ================
+Notes:
+  - [Params] Adds parameters to control how readable EDIF is extracted when DCP is loaded (#1374)
+  - Enable {dis,}connectNet() to operate on macro port insts (#1367)
+  - Array Builder Tool - Replicate Optimized Kernels in an Array (#1163)
+  - [RWRoute] On Versal, preserve node uphill of sink SPIs (#1369)
+  - [Clock Routing]Fix isse related to Versal clock routing to NoC sinks (#1370)
+  - Add test case for fixes to getCorrespondingTile when called on certain SLL tiles (#1360)
+  - Correctly handle NOC clock pins when routing (#1365)
+  - Fix IBUF creation for UltraScale+ (#1357)
+  - [DesignTools] Fix NPE in fullyUnplaceCell() (#1358)
+  - [PathExtractor] Fix unconnected static inputs (#1352)
+  - Auto extract readable EDIFs from DCPs to enable parallel parsing
+  - Fix create IOB on UltraScale+
+  - Fixes to allow Vivado 2025.2 designs with NOC components to be loaded in RapidWright
+  - Fixes for site routing
+  - Adds several missing IDCodes for UltraScale+ parts
+  - Fix SLL module relocation for Versal
+
+API Additions:
+  - com.xilinx.rapidwright.design.noc.NOCDesign "public void clearSolution()"
+
+
+============= RapidWright 2025.2.1-beta released on 2026-02-18 ================
+Notes:
+  - Fixes Issues with PathExtractor#1350
+  - [Python] Set JAVA_HOME from PATH if not already set (#1351)
+  - Export schematic viewer scene as a PDF or SVG vector graphic. (#1344)
+  - Functional Fixes for PolynomialGenerator (#1349)
+  - [DesignComparator] Add command line entrypoint (#1341)
+  - Path extraction tool (#1345)
+  - [ModuleInst] Test for handling routethrus correctly (#1333)
+  - [FanOutOptimization] Improvements to support LUT replication and more (#1338)
+  - Fix PBlock creation and movement for Versal IRI_QUAD (#1335)
+
+API Additions:
+  - com.xilinx.rapidwright.design.Module "public Collection<Cell> getCells()"
+
+
+============= RapidWright 2025.2.0-beta released on 2025-12-01 ================
+Notes:
+  - [RWRoute] Initial Versal SLR crossing support (#1302)
+  - [VersalClockRouting] VDISTR tree storage map for Versal (#1311)
+  - [DesignTools] Parallelize preprocessing methods (#1324)
+  - [VersalClockRouting] Mark sink pins as routed once LCBs are connected (#1326)
+  - Adds external library for netlists to compensate for black boxed cells (#1294)
+  - 2025.2.0 devices (#1325)
+  - [NetlistBrowser] Cell Instance Schematic Viewer (#1322)
+  - [EDIFPort] Refactor getBitBlastedIndices() (#1321)
+  - Full TCL parser for XDC (#1265)
+  - [PBlock] Add IsSoft and ExcludePlacement property in pblock (#1315)
+  - Add vertical clock spine printing and clock root detection (#1314)
+  - [ConstraintTools] Tools to handle the xdc constraint on pblock (#1307)
+  - [ECOTools] disconnectNet() to use skipUnrouteIntraSite property (#1300)
+  - Add or-tools 9.14.6206, update protobuf to 4.31.1, update commons-io to 2.20.0 (#1306)
+  - Add HierNet clock detection command line tool (#1304)
+  - [PicoBlazeArray] Fixes EDIF cell export issue (#1305)
+  - Adds encrypted cells check flag; hasEncryptedCells() (#1303)
+  - [Write EDIF] Validate .edn files attached to netlist before DCP write (#1299)
+  - [NetTools] Adds alternate pretty print for Nets/Clock Spine (#1298)
+  - [RWRoute] Improves clock root routing and correctly annotates net for Vivado (#1297)
+  - [PartialRouter] Add and use isExcludedPip() for unpreserving too (#1296)
+  - Add method to prevent Vivado from grouping together certain ports into buses (#1293)
+  - Improve module placement calculation performance
+  - DCP read of place storage support in Vivado 2025.2
+  - [Cell] getAllCorrespondingSitePinNamesFromPhysicalPin() to check LUT RTs
+
+API Additions:
+  - com.xilinx.rapidwright.design.Net "public boolean isZNet()"
+  - com.xilinx.rapidwright.design.SiteInst "public List<Integer> getSiteWireIndicesFromNet(Net net)"
+  - com.xilinx.rapidwright.design.SiteInst "public Net getNetFromSiteWireIndex(int siteWireIndex)"
+  - com.xilinx.rapidwright.design.UnisimManager "public Map<SiteTypeEnum, Set<String>> getCompatiblePlacements(FamilyType f, Unisim u)"
+
+
+============= RapidWright 2025.1.3-beta released on 2025-10-02 ================
+Notes:
+  - [RWRoute] Versal fixes for clocking, static nets and general routing (#1280)
+  - [DesignTools] createCeClkOfRoutethruFFToVCC() to handle AND2B1L/OR2L (#1286)
+  - [TestBELPin] Test that BELPin.getConnectedSitePin() thru IMRs (#1285)
+  - Adds RW_COPY_EDNS_ON_DCP_WRITE and adds helper to extract EDNs (#1288)
+  - Move Site.getIntTile() -> DeviceTools.getIntTile() and fix for Versal (#1287)
+  - Cannot close the zip file (refactor?) (#1289)
+  - Cleanup gradle 9 warnings and Java linting warnings for Java 17 (#1277)
+  - [DesignTools] Handles VCC/GND connections properly in populateBlackBox() (#1278)
+  - rc2 and tests for removing alternate SPIs (#1276)
+  - [TimingGraph] Improving Report Timing Example; add some APIs (#1273)
+  - Propagates EDN files when loading RapidWright-generated DCPs
+  - [BELPin] getConnectedSitePin() to punch thru IMRs
+  - Site.getIntTile() to call DeviceTools.getIntTile(Site)
+  - Fix SitePinInst removal for alternate pins
+  - Address unplaced modules when getting BELPins
+
+API Additions:
+
+============= RapidWright 2025.1.2-beta released on 2025-10-02 ================
+The rapidwright-api-lib jar got corrupted on Maven Central so this release version
+had to be abandoned. Please use 2025.1.3 instead.
+
+============= RapidWright 2025.1.1-beta released on 2025-08-13 ================
+Notes:
+  - Unisim Primitive Mappings Updates for Versal (#1271)
+  - [ECOTools.connectNet()] Fixes static net connection and no source issues (#1270)
+  - [RWRoute] Add support for SLL tile types (#1269)
+  - Test and fixes for Versal site routing support (#1267)
+  - Netlist Comparator Inst and Property Tracking (#1260)
+  - Fix an issue on calculateUtilization function for Versal devices. (#1264)
+  - Add support for shared sink SitePinInsts in LUTInputConeOpt (#1262)
+  - Update Versal Unisims (#1261)
+  - EDIFNetlistComparator Test (#1263)
+  - Minor Changes to PBlock and LUT eval fixes (#1257)
+  - Versal LUT Input Routing Fixes and Test (#1254)
+  - [EDIFTools] Fix connectPortInstsThruHier when finding source pin (#1258)
+  - [RWRoute] Cleanup RWRoute.isAccessibleSink() (#1256)
+  - [EDIFTools] Add support for connecting logical nets through both hierarchical directions (#1253)
+  - [RWRoute] General + SLR crossing optimizations (#1232)
+  - [ReportRouteStatus] Do not count nets with no pins (#1248)
+  - [EDIFNetlist] Create a wrapper EDIFCell constructor (#1238)
+  - Test that Versal site pins are acquired correctly (#1247)
+  - Inline Flop Insertion/Removal Tool (#1242)
+  - Reset diffCount when compareNetlists is ran (#1251)
+  - Continue if cell is null (#1250)
+
+API Additions:
+  - com.xilinx.rapidwright.design.Design "public static Map<SiteTypeEnum, Set<String>> getCompatiblePlacements(Device device, Unisim u)"
+  - com.xilinx.rapidwright.design.Design "public static Map<SiteTypeEnum, Set<String>> getCompatiblePlacements(String deviceName, Unisim u)"
+  - com.xilinx.rapidwright.device.BEL "public boolean isAnyIMR()"
+
+
+============= RapidWright 2025.1.0-beta released on 2025-06-25 ================
+Notes:
+  - Add methods to access internal DiffMap (#1234)
+  - [EDIFNetlist] Update library when renaming cells; add API to remove blackbox prop (#1226)
+  - Fixes to count LOOKAHEAD8 cells in Versal designs (#1230)
+  - [NetlistBrowser] Fix extra click issue with instances (#1229)
+  - [Netlist Browser] GUI Widget to browse a loaded netlist (#1225)
+  - [CopyImplementation] Command-line version of DesignTools.copyImplementation() (#1215)
+  - [DesignTools.copyImplementation()] Support Versal IMR routethrus (#1224)
+  - [ECOTools] connectNet() remove static net assertion (#1223)
+  - [ECOTools] Fix connectNet() for pins that don't need routing (#1222)
+  - [LUTTools] Properly size LUTCY* primitives (#1221)
+  - [LUTInputConeOpt] Enable unplaced netlists (#1213)
+  - [PhysNetlistWriter] Treat bidir BEL pins on PS8 as output (#1214)
+  - [ECOTools] Augments connectNet() to handle dual-LUT pin usage scenarios (#1209)
+  - Basic VS Code Settings (#1210)
+  - LUT Input Cone Optimization (#1205)
+  - Design Obfuscator - Flattens design and uses hashing to obfuscate names (#1196)
+  - Regroup Instances -- command line tool (#1201)
+  - [PartialDFXRouter] Add PartialRouter specialization for DFX designs (#1204)
+  - [RWRoute] Connection.setAllTargets() to always set primary sink (#1206)
+  - [ECOPlacementHelper] Fix NPE for getUnusedFlop() (#1207)
+  - [Actions] Remove gradle/wrapper-validation-action (#1208)
+  - [RWRoute] Minor cleanup (#1203)
+  - [Design.createModuleInst()] Handles black boxes by renaming prior to Design.addModule() 
+  - Fixes gap routing issue
+  - Improves NOC traffic parsing file
+
+API Additions:
+  - (None)
+============= RapidWright 2024.2.3-beta released on 2025-05-29 ================
+Notes: 
+  - Add testcase for #780 (Design.routeSites()) (#1191)
+  - Post-route fanout optimization (#1178)
+  - Updating Gradle to support Java 21 (#1197)
+  - [RouterHelper] getPIPsFromNodes() to propagate locked state (#1189)
+  - Modify API to enable netlist regrouping on non-implemented netlists (#1199)
+  - [EDIFTools] Enables downward hierarchy traversal when connecting logical nets (#1180)
+  - [RouterHelper] Invert logical connection of LUT input pins (#1176)
+  - [Utils] isClocking() to recognize all {CMT,CLK,RCLK}_* tile types (#1190)
+  - [ModuleInst] Connect port to GND or VCC (#1182)
+  - [MakeBlackBox] Fixes for unplaced designs (#1164)
+  - [EDIFTools] uniqueifyNetlist() to use hier paths to cells (#1181)
+  - LUT1 Insertion Tool (for DFX/Abstract Shell designs) (#1174)
+  - Add option for DFX bitstreams (#1179)
+  - [DesignTools] updatePinIsRouted() to handle routing loops (#1185)
+  - [EDIFTools] UniqueifyNetlist() to reset parent net map (#1175)
+  - [DesignTools] getAllRoutedSitePinsFromPhysicalPin() fix (#1173)
+  - [NetTools] Recognize BUFGCE_HDIO as a clock src site (#1172)
+  - Adds option to preserve routing upon populateBlackBox() (#1171)
+  - [ReportRouteStatusResult] Parse # of fixed/explicit gap net (#1166)
+  - [Actions] Update test-rapidwright-wrapper to setup-java@v4 (#1167)
+  - [ECOTools] Refactor cell from one hier to another (#1159)
+  - modify affiliation, revise input argv, and rename class name (#1162)
+  - [CodeGenerator] Creates Java Code to Construct a Test Design With a Single Example SiteInst (#1160)
+  - Net.connect() Improvements - Better support for hierarchy and connecting to GND/VCC
+  - Fixes two issues related to reproducing routing in DCPs
+  - Fix roundtrip DCP routing issue related to partially routed clock net with gap routing
+
+API Additions:
+  - com.xilinx.rapidwright.design.Design "public List<PartitionPin> getPartitionPins(Net net)"
+  - com.xilinx.rapidwright.design.Design "public Net getNetFromPartitionPin(PartitionPin p)"
+
+============= RapidWright 2024.2.2-beta released on 2025-03-25 ================
+Notes: 
+  - [DesignTools] Fix routethru corner case in fullyUnplaceCellHelper() (#1157)
+  - Add option to uniquify copied cells (#1156)
+  - [DesignTools] Ensure cell pin has a logical connection before attempting to unroute it (#1154)
+  - [DesignTools] Unroutes both CLK pins on a BRAM when requested (#1151)
+  - [EDIF] Fix Export of Single Bit Busses (#1147)
+  - Fixes to enable BlockStitcher to run (#1134)
+  - Enables batching of SitePinInst removals during MakeBlackBox (#1142)
+  - Routing Heat Map Example (#1145)
+  - When adding Modules to Designs, make EDIF cell names unique if name collides
+
+API Additions:
+  - com.xilinx.rapidwright.design.Design "public boolean removeSiteInst(SiteInst instance, boolean keepSitePinRouting,
+  - com.xilinx.rapidwright.design.Design "public Map<SiteTypeEnum, Set<String>> getCompatiblePlacements(Unisim u)"
+  - com.xilinx.rapidwright.design.Design "public static Map<SiteTypeEnum, Set<String>> getCompatiblePlacements(FamilyType family, Unisim u)"
+
+
+============= RapidWright 2024.2.1-beta released on 2025-01-15 ================
+Notes: 
+  - Adds an Override Flag for Advanced Flow Settings in Designs (#1135)
+  - Test for SiteInst.isEmpty() (#1128)
+  - Tests for Versal BEL flags and site unrouting (#1125)
+  - [LUTTools] Versal pin swapping fixes (#1130)
+  - [DesignTools] foreachConnectedBELPin() to walk through Versal IMRs (#1129)
+  - [DesignTools] updatePinsIsRouted() to return num unrouted sinks (#1131)
+  - [TestDesign] Add testPlaceCellPinMappings() (#1122)
+  - [RWRoute] Small cleanup; enable CUFR by default (#1126)
+  - RWRoute preprocessing fixes (#1119)
+  - Enables setting Advanced Flow Flags for Designs
+  - Corrects and Adds BEL flags; fixes unroute site net for Versal
+  - [Cell] Fixes to P2L and L2P
+
+API Additions:
+  - com.xilinx.rapidwright.design.Cell "public void fixCell(boolean isFixed)"
+  - com.xilinx.rapidwright.design.Cell "public boolean isCellFixed()"
+  - com.xilinx.rapidwright.design.Design "public boolean isAdvancedFlow()"
+  - com.xilinx.rapidwright.design.Design "public void setAdvancedFlow(boolean val)"
+  - com.xilinx.rapidwright.design.SiteInst "public boolean isEmpty()"
+  - com.xilinx.rapidwright.device.BEL "public boolean isCEIMR()"
+  - com.xilinx.rapidwright.device.BEL "public boolean isSliceIMRClkMod()"
+
+============= RapidWright 2024.2.0-beta released on 2024-12-04 ================
+Notes: 
+  - Remove reliance on gap routing test (#1117)
+  - [ModuleInst] Fix placement behavior when requesting no overlaps (#1108)
+  - [RWRoute] Clock router for Versal architecture (#1102)
+  - Various preprocessing fixes for Versal routing (#1115)
+  - [CUFR] CUFR and PartialCUFR to default to --hus (#1111)
+  - [TestNet] Improve testSetPinsMultiSrcStatic to track many sources (#1082)
+  - Changes to support new array-based cell pin mappings (#1101)
+  - Update tests to reflect bug fixes and minor behavior changes (#1110)
+  - [RWRoute] Yet more cleanup (#1107)
+  - [RWRoute] Preserve nodes of Laguna sinks (#1104)
+  - [GlobalSignalRouting] routeStaticNets() to take a list of static pins (#1105)
+  - [RWRoute] Fix typo -- not an exclusive sink (#1106)
+  - [RWRoute] Versal optimizations (#1093)
+  - [RWRoute] RouteNode.setType() to accept any locals (#1103)
+  - [RWRoute] Further divide LOCAL nodes into EAST/WEST for UltraScale(+) (#1098)
+  - [Utils] isClocking() to include TileTypeEnum.CMT_L (#1100)
+  - TileGroup and DeviceBrowser Improvements (#1094)
+  - [RWRoute] Divide nodes into LOCAL and NON_LOCAL (#1095)
+  - Update actions and do not limit to 5G RAM (#1092)
+  - [HandPlacer] Cleanup snapping code in hand placer (#1091)
+  - [LUTTools] Add zero padding to LUT INIT strings (#1090)
+  - [NetTools] Add getNodeTrees() method and NodeTree class (#1089)
+  - [YosysTools] Add synthXilinx() wrapper for Yosys (#1086)
+  - [EDIFWriteLegalNameCache] busCollisionRenames to be a ConcurrentHashMap (#1088)
+  - Add ReportRouteStatus utility (#1087)
+  - [RWRoute] Signal router for Versal architecture (#1077)
+  - [FileTools] Add runCommand(String[] ...) & getExecutablePath(String) (#1085)
+  - [RouterHelper] findPathBetweenNodes() allow clocking if src/sink is so (#1083)
+  - [RouterHelper] projectOutputPinToINTNode() to breadth-first-search (#1081)
+  - [RouterHelper] projectInputPinToINTNode() to return solitary node (#1080)
+  - [RouterHelper] findPathBetweenNodes() to ignore clocking tiles (#1079)
+  - [RouterHelper] invertPossibleGndPinsToVccPins() to support Versal LUTs (#1078)
+  - [DesignTools] Fix createCeSrRstPinsToVCC() for US BRAMs (#1075)
+  - [DesignTools] Add LDCE/LDPE to types that need VCC (#1076)
+  - [NetTools] Add NetTools.isGlobalClock() (#1057)
+  - Static router for Versal architecture (#1073)
+  - [EDIFNetlist] getPhysicalPins() to call getPhysical{Gnd,Vcc}Pins() (#1074)
+  - Fix Null SLR References in Tiles in xcvp1902
+  - Add Implements Serializable to All RapidWright Classes
+  - [SiteInst] Improve memory usage of site routing using array instead of maps
+  - [Cell] Changes pin mappings from a map to an array to improve memory usage
+  - [BEL] Deprecate isSRIMR() in favour of more general isIMR()
+  - [Tile] Add getMaxUniqueAddress()
+  - [Net] Add support for multiple output sources
+
+API Additions:
+  - com.xilinx.rapidwright.design.Cell "public Pair<BELPin, String> getFirstPhysicalPinMapping()"
+  - com.xilinx.rapidwright.design.Cell "public int getUsedPhysicalPinsCount()"
+  - com.xilinx.rapidwright.design.Cell "public Set<String> getUsedPhysicalPins()"
+  - com.xilinx.rapidwright.design.Cell "public String[] getPhysicalPinMappings()"
+  - com.xilinx.rapidwright.design.Cell "public boolean usesPhysicalPin(String physicalPinName)"
+  - com.xilinx.rapidwright.design.Design "public boolean placeCell(Cell c, Site site, BEL bel, String[] physPinMappings)"
+  - com.xilinx.rapidwright.design.Net "public List<SitePinInst> getAlternateSources()"
+  - com.xilinx.rapidwright.device.BEL "public boolean isIMR()"
+  - com.xilinx.rapidwright.device.Tile "public int getMaxUniqueAddress()"
+
+
+============= RapidWright 2024.1.3-beta released on 2024-10-02 ================
+Notes: 
+  - [RWRoute] Further cleanup (#1070)
+  - [PhysNetlistReader] Call SiteInst.setDesign() even for STATIC_SOURCEs (#1071)
+  - [GlobalSignalRouting] Fix VCC routing for UltraScale (#1068)
+  - [RWRoute] Cleanup static router and RouterHelper (#1059)
+  - [PartialRouter] Disable ripup in global/static routing (#1067)
+  - [TestDesign] Add test for net ordering of >= 2022.1 DCPs (#1054)
+  - [TestBEL] Add testDIFFsAreNotFF() (#1062)
+  - Test for Design.retargetPart() (#1061)
+  - [EDIF] Fixes rare bus renaming collision (#1065)
+  - [RWRoute] Always clear prev pointer of unpreserved RouteNode-s (#1056)
+  - [LaunchTestsOnLsf] Invoke java with assertions enabled (#1066)
+  - [LaunchTestsOnLsf] Invoke java with assertions enabled (#1063)
+  - Fix testRouteStaticNet() to avoid site pins, and fix golden values (#1064)
+  - [GitHub Actions] Migrate to upload-artifact@v4 (#1058)
+  - Add recursive partitioning ternary tree (RPTT) (#1055)
+  - Add support for vu19p tiles in bitstream
+  - [Design] createModuleInst() to not create duplicate STATIC_SOURCE-s
+  - Removes all instances of enum.hashCode()
+  - [Node] equals() to use instanceof for subclass-awareness
+  - Retarget & relocate an existing design to a new part and location
+  - Fixes issue related to non-deterministic Net order upon multi-threaded DCP load
+  - Fix BEL.isFF() based on BELTypes
+  - Fix missing Design.getSeries()
+
+API Additions:
+  - com.xilinx.rapidwright.design.Design "public boolean retargetPart(Part targetPart, int tileXOffset, int tileYOffset)"
+  
+  
+============= RapidWright 2024.1.2-beta released on 2024-09-04 ================
+Notes:
+  - Creating a standalone entry point to relocate DCPs (#1047)
+  - [Interchange] Reorders tile types and tiles to follow their Vivado index (#1039)
+  - [DesignTools] Conform to Vivado *RST* pin inversion site routing configuration (#1053)
+  - Fix for design merging, including designs with encrypted cells (#1035)
+  - Filters out comments in XDC while parsing clk constraints (#1037)
+  - Assign an empty list when path finding for direct connections fails (#1052)
+  - Make LogicalNetlistToEdif not expand macros by default (#1051)
+  - [Interchange] Fixes to support Versal designs via Interchange (#1040)
+  - EDIF cleanup preventing singleton cells/libraries from attaching to user designs (#1050)
+  - [RWRoute] Refactoring/cleanup/preparation for multi-threading (#1046)
+  - Add Hybrid Updating Strategy (HUS) (#1043)
+  - [TestSiteInst] Add test for unrouting through FF routethru cells (#1041)
+  - [TestPIP] Test PIP constructor for reversed wires (#1045)
+  - [RWRoute] Preserve primary source nodes on connections (#1038)
+  - Small Interchange/PhysNetlistReader/VivadoTools improvements (#1042)
+  - [UnisimManager] Use EDIFLibraryBuiltin for primitive/macro libs
+  - Avoids NPE when site routing BRAMs
+  - Fix isCarry() for Versal devices
+  - Resolves PIP constructor issue for reversed PIPs
+  - [SiteInst] unrouteIntraSiteNet() to handle FF routethru cells
+
+API Additions:
+  - com.xilinx.rapidwright.design.Design "public Series getSeries()"
+  - com.xilinx.rapidwright.design.SiteInst "public SitePIP getUsedSitePIP(BEL bel)"
+
+============= RapidWright 2024.1.1-beta released on 2024-07-17 ================
+Notes: 
+  - [VivadoTools] Source *_load.tcl from same dir as DCP (#1032)
+  - Test that PIP.isReversed() is correct (#1024)
+  - Add TestSite.testGetIntTile() (#1022)
+  - [EDIFTools] writeTclLoadScriptForPartialEncryptedDesigns abspath (#1029)
+  - Adding HDIOB types (#1028)
+  - Test for site routing from raw placed design (#1000)
+  - [RWRoute] Do not NPE on encrypted netlists (#1025)
+  - [RWRoute] Do not assume Y = 0 has Laguna tiles, since it could be HBM device (#1026)
+  - Adds UNKWN state for LSFJobs (#1027)
+  - Adding legacy support for u280 (#1021)
+  - Remove flawed loop intended to for encrypted cell removal (#1023)
+  - [DesignTools.makeBlackBox()] Fixes an issue of removing CARRY blocks fed by routethrus (#1009)
+  - Fix null netlist pointer on expanded macro children (#1008)
+  - [Interchange] Device Resources Verifier Fixes (#1014)
+  - Fix ConcurrentModificationError (#1015)
+  - [EDIFTools] Adding method to create a flat netlist from a hierarchical one (#1006)
+  - Adding HBM ComponentTypes (#1007)
+  - Test for wire/node mismatch reported in #983 (#1005)
+  - 3.6% memory reduction usage for large placed designs (de-duplication of cell pin strings)
+  - Add missing pin entry for BUFG_GT when tracking INT tile connections
+  - Fixes rare DCP write issue with stubbed bi-directional PIPs (more common on DFX designs)
+  - Fix for reversed flag on PIPs
+  - Addresses issue with Net.getBufferDelay() by checking for null wire names
+  - Fixes two site routing issues
+
+
+API Additions:
+  - (None)
+  
+API Removals:
+  - (None)
+
 ============= RapidWright 2024.1.0-beta released on 2024-06-11 ================
 Notes: 
   - Support for Vivado 2024.1 DCPs and devices

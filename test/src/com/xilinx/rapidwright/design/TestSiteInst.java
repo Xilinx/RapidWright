@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2022, Xilinx, Inc.
- * Copyright (c) 2022-2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2022-2024, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, Xilinx Research Labs.
@@ -23,18 +23,34 @@
 
 package com.xilinx.rapidwright.design;
 
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.BEL;
 import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.device.SitePIP;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-
-import java.util.Arrays;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.ReportRouteStatusResult;
+import com.xilinx.rapidwright.util.VivadoTools;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
 public class TestSiteInst {
 
@@ -161,6 +177,32 @@ public class TestSiteInst {
 
             if (d.getDevice().getSeries() == Series.Series7 && letter == 'D') break;
         }
+    }
+
+    @Test
+    public void testUnrouteFFRouteThru() {
+        Design d = RapidWrightDCP.loadDCP("microblazeAndILA_3pblocks.dcp");
+        SiteInst si = d.getSiteInstFromSiteName("SLICE_X58Y84");
+        Cell ffCell = si.getCell("AFF");
+        Assertions.assertTrue(ffCell.isFFRoutethruCell());
+
+        // Check all intra-site routing present
+        Net net = si.getNetFromSiteWire("AQ");
+        Assertions.assertSame(net, si.getNetFromSiteWire("FFMUXA1_OUT1"));
+        Assertions.assertEquals("D5", si.getUsedSitePIP("FFMUXA1").getInputPinName());
+        Assertions.assertSame(net, si.getNetFromSiteWire("A5LUT_O5"));
+
+        // Unroute intra-site net
+        BELPin o5 = si.getBELPin("A5LUT", "O5");
+        BELPin aq = si.getBELPin("AFF", "Q");
+        Assertions.assertTrue(si.unrouteIntraSiteNet(o5, aq));
+
+        // Check all intra-site net (incl. routethru cell) is gone
+        Assertions.assertNull(si.getNetFromSiteWire("AQ"));
+        Assertions.assertNull(si.getNetFromSiteWire("FFMUXA1_OUT1"));
+        Assertions.assertNull(si.getUsedSitePIP("FFMUXA1"));
+        Assertions.assertNull(si.getNetFromSiteWire("A5LUT_O5"));
+        Assertions.assertNull(si.getCell("AFF"));
     }
 
     @Test
@@ -364,5 +406,137 @@ public class TestSiteInst {
         si.unrouteSite();
 
         Assertions.assertTrue(net.getSiteInsts().isEmpty());
+    }
+
+    @Test
+    public void testSiteRouting(@TempDir Path dir) {
+        Design design = RapidWrightDCP.loadDCP("gnl_2_4_3_1.3_gnl_3000_07_3_80_80_placed.dcp");
+        design.routeSites();
+        VivadoToolsHelper.assertRoutedSuccessfullyByVivado(design, dir);
+    }
+
+    @Test
+    public void testIsEmpty() {
+        Design d = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+        for (SiteInst si : d.getSiteInsts()) {
+            Assertions.assertFalse(si.isEmpty());
+        }
+
+        SiteInst si = d.createSiteInst(d.getDevice().getSite("SLICE_X40Y10"));
+        Assertions.assertTrue(si.isEmpty());
+    }
+
+    @Test
+    public void testRouteSiteVersal() {
+        Design d = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
+
+        _testRouteSiteVersal(d, "SLICE_X138Y0", 40, 34);
+        _testRouteSiteVersal(d, "SLICE_X139Y0", 65, 34);
+        _testRouteSiteVersal(d, "SLICE_X142Y4", 40, 24);
+
+        if (FileTools.isVivadoOnPath()) {
+            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(d);
+            // The original design had 14 pre-existing routing errors
+            Assertions.assertEquals(14, rrs.netsWithRoutingErrors);
+            Assertions.assertEquals(276, rrs.fullyRoutedNets);
+        }
+
+    }
+
+    private void _testRouteSiteVersal(Design d, String siteName, int expectedSiteNetMappings,
+            int expectedUsedSitePIPs) {
+        SiteInst si = d.getSiteInstFromSiteName(siteName);
+        Map<Net, List<String>> origSiteNetMap = si.getNetToSiteWiresMap();
+        List<SitePIP> origUsedSitePIPs = si.getUsedSitePIPs();
+
+        Assertions.assertEquals(expectedSiteNetMappings, origSiteNetMap.size());
+        Assertions.assertEquals(expectedUsedSitePIPs, origUsedSitePIPs.size());
+
+        si.unrouteSite();
+
+        // Remove routethru cells
+        Set<String> belsWithRouteThrus = new HashSet<>();
+        for (Cell c : new ArrayList<>(si.getCells())) {
+            if (c.isRoutethru()) {
+                belsWithRouteThrus.add(c.getBELName());
+                si.removeCell(c.getBEL());
+            }
+        }
+
+        // TODO Not going to reproduce these for now
+        origSiteNetMap.remove(d.getNet(Net.USED_NET));
+
+        Assertions.assertTrue(si.getNetToSiteWiresMap().isEmpty());
+        Assertions.assertTrue(si.getUsedSitePIPs().isEmpty());
+
+        si.routeSite();
+
+        // Ensure routethru cells restored
+        for (Cell c : si.getCells()) {
+            if (c.isRoutethru()) {
+                Assertions.assertTrue(belsWithRouteThrus.contains(c.getBELName()));
+            } else {
+                Assertions.assertFalse(belsWithRouteThrus.contains(c.getBELName()));
+            }
+        }
+
+        Map<Net, List<String>> siteNetMap = si.getNetToSiteWiresMap();
+        List<SitePIP> usedSitePIPs = si.getUsedSitePIPs();
+
+        Assertions.assertEquals(origSiteNetMap.size(), siteNetMap.size());
+        Assertions.assertEquals(origUsedSitePIPs.size(), usedSitePIPs.size());
+
+        for (Entry<Net, List<String>> e : origSiteNetMap.entrySet()) {
+            List<String> origSiteWires = e.getValue();
+            List<String> siteWires = siteNetMap.get(e.getKey());
+            Collections.sort(origSiteWires);
+            Collections.sort(siteWires);
+            Assertions.assertEquals(origSiteWires.toString(), siteWires.toString());
+        }
+
+        List<String> origUsedSitePIPNames = getSortedStringList(origUsedSitePIPs);
+        List<String> usedSitePIPNames = getSortedStringList(usedSitePIPs);
+        Assertions.assertEquals(origUsedSitePIPNames, usedSitePIPNames);
+    }
+
+    private List<String> getSortedStringList(List<SitePIP> sitePIPs) {
+        List<String> strings = new ArrayList<>();
+        for (SitePIP p : sitePIPs) {
+            strings.add(p.toString());
+        }
+        Collections.sort(strings);
+        return strings;
+    }
+
+    @Test
+    public void testRemoveSitePinInst() {
+        Design d = new Design("test", "xc7a200tsbg484-1");
+        Cell c = d.createAndPlaceCell("testRAMB18E1", Unisim.RAMB18E1, "RAMB18_X0Y58/RAMB18E1");
+        Assertions.assertEquals(SiteTypeEnum.RAMB18E1, c.getSiteInst().getSiteTypeEnum());
+        SitePinInst spi = new SitePinInst(true, "DO18", c.getSiteInst());
+        Net n = d.createNet("debug_net");
+        n.addPin(spi);
+        Assertions.assertTrue(spi.getSiteInst().removePin(spi));
+    }
+
+    @Test
+    public void testAddPinDuplicate() {
+        Design design = new Design("top", Device.AWS_F1);
+        SiteInst si = design.createSiteInst(design.getDevice().getSite("SLICE_X0Y0"));
+
+        String pinName = "H_O";
+        boolean isOutPin = true;
+        SitePinInst spi = new SitePinInst(pinName, si);
+        Assertions.assertNotNull(spi);
+
+        Assertions.assertThrows(RuntimeException.class, () -> new SitePinInst(pinName, si));
+        Assertions.assertThrows(RuntimeException.class, () -> {
+            SitePinInst spi2 = new SitePinInst(isOutPin, pinName, null);
+            spi2.setSiteInst(si);
+        });
+        Assertions.assertThrows(RuntimeException.class, () -> {
+            SitePinInst spi2 = new SitePinInst(isOutPin, pinName, null);
+            si.addPin(spi2);
+        });
     }
 }

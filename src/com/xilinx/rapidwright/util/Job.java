@@ -57,6 +57,8 @@ public abstract class Job {
 
     public static final String DEFAULT_COMMAND_LOG_FILE = DEFAULT_COMMAND_NAME + DEFAULT_LOG_EXTENSION;
 
+    public static final int DEFAULT_LOG_LINES = 80;
+
     public abstract long launchJob();
 
     public abstract JobState getJobState();
@@ -108,9 +110,10 @@ public abstract class Job {
      * @param memoryLimitMB maximum memory in MB
      * @param arguments command arguments as single string
      */
-    public void setRapidWrightCommand(Class<?> mainClass, int memoryLimitMB, String arguments) {
+    public void setRapidWrightCommand(Class<?> mainClass, int memoryLimitMB, boolean enableAssertions, String arguments) {
         command = System.getProperty("java.home")+"/bin/java -cp "
                 + System.getProperty("java.class.path") + " -Xmx"+memoryLimitMB+"m "
+                + (enableAssertions ? "-ea " : "")
                 + mainClass.getCanonicalName()+" "+arguments;
     }
 
@@ -150,7 +153,7 @@ public abstract class Job {
         String logFileName = getLogFilename();
         if (new File(logFileName).exists()) {
             ArrayList<String> lines = FileTools.getLinesFromTextFile(logFileName);
-            int start = lines.size() >= 8 ? lines.size()-8 : 0;
+            int start = lines.size() >= DEFAULT_LOG_LINES ? lines.size()-DEFAULT_LOG_LINES : 0;
             return Optional.of(IntStream.range(start, lines.size()).mapToObj(lines::get).collect(Collectors.toList()));
         }
         return Optional.empty();

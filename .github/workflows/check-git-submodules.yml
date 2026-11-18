@@ -2,8 +2,6 @@ name: Submodule refs on origin
 
 on:
   pull_request:
-    branches:
-      - master
 
 jobs:
   check:

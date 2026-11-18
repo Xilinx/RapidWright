@@ -93,20 +93,20 @@ public class PhysNetlistReader {
     protected static final String DISABLE_AUTO_IO_BUFFERS = "DISABLE_AUTO_IO_BUFFERS";
     protected static final String OUT_OF_CONTEXT = "OUT_OF_CONTEXT";
 
-    public static boolean VALIDATE_MACROS_PLACED_FULLY = true;
+    public static boolean VALIDATE_MACROS_PLACED_FULLY = false;
 
     /**
      *  Checks that constant routing and net names are valid.
      *  This incurs a runtime overhead.
      */
-    public static boolean CHECK_CONSTANT_ROUTING_AND_NET_NAMING = true;
+    public static boolean CHECK_CONSTANT_ROUTING_AND_NET_NAMING = false;
 
     /**
      * Examines a design to ensure that the provided macro placement is consistent with the
      * macro definition in the library.
      * This incurs a runtime overhead.
      */
-    public static boolean CHECK_MACROS_CONSISTENT = true;
+    public static boolean CHECK_MACROS_CONSISTENT = false;
 
 
     /**
@@ -114,7 +114,7 @@ public class PhysNetlistReader {
      * consistency with logical netlist cells.
      * This incurs a runtime overhead.
      */
-    public static boolean CHECK_AND_CREATE_LOGICAL_CELL_IF_NOT_PRESENT = true;
+    public static boolean CHECK_AND_CREATE_LOGICAL_CELL_IF_NOT_PRESENT = false;
 
     protected final Design design;
     protected Device device;
@@ -131,7 +131,10 @@ public class PhysNetlistReader {
 
     public PhysNetlistReader(EDIFNetlist netlist) {
         design = new Design();
-        design.setNetlist(netlist);
+        if (netlist != null) {
+            design.setNetlist(netlist);
+            design.setName(netlist.getName());
+        }
     }
 
     protected Design read(String physNetlistFileName) throws IOException {
@@ -736,8 +739,9 @@ public class PhysNetlistReader {
             String name = SiteInst.STATIC_SOURCE + "_" + site.getName();
             SiteInst si = new SiteInst(name, site.getSiteTypeEnum());
             si.place(site);
+            si.setDesign(design);
             // Ensure it is not attached to the design
-            assert(si.getDesign() == null);
+            assert(design.getSiteInstFromSite(site) == null);
             return si;
         });
         assert(siteInst != null && siteInst.isPlaced());

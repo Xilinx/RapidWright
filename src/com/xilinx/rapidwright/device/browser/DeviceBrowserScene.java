@@ -28,8 +28,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Queue;
 
+import com.trolltech.qt.core.QEvent;
 import com.trolltech.qt.core.Qt.MouseButton;
 import com.trolltech.qt.core.Qt.PenStyle;
 import com.trolltech.qt.gui.QAction;
@@ -39,12 +42,14 @@ import com.trolltech.qt.gui.QGraphicsLineItem;
 import com.trolltech.qt.gui.QGraphicsSceneMouseEvent;
 import com.trolltech.qt.gui.QMenu;
 import com.trolltech.qt.gui.QPen;
-import com.xilinx.rapidwright.router.RouteNode;
+import com.xilinx.rapidwright.design.tools.Edge;
+import com.xilinx.rapidwright.design.tools.TileGroup;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.gui.NumberedHighlightedTile;
 import com.xilinx.rapidwright.gui.TileScene;
+import com.xilinx.rapidwright.router.RouteNode;
 
 /**
  * This class was written specifically for the DeviceBrowser class.  It
@@ -64,12 +69,18 @@ public class DeviceBrowserScene extends TileScene{
     /**     */
     private ArrayList<NumberedHighlightedTile> currentTiles = new ArrayList<NumberedHighlightedTile>();
 
+    // User Defined Qt Events
+    public static final int CLEAR_HIGHLIGHTED_TILES = 1001;
+    public static final int HIGHLIGHT_TILE_GROUPS = 1002;
+    // End Events
 
     public DeviceBrowserScene(Device device, boolean hideTiles, boolean drawPrimitives, DeviceBrowser browser) {
         super(device, hideTiles, drawPrimitives);
         currLines = new ArrayList<QGraphicsLineItem>();
         wirePen = new QPen(QColor.yellow, 0.25, PenStyle.SolidLine);
         this.browser = browser;
+        QEvent.registerEventType(CLEAR_HIGHLIGHTED_TILES);
+        QEvent.registerEventType(HIGHLIGHT_TILE_GROUPS);
     }
 
     public void drawWire(Tile src, Tile dst) {
@@ -181,6 +192,15 @@ public class DeviceBrowserScene extends TileScene{
     }
 
     private void menuReachabilityClear() {
+        clearHighlightedTiles();
+    }
+
+
+    public void addHighlightedTile(NumberedHighlightedTile tile) {
+        currentTiles.add(tile);
+    }
+
+    public void clearHighlightedTiles() {
         for (NumberedHighlightedTile rect : currentTiles) {
             rect.remove();
         }
@@ -229,5 +249,42 @@ public class DeviceBrowserScene extends TileScene{
 
 
         super.mouseReleaseEvent(event);
+    }
+
+    public List<TileGroup> tileGroups;
+
+    public void highlightTileGroups() {
+        for (TileGroup tg : tileGroups) {
+            highlightTileGroup(tg);
+        }
+    }
+
+    public void highlightTileGroup(TileGroup tg) {
+        QBrush brush = new QBrush(QColor.red);
+        Map<Tile, Edge> tileMap = tg.getRegionTiles();
+        for (Entry<Tile, Edge> e : tileMap.entrySet()) {
+            if (e.getValue() == Edge.INTERNAL)
+                continue;
+            NumberedHighlightedTile highTile = new NumberedHighlightedTile(e.getKey(), this, null);
+            highTile.setBrush(brush);
+            addHighlightedTile(highTile);
+        }
+    }
+
+    @Override
+    public boolean event(QEvent event) {
+        boolean result = true;
+
+        switch(event.type().value()) {
+            case CLEAR_HIGHLIGHTED_TILES:
+                clearHighlightedTiles();
+                break;
+            case HIGHLIGHT_TILE_GROUPS:
+                highlightTileGroups();
+                break;
+            default:
+                result = super.event(event);
+            }
+        return result;
     }
 }

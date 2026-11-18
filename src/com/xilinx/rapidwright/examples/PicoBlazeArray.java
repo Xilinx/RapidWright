@@ -158,6 +158,7 @@ public class PicoBlazeArray {
 
             Map<String, T> instances = new HashMap<>();
 
+            EDIFCell picoblazeCell = null;
             for (int x=0; x < bramColumns; x++) {
                 // we will skip top and bottom clock region rows to avoid laguna tiles and U-turn routing
                 for (int y=BRAMS_IN_CLOCK_REGION_HEIGHT; y < bramRows-BRAMS_IN_CLOCK_REGION_HEIGHT; y++) {
@@ -173,8 +174,13 @@ public class PicoBlazeArray {
 
                     T mi = createInstance(design, makeName(x,y), impl, picoBlazeImpls);
 
+                    if (picoblazeCell == null) {
+                        picoblazeCell = design.getNetlist().getWorkLibrary()
+                                .getCell(impl.getNetlist().getTopCell().getName());
+                    }
+
                     instances.put(mi.getName(), mi);
-                    mi.getCellInst().setCellType(impl.getNetlist().getTopCell());
+                    mi.getCellInst().setCellType(picoblazeCell);
 
                     placeInArray(mi, bram, impl);
 

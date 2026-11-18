@@ -130,7 +130,16 @@ public enum IntentCode {
     NODE_SLL_DATA,
     NODE_GLOBAL_VDISTR_LVL3,
     NODE_GLOBAL_VDISTR_LVL21,
-    NODE_GLOBAL_VDISTR_SHARED;
+    NODE_GLOBAL_VDISTR_SHARED,
+    
+    // Versal Gen 2
+    NODE_GLOBAL_HDISTR_SLOW,
+    NODE_GLOBAL_HDISTR_MED,
+    NODE_GLOBAL_HDISTR_FAST,
+    NODE_GLOBAL_HROUTE_SLOW,
+    NODE_GLOBAL_HROUTE_MED;
+    
+    
 
 
     public static boolean isLongWire(Tile tile, int wire) {
@@ -156,6 +165,13 @@ public enum IntentCode {
 
     public boolean isUltraScaleClockDistribution() {
         return NODE_GLOBAL_HDISTR == this || NODE_GLOBAL_VDISTR == this;
+    }
+
+    public boolean isVersalClocking() {
+        return NODE_GLOBAL_HDISTR == this || NODE_GLOBAL_HDISTR_LOCAL == this || NODE_GLOBAL_HROUTE_HSR == this ||
+                NODE_GLOBAL_VDISTR == this || NODE_GLOBAL_VDISTR_LVL2 == this || NODE_GLOBAL_VROUTE == this ||
+                NODE_GLOBAL_GCLK == this || NODE_GLOBAL_LEAF == this || NODE_GLOBAL_BUFG == this
+                || NODE_GLOBAL_HROUTE == this;
     }
 
     private static final int SERIES7_START_IDX = 23;

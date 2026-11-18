@@ -25,6 +25,7 @@
  */
 package com.xilinx.rapidwright.design.blocks;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -104,7 +105,16 @@ public class PBlockRange {
         this.upperRight = upperRight;
     }
 
+    private static String getPrefixedCornerName(PBlockCorner corner) {
+        if (corner instanceof ClockRegion) {
+            return CLOCK_REGION_RANGE_STR+"_"+corner.getName();
+        }
+        return corner.getName();
+    }
     public String toString() {
+        if (isClockRegionRange()) {
+            return CLOCK_REGION_RANGE_STR + "_" + lowerLeft.getName() + ":" + CLOCK_REGION_RANGE_STR + "_" + upperRight.getName();
+        }
         return lowerLeft.getName() + ":" + upperRight.getName();
     }
 
@@ -199,8 +209,11 @@ public class PBlockRange {
      * @return A set of all tiles inclusive of the pblock range.
      */
     public Set<Tile> getAllTiles() {
-        Set<Tile> tiles = new HashSet<>();
+        if (getBottomLeftTile() == getTopRightTile()) {
+            return Collections.singleton(getBottomLeftTile());
+        }
 
+        Set<Tile> tiles = new HashSet<>();
         int colMin = getBottomLeftTile().getColumn();
         int rowMin = getTopRightTile().getRow();
         int colMax = getTopRightTile().getColumn();
@@ -209,9 +222,9 @@ public class PBlockRange {
         // We may need to expand column to include outward facing CLB/DSP/BRAM to INT tiles
         if (isSiteRange()) {
             Tile t = getLowerLeftSite().getIntTile();
-            if (t.getColumn() < colMin) colMin = t.getColumn();
+            if (t != null && t.getColumn() < colMin) colMin = t.getColumn();
             t = getUpperRightSite().getIntTile();
-            if (t.getColumn() > colMax) colMax = t.getColumn();
+            if (t != null && t.getColumn() > colMax) colMax = t.getColumn();
         }
 
         for (int col=colMin; col <= colMax; col++) {

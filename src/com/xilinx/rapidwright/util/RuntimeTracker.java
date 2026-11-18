@@ -46,8 +46,7 @@ public class RuntimeTracker {
     }
 
     public RuntimeTracker(String name, short level) {
-        this.name = name + ":";
-        this.time = 0;
+        this(name);
         this.level = level;
         if (this.getLevel() * 3 + this.getName().length() > 36) {
             System.out.println("\nWARNING: RuntimeTracker name too long: " + name + ". Ideal max string length: " + (35 - this.getLevel() * 3));
@@ -92,15 +91,23 @@ public class RuntimeTracker {
         }
     }
 
+    public static long now() {
+        return System.nanoTime();
+    }
+
+    public static long elapsed(long start) {
+        return now() - start;
+    }
+
     public void start() {
-        this.start = System.nanoTime();
+        this.start = now();
     }
 
     /**
      * Stops the runtime tracker and stores the total time elapsed in nanoseconds.
      */
     public void stop() {
-        this.time += System.nanoTime() - this.start;
+        this.time += elapsed(this.start);
     }
 
     /**

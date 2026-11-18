@@ -36,6 +36,33 @@ public class Params {
 
     public static String RW_WRITE_DCP_2024_1_NAME = "RW_WRITE_DCP_2024_1";
 
+    public static String RW_DISABLE_WRITING_ADV_FLOW_DCPS_NAME = "RW_DISABLE_WRITING_ADV_FLOW_DCPS";
+
+    public static String RW_COPY_EDNS_ON_DCP_WRITE_NAME = "RW_COPY_EDNS_ON_DCP_WRITE";
+
+    /**
+     * Directory where RapidWright should temporarily extract readable EDIF files
+     * embedded inside DCPs before parsing. This can be set either as an environment
+     * variable or JVM system property. If unset, RapidWright will try the DCP's
+     * directory first and then the JVM temp directory.
+     */
+    public static String RW_DCP_EDIF_TEMP_DIR_NAME = "RW_DCP_EDIF_TEMP_DIR";
+
+    /**
+     * Minimum uncompressed EDIF size in bytes where RapidWright should extract a
+     * readable EDIF embedded inside a DCP before parsing. If unset or negative,
+     * RapidWright uses the parallel EDIF parser's thread-count heuristic.
+     */
+    public static String RW_DCP_EDIF_EXTRACT_THRESHOLD_BYTES_NAME = "RW_DCP_EDIF_EXTRACT_THRESHOLD_BYTES";
+
+    /**
+    * Max EDIF token size in bytes for {@link com.xilinx.rapidwright.edif.EDIFTokenizer}
+    * Must be a power of two. Set via environment variable or JVM system property.
+    * {@value #RW_EDIF_MAX_TOKEN_LENGTH_NAME}
+    */
+    public static String RW_EDIF_MAX_TOKEN_LENGTH_NAME = "RW_EDIF_MAX_TOKEN_LENGTH";
+    public static int RW_EDIF_DEFAULT_MAX_TOKEN_LENGTH = 8192 * 16 * 32;
+
     /**
      * Flag to have RapidWright decompress gzipped EDIF files to disk prior to
      * parsing. This is a tradeoff where pre-decompression improves runtime over the
@@ -50,7 +77,7 @@ public class Params {
      * range from -7 to 22, with higher numbers producing a more compact result for
      * more runtime.
      */
-    public static int RW_ZSTD_COMPRESSION_LEVEL = getParamOrDefaultIntSetting(RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK_NAME,
+    public static int RW_ZSTD_COMPRESSION_LEVEL = getParamOrDefaultIntSetting(RW_ZSTD_COMPRESSION_LEVEL_NAME,
             RW_ZSTD_DEFAULT_COMPRESSION_LEVEL);
 
     /**
@@ -59,6 +86,43 @@ public class Params {
      * faster and will provide better support for the largest devices.
      */
     public static boolean RW_WRITE_DCP_2024_1 = isParamSet(RW_WRITE_DCP_2024_1_NAME);
+
+    /**
+     * Flag to disable RapidWright from writing any DCPs that target Vivado's
+     * Advanced Flow (starting in Vivado 2024.2). By default, RapidWright writes
+     * DCPs targeting Versal devices with the Advanced Flow compatibility flag set
+     * to true.
+     */
+    public static boolean RW_DISABLE_WRITING_ADV_FLOW_DCPS = isParamSet(RW_DISABLE_WRITING_ADV_FLOW_DCPS_NAME);
+
+    /**
+     * Flag to indicate RapidWright should copy *.edn (encrypted cell netlist files)
+     * to the same directory where the DCP is being written to.
+     */
+    public static boolean RW_COPY_EDNS_ON_DCP_WRITE = isParamSet(RW_COPY_EDNS_ON_DCP_WRITE_NAME);
+
+    /**
+     * Directory where RapidWright should temporarily extract readable EDIF files
+     * embedded inside DCPs before parsing, or null if unset.
+     */
+    public static String RW_DCP_EDIF_TEMP_DIR = getParamValue(RW_DCP_EDIF_TEMP_DIR_NAME);
+
+    /**
+     * Minimum uncompressed EDIF size in bytes where RapidWright should extract a
+     * readable EDIF embedded inside a DCP before parsing. A negative value means
+     * the threshold was not set explicitly.
+     */
+    public static long RW_DCP_EDIF_EXTRACT_THRESHOLD_BYTES =
+            getParamOrDefaultLongSetting(RW_DCP_EDIF_EXTRACT_THRESHOLD_BYTES_NAME, -1L);
+
+
+    /**
+     * Configured max EDIF token length; falls back to {@link #RW_EDIF_DEFAULT_MAX_TOKEN_LENGTH}
+     * if unset or invalid (not a power of two).
+     */
+    public static int RW_EDIF_MAX_TOKEN_LENGTH = validatedEdifMaxTokenLength(
+        getParamOrDefaultIntSetting(RW_EDIF_MAX_TOKEN_LENGTH_NAME, RW_EDIF_DEFAULT_MAX_TOKEN_LENGTH),
+        RW_EDIF_DEFAULT_MAX_TOKEN_LENGTH);
 
     /**
      * Checks if the named RapidWright parameter is set via an environment variable
@@ -109,6 +173,27 @@ public class Params {
     }
 
     /**
+     * Gets the long value of the provided parameter name.
+     *
+     * @param key Name of the system parameter to get.
+     * @return The set long value of the parameter, or null if none was set. If
+     *         the property is set to a value that is not a parsable long, a
+     *         warning message is produced and returns null.
+     */
+    public static Long getParamLongValue(String key) {
+        String envValue = getParamValue(key);
+        if (envValue != null) {
+            try {
+                return Long.parseLong(envValue);
+            } catch (NumberFormatException e) {
+                System.err.println("WARNING: Couldn't interpret the value '" + envValue
+                        + "' from the parameter '" + key + "' as a long.");
+            }
+        }
+        return null;
+    }
+
+    /**
      * Gets the string value of the provided parameter name.
      * 
      * @param key Name of the system parameter to get.
@@ -136,4 +221,27 @@ public class Params {
         return setValue == null ? defaultValue : setValue;
     }
 
+    /**
+     * Checks the parameter value of the provided key. If it is set, it returns the
+     * set value. Otherwise it will return the default value.
+     *
+     * @param key          Name of the system parameter to check.
+     * @param defaultValue The default value to return if the parameter is not set.
+     * @return The system parameter value if is set, otherwise it returns
+     *         defaultValue.
+     */
+    public static long getParamOrDefaultLongSetting(String key, long defaultValue) {
+        Long setValue = getParamLongValue(key);
+        return setValue == null ? defaultValue : setValue;
+    }
+
+    private static int validatedEdifMaxTokenLength(int value, int defaultValue) {
+        if (value <= 0 || (value & (value - 1)) != 0) {
+            System.err.println("WARNING: " + RW_EDIF_MAX_TOKEN_LENGTH_NAME
+                + " must be a positive power of two (" + value + ") using default "
+                + defaultValue);
+            return defaultValue;
+        }
+        return value;
+    }
 }

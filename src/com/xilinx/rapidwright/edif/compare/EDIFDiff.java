@@ -23,6 +23,7 @@
 package com.xilinx.rapidwright.edif.compare;
 
 import com.xilinx.rapidwright.edif.EDIFCell;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFLibrary;
 
 /**
@@ -44,14 +45,29 @@ public class EDIFDiff {
 
     private String notEqualString;
 
+    private EDIFCellInst sourceInst;
+
+    private String propertyKey;
+
     public EDIFDiff(EDIFDiffType type, Object gold, Object test, EDIFCell parentCell,
-            EDIFLibrary parentLibrary, String notEqualString) {
+            EDIFLibrary parentLibrary, String notEqualString, 
+            EDIFCellInst sourceInst, String propertyKey) {
         this.type = type;
         this.gold = gold;
         this.test = test;
         this.parentCell = parentCell;
         this.parentLibrary = parentLibrary;
         this.notEqualString = notEqualString;
+        this.sourceInst = sourceInst;
+        this.propertyKey = propertyKey;
+    }
+
+    public EDIFCellInst getSourceInst() {
+        return sourceInst;
+    }
+
+    public String getPropertyKey() {
+        return propertyKey;
     }
 
     public String getContext() {
@@ -68,31 +84,35 @@ public class EDIFDiff {
         return null;
     }
     
-    
+    @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
+
         if (type.isMissingType()) {
-            sb.append("Missing ");
-            sb.append(getClassName());
-            sb.append(" ");
-            sb.append(gold);
-            if (notEqualString.length() > 0) {
-                sb.append("(");
-                sb.append(notEqualString);
-                sb.append(")");
+            sb.append("Missing ")
+              .append(getClassName()).append(' ')
+              .append(gold);
+
+            if (notEqualString != null && !notEqualString.isEmpty()) {
+                sb.append(" (").append(notEqualString).append(')');
             }
         } else if (type.isExtraType()) {
-            sb.append("Extra ");
-            sb.append(getClassName());
-            sb.append(" ");
-            sb.append(test);
+            sb.append("Extra ")
+              .append(getClassName()).append(' ')
+              .append(test);
         } else if (type.isNonNullMismatch()) {
-            sb.append("Mismatch found (" + notEqualString + "), expected ");
-            sb.append(gold);
-            sb.append(", but found ");
-            sb.append(test);
+            sb.append("Mismatch found (")
+              .append(notEqualString).append("), expected ")
+              .append(gold).append(", but found ").append(test);
         }
+
         sb.append(getContext());
+
+        if (sourceInst != null)
+            sb.append(" inst=").append(sourceInst.getName());
+
+        if (propertyKey != null && !propertyKey.isEmpty())
+            sb.append(" property=").append(propertyKey);
 
         return sb.toString();
     }

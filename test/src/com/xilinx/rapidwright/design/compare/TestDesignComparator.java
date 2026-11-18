@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, Advanced Micro Devices, Inc.
+ * Copyright (c) 2024-2026, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Chris Lavin, AMD Research and Advanced Development.
@@ -34,6 +34,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Site;
 import com.xilinx.rapidwright.device.SitePIP;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
+import com.xilinx.rapidwright.support.ChangeTrackingAssertions;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 
 /**
@@ -81,10 +82,23 @@ public class TestDesignComparator {
 
         compareDesign(1, 1, DesignDiffType.DESIGN_PARTNAME, dc, gold, test2);
         
+        // Track from here on: an object leaving a design must have what it held recorded as
+        // original, or a consumer undoing the original state never hears about the removal. It is
+        // not left as modified, since the design no longer holds it
+        test2.setTrackSiteInstChanges(true);
+        test2.setCopyingOriginalSiteInsts(true);
+        test2.setTrackNetChanges(true);
+        test2.setCopyingOriginalNetsRouting(true);
+
         test2.removeSiteInst(siteInst, true);
 
+        Assertions.assertFalse(test2.getModifiedSiteInsts().contains(siteInst));
+        SiteInst original = test2.getOriginalSiteInsts().get(siteInst.getSiteName());
+        Assertions.assertNotNull(original);
+        ChangeTrackingAssertions.assertModifiedAreInDesign(test2);
+
         compareDesign(2, 1, DesignDiffType.SITEINST_MISSING, dc, gold, test2);
-        
+
         Site s = device.getSite("SLICE_X56Y0");
         new SiteInst(s.getName(), test2, SiteTypeEnum.SLICEL, s);
 
@@ -94,8 +108,15 @@ public class TestDesignComparator {
         siteInst.setName("anotherNamedSiteInst");
         test2.addSiteInst(siteInst);
 
+        // Back on the site it was removed from, under another name: the original is keyed by site,
+        // so it is still the one recorded as it was removed
+        Assertions.assertTrue(test2.getModifiedSiteInsts().contains(siteInst));
+        Assertions.assertSame(original, test2.getOriginalSiteInsts().get(siteInst.getSiteName()));
+        ChangeTrackingAssertions.assertModifiedAreInDesign(test2);
+
         compareDesign(3, 1, DesignDiffType.SITEINST_NAME, dc, gold, test2);
 
+        // Renamed behind the design's back from here on, so only nets are checked below
         siteInst.setName(oldName);
         Cell removedCell = siteInst.removeCell(siteInst.getBEL("AFF"));
 
@@ -109,12 +130,24 @@ public class TestDesignComparator {
         String oldType = removedCell.getType();
         removedCell.setType("MISMATCHEDTYPE");
 
-        compareDesign(4, 1, DesignDiffType.PLACED_CELL_TYPE, dc, gold, test2);
+        compareDesign(6, 1, DesignDiffType.PLACED_CELL_TYPE, dc, gold, test2);
 
         removedCell.setType(oldType);
         removedCell.updateName("NEWNAME");
 
-        compareDesign(4, 1, DesignDiffType.PLACED_CELL_NAME, dc, gold, test2);
+        compareDesign(6, 1, DesignDiffType.PLACED_CELL_NAME, dc, gold, test2);
+
+        Cell compareCell = siteInst.getCell("F6LUT");
+
+        Assertions.assertFalse(compareCell.isBELFixed());
+        compareCell.setBELFixed(true);
+
+        compareDesign(7, 2, DesignDiffType.PLACED_CELL_IS_BEL_FIXED, dc, gold, test2);
+
+        Assertions.assertFalse(compareCell.isSiteFixed());
+        compareCell.setSiteFixed(true);
+
+        compareDesign(8, 2, DesignDiffType.PLACED_CELL_IS_SITE_FIXED, dc, gold, test2);
 
         SitePIP sitePIP = siteInst.getUsedSitePIP("CLKINV");
         Net clk = siteInst.getNetFromSiteWire(sitePIP.getInputPin().getSiteWireName());
@@ -122,11 +155,11 @@ public class TestDesignComparator {
         siteInst.routeIntraSiteNet(clk, sitePIP.getInputPin(), sitePIP.getInputPin());
         siteInst.routeIntraSiteNet(clk, sitePIP.getOutputPin(), sitePIP.getOutputPin());
 
-        compareDesign(5, 1, DesignDiffType.SITEPIP_MISSING, dc, gold, test2);
+        compareDesign(9, 1, DesignDiffType.SITEPIP_MISSING, dc, gold, test2);
 
         siteInst.addSitePIP("FFMUXC1", "D6");
 
-        compareDesign(6, 1, DesignDiffType.SITEPIP_EXTRA, dc, gold, test2);
+        compareDesign(10, 1, DesignDiffType.SITEPIP_EXTRA, dc, gold, test2);
 
         sitePIP = siteInst.getUsedSitePIP("FFMUXA1");
         Net net = siteInst.getNetFromSiteWire(sitePIP.getInputPin().getSiteWireName());
@@ -135,39 +168,47 @@ public class TestDesignComparator {
         siteInst.routeIntraSiteNet(net, sitePIP.getOutputPin(), sitePIP.getOutputPin());
         siteInst.addSitePIP("FFMUXA1", "D6");
 
-        compareDesign(8, 1, DesignDiffType.SITEPIP_INPIN_NAME, dc, gold, test2);
+        compareDesign(12, 1, DesignDiffType.SITEPIP_INPIN_NAME, dc, gold, test2);
         Assertions.assertEquals(1, dc.getDiffList(DesignDiffType.SITEWIRE_NET_EXTRA).size());
 
         siteInst.unrouteIntraSiteNet(sitePIP.getInputPin(), sitePIP.getInputPin());
 
-        compareDesign(9, 1, DesignDiffType.SITEWIRE_NET_MISSING, dc, gold, test2);
+        compareDesign(13, 1, DesignDiffType.SITEWIRE_NET_MISSING, dc, gold, test2);
 
         siteInst.routeIntraSiteNet(new Net("mismatch"), sitePIP.getInputPin(), sitePIP.getInputPin());
 
-        compareDesign(9, 1, DesignDiffType.SITEWIRE_NET_NAME, dc, gold, test2);
+        compareDesign(13, 1, DesignDiffType.SITEWIRE_NET_NAME, dc, gold, test2);
 
         Assertions.assertTrue(net.hasPIPs());
         test2.removeNet(net);
 
-        compareDesign(22, 1, DesignDiffType.NET_MISSING, dc, gold, test2);
+        // Its routing is recorded as original, and recorded rather than unrouted: the PIPs below
+        // are still there to copy. It is not left as modified, since the design no longer holds it
+        Assertions.assertFalse(test2.getModifiedNets().contains(net));
+        Assertions.assertEquals(net.getPIPs(), test2.getOriginalNetRouting().get(net.getName()));
+        ChangeTrackingAssertions.assertModifiedNetsAreInDesign(test2);
+
+        compareDesign(32, 1, DesignDiffType.NET_MISSING, dc, gold, test2);
 
         Net extra = new Net("extraNet");
         for (PIP p : net.getPIPs()) {
             extra.addPIP(p);
         }
         test2.addNet(extra);
+        Assertions.assertTrue(test2.getModifiedNets().contains(extra));
+        ChangeTrackingAssertions.assertModifiedNetsAreInDesign(test2);
 
-        compareDesign(23, 1, DesignDiffType.NET_EXTRA, dc, gold, test2);
+        compareDesign(33, 1, DesignDiffType.NET_EXTRA, dc, gold, test2);
 
         Assertions.assertTrue(extra.hasPIPs());
         clk.addPIP(extra.getPIPs().get(0));
 
-        compareDesign(24, 1, DesignDiffType.PIP_EXTRA, dc, gold, test2);
+        compareDesign(34, 1, DesignDiffType.PIP_EXTRA, dc, gold, test2);
 
         clk.getPIPs().remove(clk.getPIPs().size() - 1);
         clk.getPIPs().remove(clk.getPIPs().size() - 1);
 
-        compareDesign(24, 1, DesignDiffType.PIP_MISSING, dc, gold, test2);
+        compareDesign(34, 1, DesignDiffType.PIP_MISSING, dc, gold, test2);
 
         if (dc.comparePIPFlags()) {
             clk.getPIPs().get(clk.getPIPs().size() - 1).setIsStub(true);

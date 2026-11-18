@@ -23,11 +23,13 @@
 
 package com.xilinx.rapidwright.edif;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Device;
@@ -80,8 +82,8 @@ public class TestEDIFPort {
         EDIFCell cell = new EDIFCell(netlist.getWorkLibrary(), "cell_1");
         int outer = 0;
         // Creates ports: {bus_output[0][3:0], bus_output[2][5:2],
-        // bus_output[1][0:3], bus_output[3][2:5]}
-        for (String range : new String[] { "3:0", "0:3", "5:2", "2:5" }) {
+        // bus_output[1][0:3], bus_output[3][2:5], , bus_output[4][0:-1], bus_output[5][-3:-1]}
+        for (String range : new String[] { "3:0", "0:3", "5:2", "2:5", "0:-1", "-3:-1" }) {
             int left = Integer.parseInt(range.substring(0, range.indexOf(':')));
             int right = Integer.parseInt(range.substring(range.indexOf(':') + 1));
             int width = Math.abs(left - right) + 1;
@@ -94,7 +96,7 @@ public class TestEDIFPort {
             EDIFPort copy = cell.getPort("bus_output[" + outer + "][");
             Assertions.assertEquals(busOutput, copy);
 
-            int[] portIndices = busOutput.getBitBlastedIndicies();
+            int[] portIndices = busOutput.getBitBlastedIndices();
             Assertions.assertEquals(width, portIndices.length);
             Assertions.assertEquals(left, portIndices[0]);
             Assertions.assertEquals(right, portIndices[portIndices.length - 1]);
@@ -152,5 +154,28 @@ public class TestEDIFPort {
         EDIFCell cell = new EDIFCell(netlist.getWorkLibrary(), "cell_1");
         EDIFPort busOutput = cell.createPort(portName, EDIFDirection.OUTPUT, width);
         Assertions.assertEquals(busName, busOutput.getBusName());
+    }
+    
+    @Test
+    public void testExportOfSingleBitBusses(@TempDir Path tempDir) {
+        final EDIFNetlist netlist = EDIFTools.createNewNetlist("testExportOfSingleBitBusses");
+        String cellName = "cell_1";
+        String portName = "single_bit_bus[0:0]";
+        EDIFCell cell = new EDIFCell(netlist.getWorkLibrary(), cellName);
+        EDIFPort busOutput = cell.createPort(portName, EDIFDirection.OUTPUT, 1);
+
+        Assertions.assertTrue(busOutput.isBus());
+        Assertions.assertEquals(1, busOutput.getWidth());
+
+        Path edifOutput = tempDir.resolve("output.edf");
+        netlist.exportEDIF(edifOutput);
+
+        EDIFNetlist readEdif = EDIFTools.readEdifFile(edifOutput);
+        
+        // Ensure export and parsing of EDIF single bit bus results in a single bit bus
+        EDIFPort port = readEdif.getCell(cellName).getPort(busOutput.getBusName());
+        Assertions.assertNotNull(port);
+        Assertions.assertTrue(port.isBus());
+        Assertions.assertEquals(1, port.getWidth());
     }
 }
