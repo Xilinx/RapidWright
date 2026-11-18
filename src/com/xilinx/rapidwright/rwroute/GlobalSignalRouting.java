@@ -1033,7 +1033,7 @@ public class GlobalSignalRouting {
      * @param tail The routethru's end node.
      * @return True if the routethru can be used.
      */
-    private static boolean isRouteThruAvailable(Design design, Net net, Node head, Node tail) {
+    public static boolean isRouteThruAvailable(Design design, Net net, Node head, Node tail) {
         SitePin inPin = head.getSitePin();
         SitePin outPin = tail.getSitePin();
         if (inPin == null || outPin == null) {

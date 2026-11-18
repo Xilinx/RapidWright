@@ -53,6 +53,7 @@ import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
+import com.xilinx.rapidwright.rwroute.GlobalSignalRouting;
 import com.xilinx.rapidwright.rwroute.NodeStatus;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
 import com.xilinx.rapidwright.rwroute.RouterHelper.NodeWithPrev;
@@ -687,6 +688,13 @@ public class VersalClockRouting {
                     }
                     IntentCode uphillIntentCode = uphill.getIntentCode();
                     if (!intentCodes.contains(uphillIntentCode)) {
+                        continue;
+                    }
+                    if (deskewFeedback && curr.getIntentCode() == IntentCode.NODE_IRI
+                            && routeThruHelper.isRouteThru(uphill, curr)
+                            && !GlobalSignalRouting.isRouteThruAvailable(design, clk, uphill, curr)) {
+                        // The IRI routethru of the leaf path is not free (its site is used by another net or a
+                        // cell); checked before visiting, as another routethru from the same node may be free
                         continue;
                     }
                     if (!visited.add(uphill)) {
