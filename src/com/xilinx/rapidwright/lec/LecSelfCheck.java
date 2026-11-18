@@ -28,7 +28,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -247,6 +249,7 @@ public class LecSelfCheck {
         int[] rootPinInst;
         int[] rootPinBit;
         List<LutSite> cleanSites;
+        ClockFunctions clocks;   // built on first use, shared by every candidate
 
         void indexFanout() {
             int roots = conn.getRootCount();
@@ -1358,17 +1361,60 @@ public class LecSelfCheck {
     }
 
     /**
+     * The functions of the clock nodes of a netlist's registers, built once per
+     * mutation attempt and shared by every register it tries.
+     */
+    private final class ClockFunctions {
+
+        private final Map<Integer, Integer> litOfRoot = new HashMap<>();
+
+        private final EquivalenceEngine engine;
+
+        ClockFunctions(Context ctx) {
+            Aig aig = new Aig();
+            ConeBuilder cones = new ConeBuilder(ctx.flat, ctx.conn,
+                    new CellClassifier(ctx.series, config, quiet), aig, ctx.series, quiet,
+                    "IMP");
+            for (int id : ctx.flat.getLeafInstIds()) {
+                if (!ctx.flat.getCellTypeName(id).startsWith("FD")) {
+                    continue;
+                }
+                int root = rootOf(ctx, id, "C");
+                if (root >= 0 && !litOfRoot.containsKey(root)) {
+                    litOfRoot.put(root, cones.literalOfNetRoot(root));
+                }
+            }
+            // After every cone is built, so the engine sees the whole graph
+            engine = new EquivalenceEngine(aig, config, quiet);
+        }
+
+        /**
+         * @return True only if the two register clock nodes are proven to carry
+         *         different functions: equal or undecided ones are not.
+         */
+        boolean differ(int root, int otherRoot) {
+            EquivalenceEngine.Task task = new EquivalenceEngine.Task("clock",
+                    litOfRoot.get(root), litOfRoot.get(otherRoot));
+            engine.run(Collections.singletonList(task));
+            return task.getVerdict().getKind() == ConeVerdict.Kind.DIFFERENT;
+        }
+    }
+
+    /**
      * Moves the register to the clock net of a register in another clock
-     * domain: one whose clock is a different function, not merely a different
-     * net. A replica of the same clock behind a transparent buffer is the same
-     * clock, and moving to it must not be detected.
+     * domain: one whose clock is proven to be a different function, not merely
+     * a different net or a different graph. A replica of the same clock behind
+     * a transparent buffer, or the same function built another way, is the
+     * same clock, and moving to it must not be detected.
      */
     private String moveClock(Context ctx, int id) {
         int own = rootOf(ctx, id, "C");
-        ConeBuilder cones = new ConeBuilder(ctx.flat, ctx.conn,
-                new CellClassifier(ctx.series, config, quiet), new Aig(), ctx.series, quiet,
-                "IMP");
-        int ownClock = own < 0 ? Aig.FALSE : cones.literalOfNetRoot(own);
+        if (own < 0) {
+            return null;
+        }
+        if (ctx.clocks == null) {
+            ctx.clocks = new ClockFunctions(ctx);
+        }
         for (int other : ctx.flat.getLeafInstIds()) {
             if (!ctx.flat.getCellTypeName(other).startsWith("FD")) {
                 continue;
@@ -1380,7 +1426,7 @@ public class LecSelfCheck {
             // instances of one cell can be clocked differently through the
             // same local net, and moving to it would change nothing
             if (root < 0 || root == own || ctx.flat.getParent(other) != ctx.flat.getParent(id)
-                    || cones.literalOfNetRoot(root) == ownClock) {
+                    || !ctx.clocks.differ(own, root)) {
                 continue;
             }
             EDIFNet clock = donor.getPortInst("C").getNet();

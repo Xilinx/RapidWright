@@ -189,6 +189,12 @@ public class CellClassifier {
                         + "' cannot be read";
             }
         }
+        // The gate opens only once I has been low after configuration, so a
+        // buffer whose I is tied high never passes it. Any tied I keeps the
+        // buffer the terminal it was before buffers were modelled.
+        if (isTied(flat, conn, instId, "I")) {
+            return "whose I is tied to a constant";
+        }
         if (!isTiedTo(flat, conn, instId, "CE", true)) {
             return "whose CE is not tied active";
         }
@@ -210,6 +216,26 @@ public class CellClassifier {
             v = v.substring(1, v.length() - 1).trim();
         }
         return v;
+    }
+
+    /**
+     * @return True if the pin is missing, unconnected, on a net with no
+     *         driver, or on a constant node.
+     */
+    private static boolean isTied(FlatNetlist flat, Connectivity conn, int instId,
+            String pinName) {
+        int bit = flat.getIndex(instId).portBitIndexOfPinName(pinName);
+        if (bit < 0) {
+            return true;
+        }
+        int pin = flat.getGlobalPin(instId, bit);
+        int root = pin < 0 ? -1 : conn.getPinRoot(pin);
+        if (root < 0) {
+            return true;
+        }
+        byte kind = conn.getRootKind(root);
+        return kind == Connectivity.CONST0 || kind == Connectivity.CONST1
+                || kind == Connectivity.UNDRIVEN;
     }
 
     /**

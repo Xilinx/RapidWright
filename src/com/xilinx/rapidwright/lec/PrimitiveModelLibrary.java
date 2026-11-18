@@ -127,7 +127,9 @@ public class PrimitiveModelLibrary {
      * functions after configuration: a buffer's delay, its skew between
      * replicas and its routing resources are timing, not function, and are not
      * compared. {@code BUFG} has no control input at all; {@code BUFG_FABRIC}
-     * neither.
+     * neither. In the vendor simulation models both are plain buffers with no
+     * gate, so the start-up assumption of the gated buffers below does not
+     * arise for them.
      */
     private static void addClockBuffers(Set<String> types) {
         types.add("BUFG");
@@ -143,9 +145,9 @@ public class PrimitiveModelLibrary {
      * each instance decides whether it is used.
      *
      * <ul>
-     * <li>{@code BUFGCE}: {@code CE} tied active, {@code CE_TYPE} absent,
-     * {@code SYNC} or {@code ASYNC}, and {@code STARTUP_SYNC} absent or
-     * {@code FALSE}.</li>
+     * <li>{@code BUFGCE}: {@code I} not tied to a constant, {@code CE} tied
+     * active, {@code CE_TYPE} absent, {@code SYNC} or {@code ASYNC}, and
+     * {@code STARTUP_SYNC} absent or {@code FALSE}.</li>
      * <li>{@code BUFGCE_DIV}: the same, and also {@code CLR} tied inactive,
      * {@code HARDSYNC_CLR} absent or {@code FALSE}, and {@code BUFGCE_DIVIDE}
      * absent or 1. A divider by any other value is not a buffer: its output
@@ -171,12 +173,20 @@ public class PrimitiveModelLibrary {
      * <li>{@code STARTUP_SYNC TRUE} holds the output until the buffer has
      * synchronised to the end of configuration, which an unbuffered net does
      * not do, so such a buffer stays a terminal.</li>
-     * <li>After configuration, a buffer with the default {@code SYNC} enable
-     * starts with its gate closed until its input first goes low, as in the
-     * vendor simulation models. The check compares the steady state, in which
-     * the buffer is combinationally transparent: the same assumption the
-     * vendor tool makes when its own optimisation inserts such buffers on
-     * device-wide control nets.</li>
+     * <li>After configuration the gate is closed, and it opens only once
+     * {@code I} has been low: always for {@code BUFGCE_DIV}, and for
+     * {@code BUFGCE} with the default {@code SYNC} enable, as in the vendor
+     * simulation models. A buffer whose {@code I} never goes low therefore
+     * drives a constant low. The check rules out the cases it can see: a
+     * buffer whose {@code I} is tied to a constant stays a terminal, and one
+     * whose {@code I} cone is constantly high gets an unknown output, which
+     * leaves its loads unproven. For any other {@code I} it assumes that
+     * {@code I} is low at some point after configuration, and compares the
+     * steady state that follows, in which the buffer is combinationally
+     * transparent. That is not proven: an {@code I} driven by a register that
+     * keeps an initial value of 1, or by a port held high, breaks it. The
+     * vendor tool makes the same assumption when its own optimisation inserts
+     * such buffers on device-wide control nets.</li>
      * <li>{@code SIM_DEVICE} and other simulation-only attributes have no
      * effect on the function.</li>
      * </ul>

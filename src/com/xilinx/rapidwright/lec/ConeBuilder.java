@@ -431,6 +431,16 @@ public class ConeBuilder {
         PrimitiveModel model = library.get(flat.getCellTypeName(owner));
         int lit = model.build(aig, flat.getIndex(owner), flat.getInst(owner), bit,
                 frameLits[frame]);
+        if (lit == Aig.TRUE && PrimitiveModelLibrary.isConditional(flat.getCellTypeName(owner))) {
+            // A transparent gated clock buffer passes I only once I has been low
+            // after configuration. Logic that makes I constantly high (a tied I
+            // keeps the buffer a terminal) never opens the gate, so the output
+            // is unknown: an unstable variable leaves its loads unproven.
+            log.warn(UNMODELED_OUTPUT, flat.getCellTypeName(owner) + "."
+                    + flat.getIndex(owner).getPortBitName(bit) + " with I constantly high",
+                    flat.getInstName(owner));
+            lit = unstableInput(TerminalKey.OPAQUE_PREFIX, unstablePinName(owner, bit));
+        }
         litOf[pin] = lit;
         state[pin] = BLACK;
         pop();

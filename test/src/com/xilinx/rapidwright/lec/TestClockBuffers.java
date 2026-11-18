@@ -613,6 +613,37 @@ public class TestClockBuffers {
                 "en_buf");
     }
 
+    /**
+     * A gated buffer opens only once its input has been low, so one whose
+     * input is tied high never passes it: with its enable tied active too, it
+     * must not be proven equal to the bare constant. A tied input keeps the
+     * buffer a terminal; an input that logic holds constantly high leaves the
+     * loads unproven.
+     */
+    @Test
+    public void testConstantInputIsNotTransparent() {
+        Circuit ref = bank(new Circuit(false, VERSAL_PART), fill("vcc"), fill("rst"));
+        for (String type : new String[] { "BUFGCE", "BUFGCE_DIV" }) {
+            Circuit imp = new Circuit(false, VERSAL_PART);
+            if (type.equals("BUFGCE")) {
+                imp.bufgce("en_buf", "vcc", "en_g", "vcc");
+            } else {
+                imp.bufgceDiv("en_buf", "vcc", "en_g", "vcc", "gnd");
+            }
+            assertKept(check(ref, bank(imp, fill("en_g"), fill("rst"))),
+                    type + " whose I is tied to a constant");
+            ref = bank(new Circuit(false, VERSAL_PART), fill("vcc"), fill("rst"));
+        }
+        Circuit logic = new Circuit(false, VERSAL_PART).lut("one", "2'h3", "one_o", "a")
+                .bufgce("en_buf", "one_o", "en_g", "vcc");
+        LecHarness result = check(ref, bank(logic, fill("en_g"), fill("rst")));
+        result.assertFail();
+        Assertions.assertTrue(result.getOutput().contains(ConeBuilder.UNMODELED_OUTPUT
+                + ": BUFGCE.O with I constantly high"), result.getOutput());
+        Assertions.assertTrue(result.getReport().getCount(LecDifferenceType.CONE_INCONCLUSIVE) > 0,
+                result.getOutput());
+    }
+
     // ------------------------------------------------------ around buffers
 
     /** Two buffered clocks, with one load moved from one to the other. */
@@ -700,29 +731,68 @@ public class TestClockBuffers {
                     c.flop("FDRE", "z", "c", "qz", "vcc", "gnd", "clk2", null).out("qz", "qz");
                 }
             }
-            Path refFile = dir.resolve("ref.edf");
-            Path impFile = dir.resolve("imp.edf");
-            EDIFTools.writeEDIFFile(refFile, ref.netlist(),
-                    LecNetlistFixtures.ULTRASCALE_PLUS_PART);
-            EDIFTools.writeEDIFFile(impFile, imp.netlist(),
-                    LecNetlistFixtures.ULTRASCALE_PLUS_PART);
-            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-            PrintStream original = System.out;
-            int exit;
-            try {
-                System.setOut(new PrintStream(buffer));
-                exit = new LecSelfCheck(refFile, impFile, map("IMP r = REF f/O")).run();
-            } finally {
-                System.setOut(original);
-            }
-            String output = buffer.toString();
-            Assertions.assertEquals(LogicEquivalenceChecker.EXIT_PASS, exit, output);
-            String line = Arrays.stream(output.split("\\R"))
-                    .filter(l -> l.startsWith("retimed register moved to another clock"))
-                    .findFirst().orElse("");
-            Assertions.assertEquals(!secondClock, line.contains("SKIPPED"), output);
-            Assertions.assertEquals(secondClock, line.contains("clk2"), output);
+            String line = moveClockCase(dir, ref, imp);
+            Assertions.assertEquals(!secondClock, line.contains("SKIPPED"), line);
+            Assertions.assertEquals(secondClock, line.contains("clk2"), line);
         }
+    }
+
+    /**
+     * Two gated clocks that compute the same function through differently
+     * grouped look up tables, {@code (c & d) & clk} and {@code c & (d & clk)}:
+     * the self-check must not take one for another clock.
+     */
+    @Test
+    public void testSelfCheckSameClockFunctionIsNotAnotherClock(@TempDir Path dir)
+            throws IOException {
+        Circuit ref = new Circuit()
+                .lut("k1", "4'h8", "k1o", "c", "d")
+                .lut("g1", "4'h8", "clk_g1", "k1o", "clk")
+                .flop("FDRE", "ra", "a", "qa", "vcc", "gnd", "clk_g1", null)
+                .flop("FDRE", "rb", "b", "qb", "vcc", "gnd", "clk_g1", null)
+                .lut("f", "4'h8", "fo", "qa", "qb")
+                .flop("FDRE", "out", "fo", "q", "vcc", "gnd", "clk_g1", null)
+                .out("q", "q");
+        Circuit imp = new Circuit()
+                .lut("k1", "4'h8", "k1o", "c", "d")
+                .lut("g1", "4'h8", "clk_g1", "k1o", "clk")
+                .lut("k2", "4'h8", "k2o", "d", "clk")
+                .lut("g2", "4'h8", "clk_g2", "c", "k2o")
+                .lut("f", "4'h8", "fo", "a", "b")
+                .flop("FDRE", "r", "fo", "qr", "vcc", "gnd", "clk_g1", null)
+                .flop("FDRE", "out", "qr", "q", "vcc", "gnd", "clk_g2", null)
+                .out("q", "q");
+        String line = moveClockCase(dir, ref, imp);
+        Assertions.assertTrue(line.contains("SKIPPED"), line);
+    }
+
+    /**
+     * Runs the self-check campaign with register {@code r} retimed, which must
+     * meet every expectation.
+     *
+     * @return The campaign's line for the case that moves {@code r} to another
+     *         clock.
+     */
+    private static String moveClockCase(Path dir, Circuit ref, Circuit imp)
+            throws IOException {
+        Path refFile = dir.resolve("ref.edf");
+        Path impFile = dir.resolve("imp.edf");
+        EDIFTools.writeEDIFFile(refFile, ref.netlist(), LecNetlistFixtures.ULTRASCALE_PLUS_PART);
+        EDIFTools.writeEDIFFile(impFile, imp.netlist(), LecNetlistFixtures.ULTRASCALE_PLUS_PART);
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        PrintStream original = System.out;
+        int exit;
+        try {
+            System.setOut(new PrintStream(buffer));
+            exit = new LecSelfCheck(refFile, impFile, map("IMP r = REF f/O")).run();
+        } finally {
+            System.setOut(original);
+        }
+        String output = buffer.toString();
+        Assertions.assertEquals(LogicEquivalenceChecker.EXIT_PASS, exit, output);
+        return Arrays.stream(output.split("\\R"))
+                .filter(l -> l.startsWith("retimed register moved to another clock"))
+                .findFirst().orElse(output);
     }
 
     // ---------------------------------------------------------------- builder
