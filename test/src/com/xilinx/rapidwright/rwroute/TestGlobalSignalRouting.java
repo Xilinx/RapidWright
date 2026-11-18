@@ -1420,4 +1420,60 @@ public class TestGlobalSignalRouting {
                     && pip.getEndNode().equals(cascadeNode)));
         }
     }
+
+    /**
+     * A clock driving the deskew feedback input (CLKFB1_DESKEW) of an XPLL, as in the digital deskew
+     * of memory interface PHYs: the input must be routed as a leaf of the clock tree (from a leaf clock
+     * buffer through the IRI clock input of an interface tile into the feedback mux of the clock tile,
+     * as Vivado does), not through the shorter path from the clock distribution into that mux, which
+     * would shift the deskewed XPLL output clock against the other loads of the clock. When no leaf
+     * path is available (here: the IRI nodes are used by other nets), the input is still routed from
+     * the clock distribution.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "true,false",
+            "false,false",
+            "true,true"
+    })
+    public void testVersalXPLLDeskewFeedbackClockRouting(boolean fabricLoad, boolean blockIri) {
+        Design design = new Design("versal_xpll_deskew_feedback", "xcvc1902-vsva2197-2MP-e-S");
+        Device device = design.getDevice();
+        Net clk = design.createNet("clk");
+        clk.connect(design.createAndPlaceCell("bufgce", Unisim.BUFGCE, "BUFGCE_X0Y0/BUFCE"), "O");
+        if (fabricLoad) {
+            clk.connect(design.createAndPlaceCell("ff", Unisim.FDRE, "SLICE_X44Y62/AFF"), "C");
+        }
+        design.routeSites();
+        SitePinInst feedback = clk.createPin("CLKFB1_DESKEW", design.createSiteInst(device.getSite("XPLL_X0Y0")));
+
+        GlobalSignalRouting.symmetricClkRouting(clk, device,
+                (n) -> blockIri && n.getIntentCode() == IntentCode.NODE_IRI ? NodeStatus.UNAVAILABLE
+                        : NodeStatus.AVAILABLE,
+                new HashMap<>());
+
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        Assertions.assertTrue(feedback.isRouted());
+        Map<Node, Node> driver = new HashMap<>();
+        for (PIP pip : clk.getPIPs()) {
+            Node start = pip.isReversed() ? pip.getEndNode() : pip.getStartNode();
+            Node end = pip.isReversed() ? pip.getStartNode() : pip.getEndNode();
+            Node other = driver.put(end, start);
+            Assertions.assertTrue(other == null || other.equals(start), "Node " + end + " driven twice");
+        }
+        // Walk from the feedback input back to the clock source
+        Node sourceNode = clk.getSource().getConnectedNode();
+        List<Node> path = new ArrayList<>();
+        for (Node n = feedback.getConnectedNode(); !sourceNode.equals(n); n = driver.get(n)) {
+            Assertions.assertNotNull(n, "Path " + path + " not driven");
+            Assertions.assertTrue(path.size() < 100, "Loop on path " + path);
+            path.add(n);
+        }
+        Node mux = path.get(1);
+        Assertions.assertEquals(IntentCode.NODE_GLOBAL_GCLK, mux.getIntentCode());
+        boolean throughLeaf = path.stream().anyMatch((n) -> n.getIntentCode() == IntentCode.NODE_GLOBAL_LEAF);
+        Assertions.assertEquals(!blockIri, throughLeaf, path.toString());
+        Assertions.assertEquals(blockIri ? IntentCode.NODE_GLOBAL_GCLK : IntentCode.NODE_IRI,
+                path.get(2).getIntentCode(), path.toString());
+    }
 }

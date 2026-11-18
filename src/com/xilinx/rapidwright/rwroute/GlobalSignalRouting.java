@@ -288,6 +288,11 @@ public class GlobalSignalRouting {
         // Use the actual selected LCBs as distribution targets instead of a superset
         // of possible neighboring regions.
         Map<Node, List<SitePinInst>> lcbMappings = VersalClockRouting.routeLCBsToSinks(clk, getNodeStatus);
+        // XPLL deskew feedback inputs that were given a leaf clock buffer are routed as leaves of the
+        // clock tree, not from the clock distribution
+        List<SitePinInst> nonLCBPins = usedCRsAndNonLCBPinsTuple.getSecond();
+        nonLCBPins.removeIf((p) -> VersalClockRouting.isDeskewFeedbackPin(p)
+                && lcbMappings.values().stream().anyMatch((pins) -> pins.contains(p)));
         Set<ClockRegion> usedClockRegions = getClockRegionsOfNodes(lcbMappings.keySet());
         if (usedClockRegions.isEmpty()) {
             usedClockRegions = usedCRsAndNonLCBPinsTuple.getFirst();
@@ -295,7 +300,7 @@ public class GlobalSignalRouting {
         if (usedClockRegions.isEmpty()) {
             // No sinks reached through leaf clock buffers (e.g. a clock buffer only driving
             // the input of another clock buffer): no clock tree needed, route straight from the source
-            VersalClockRouting.routeNonLCBPins(clk, usedCRsAndNonLCBPinsTuple.getSecond(), getNodeStatus);
+            VersalClockRouting.routeNonLCBPins(clk, nonLCBPins, getNodeStatus);
             return;
         }
         SitePinInst source = clk.getSource();
@@ -379,7 +384,7 @@ public class GlobalSignalRouting {
                         false, getNodeStatus);
 
         // Route non-LCB driven pins (such as driving clocks off chip via an IOB)
-        VersalClockRouting.routeNonLCBPins(clk, usedCRsAndNonLCBPinsTuple.getSecond(), getNodeStatus);
+        VersalClockRouting.routeNonLCBPins(clk, nonLCBPins, getNodeStatus);
 
         VersalClockRouting.routeDistributionToLCBs(clk, upDownDistLines, lcbMappings, getNodeStatus);
 
