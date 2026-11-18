@@ -510,6 +510,10 @@ public class NOCDesign implements Serializable {
             }
             for (NOCClient clt : getClients().values()) {
                 String loc = clt.getLocation();
+                if (loc == null) {
+                    // Not placed (e.g. not listed in the loaded solution): a component needs a site name
+                    continue;
+                }
                 phyComponents.remove(loc);
                 int numPorts = 1;
                 if (clt.isDDRC()) {

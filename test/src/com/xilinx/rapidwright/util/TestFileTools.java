@@ -23,15 +23,27 @@
 package com.xilinx.rapidwright.util;
 
 import java.io.BufferedInputStream;
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.io.UncheckedIOException;
 import java.lang.management.ManagementFactory;
+import java.net.InetAddress;
+import java.net.URL;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
@@ -202,5 +214,89 @@ public class TestFileTools {
         FileTools.unzipFile(zip.toString(), bad.toString());
         Assertions.assertTrue(Files.exists(bad.resolve("a.txt")));
         Assertions.assertFalse(Files.exists(bad.resolve("b.txt")));
+    }
+
+    /**
+     * Serves the given body for each request, as a response that claims its full length but whose
+     * connection is closed after only the given number of bytes of it, for each of the first
+     * truncatedResponses requests (as a server can do while a download looks successful), then in
+     * full. Runs until the returned socket is closed.
+     */
+    private static ServerSocket serveTruncated(byte[] body, int truncatedResponses, int bytesSent,
+                                               AtomicInteger requests) throws IOException {
+        ServerSocket server = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
+        Thread thread = new Thread(() -> {
+            while (!server.isClosed()) {
+                try (Socket socket = server.accept()) {
+                    // Read the request up to the blank line that ends its headers
+                    BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream(),
+                            StandardCharsets.US_ASCII));
+                    for (String line = in.readLine(); line != null && !line.isEmpty(); line = in.readLine()) {
+                    }
+                    boolean truncated = requests.getAndIncrement() < truncatedResponses;
+                    OutputStream out = socket.getOutputStream();
+                    out.write(("HTTP/1.1 200 OK\r\nContent-Length: " + body.length
+                            + "\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+                    out.write(body, 0, truncated ? bytesSent : body.length);
+                    out.flush();
+                } catch (IOException e) {
+                    // Closed
+                }
+            }
+        });
+        thread.setDaemon(true);
+        thread.start();
+        return server;
+    }
+
+    private static byte[] randomBytes(int length) {
+        byte[] bytes = new byte[length];
+        new Random(0).nextBytes(bytes);
+        return bytes;
+    }
+
+    private static void assertNoTemporaryFiles(Path dir) throws IOException {
+        try (Stream<Path> files = Files.list(dir)) {
+            Assertions.assertEquals(0, files.filter((f) -> f.getFileName().toString().endsWith(".part")).count());
+        }
+    }
+
+    @Test
+    public void testDownloadDataFileRetriesTruncatedDownload(@TempDir Path dir) throws IOException {
+        byte[] body = randomBytes(100000);
+        String md5 = Installer.calculateMD5OfStream(new ByteArrayInputStream(body));
+        Path dst = dir.resolve("sub").resolve("data.dat");
+        AtomicInteger requests = new AtomicInteger();
+        try (ServerSocket server = serveTruncated(body, 2, 1000, requests)) {
+            String url = new URL("http", server.getInetAddress().getHostAddress(), server.getLocalPort(), "/data")
+                    .toString();
+            // The first two downloads end early without any error, so are only found invalid by their md5sum
+            Assertions.assertEquals(md5, FileTools.downloadDataFile(url, dst, md5, 3, 1));
+        }
+        Assertions.assertEquals(3, requests.get());
+        Assertions.assertArrayEquals(body, Files.readAllBytes(dst));
+        assertNoTemporaryFiles(dst.getParent());
+    }
+
+    @Test
+    public void testDownloadDataFileFailureKeepsExistingFile(@TempDir Path dir) throws IOException {
+        byte[] body = randomBytes(100000);
+        String md5 = Installer.calculateMD5OfStream(new ByteArrayInputStream(body));
+        Path dst = dir.resolve("data.dat");
+        byte[] existing = "existing".getBytes(StandardCharsets.US_ASCII);
+        Files.write(dst, existing);
+        AtomicInteger requests = new AtomicInteger();
+        try (ServerSocket server = serveTruncated(body, Integer.MAX_VALUE, 1000, requests)) {
+            String url = new URL("http", server.getInetAddress().getHostAddress(), server.getLocalPort(), "/data")
+                    .toString();
+            RuntimeException e = Assertions.assertThrows(RuntimeException.class,
+                    () -> FileTools.downloadDataFile(url, dst, md5, 3, 1));
+            Assertions.assertTrue(e.getMessage().contains("after 3 attempts"), e.getMessage());
+            Assertions.assertTrue(e.getMessage().contains("downloaded 1000 bytes"), e.getMessage());
+        }
+        Assertions.assertEquals(3, requests.get());
+        // An invalid download never replaces the file there
+        Assertions.assertArrayEquals(existing, Files.readAllBytes(dst));
+        assertNoTemporaryFiles(dir);
     }
 }

@@ -39,6 +39,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicIntegerArray;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -589,6 +590,26 @@ public class TestParallelismTools {
                 Assertions.assertThrows(IllegalStateException.class, () -> ParallelismTools.get(failed)));
     }
 
+    /** A way to wait for a CompletableFuture, which returns its value */
+    private interface Wait {
+        Thread waitFor(CompletableFuture<Thread> future) throws Exception;
+    }
+
+    /**
+     * Attempts of each check of {@link #testSupplyAsyncOwnWaitRunsUnclaimedTask()}: keeping every thread of the pool
+     * busy does not stop a thread outside the test from claiming a task supplied meanwhile (e.g. a spare thread of the
+     * pool finishing a task of an earlier test, which then looks for more work), in which case the check is repeated.
+     */
+    private static final int UNCLAIMED_TASK_ATTEMPTS = 100;
+
+    /** Asserts that waiting for a task supplied, unless another thread claims it first, runs it on this thread */
+    private static void assertWaitRunsUnclaimedTask(Wait wait) throws Exception {
+        Thread self = Thread.currentThread();
+        for (int attempt = 1; wait.waitFor(ParallelismTools.supplyAsync(Thread::currentThread)) != self; attempt++) {
+            Assertions.assertTrue(attempt < UNCLAIMED_TASK_ATTEMPTS, "Never run by the waiting thread");
+        }
+    }
+
     /**
      * A task given to supplyAsync() that no thread of the pool has started yet is run by the thread waiting for its
      * CompletableFuture with the CompletableFuture's own get(), timed get() or join(), rather than that thread only
@@ -615,20 +636,42 @@ public class TestParallelismTools {
             started.await();
             Thread self = Thread.currentThread();
 
-            Assertions.assertSame(self, ParallelismTools.supplyAsync(Thread::currentThread).get());
+            assertWaitRunsUnclaimedTask(CompletableFuture::get);
             // Run to the end, whatever the timeout
-            Assertions.assertSame(self,
-                    ParallelismTools.supplyAsync(Thread::currentThread).get(1, TimeUnit.MILLISECONDS));
-            Assertions.assertSame(self, ParallelismTools.supplyAsync(Thread::currentThread).join());
+            assertWaitRunsUnclaimedTask(future -> {
+                try {
+                    return future.get(1, TimeUnit.MILLISECONDS);
+                } catch (TimeoutException e) {
+                    // Only if another thread claimed it first, and is still running it: join() then returns its value
+                    Thread ranOn = future.join();
+                    Assertions.assertNotSame(self, ranOn);
+                    return ranOn;
+                }
+            });
+            assertWaitRunsUnclaimedTask(CompletableFuture::join);
 
             // When interrupted, get() throws (clearing the interrupt status) without running it, as a Future's get()
             // does if it would wait; join() is not interruptible, so then runs it
-            CompletableFuture<Thread> future = ParallelismTools.supplyAsync(Thread::currentThread);
-            self.interrupt();
-            Assertions.assertThrows(InterruptedException.class, future::get);
-            Assertions.assertFalse(Thread.interrupted());
-            Assertions.assertFalse(future.isDone());
-            Assertions.assertSame(self, future.join());
+            for (int attempt = 1; ; attempt++) {
+                CompletableFuture<Thread> future = ParallelismTools.supplyAsync(Thread::currentThread);
+                self.interrupt();
+                boolean threw = false;
+                try {
+                    future.get();
+                } catch (InterruptedException e) {
+                    threw = true;
+                }
+                // Cleared if get() threw; otherwise still set, as get() returns without waiting for a task done
+                Assertions.assertNotEquals(threw, Thread.interrupted());
+                boolean doneAfterGet = future.isDone();
+                Thread ranOn = future.join();
+                if (threw && !doneAfterGet && ranOn == self) {
+                    break;
+                }
+                // Another thread claimed it, before get() (which then returns its value) or after: get() did not run it
+                Assertions.assertNotSame(self, ranOn);
+                Assertions.assertTrue(attempt < UNCLAIMED_TASK_ATTEMPTS, "Never run by the waiting thread");
+            }
         } finally {
             release.countDown();
             ParallelismTools.setParallel(wasParallel);

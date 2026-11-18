@@ -25,12 +25,20 @@ package com.xilinx.rapidwright.design.noc;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.TreeMap;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -39,6 +47,7 @@ import org.junit.jupiter.api.io.TempDir;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.FileTools;
 
 public class TestNOCDesign {
 
@@ -449,5 +458,96 @@ public class TestNOCDesign {
         Assertions.assertFalse(reread.getMasterClients().get("nmu").isVirtual());
         Assertions.assertTrue(reread.getMasterClients().get("nmu").getExternalConnections().isEmpty());
         Assertions.assertNull(reread.getAllConnections().get(0).getExclusiveGroup());
+    }
+
+    private static String readDCPEntry(ZipFile dcp, String suffix) throws IOException {
+        for (ZipEntry e : Collections.list(dcp.entries())) {
+            if (e.getName().endsWith(suffix)) {
+                return String.join("\n", FileTools.getLinesFromInputStream(dcp.getInputStream(e)));
+            }
+        }
+        throw new IOException("No " + suffix + " entry in " + dcp.getName());
+    }
+
+    /** Counts solution components by content, regardless of the order of the components and of their fields */
+    private static Map<String, Integer> componentCounts(JSONObject solution) {
+        Map<String, Integer> counts = new HashMap<>();
+        JSONArray comps = solution.getJSONArray("Components");
+        for (int i = 0; i < comps.length(); i++) {
+            counts.merge(new TreeMap<>(comps.getJSONObject(i).toMap()).toString(), 1, Integer::sum);
+        }
+        return counts;
+    }
+
+    private static JSONObject writeSolution(NOCDesign noc) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        noc.writeSolution(out);
+        JSONObject solution = new JSONObject(new String(out.toByteArray(), StandardCharsets.UTF_8));
+        JSONArray comps = solution.getJSONArray("Components");
+        for (int i = 0; i < comps.length(); i++) {
+            Assertions.assertTrue(comps.getJSONObject(i).has("Name"), comps.getJSONObject(i).toString());
+        }
+        return solution;
+    }
+
+    /**
+     * Traffic clients that a NoC solution does not place (it lists no component for them) have no
+     * location. Writing the solution back must not list them either: a component without a site name
+     * makes the whole NoC solution invalid for Vivado.
+     */
+    @Test
+    public void testSolutionWithUnplacedClients() throws IOException {
+        String traffic;
+        String solution;
+        try (ZipFile dcp = new ZipFile(RapidWrightDCP.getPath("noc_tutorial_routed.dcp").toFile())) {
+            traffic = readDCPEntry(dcp, ".nts");
+            solution = readDCPEntry(dcp, ".ncr");
+        }
+        // Add a copy of a NoC master and of a memory controller (several ports) that are not in the solution
+        JSONObject trafficJSON = new JSONObject(traffic);
+        JSONArray clients = trafficJSON.getJSONArray("LogicalInstances");
+        List<String> unplaced = new ArrayList<>();
+        for (int i = 0, n = clients.length(); i < n; i++) {
+            JSONObject client = clients.getJSONObject(i);
+            String copyName = client.getBoolean("IsMaster") ? "unplaced_master"
+                    : client.getString("CompType").equals("DDRC") ? "unplaced_ddrc" : null;
+            if (copyName != null && !unplaced.contains(copyName)) {
+                JSONObject copy = new JSONObject(client.toString());
+                copy.put("Name", copyName);
+                clients.put(copy);
+                unplaced.add(copyName);
+            }
+        }
+        Assertions.assertEquals(2, unplaced.size());
+
+        Design d = new Design("noc", "xcvc1902-vsva2197-2MP-e-S");
+        NOCDesign noc = new NOCDesign(d);
+        noc.loadTraffic(new ByteArrayInputStream(trafficJSON.toString().getBytes(StandardCharsets.UTF_8)));
+        noc.loadSolution(new ByteArrayInputStream(solution.getBytes(StandardCharsets.UTF_8)));
+        for (String name : unplaced) {
+            Assertions.assertNull(noc.getClients().get(name).getLocation(), name);
+        }
+
+        // Written back unchanged: the same components (in any order) and the same paths
+        JSONObject orig = new JSONObject(solution);
+        JSONObject written = writeSolution(noc);
+        Assertions.assertEquals(componentCounts(orig), componentCounts(written));
+        Assertions.assertEquals(orig.getJSONArray("Paths").length(), written.getJSONArray("Paths").length());
+
+        // A client unplaced after loading is not listed either; its former site is written out unused
+        NOCClient nmu = noc.getAllConnections().get(0).getSource();
+        String site = nmu.getLocation();
+        nmu.setLocation(null);
+        JSONArray comps = writeSolution(noc).getJSONArray("Components");
+        int siteEntries = 0;
+        for (int i = 0; i < comps.length(); i++) {
+            JSONObject c = comps.getJSONObject(i);
+            Assertions.assertNotEquals(nmu.getName(), c.optString("TrafficLInst"));
+            if (c.getString("Name").equals(site)) {
+                siteEntries++;
+                Assertions.assertEquals(0, c.getInt("DestId"));
+            }
+        }
+        Assertions.assertEquals(1, siteEntries);
     }
 }
