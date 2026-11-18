@@ -27,7 +27,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Thu Jun 11 14:46:47 MDT 2026
+ * Generated on: Wed Nov 11 16:04:54 MST 2026
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  *
  * Set of all Supported Xilinx families in RapidWright
@@ -42,6 +42,7 @@ public enum FamilyType {
         ASPARTAN7,
         ASPARTANUPLUS,
         AVERSALAIEDGE,
+        AVERSALAIEDGE2,
         AZYNQ,
         AZYNQUPLUS,
         KINTEX7,
@@ -58,8 +59,10 @@ public enum FamilyType {
         QRVERSALAIEDGE,
         QVERSALAICORE,
         QVERSALAIEDGE,
+        QVERSALAIEDGE2,
         QVERSALPREMIUM,
         QVERSALPRIME,
+        QVERSALPRIME2,
         QVIRTEX7,
         QVIRTEXUPLUS,
         QVIRTEXUPLUSHBM,
@@ -74,6 +77,7 @@ public enum FamilyType {
         VERSALAIEDGE2,
         VERSALHBM,
         VERSALPREMIUM,
+        VERSALPREMIUM2,
         VERSALPRIME,
         VERSALPRIME2,
         VERSALRF,

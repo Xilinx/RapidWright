@@ -20,11 +20,14 @@
 
 package com.xilinx.rapidwright.design.xdc.parser;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.commons.io.FilenameUtils;
 import org.junit.jupiter.api.Assertions;
@@ -32,6 +35,7 @@ import org.junit.jupiter.api.Test;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.design.xdc.XDCParser;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
@@ -130,5 +134,128 @@ public class TestEdifCellLookup {
             Assertions.assertFalse(got.isEmpty(), p);
             Assertions.assertEquals(want.size(), got.size(), p);
         }
+    }
+
+    /** A lookup that counts the children lists it is asked for (one per cell and walk). */
+    private static final class CountingLookup extends RegularEdifCellLookup {
+        final AtomicInteger childLists = new AtomicInteger();
+
+        CountingLookup(EDIFNetlist netlist) {
+            super(netlist);
+        }
+
+        @Override
+        public Stream<? extends EDIFHierCellInst> getChildrenOf(EDIFHierCellInst f) {
+            childLists.incrementAndGet();
+            return super.getChildrenOf(f);
+        }
+    }
+
+    private static List<String> names(Stream<EDIFHierCellInst> cells) {
+        return cells.map(EDIFHierCellInst::getFullHierarchicalInstName).collect(Collectors.toList());
+    }
+
+    private static final int CELLS = 1 + 3 * 6 + 1 + 2 * 6;
+    private static final List<String> FDRE_QUERIES = Arrays.asList(
+            "set a [get_cells -hierarchical -filter {(ORIG_REF_NAME == FDRE || REF_NAME == FDRE)}]",
+            "set b [get_cells -hierarchical -filter {(ORIG_REF_NAME == FDRE || REF_NAME == FDRE)}]");
+
+    /**
+     * Without caching getAllCellInsts walks the hierarchy on every call; with caching once, until the cache is
+     * cleared or caching is turned off. The order is that of allCellInsts(root) either way.
+     */
+    @Test
+    public void testAllCellInstsWalkedOnceWhileCached() {
+        EDIFNetlist nl = netlist();
+        RegularEdifCellLookup plain = new RegularEdifCellLookup(nl);
+        List<String> want = names(plain.allCellInsts(plain.getRoot()));
+        Assertions.assertEquals(CELLS, want.size());
+        CountingLookup lookup = new CountingLookup(nl);
+        Assertions.assertFalse(lookup.isCacheAllCellInsts());
+        Assertions.assertEquals(want, names(lookup.getAllCellInsts()));
+        Assertions.assertEquals(want, names(lookup.getAllCellInsts()));
+        Assertions.assertEquals(2 * CELLS, lookup.childLists.get());
+        lookup.setCacheAllCellInsts(true);
+        for (int i = 0; i < 3; i++) {
+            Assertions.assertEquals(want, names(lookup.getAllCellInsts()));
+            Assertions.assertEquals(3 * CELLS, lookup.childLists.get());
+        }
+        lookup.clearAllCellInstsCache();
+        Assertions.assertEquals(want, names(lookup.getAllCellInsts()));
+        Assertions.assertEquals(4 * CELLS, lookup.childLists.get());
+        lookup.setCacheAllCellInsts(false);
+        Assertions.assertEquals(want, names(lookup.getAllCellInsts()));
+        Assertions.assertEquals(5 * CELLS, lookup.childLists.get());
+    }
+
+    /** getAllCellInsts goes through allCellInsts, so a subclass that prunes the walk is honoured. */
+    @Test
+    public void testAllCellInstsOverrideHonoured() {
+        EDIFNetlist nl = netlist();
+        RegularEdifCellLookup pruned = new RegularEdifCellLookup(nl) {
+            @Override
+            public Stream<EDIFHierCellInst> allCellInsts(EDIFHierCellInst ci) {
+                // (cells of type "mid" without their contents)
+                if (ci.getCellType().getName().equals("mid")) return Stream.of(ci);
+                return super.allCellInsts(ci);
+            }
+        };
+        for (boolean cache : new boolean[] {false, true}) {
+            pruned.setCacheAllCellInsts(cache);
+            List<String> got = names(pruned.getAllCellInsts());
+            Assertions.assertEquals(1 + 3 * 6 + 1, got.size());
+            Assertions.assertTrue(got.contains("m"));
+            Assertions.assertFalse(got.contains("m/s0"));
+        }
+    }
+
+    /**
+     * XDCParser.parseXDC caches the list of all cells for one parse: one walk for all its queries, released when
+     * the parse ends, so a lookup reused across parses sees the netlist as it is at each parse.
+     */
+    @Test
+    public void testParseXdcCachesForOneParse() {
+        EDIFNetlist nl = netlist();
+        CountingLookup lookup = new CountingLookup(nl);
+        XDCParser.parseXDC(nl.getDevice(), FDRE_QUERIES, lookup);
+        Assertions.assertEquals(CELLS, lookup.childLists.get());
+        Assertions.assertFalse(lookup.isCacheAllCellInsts());
+        // (released: a new walk)
+        Assertions.assertEquals(CELLS, lookup.getAllCellInsts().count());
+        Assertions.assertEquals(2 * CELLS, lookup.childLists.get());
+        nl.getTopCell().createChildCellInst("z", nl.getHDIPrimitive(Unisim.FDRE));
+        XDCParser.parseXDC(nl.getDevice(), FDRE_QUERIES, lookup);
+        Assertions.assertEquals(3 * CELLS + 1, lookup.childLists.get());
+    }
+
+    /** A parse that fails still turns the caching off and releases the list. */
+    @Test
+    public void testParseXdcFailureReleasesCache() {
+        EDIFNetlist nl = netlist();
+        CountingLookup lookup = new CountingLookup(nl);
+        List<String> xdc = Arrays.asList(FDRE_QUERIES.get(0), "no_such_command_in_any_xdc 1");
+        Assertions.assertThrows(RuntimeException.class, () -> XDCParser.parseXDC(nl.getDevice(), xdc, lookup));
+        Assertions.assertEquals(CELLS, lookup.childLists.get());
+        Assertions.assertFalse(lookup.isCacheAllCellInsts());
+        lookup.getAllCellInsts().count();
+        Assertions.assertEquals(2 * CELLS, lookup.childLists.get());
+    }
+
+    /**
+     * A caller that turned caching on keeps one list across its parses (one walk for both); turning it off
+     * drops the list.
+     */
+    @Test
+    public void testCallerCachesAcrossParses() {
+        EDIFNetlist nl = netlist();
+        CountingLookup lookup = new CountingLookup(nl);
+        lookup.setCacheAllCellInsts(true);
+        XDCParser.parseXDC(nl.getDevice(), FDRE_QUERIES, lookup);
+        XDCParser.parseXDC(nl.getDevice(), FDRE_QUERIES, lookup);
+        Assertions.assertTrue(lookup.isCacheAllCellInsts());
+        Assertions.assertEquals(CELLS, lookup.childLists.get());
+        lookup.setCacheAllCellInsts(false);
+        Assertions.assertEquals(CELLS, lookup.getAllCellInsts().count());
+        Assertions.assertEquals(2 * CELLS, lookup.childLists.get());
     }
 }

@@ -30,7 +30,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 
 /**
- * Generated on: Thu Jun 11 14:46:47 MDT 2026
+ * Generated on: Wed Nov 11 16:04:54 MST 2026
  * by: com.xilinx.rapidwright.release.PartNamePopulator
  *
  * Class used to uniquely represent a Xilinx part.
@@ -261,18 +261,22 @@ public class Part {
         ultraScalePlus = new HashSet<FamilyType>(Arrays.asList(ultraScalePlusTypes));
         versalTypes = new FamilyType[] {
                 FamilyType.AVERSALAIEDGE,
+                FamilyType.AVERSALAIEDGE2,
                 FamilyType.QRVERSALAICORE,
                 FamilyType.QRVERSALAIEDGE,
                 FamilyType.QVERSALAICORE,
                 FamilyType.QVERSALAIEDGE,
+                FamilyType.QVERSALAIEDGE2,
                 FamilyType.QVERSALPREMIUM,
                 FamilyType.QVERSALPRIME,
+                FamilyType.QVERSALPRIME2,
                 FamilyType.VERSAL,
                 FamilyType.VERSALAICORE,
                 FamilyType.VERSALAIEDGE,
                 FamilyType.VERSALAIEDGE2,
                 FamilyType.VERSALHBM,
                 FamilyType.VERSALPREMIUM,
+                FamilyType.VERSALPREMIUM2,
                 FamilyType.VERSALPRIME,
                 FamilyType.VERSALPRIME2,
                 FamilyType.VERSALRF,

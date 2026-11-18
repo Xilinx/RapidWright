@@ -20,15 +20,16 @@
 
 package com.xilinx.rapidwright.util;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -37,7 +38,10 @@ public class TestParams {
     /**
      * Params are read once, when the class is loaded, so each case reads
      * RW_ZSTD_COMPRESSION_LEVEL in a JVM of its own, with only the given
-     * environment variable set.
+     * environment variable set. Its input and output are files rather than
+     * pipes: the JDK closes a child process's pipes on a thread of its own
+     * once the process exits, which can be after waitFor() returns, and so
+     * after this test (whose open files are checked) ends.
      */
     @ParameterizedTest
     @CsvSource({
@@ -45,7 +49,7 @@ public class TestParams {
             // Another parameter must not change the compression level
             "RW_DECOMPRESS_GZIPPED_EDIF_TO_DISK, 1, 3",
     })
-    public void testZstdCompressionLevel(String name, String value, int expected)
+    public void testZstdCompressionLevel(String name, String value, int expected, @TempDir Path tempDir)
             throws IOException, InterruptedException {
         ProcessBuilder pb = new ProcessBuilder();
         Map<String, String> env = pb.environment();
@@ -57,17 +61,14 @@ public class TestParams {
         pb.command(java, "-cp", classpath, Jython.class.getCanonicalName(), "-c",
                 "from com.xilinx.rapidwright.util import Params;"
                 + "print('LEVEL=%d' % Params.RW_ZSTD_COMPRESSION_LEVEL)");
+        Path input = Files.createFile(tempDir.resolve("input"));
+        Path outputFile = tempDir.resolve("output");
+        pb.redirectInput(input.toFile());
+        pb.redirectOutput(outputFile.toFile());
         pb.redirectErrorStream(true);
-        Process p = pb.start();
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        try (InputStream in = p.getInputStream()) {
-            byte[] buf = new byte[8192];
-            for (int n; (n = in.read(buf)) > 0;) {
-                bytes.write(buf, 0, n);
-            }
-        }
-        String output = new String(bytes.toByteArray(), StandardCharsets.UTF_8);
-        Assertions.assertEquals(0, p.waitFor(), output);
+        int exitCode = pb.start().waitFor();
+        String output = new String(Files.readAllBytes(outputFile), StandardCharsets.UTF_8);
+        Assertions.assertEquals(0, exitCode, output);
         Assertions.assertTrue(output.contains("LEVEL=" + expected), output);
     }
 }

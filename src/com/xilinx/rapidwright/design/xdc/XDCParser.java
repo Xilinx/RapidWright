@@ -184,6 +184,10 @@ public class XDCParser {
 
 
         Interp interp = makeTclInterp(constraints, dev, cellLookup);
+        // One list of all cells for the name-less get_cells -hierarchical queries of this parse (the netlist may
+        // change between parses), unless the caller caches it across its parses already
+        boolean callerCaches = cellLookup != null && cellLookup.isCacheAllCellInsts();
+        if (cellLookup != null && !callerCaches) cellLookup.setCacheAllCellInsts(true);
         try {
             String data = String.join("\n", lines);
             try {
@@ -206,6 +210,7 @@ public class XDCParser {
             }
         }  finally {
             interp.dispose();
+            if (cellLookup != null && !callerCaches) cellLookup.setCacheAllCellInsts(false);
         }
 
         return constraints;
