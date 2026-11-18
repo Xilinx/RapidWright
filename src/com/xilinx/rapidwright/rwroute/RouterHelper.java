@@ -53,6 +53,7 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
 import com.xilinx.rapidwright.device.Series;
+import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
@@ -216,6 +217,9 @@ public class RouterHelper {
         final boolean isLagunaRXD = Utils.isLaguna(sink.getTile().getTileTypeEnum());
         assert(!isLagunaRXD || input.getName().startsWith("RXD"));
 
+        final SiteInst sinkSiteInst = input.getSiteInst();
+        final Design design = sinkSiteInst != null ? sinkSiteInst.getDesign() : null;
+
         int watchdog = 100;
 
         // Starting from the SPI's connected node, perform an uphill breadth-first search
@@ -240,6 +244,13 @@ public class RouterHelper {
                 if (uphillTileType != sinkTileType && Utils.isClocking(uphillTileType)) {
                     continue;
                 }
+                if (isUsedSiteOutput(uphill, design)) {
+                    // A site output pin in use is where the input is driven from (e.g. the OUTB_B output of a
+                    // differential master IOB feeding the OUTB_B_IN input of its slave): searching on uphill
+                    // through a routethru of that site would project the input onto an INT node it is not
+                    // reached from
+                    continue;
+                }
                 IntentCode uphillIntentCode = uphill.getIntentCode();
                 if (uphillIntentCode.isUltraScaleClocking() || uphillIntentCode.isVersalClocking() ||
                         uphill.isTiedToVcc()) {
@@ -256,6 +267,25 @@ public class RouterHelper {
         }
 
         return null;
+    }
+
+    /**
+     * Checks whether a node is the node of a site output pin that is in use in a design, i.e. that has a
+     * {@link SitePinInst} on its {@link SiteInst}.
+     * @param node The node.
+     * @param design The design (may be null).
+     * @return True if the node is a used site output pin's node, false otherwise or if design is null.
+     */
+    private static boolean isUsedSiteOutput(Node node, Design design) {
+        if (design == null) {
+            return false;
+        }
+        SitePin sitePin = node.getSitePin();
+        if (sitePin == null || sitePin.isInput()) {
+            return false;
+        }
+        SiteInst si = design.getSiteInstFromSite(sitePin.getSite());
+        return si != null && si.getSitePinInst(sitePin.getPinName()) != null;
     }
 
     public static Tile getUpstreamINTTileOfClkIn(SitePinInst clkIn) {
