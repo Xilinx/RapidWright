@@ -441,6 +441,25 @@ public class ConstantDefinitions {
             }
         }
 
+        // A tile type/wire that is the base of GND-tied nodes in some tiles can also be a
+        // non-base member of a VCC-tied node in another tile (and vice versa).  For example,
+        // in xcau10p INT_IBRK_FSR2IO/IO_TO_CTR_FT0_3 is the base of GND nodes in several tiles,
+        // but INT_IBRK_FSR2IO_X0Y174/IO_TO_CTR_FT0_3 belongs to the VCC node
+        // HPIO_AUX_IO_TERM_L_TOP_FT_X0Y150/VCC_WIRE0.  Readers resolve a node's constant from
+        // any of its wires, so such nodes must be listed explicitly as exceptions.
+        Set<Node> exceptionSet = new HashSet<>(tiedNodeExceptions);
+        for (Node tiedNode : allTiedNodes) {
+            if (exceptionSet.contains(tiedNode)) continue;
+            Map<TileTypeEnum, Set<Integer>> oppositeTiedNodes = tiedNode.isTiedToGnd() ? vccTiedNodes : gndTiedNodes;
+            for (Wire wire : tiedNode.getAllWiresInNode()) {
+                Set<Integer> oppositeWires = oppositeTiedNodes.get(wire.getTile().getTileTypeEnum());
+                if (oppositeWires != null && oppositeWires.contains(wire.getWireIndex())) {
+                    tiedNodeExceptions.add(tiedNode);
+                    break;
+                }
+            }
+        }
+
         int i = 0;
         StructList.Builder<NodeConstantSource.Builder> nodeSourcesObj =
                 builder.initNodeSources(tiedNodeExceptions.size());
