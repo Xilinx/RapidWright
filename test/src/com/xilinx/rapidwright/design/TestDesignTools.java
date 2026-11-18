@@ -2305,6 +2305,56 @@ public class TestDesignTools {
     }
 
     @Test
+    public void testGetTrimmablePIPsFromPinsOffRoute() {
+        Design design = new Design("top", "xcau10p");
+        Device device = design.getDevice();
+        Net net = TestDesignHelper.createTestNet(design, "net", new String[]{
+                "INT_X24Y92/INT.LOGIC_OUTS_E27->INT_NODE_SDQ_41_INT_OUT1",            // Output pin
+                "INT_X24Y92/INT.INT_NODE_SDQ_41_INT_OUT1->>SS1_E_BEG7",
+                "INT_X24Y91/INT.SS1_E_END7->>INT_NODE_IMUX_25_INT_OUT1",
+                "INT_X24Y91/INT.INT_NODE_IMUX_25_INT_OUT1->>BOUNCE_E_13_FT0",
+                "INT_X24Y92/INT.BOUNCE_E_BLN_13_FT1->>INT_NODE_IMUX_30_INT_OUT0",
+                "INT_X24Y92/INT.INT_NODE_IMUX_30_INT_OUT0->>BYPASS_E4",
+                "INT_X24Y92/INT.BYPASS_E4->>INT_NODE_IMUX_0_INT_OUT0",
+                "INT_X24Y92/INT.INT_NODE_IMUX_0_INT_OUT0->>BYPASS_E3",                // DX input pin
+                "INT_X24Y92/INT.BYPASS_E3->>INT_NODE_IMUX_12_INT_OUT1",
+                "INT_X24Y92/INT.INT_NODE_IMUX_12_INT_OUT1->>BYPASS_E7",               // D_I input pin
+        });
+
+        SiteInst si = design.createSiteInst("SLICE_X38Y92");
+        net.createPin("DQ2", si);
+        SitePinInst dI = net.createPin("D_I", si);
+        net.createPin("DX", si);
+        // Sinks whose nodes no PIP of the net starts or ends at
+        SitePinInst a1 = net.createPin("A1", si);
+        SitePinInst b1 = net.createPin("B1", si);
+        for (PIP pip : net.getPIPs()) {
+            for (SitePinInst p : Arrays.asList(a1, b1)) {
+                Assertions.assertNotEquals(p.getConnectedNode(), pip.getStartNode());
+                Assertions.assertNotEquals(p.getConnectedNode(), pip.getEndNode());
+            }
+        }
+
+        Assertions.assertTrue(DesignTools.getTrimmablePIPsFromPins(net, Arrays.asList(a1, b1)).isEmpty());
+
+        // Together with a routed sink, only that sink's PIPs are trimmable
+        Set<PIP> trimmable = DesignTools.getTrimmablePIPsFromPins(net, Arrays.asList(a1, dI));
+        Assertions.assertEquals(2, trimmable.size());
+        Assertions.assertTrue(trimmable.containsAll(Arrays.asList(
+                device.getPIP("INT_X24Y92/INT.BYPASS_E3->>INT_NODE_IMUX_12_INT_OUT1"),
+                device.getPIP("INT_X24Y92/INT.INT_NODE_IMUX_12_INT_OUT1->>BYPASS_E7")
+        )));
+
+        // Removing such a sink (preserving the other routes) leaves the routing as it is
+        List<PIP> before = new ArrayList<>(net.getPIPs());
+        a1.setRouted(true);
+        net.removePin(a1, true);
+        Assertions.assertEquals(before, net.getPIPs());
+        Assertions.assertFalse(a1.isRouted());
+        Assertions.assertNull(a1.getNet());
+    }
+
+    @Test
     public void testCreateMissingSitePinInstsAlias() {
         Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
         Net net = design.getNet("input_port_b[4]");

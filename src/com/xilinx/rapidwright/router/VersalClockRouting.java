@@ -50,8 +50,10 @@ import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFPropertyValue;
+import com.xilinx.rapidwright.rwroute.GlobalSignalRouting;
 import com.xilinx.rapidwright.rwroute.NodeStatus;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
 import com.xilinx.rapidwright.rwroute.RouterHelper.NodeWithPrev;
@@ -649,12 +651,32 @@ public class VersalClockRouting {
         RouteThruHelper routeThruHelper = new RouteThruHelper(design.getDevice());
 
         nextPin: for (SitePinInst p: clk.getPins()) {
-            if (p.isOutPin() || p.isRouted() || Utils.isIOB(p.getSiteInst()) || isDrivenByGlobalClockNode(p)) {
+            if (p.isOutPin() || p.isRouted() || Utils.isIOB(p.getSiteInst())) {
                 continue;
+            }
+            boolean deskewFeedback = false;
+            if (isDrivenByGlobalClockNode(p)) {
+                if (!isDeskewFeedbackPin(p)) {
+                    continue;
+                }
+                deskewFeedback = true;
             }
             NodeWithPrev sink = new NodeWithPrev(p.getConnectedNode());
             ClockRegion cr = getSinkClockRegion(sink);
             boolean crossCRSink = Utils.isPS(p.getSiteInst()) || Utils.isNOC(p.getSiteInst());
+            Set<IntentCode> intentCodes = allowedIntentCodes;
+            if (deskewFeedback) {
+                // Search from the feedback mux driving the pin, through the nodes from a leaf clock buffer of the
+                // fabric next to it only (which can be in another clock region than the pin)
+                List<Node> uphill = sink.getAllUphillNodes();
+                if (uphill.size() != 1 || isNodeUnavailable.test(uphill.get(0))) {
+                    // Left to routeNonLCBPins()
+                    continue;
+                }
+                sink = new NodeWithPrev(uphill.get(0), sink);
+                crossCRSink = true;
+                intentCodes = DESKEW_FEEDBACK_INTENT_CODES;
+            }
             q.clear();
             q.add(sink);
 
@@ -665,7 +687,14 @@ public class VersalClockRouting {
                         continue;
                     }
                     IntentCode uphillIntentCode = uphill.getIntentCode();
-                    if (!allowedIntentCodes.contains(uphillIntentCode)) {
+                    if (!intentCodes.contains(uphillIntentCode)) {
+                        continue;
+                    }
+                    if (deskewFeedback && curr.getIntentCode() == IntentCode.NODE_IRI
+                            && routeThruHelper.isRouteThru(uphill, curr)
+                            && !GlobalSignalRouting.isRouteThruAvailable(design, clk, uphill, curr)) {
+                        // The IRI routethru of the leaf path is not free (its site is used by another net or a
+                        // cell); checked before visiting, as another routethru from the same node may be free
                         continue;
                     }
                     if (!visited.add(uphill)) {
@@ -689,6 +718,11 @@ public class VersalClockRouting {
                     }
                     q.add(node);
                 }
+            }
+            if (deskewFeedback) {
+                // No leaf clock buffer available: left to routeNonLCBPins()
+                visited.clear();
+                continue;
             }
             throw new RuntimeException("ERROR: Couldn't route pin " + sink + " to any LCB");
         }
@@ -759,6 +793,38 @@ public class VersalClockRouting {
         }
         return true;
     }
+
+    /**
+     * Checks if a sink pin of a clock net is a deskew feedback input (CLKFB1_DESKEW or
+     * CLKFB2_DESKEW) of an XPLL. Under digital deskew, the XPLL aligns its output clock by
+     * the delay of the clock net to this input, which must therefore be about the insertion
+     * delay of the other loads of the clock: as Vivado does, the input is routed as a leaf of
+     * the clock tree, from a leaf clock buffer (LCB) of the fabric next to the XPLL through the
+     * IRI clock input of an interface tile and the feedback mux of the clock tile, rather than
+     * through the shorter path from the clock distribution into that mux.
+     * @param p The sink pin.
+     * @return True if the pin is the deskew feedback input of an XPLL.
+     */
+    public static boolean isDeskewFeedbackPin(SitePinInst p) {
+        if (p.isOutPin() || p.getSiteTypeEnum() != SiteTypeEnum.XPLL) {
+            return false;
+        }
+        String name = p.getName();
+        return name.equals("CLKFB1_DESKEW") || name.equals("CLKFB2_DESKEW");
+    }
+
+    /**
+     * Intent codes of the nodes from a leaf clock buffer to the feedback mux of an XPLL deskew
+     * feedback input (see {@link #isDeskewFeedbackPin(SitePinInst)}).
+     */
+    private static final Set<IntentCode> DESKEW_FEEDBACK_INTENT_CODES = EnumSet.of(
+            IntentCode.NODE_IRI,
+            IntentCode.NODE_PINFEED,
+            IntentCode.NODE_CLE_CTRL,
+            IntentCode.NODE_INTF_CTRL,
+            IntentCode.NODE_CLE_CNODE,
+            IntentCode.NODE_INTF_CNODE,
+            IntentCode.NODE_GLOBAL_LEAF);
 
     /**
      * Intent codes of the nodes that routes to pins driven by global clock nodes

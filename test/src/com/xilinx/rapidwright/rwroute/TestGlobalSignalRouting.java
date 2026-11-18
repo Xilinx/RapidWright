@@ -1420,4 +1420,189 @@ public class TestGlobalSignalRouting {
                     && pip.getEndNode().equals(cascadeNode)));
         }
     }
+
+    /**
+     * A clock driving the deskew feedback input (CLKFB1_DESKEW) of an XPLL, as in the digital deskew
+     * of memory interface PHYs: the input must be routed as a leaf of the clock tree (from a leaf clock
+     * buffer through the IRI clock input of an interface tile into the feedback mux of the clock tile,
+     * as Vivado does), not through the shorter path from the clock distribution into that mux, which
+     * would shift the deskewed XPLL output clock against the other loads of the clock. When no leaf
+     * path is available (here: the IRI nodes are used by other nets), the input is still routed from
+     * the clock distribution.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "true,false",
+            "false,false",
+            "true,true"
+    })
+    public void testVersalXPLLDeskewFeedbackClockRouting(boolean fabricLoad, boolean blockIri) {
+        Design design = createXPLLDeskewFeedbackDesign(fabricLoad);
+        Net clk = design.getNet("clk");
+        SitePinInst feedback = getXPLLDeskewFeedbackPin(clk);
+
+        GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(),
+                (n) -> blockIri && n.getIntentCode() == IntentCode.NODE_IRI ? NodeStatus.UNAVAILABLE
+                        : NodeStatus.AVAILABLE,
+                new HashMap<>());
+
+        List<Node> path = getRoutedPathToSource(clk, feedback);
+        Node mux = path.get(1);
+        Assertions.assertEquals(IntentCode.NODE_GLOBAL_GCLK, mux.getIntentCode());
+        boolean throughLeaf = path.stream().anyMatch((n) -> n.getIntentCode() == IntentCode.NODE_GLOBAL_LEAF);
+        Assertions.assertEquals(!blockIri, throughLeaf, path.toString());
+        Assertions.assertEquals(blockIri ? IntentCode.NODE_GLOBAL_GCLK : IntentCode.NODE_IRI,
+                path.get(2).getIntentCode(), path.toString());
+    }
+
+    /**
+     * The leaf path of an XPLL deskew feedback input (see
+     * {@link #testVersalXPLLDeskewFeedbackClockRouting(boolean, boolean)}) enters the interface tile through
+     * the routethru of an IRI site. Such a routethru is only used if its site is free: with another net on the
+     * site wire of the routethru's input pin, or with a cell on the BEL that this pin drives, another leaf path
+     * is searched for. Each routethru that the search picks is occupied in turn until no leaf path remains;
+     * the input is then routed from the clock distribution, and no routethru of the clock starts at an
+     * occupied pin.
+     */
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testVersalXPLLDeskewFeedbackSkipsUsedIriRouteThru(boolean cellNotNet) {
+        List<Node> occupied = new ArrayList<>();
+        while (true) {
+            Assertions.assertTrue(occupied.size() < 64, occupied.toString());
+            Design design = createXPLLDeskewFeedbackDesign(true);
+            Net clk = design.getNet("clk");
+            SitePinInst feedback = getXPLLDeskewFeedbackPin(clk);
+            Net user = design.createNet("user");
+            for (Node head : occupied) {
+                SitePin sitePin = head.getSitePin();
+                SiteInst si = design.getSiteInstFromSite(sitePin.getSite());
+                if (si == null) {
+                    si = design.createSiteInst(sitePin.getSite());
+                }
+                BELPin routeThruInPin = sitePin.getBELPin();
+                if (cellNotNet) {
+                    BEL bel = routeThruInPin.getSiteConns().get(0).getBEL();
+                    if (si.getCell(bel) == null) {
+                        si.addCell(new Cell("user" + si.getCells().size(), bel));
+                    }
+                } else {
+                    si.routeIntraSiteNet(user, routeThruInPin, routeThruInPin);
+                }
+            }
+
+            GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), (n) -> NodeStatus.AVAILABLE,
+                    new HashMap<>());
+
+            for (PIP pip : clk.getPIPs()) {
+                Assertions.assertFalse(pip.isRouteThru() && occupied.contains(pip.getStartNode()),
+                        "Occupied routethru used: " + pip);
+            }
+            List<Node> path = getRoutedPathToSource(clk, feedback);
+            if (path.stream().noneMatch((n) -> n.getIntentCode() == IntentCode.NODE_GLOBAL_LEAF)) {
+                // No leaf path left: routed from the clock distribution
+                Assertions.assertFalse(occupied.isEmpty());
+                Assertions.assertEquals(IntentCode.NODE_GLOBAL_GCLK, path.get(2).getIntentCode(), path.toString());
+                return;
+            }
+            Node[] routeThru = getIriRouteThru(path, new RouteThruHelper(design.getDevice()));
+            occupied.add(routeThru[0]);
+        }
+    }
+
+    /**
+     * A clock that was routed through the IRI routethru of the leaf path of an XPLL deskew feedback input
+     * (see {@link #testVersalXPLLDeskewFeedbackClockRouting(boolean, boolean)}) keeps the site wires of the
+     * routethru and the &lt;LOCKED&gt; placeholder on its BEL when it is unrouted, as in a routed design: these do
+     * not block the routethru when the clock is routed again, which finds the same leaf path.
+     */
+    @Test
+    public void testVersalXPLLDeskewFeedbackReusesOwnIriRouteThru() {
+        Design design = createXPLLDeskewFeedbackDesign(true);
+        Net clk = design.getNet("clk");
+        SitePinInst feedback = getXPLLDeskewFeedbackPin(clk);
+        Function<Node, NodeStatus> getNodeStatus = (n) -> NodeStatus.AVAILABLE;
+        GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), getNodeStatus, new HashMap<>());
+        List<Node> path = getRoutedPathToSource(clk, feedback);
+        Node[] routeThru = getIriRouteThru(path, new RouteThruHelper(design.getDevice()));
+
+        SitePin inPin = routeThru[0].getSitePin();
+        SitePin outPin = routeThru[1].getSitePin();
+        SiteInst si = design.getSiteInstFromSite(inPin.getSite());
+        if (si == null) {
+            si = design.createSiteInst(inPin.getSite());
+        }
+        si.routeIntraSiteNet(clk, inPin.getBELPin(), inPin.getBELPin());
+        si.routeIntraSiteNet(clk, outPin.getBELPin(), outPin.getBELPin());
+        si.addCell(new Cell(Cell.LOCKED, inPin.getBELPin().getSiteConns().get(0).getBEL()));
+        clk.unroute();
+        for (SitePinInst spi : clk.getPins()) {
+            spi.setRouted(false);
+        }
+        Assertions.assertTrue(clk.getPIPs().isEmpty());
+
+        GlobalSignalRouting.symmetricClkRouting(clk, design.getDevice(), getNodeStatus, new HashMap<>());
+        Assertions.assertEquals(path, getRoutedPathToSource(clk, feedback));
+    }
+
+    /**
+     * Creates a design with a clock driven by a BUFGCE, driving the deskew feedback input (CLKFB1_DESKEW) of
+     * XPLL_X0Y0 and, optionally, a flip-flop in the fabric.
+     */
+    private static Design createXPLLDeskewFeedbackDesign(boolean fabricLoad) {
+        Design design = new Design("versal_xpll_deskew_feedback", "xcvc1902-vsva2197-2MP-e-S");
+        Net clk = design.createNet("clk");
+        clk.connect(design.createAndPlaceCell("bufgce", Unisim.BUFGCE, "BUFGCE_X0Y0/BUFCE"), "O");
+        if (fabricLoad) {
+            clk.connect(design.createAndPlaceCell("ff", Unisim.FDRE, "SLICE_X44Y62/AFF"), "C");
+        }
+        design.routeSites();
+        clk.createPin("CLKFB1_DESKEW", design.createSiteInst(design.getDevice().getSite("XPLL_X0Y0")));
+        return design;
+    }
+
+    private static SitePinInst getXPLLDeskewFeedbackPin(Net clk) {
+        return clk.getPins().stream().filter((p) -> p.getName().equals("CLKFB1_DESKEW")).findFirst().get();
+    }
+
+    /**
+     * Checks that a clock is fully routed, with each node driven once, and gets the nodes of its route from a sink
+     * back to its source.
+     * @return The nodes from the sink's node to the node after the source's node.
+     */
+    private static List<Node> getRoutedPathToSource(Net clk, SitePinInst sink) {
+        Assertions.assertEquals(0, DesignTools.updatePinsIsRouted(clk));
+        Assertions.assertTrue(sink.isRouted());
+        Map<Node, Node> driver = new HashMap<>();
+        for (PIP pip : clk.getPIPs()) {
+            Node start = pip.isReversed() ? pip.getEndNode() : pip.getStartNode();
+            Node end = pip.isReversed() ? pip.getStartNode() : pip.getEndNode();
+            Node other = driver.put(end, start);
+            Assertions.assertTrue(other == null || other.equals(start), "Node " + end + " driven twice");
+        }
+        Node sourceNode = clk.getSource().getConnectedNode();
+        List<Node> path = new ArrayList<>();
+        for (Node n = sink.getConnectedNode(); !sourceNode.equals(n); n = driver.get(n)) {
+            Assertions.assertNotNull(n, "Path " + path + " not driven");
+            Assertions.assertTrue(path.size() < 100, "Loop on path " + path);
+            path.add(n);
+        }
+        return path;
+    }
+
+    /**
+     * Gets the routethru onto an IRI node on a path from a sink back to its source.
+     * @return The routethru's start and end nodes.
+     */
+    private static Node[] getIriRouteThru(List<Node> path, RouteThruHelper routeThruHelper) {
+        for (int i = 0; i + 1 < path.size(); i++) {
+            Node tail = path.get(i);
+            Node head = path.get(i + 1);
+            if (tail.getIntentCode() == IntentCode.NODE_IRI && routeThruHelper.isRouteThru(head, tail)) {
+                return new Node[]{head, tail};
+            }
+        }
+        Assertions.fail("No IRI routethru on " + path);
+        return null;
+    }
 }

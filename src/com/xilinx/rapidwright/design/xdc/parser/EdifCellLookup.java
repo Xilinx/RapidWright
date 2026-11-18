@@ -58,6 +58,10 @@ import tcl.lang.TclObject;
  */
 public abstract class EdifCellLookup<T> {
 
+    /** All cells, kept by {@link #getAllCellInsts()} while caching is on; null before its first call. */
+    private volatile List<T> allCells;
+    /** {@link #getAllCellInsts()} reuses one list of all cells (see {@link #setCacheAllCellInsts(boolean)}). */
+    private volatile boolean cacheAllCellInsts;
 
     /**
      * Convert a cell to a Tcl Object
@@ -298,8 +302,50 @@ public abstract class EdifCellLookup<T> {
         return eci -> p.matches(getAbsoluteOriginalName(eci));
     }
 
+    /**
+     * All cells of the netlist: {@link #allCellInsts(Object) allCellInsts(getRoot())}, the root and every cell
+     * below it in pre-order. Every get_cells -hierarchical query without a cell name (e.g. by REF_NAME filter)
+     * needs it. Without caching (the default) this is the live, lazy walk. While caching is on
+     * ({@link #setCacheAllCellInsts(boolean)}; {@link com.xilinx.rapidwright.design.xdc.XDCParser#parseXDC(
+     * com.xilinx.rapidwright.device.Device, List, EdifCellLookup)} turns it on for the duration of each parse),
+     * the hierarchy is walked once and the list is reused by later calls.
+     * @return Stream of all cells.
+     */
     public Stream<T> getAllCellInsts() {
-        return allCellInsts(getRoot());
+        if (!cacheAllCellInsts) return allCellInsts(getRoot());
+        List<T> all = allCells;
+        if (all == null) {
+            all = allCellInsts(getRoot()).collect(Collectors.toList());
+            allCells = all;
+        }
+        return all.stream();
+    }
+
+    /**
+     * Drops the list of all cells kept while caching is on (e.g. after a netlist change while caching is on);
+     * the next {@link #getAllCellInsts()} walks the hierarchy again.
+     */
+    public void clearAllCellInstsCache() {
+        allCells = null;
+    }
+
+    /**
+     * Turns the caching of {@link #getAllCellInsts()} on or off; either way drops any list kept so far.
+     * XDCParser.parseXDC turns it on for the duration of each parse unless it is on already: a caller that
+     * parses an XDC in several parts with one lookup (e.g. re-parsing parts of a file whose whole-text parse
+     * failed) may turn it on itself to share one list across those parses. The caller guarantees that the
+     * netlist is not edited while caching is on (or calls {@link #clearAllCellInstsCache()} after an edit), and
+     * turns it off when done: the list is held until then.
+     * @param cache True to walk the hierarchy once and reuse the list of all cells.
+     */
+    public void setCacheAllCellInsts(boolean cache) {
+        cacheAllCellInsts = cache;
+        allCells = null;
+    }
+
+    /** @return True while {@link #getAllCellInsts()} reuses one list ({@link #setCacheAllCellInsts(boolean)}). */
+    public boolean isCacheAllCellInsts() {
+        return cacheAllCellInsts;
     }
 
     public abstract EDIFHierCellInst toEdifHierCellInst(T cell);
