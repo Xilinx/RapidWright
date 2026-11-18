@@ -110,7 +110,7 @@ public class NetlistSummary {
         ConeBuilder cones = new ConeBuilder(flat, conn, classifier, aig, series, log, label);
         cones.setPrivateRegisters(privateRegisters);
         int nodesBefore = aig.getNodeCount();
-        summary.collectTerminalCones(flat, classifier, cones, log);
+        summary.collectTerminalCones(flat, conn, classifier, cones, log);
         for (String register : privateRegisters) {
             if (!summary.terminals.containsKey(register)) {
                 throw new LecException(label + ": the retiming map defines register '" + register
@@ -130,10 +130,10 @@ public class NetlistSummary {
      * Walks every terminal, building a cone for each input pin and
      * recording the terminal's own configuration.
      */
-    private void collectTerminalCones(FlatNetlist flat, CellClassifier classifier,
-            ConeBuilder cones, LecLog log) {
+    private void collectTerminalCones(FlatNetlist flat, Connectivity conn,
+            CellClassifier classifier, ConeBuilder cones, LecLog log) {
         for (int instId : flat.getLeafInstIds()) {
-            if (!classifier.isMatchedByName(classifier.classify(flat.getCellType(instId)))) {
+            if (!classifier.isMatchedByName(classifier.classify(flat, conn, instId))) {
                 continue;
             }
             String typeName = flat.getCellTypeName(instId);

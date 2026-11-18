@@ -1357,9 +1357,18 @@ public class LecSelfCheck {
         return net;
     }
 
-    /** Moves the register to the clock net of a register in another clock domain. */
-    private static String moveClock(Context ctx, int id) {
+    /**
+     * Moves the register to the clock net of a register in another clock
+     * domain: one whose clock is a different function, not merely a different
+     * net. A replica of the same clock behind a transparent buffer is the same
+     * clock, and moving to it must not be detected.
+     */
+    private String moveClock(Context ctx, int id) {
         int own = rootOf(ctx, id, "C");
+        ConeBuilder cones = new ConeBuilder(ctx.flat, ctx.conn,
+                new CellClassifier(ctx.series, config, quiet), new Aig(), ctx.series, quiet,
+                "IMP");
+        int ownClock = own < 0 ? Aig.FALSE : cones.literalOfNetRoot(own);
         for (int other : ctx.flat.getLeafInstIds()) {
             if (!ctx.flat.getCellTypeName(other).startsWith("FD")) {
                 continue;
@@ -1370,7 +1379,8 @@ public class LecSelfCheck {
             // The same flattened parent, not just the same cell definition: two
             // instances of one cell can be clocked differently through the
             // same local net, and moving to it would change nothing
-            if (root < 0 || root == own || ctx.flat.getParent(other) != ctx.flat.getParent(id)) {
+            if (root < 0 || root == own || ctx.flat.getParent(other) != ctx.flat.getParent(id)
+                    || cones.literalOfNetRoot(root) == ownClock) {
                 continue;
             }
             EDIFNet clock = donor.getPortInst("C").getNet();

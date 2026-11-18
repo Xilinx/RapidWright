@@ -51,6 +51,8 @@ public class PrimitiveModelLibrary {
 
     private static final Set<String> COMBINATIONAL = buildCombinationalTypes();
 
+    private static final Set<String> CONDITIONAL = buildConditionalTypes();
+
     private final Map<String, PrimitiveModel> models = new HashMap<>();
 
     private final LecLog log;
@@ -64,7 +66,7 @@ public class PrimitiveModelLibrary {
      *         must therefore be treated as an opaque cone endpoint.
      */
     public PrimitiveModel get(String cellTypeName) {
-        if (!COMBINATIONAL.contains(cellTypeName)) {
+        if (!COMBINATIONAL.contains(cellTypeName) && !CONDITIONAL.contains(cellTypeName)) {
             return null;
         }
         PrimitiveModel cached = models.get(cellTypeName);
@@ -107,7 +109,108 @@ public class PrimitiveModelLibrary {
         addCarry(types);
         addSoftGates(types);
         addBuffers(types);
+        addClockBuffers(types);
         return Collections.unmodifiableSet(types);
+    }
+
+    /**
+     * Global clock buffers with no control input, which are transparent:
+     * {@code O = I}, or {@code O = !I} when {@code IS_I_INVERTED} is set.
+     *
+     * A placer inserts these on high fanout nets such as clock enables and
+     * resets, to reach the global routing, and may replicate one into several
+     * regional copies that each drive a subset of the loads. Treating them as
+     * terminals would make every such insertion a terminal difference, and
+     * would also stop every clock pin's cone one cell short of the clock port.
+     *
+     * The assumptions are those of the whole check, which compares logic
+     * functions after configuration: a buffer's delay, its skew between
+     * replicas and its routing resources are timing, not function, and are not
+     * compared. {@code BUFG} has no control input at all; {@code BUFG_FABRIC}
+     * neither.
+     */
+    private static void addClockBuffers(Set<String> types) {
+        types.add("BUFG");
+        types.add("BUFG_FABRIC");
+    }
+
+    /**
+     * Clock buffers with control inputs, which are transparent only when their
+     * settings and controls make them pass their input through, and are
+     * otherwise terminals. These types are therefore not combinational by
+     * type: {@link #get(String)} returns a model for them, and the role that
+     * {@link CellClassifier#classify(FlatNetlist, Connectivity, int)} gives
+     * each instance decides whether it is used.
+     *
+     * <ul>
+     * <li>{@code BUFGCE}: {@code CE} tied active, {@code CE_TYPE} absent,
+     * {@code SYNC} or {@code ASYNC}, and {@code STARTUP_SYNC} absent or
+     * {@code FALSE}.</li>
+     * <li>{@code BUFGCE_DIV}: the same, and also {@code CLR} tied inactive,
+     * {@code HARDSYNC_CLR} absent or {@code FALSE}, and {@code BUFGCE_DIVIDE}
+     * absent or 1. A divider by any other value is not a buffer: its output
+     * toggles once every so many input edges.</li>
+     * </ul>
+     *
+     * Assumptions behind these conditions:
+     * <ul>
+     * <li>"Tied" is decided from the netlist alone: the pin's node is a
+     * constant, after the pin's inversion attribute ({@code IS_CE_INVERTED},
+     * {@code IS_CLR_INVERTED}), or the pin has no driver, no inversion
+     * attribute, and a tie value listed in the pin default table for the part
+     * that is the pass through value. A control driven by logic is never taken
+     * as tied, even when that logic is constant. An unconnected control
+     * without a part, without a table entry, or with an inversion attribute
+     * keeps the buffer a terminal, since what it is tied to is then not
+     * known.</li>
+     * <li>{@code CE_TYPE HARDSYNC} and {@code HARDSYNC_CLR TRUE} add a three
+     * stage synchroniser that starts with the buffer disabled or cleared, so
+     * even with constant controls the output misses the first input edges
+     * after configuration. Such a buffer, or one with any other value, stays a
+     * terminal.</li>
+     * <li>{@code STARTUP_SYNC TRUE} holds the output until the buffer has
+     * synchronised to the end of configuration, which an unbuffered net does
+     * not do, so such a buffer stays a terminal.</li>
+     * <li>After configuration, a buffer with the default {@code SYNC} enable
+     * starts with its gate closed until its input first goes low, as in the
+     * vendor simulation models. The check compares the steady state, in which
+     * the buffer is combinationally transparent: the same assumption the
+     * vendor tool makes when its own optimisation inserts such buffers on
+     * device-wide control nets.</li>
+     * <li>{@code SIM_DEVICE} and other simulation-only attributes have no
+     * effect on the function.</li>
+     * </ul>
+     *
+     * A gated buffer is not a combinational gate even then: a synchronous
+     * enable is sampled by the clock it gates, so a dynamic {@code CE} cannot be
+     * modelled as {@code I & CE}, which would let a glitching gate be proven
+     * equal to a glitch free one.
+     *
+     * Every other clock buffer stays an opaque terminal matched by name, as
+     * before: {@code BUFGCE_1} (its output idles high when disabled),
+     * {@code BUFGCTRL} and the {@code BUFGMUX} family (clock multiplexers),
+     * {@code BUFG_GT} (divide value on a dynamic pin bus with masked enable
+     * and clear; driven only by a transceiver) and its enable and clear
+     * synchroniser {@code BUFG_GT_SYNC},
+     * {@code BUFG_PS} (driven only by the processing system), and the
+     * {@code MBUFG} family (several outputs at different divisions). None of
+     * them is provably {@code O = I} from the netlist under the rules above.
+     */
+    private static Set<String> buildConditionalTypes() {
+        Set<String> types = new HashSet<>();
+        types.add("BUFGCE");
+        types.add("BUFGCE_DIV");
+        return Collections.unmodifiableSet(types);
+    }
+
+    /**
+     * @param cellTypeName A primitive type name.
+     * @return True if the type is transparent only when its control inputs are
+     *         tied to their pass through values, so it is classified per
+     *         instance.
+     */
+    public static boolean isConditional(String cellTypeName) {
+        return CONDITIONAL.contains(cellTypeName);
     }
 
     /**

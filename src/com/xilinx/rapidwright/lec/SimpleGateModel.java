@@ -59,6 +59,13 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
  * every cone one cell short of the port. The differential receivers drive their
  * output from {@code I} whenever the pair is valid, which is the only case with
  * a defined value, so {@code O = I}.
+ *
+ * <h2>Clock buffers</h2>
+ *
+ * The global clock buffers {@code BUFG} and {@code BUFG_FABRIC} are
+ * transparent, as are {@code BUFGCE} and {@code BUFGCE_DIV} instances whose
+ * controls {@link CellClassifier} finds tied to pass through values:
+ * {@code O = I ^ IS_I_INVERTED}.
  */
 public class SimpleGateModel implements PrimitiveModel {
 
@@ -74,6 +81,8 @@ public class SimpleGateModel implements PrimitiveModel {
         INVERTER,
         /** {@code O = I}, and for differential outputs {@code OB = !I}. */
         BUFFER,
+        /** A global clock buffer: {@code O = I ^ IS_I_INVERTED}. */
+        CLOCK_BUFFER,
         /** {@code O = DI & !(SRI ^ IS_SRI_INVERTED)}. */
         AND2B1L,
         /** {@code O = DI | (SRI ^ IS_SRI_INVERTED)}. */
@@ -116,6 +125,9 @@ public class SimpleGateModel implements PrimitiveModel {
         if (isBuffer(typeName)) {
             return new SimpleGateModel(Kind.BUFFER, typeName);
         }
+        if (isClockBuffer(typeName)) {
+            return new SimpleGateModel(Kind.CLOCK_BUFFER, typeName);
+        }
         if (softGateArity(typeName) > 0) {
             return new SimpleGateModel(Kind.SOFT, typeName);
         }
@@ -126,6 +138,17 @@ public class SimpleGateModel implements PrimitiveModel {
         return typeName.equals("BUF") || typeName.equals("IBUF") || typeName.equals("OBUF")
                 || typeName.equals("IBUFG") || typeName.equals("OBUFDS")
                 || typeName.equals("OBUFDS_DUAL_BUF");
+    }
+
+    /**
+     * The global clock buffers, transparent when their controls are tied to
+     * pass through values; see {@link PrimitiveModelLibrary}. The model
+     * itself has no control inputs: whether an instance may use it is decided
+     * by {@link CellClassifier}.
+     */
+    private static boolean isClockBuffer(String typeName) {
+        return typeName.equals("BUFG") || typeName.equals("BUFG_FABRIC")
+                || typeName.equals("BUFGCE") || typeName.equals("BUFGCE_DIV");
     }
 
     @Override
@@ -139,6 +162,7 @@ public class SimpleGateModel implements PrimitiveModel {
             return ModelUtils.bitsOf(index, "CI", "LI");
         case INVERTER:
         case BUFFER:
+        case CLOCK_BUFFER:
             return ModelUtils.bitsOf(index, "I");
         case AND2B1L:
         case OR2L:
@@ -165,6 +189,8 @@ public class SimpleGateModel implements PrimitiveModel {
         case BUFFER:
             return index.getPortBitName(outPortBit).equals("OB")
                     ? Aig.not(inputLits[0]) : inputLits[0];
+        case CLOCK_BUFFER:
+            return ModelUtils.isPinInverted(inst, "I") ? Aig.not(inputLits[0]) : inputLits[0];
         case AND2B1L:
             return aig.and(inputLits[0], Aig.not(setResetInput(inst, inputLits[1])));
         case OR2L:
