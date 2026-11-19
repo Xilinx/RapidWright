@@ -258,8 +258,6 @@ class TestEDIFNetlist {
 
         EDIFTools.connectPortInstsThruHier(srcPortInst, snkPortInst, TestEDIFTools.UNIQUE_SUFFIX);
 
-        netlist.resetParentNetMap();
-
         Map<EDIFCell,List<EDIFChange>> modifiedCells = netlist.getModifiedCells();
 
         Assertions.assertEquals(modifiedCells.size(), 8);

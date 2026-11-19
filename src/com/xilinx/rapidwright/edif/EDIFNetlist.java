@@ -1551,8 +1551,7 @@ public class EDIFNetlist extends EDIFName {
             if (p.getNet().getName().equals(EDIFTools.LOGICAL_VCC_NET_NAME)) return d.getVccNet();
         }
 
-        Map<EDIFHierNet,EDIFHierNet> parentNetMap = getParentNetMap();
-        EDIFHierNet parentNet = parentNetMap.get(p.getHierarchicalNet());
+        EDIFHierNet parentNet = getParentNet(p.getHierarchicalNet());
         Net n = parentNet == null ? null : d.getNet(parentNet.getHierarchicalNetName());
         if (n == null) {
             if (parentNet == null) {
@@ -1788,9 +1787,10 @@ public class EDIFNetlist extends EDIFName {
      * top-level input port or, for a net that has neither, a top-level inout port.
      * <p>
      * Only what the lookup needs is examined and kept: nothing is built for the netlist as a
-     * whole, and changes to the netlist are followed without calling
-     * {@link #resetParentNetMap()}. This can be called from several threads at the same time, as
-     * long as no thread changes the netlist meanwhile.
+     * whole, and changes to what is connected that are made through the methods of the netlist
+     * classes (adding or removing nets, port instances or cell instances, changing the cell of
+     * an instance, populating a black box, etc) are followed. This can be called from several
+     * threads at the same time, as long as no thread changes the netlist meanwhile.
      * @param netAlias A net in the netlist. Only the parent cells along its hierarchy are checked
      * (see below): a net that was removed from its cell with port insts left on it, or a net of
      * another netlist, has the parent net that a search starting from it finds.
@@ -1825,7 +1825,10 @@ public class EDIFNetlist extends EDIFName {
      * netlist changes), and throws a RuntimeException if a net of the netlist has more than one
      * source. The map cannot be changed, and always reflects the netlist as it is.
      * @return the map
+     * @deprecated Use {@link #getParentNet(EDIFHierNet)}, which is what looking up a net in this
+     * map does.
      */
+    @Deprecated
     public Map<EDIFHierNet,EDIFHierNet> getParentNetMap() {
         return parentNets.getParentNetMap();
     }
@@ -1839,18 +1842,30 @@ public class EDIFNetlist extends EDIFName {
      * {@link #getParentNetName(String)}. Iterating over the map, or asking for its size, throws
      * an IllegalStateException if two nets that have a parent net have the same hierarchical name.
      * @return the map
+     * @deprecated Use {@link #getParentNetName(String)}, which is what looking up a name in this
+     * map does.
      */
+    @Deprecated
     public Map<String, String> getParentNetMapNames() {
         return parentNets.getParentNetNameMap();
     }
 
     /**
-     * Drops everything that is kept for finding parent nets and physical pins. This is not needed
-     * after modifications made through the methods of the netlist classes (adding or removing
-     * nets, port instances or cell instances, changing the cell of an instance, populating a
-     * black box, etc), which are followed. It remains for changes that are not, such as renaming
-     * a net or a cell instance in place.
+     * Drops everything that is kept for finding parent nets and physical pins.
+     * @deprecated No longer needed after changes to what is connected that are made through the
+     * methods of the netlist classes, which are followed (see
+     * {@link #getParentNet(EDIFHierNet)}). Other changes are not followed:
+     * <ul>
+     * <li>Removing a net or a cell instance through the collection that
+     * {@link EDIFCell#getNets()} or {@link EDIFCell#getCellInsts()} returns, or changing the port
+     * instances of a cell instance through {@link EDIFCellInst#getPortInsts()}: use the methods
+     * of the cell, the net and the port instance instead.</li>
+     * <li>Renaming a cell that is named VCC or GND, or giving a cell one of these names, which
+     * changes the pins that {@link #getPhysicalVccPins()} and {@link #getPhysicalGndPins()}
+     * return.</li>
+     * </ul>
      */
+    @Deprecated
     public void resetParentNetMap() {
         parentNets.reset();
     }
@@ -1859,9 +1874,11 @@ public class EDIFNetlist extends EDIFName {
      * Checks whether the parent nets of all nets of the netlist have been found and are kept,
      * which only iterating over {@link #getParentNetMap()}, {@link #getParentNetMapNames()} or
      * {@link #getPhysicalNetPinMap()} (or asking for their size) does, until the netlist changes.
-     * Looking up parent nets does not need it.
      * @return True if the parent nets of all nets are kept, false otherwise.
+     * @deprecated Nothing has to be built to look up parent nets, see
+     * {@link #getParentNet(EDIFHierNet)}.
      */
+    @Deprecated
     public boolean isParentNetMapBuilt() {
         return parentNets.isComplete();
     }
@@ -2109,9 +2126,6 @@ public class EDIFNetlist extends EDIFName {
      * @param series The architecture series targeted by this netlist.
      */
     public void expandMacroUnisims(Series series) {
-        //Invalidate Cached Data
-        resetParentNetMap();
-
         EDIFLibrary macros = Design.getMacroPrimitives(series);
         EDIFLibrary netlistPrims = getHDIPrimitivesLibrary();
 
@@ -2450,9 +2464,6 @@ public class EDIFNetlist extends EDIFName {
         if (external != null) {
             blackBoxExternalCells();
         }
-
-        // Invalidate parent net map due to macro collapses
-        resetParentNetMap();
     }
 
     public void blackBoxExternalCells() {

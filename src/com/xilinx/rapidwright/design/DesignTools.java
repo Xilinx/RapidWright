@@ -851,7 +851,6 @@ public class DesignTools {
     public static String resolveNetNameFromSiteWire(SiteInst inst, int siteWire) {
         String parentNetName = null;
         EDIFNetlist netlist = inst.getDesign().getNetlist();
-        Map<String,String> parentNetMap = netlist != null ? netlist.getParentNetMapNames() : Collections.emptyMap();
         BELPin[] pins = inst.getSite().getBELPins(siteWire);
         for (BELPin pin : pins) {
             if (pin.isSitePort()) continue;
@@ -861,7 +860,10 @@ public class DesignTools {
                 if (currNet == null) {
                     continue;
                 } else {
-                    return parentNetMap.getOrDefault(currNet.getName(), currNet.getName());
+                    String currNetName = currNet.getName();
+                    String currParentNetName = (netlist != null && currNetName != null)
+                            ? netlist.getParentNetName(currNetName) : null;
+                    return currParentNetName != null ? currParentNetName : currNetName;
                 }
             }
             String logPinName = c.getLogicalPinMapping(pin.getName());
@@ -869,7 +871,10 @@ public class DesignTools {
             if (portInst == null) continue;
             EDIFNet net =  portInst.getNet();
             String netName = c.getParentHierarchicalInstName() + EDIFTools.EDIF_HIER_SEP + net.getName();
-            parentNetName = parentNetMap.getOrDefault(netName, netName);
+            parentNetName = netlist != null ? netlist.getParentNetName(netName) : null;
+            if (parentNetName == null) {
+                parentNetName = netName;
+            }
         }
         return parentNetName;
     }
@@ -1164,11 +1169,6 @@ public class DesignTools {
             inst.setCellType(cellType);
         }
         netlist.removeUnusedCellsFromAllWorkLibraries();
-
-        // The logical netlist is final from here on, so the cached parent net map -- which describes
-        // the black boxes as they were, empty -- can be dropped now. Nothing below builds it again:
-        // every owner needed was recorded above, and a caller that wants the map pays for it
-        netlist.resetParentNetMap();
 
         Net vcc = design.getVccNet();
         Net gnd = design.getGndNet();
@@ -3704,7 +3704,6 @@ public class DesignTools {
             bbInst.getInst().setCellType(destCell);
             instsWithSeparator.add(e.getKey() + EDIFTools.EDIF_HIER_SEP);
         }
-        destNetlist.resetParentNetMap();
 
         Map<String,String> prefixes = new HashMap<>();
         for (String srcPrefix : srcToDestInstNames.keySet()) {
@@ -4171,7 +4170,7 @@ public class DesignTools {
      * encrypted cell or a primitive.
      */
     public static void makePhysNetNamesConsistent(Design design, boolean fromCellPins) {
-        final Map<EDIFHierNet, EDIFHierNet> netParentMap = design.getNetlist().getParentNetMap();
+        final EDIFNetlist netlist = design.getNetlist();
 
         // Static nets are lazily created; do them before going parallel
         final Net gndNet = design.getGndNet();
@@ -4197,9 +4196,9 @@ public class DesignTools {
             EDIFHierNet hierNet = net.getLogicalHierNet();
             if (hierNet == null) {
                 // Likely an encrypted cell
-                return fromCellPins ? getMergeFromCellPins(design, net, netParentMap, gndNet, vccNet) : null;
+                return fromCellPins ? getMergeFromCellPins(design, net, gndNet, vccNet) : null;
             }
-            EDIFHierNet parentHierNet = netParentMap.get(hierNet);
+            EDIFHierNet parentHierNet = netlist.getParentNet(hierNet);
             if (parentHierNet == null) {
                 // System.out.println("WARNING: Couldn't find parent net for '" +
                 //         hierNet.getHierarchicalNetName() + "'");
@@ -4310,11 +4309,11 @@ public class DesignTools {
      * cell pins on its site wires.
      * @return The merge, or null if the Net is to be left as it is.
      */
-    private static PhysNetMerge getMergeFromCellPins(Design design, Net net,
-            Map<EDIFHierNet, EDIFHierNet> netParentMap, Net gndNet, Net vccNet) {
+    private static PhysNetMerge getMergeFromCellPins(Design design, Net net, Net gndNet, Net vccNet) {
+        EDIFNetlist netlist = design.getNetlist();
         // A name reaching an instance of a cell with no contents is resolved inside that cell by
         // Vivado, which cannot be done here
-        if (isInsideOpaqueCell(design.getNetlist(), net.getName())) {
+        if (isInsideOpaqueCell(netlist, net.getName())) {
             return null;
         }
         EDIFHierNet parent = null;
@@ -4337,7 +4336,7 @@ public class DesignTools {
                     }
                     EDIFHierPortInst portInst = inst.getPortInst(logicalPin);
                     EDIFHierNet logical = portInst == null ? null : portInst.getHierarchicalNet();
-                    EDIFHierNet p = logical == null ? null : netParentMap.get(logical);
+                    EDIFHierNet p = logical == null ? null : netlist.getParentNet(logical);
                     if (p == null) {
                         return null;
                     }
@@ -4386,8 +4385,7 @@ public class DesignTools {
             return null; // Likely an encrypted cell
         }
 
-        Map<EDIFHierNet, EDIFHierNet> netParentMap = design.getNetlist().getParentNetMap();
-        EDIFHierNet parentHierNet = netParentMap.get(hierNet);
+        EDIFHierNet parentHierNet = design.getNetlist().getParentNet(hierNet);
         if (parentHierNet == null) {
             return null;
         }

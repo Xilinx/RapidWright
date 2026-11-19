@@ -61,6 +61,8 @@ import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.edif.EDIFCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
@@ -1935,18 +1937,26 @@ public class Router extends AbstractRouter {
     public void elaboratePhysicalNets() {
         Design d = getDesign();
         EDIFNetlist n = d.getNetlist();
-        d.getNetlist().resetParentNetMap();
-        Map<String,String> parentNetMap = getDesign().getNetlist().getParentNetMapNames();
 
         // Build a reverse net (Parent Net -> Net Aliases)
         Map<String,HashSet<String>> reverseNetMap = new HashMap<>();
-        for (Entry<String,String> e : parentNetMap.entrySet()) {
-            HashSet<String> aliases = reverseNetMap.get(e.getValue());
-            if (aliases == null) {
-                aliases = new HashSet<>();
-                reverseNetMap.put(e.getValue(), aliases);
+        Queue<EDIFHierCellInst> hierInsts = new LinkedList<>();
+        hierInsts.add(n.getTopHierCellInst());
+        while (!hierInsts.isEmpty()) {
+            EDIFHierCellInst hierInst = hierInsts.poll();
+            for (EDIFNet net : hierInst.getCellType().getNets()) {
+                EDIFHierNet hierNet = new EDIFHierNet(hierInst, net);
+                EDIFHierNet parentNet = n.getParentNet(hierNet);
+                if (parentNet != null) {
+                    reverseNetMap.computeIfAbsent(parentNet.getHierarchicalNetName(), k -> new HashSet<>())
+                            .add(hierNet.getHierarchicalNetName());
+                }
             }
-            aliases.add(e.getKey());
+            for (EDIFCellInst child : hierInst.getCellType().getCellInsts()) {
+                if (!child.getCellType().isLeafCellOrBlackBox()) {
+                    hierInsts.add(hierInst.getChild(child));
+                }
+            }
         }
 
         // For each aliased set of nets, find all primitive cell pins and ensure

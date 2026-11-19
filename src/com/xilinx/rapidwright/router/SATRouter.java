@@ -288,13 +288,12 @@ public class SATRouter {
      * for the SAT solver.
      */
     private void populateNetsToRoute() {
-        Map<String,String> parentNetMap = design.getNetlist().getParentNetMapNames();
         for (SiteInst i : design.getSiteInsts()) {
             for (Entry<String, Net> e : i.getSiteWireToNetMap().entrySet()) {
                 Net n = e.getValue();
                 if (e.getValue().isStaticNet()) continue;
                 if (n.getName().equals(Net.USED_NET)) continue;
-                String parentNetName = parentNetMap.get(n.getName());
+                String parentNetName = design.getNetlist().getParentNetName(n.getName());
                 if (parentNetName == null) {
                     // Try looking at the connected cell pin and use that net instead
                     int siteWireIdx = i.getSite().getSiteWireIndex(e.getKey());
