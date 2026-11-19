@@ -507,6 +507,13 @@ public class TestParallelismTools {
     }
 
     @Test
+    public void testJoinUnorderedEmpty() {
+        final Iterator<CompletableFuture<Integer>> it = ParallelismTools.joinUnordered(new ArrayList<>());
+        Assertions.assertFalse(it.hasNext());
+        Assertions.assertThrows(NoSuchElementException.class, it::next);
+    }
+
+    @Test
     public void testJoinUnorderedSkipsReturned() {
         // Already done, so each is returned in the List's order
         final int numItems = 1000;
@@ -559,6 +566,8 @@ public class TestParallelismTools {
             Iterator<CompletableFuture<Integer>> it = ParallelismTools.joinUnordered(futures);
             Assertions.assertSame(other, it.next());
             Assertions.assertFalse(blocked.isDone());
+            // One not yet returned remains, before the one returned
+            Assertions.assertTrue(it.hasNext());
 
             // Then the blocked one, waited for until it is released by another thread
             new Thread(() -> {
