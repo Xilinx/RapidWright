@@ -61,11 +61,27 @@ public class LecReport {
 
     private int truncated;
 
+    private int retimedDefined;
+
+    private int retimedAway;
+
+    private int retimingSteps;
+
+    private int retimingClocks;
+
     public LecReport(LecConfig config) {
         this.config = config;
         for (LecDifferenceType type : LecDifferenceType.values()) {
             counts.put(type, 0);
         }
+    }
+
+    /** Records the size of a retiming check, for the summary. */
+    void setRetimingCounts(int defined, int away, int steps, int clocks) {
+        retimedDefined = defined;
+        retimedAway = away;
+        retimingSteps = steps;
+        retimingClocks = clocks;
     }
 
     /**
@@ -181,6 +197,9 @@ public class LecReport {
         if (getPreexistingLoopCount() > 0 && !config.isAllowPreexistingLoops()) {
             return false;
         }
+        if (counts.get(LecDifferenceType.RETIMING_UNPROVEN) > 0) {
+            return false;
+        }
         return getInconclusiveCount() == 0 || config.isAllowInconclusive();
     }
 
@@ -206,6 +225,12 @@ public class LecReport {
         out.println("  equivalence differences  : " + getEquivalenceDifferenceCount());
         out.println("  loops introduced by IMP  : " + getIntroducedLoopCount());
         out.println("  loops in both netlists   : " + getPreexistingLoopCount());
+        if (retimedDefined > 0) {
+            out.println("  retimed registers        : " + retimedDefined + " defined, "
+                    + retimedAway + " retimed away");
+            out.println("  retiming obligations     : " + retimingSteps + " step, "
+                    + retimingClocks + " clock, " + retimedDefined + " initial state");
+        }
         for (LecDifferenceType type : LecDifferenceType.values()) {
             int count = counts.get(type);
             if (count > 0) {
@@ -312,6 +337,11 @@ public class LecReport {
             out.println("   " + getInconclusiveCount() + " cones could not be decided, so "
                     + "equivalence is not established for them");
             out.println("   use --allow-inconclusive to treat those as a warning instead");
+        }
+        if (counts.get(LecDifferenceType.RETIMING_UNPROVEN) > 0) {
+            out.println("   " + counts.get(LecDifferenceType.RETIMING_UNPROVEN) + " retiming "
+                    + "certificate obligations could not be decided, so the certificate is "
+                    + "not proven");
         }
     }
 

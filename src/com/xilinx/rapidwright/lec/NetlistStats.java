@@ -117,7 +117,7 @@ public class NetlistStats {
         stats.partitionCount = countPartitions(flat);
 
         for (int instId : flat.getLeafInstIds()) {
-            CellRole role = classifier.classify(flat.getCellType(instId));
+            CellRole role = classifier.classify(flat, conn, instId);
             stats.roleCounts.merge(role, 1, Integer::sum);
             String typeName = flat.getCellTypeName(instId);
             stats.typeCounts.merge(typeName, 1, Integer::sum);

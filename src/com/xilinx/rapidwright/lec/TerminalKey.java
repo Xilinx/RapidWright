@@ -60,6 +60,14 @@ public class TerminalKey {
     /** Key prefix for the output of an unmodelled cell inside the cloud. */
     public static final String OPAQUE_PREFIX = UNSTABLE_PREFIX + "opaque:";
 
+    /**
+     * Key prefix for the output of a register a retiming certificate defines.
+     * Its variable is private to one netlist, so a retimed register that keeps
+     * an old name cannot be confused with its namesake, and the certificate
+     * check substitutes it away; one left over would taint the cone.
+     */
+    public static final String RETIMED_PREFIX = UNSTABLE_PREFIX + "retimed:";
+
     private TerminalKey() {
     }
 
@@ -101,6 +109,14 @@ public class TerminalKey {
             sb.append(key.length()).append(':').append(key);
         }
         return sb.toString();
+    }
+
+    /**
+     * @return The key of a register output pin that a retiming certificate
+     *         defines, private to one netlist.
+     */
+    public static String forRetimed(String scope, String pinKey) {
+        return RETIMED_PREFIX + scope + ":" + pinKey;
     }
 
     /**

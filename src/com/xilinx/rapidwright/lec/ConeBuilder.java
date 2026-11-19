@@ -24,9 +24,12 @@ package com.xilinx.rapidwright.lec;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.xilinx.rapidwright.design.CellPinStaticDefaults;
 import com.xilinx.rapidwright.design.NetType;
@@ -143,6 +146,9 @@ public class ConeBuilder {
 
     private final String scope;
 
+    /** Instances of the registers whose outputs get private variables. */
+    private Set<Integer> privateRegisters = Collections.emptySet();
+
     /**
      * @param scope Label of the netlist being built, such as {@code "REF"}. It
      *              qualifies every unstable variable, so that the two netlists
@@ -190,6 +196,10 @@ public class ConeBuilder {
         if (role == null) {
             role = classifier.classify(flat.getCellType(instId));
             roleOfType[typeId] = role;
+        }
+        if (role == CellRole.TERMINAL
+                && PrimitiveModelLibrary.isConditional(flat.getCellTypeName(instId))) {
+            return classifier.classify(flat, conn, instId);
         }
         return role;
     }
@@ -421,6 +431,16 @@ public class ConeBuilder {
         PrimitiveModel model = library.get(flat.getCellTypeName(owner));
         int lit = model.build(aig, flat.getIndex(owner), flat.getInst(owner), bit,
                 frameLits[frame]);
+        if (lit == Aig.TRUE && PrimitiveModelLibrary.isConditional(flat.getCellTypeName(owner))) {
+            // A transparent gated clock buffer passes I only once I has been low
+            // after configuration. Logic that makes I constantly high (a tied I
+            // keeps the buffer a terminal) never opens the gate, so the output
+            // is unknown: an unstable variable leaves its loads unproven.
+            log.warn(UNMODELED_OUTPUT, flat.getCellTypeName(owner) + "."
+                    + flat.getIndex(owner).getPortBitName(bit) + " with I constantly high",
+                    flat.getInstName(owner));
+            lit = unstableInput(TerminalKey.OPAQUE_PREFIX, unstablePinName(owner, bit));
+        }
         litOf[pin] = lit;
         state[pin] = BLACK;
         pop();
@@ -473,6 +493,9 @@ public class ConeBuilder {
             return Aig.TRUE;
         }
         int bit = pin - flat.getGlobalPin(instId, 0);
+        if (isPrivateRegister(instId)) {
+            return aig.newInput(TerminalKey.forRetimed(scope, flat.getPinName(instId, bit)), false);
+        }
         if (classifier.isMatchedByName(role)) {
             return aig.newInput(flat.getPinName(instId, bit), true);
         }
@@ -488,6 +511,28 @@ public class ConeBuilder {
     private String unstablePinName(int instId, int bit) {
         String name = flat.getPinName(instId, bit);
         return flat.getKeyProperty() == null ? name : name + "#" + flat.getGlobalPin(instId, bit);
+    }
+
+    /**
+     * Gives the outputs of these registers variables private to this netlist,
+     * named by {@link TerminalKey#forRetimed(String, String)}: they are the
+     * registers a retiming certificate defines.
+     */
+    public void setPrivateRegisters(Set<String> registers) {
+        // Resolved to instances once, so the check made at every cone boundary
+        // is a lookup rather than a hierarchical name built per call.
+        Set<Integer> ids = new HashSet<>();
+        for (String register : registers) {
+            int id = flat.findInstId(register);
+            if (id >= 0) {
+                ids.add(id);
+            }
+        }
+        privateRegisters = ids;
+    }
+
+    private boolean isPrivateRegister(int instId) {
+        return !privateRegisters.isEmpty() && privateRegisters.contains(instId);
     }
 
     /** Mints an unstable variable private to this netlist. */
@@ -525,7 +570,14 @@ public class ConeBuilder {
         }
         int[] drivers = conn.getExtraDrivers(root);
         int lit;
-        if (drivers != null && conn.getTopSourceCount(root) == 0) {
+        boolean privateDriver = false;
+        if (drivers != null) {
+            for (int driver : drivers) {
+                privateDriver |= isPrivateRegister(pinOwner[driver]);
+            }
+        }
+        boolean topSource = conn.getTopSourceCount(root) > 0;
+        if (drivers != null && !privateDriver && !topSource) {
             String[] names = new String[drivers.length];
             for (int i = 0; i < drivers.length; i++) {
                 int owner = pinOwner[drivers[i]];
@@ -538,7 +590,8 @@ public class ConeBuilder {
         } else {
             lit = unstableInput(TerminalKey.MULTI_DRIVER_PREFIX, "#" + (unstableCounter++));
             log.warn(UNSTABLE_MULTI_DRIVER, drivers == null ? "unknown drivers"
-                    : drivers.length + " drivers and a top level port", exampleDriverName(drivers));
+                    : drivers.length + (topSource ? " drivers and a top level port" : " drivers"),
+                    exampleDriverName(drivers));
         }
         multiDriverLits.put(root, lit);
         return lit;
@@ -622,8 +675,28 @@ public class ConeBuilder {
      * otherwise.
      */
     static NetType pinDefault(Series series, Unisim unisim, String pinName) {
+        NetType tie = listedPinDefault(series, unisim, pinName);
+        return tie == null ? NetType.GND : tie;
+    }
+
+    /** @see #pinDefault(Series, Unisim, String) */
+    static NetType pinDefault(Series series, String typeName, String pinName) {
+        return pinDefault(series, toUnisim(typeName), pinName);
+    }
+
+    /**
+     * @return The tie value the pin default table lists for an unconnected
+     *         pin, or null without a recognised part or for a pin the table
+     *         does not list, where {@link #pinDefault(Series, Unisim, String)}
+     *         falls back to ground.
+     */
+    static NetType listedPinDefault(Series series, String typeName, String pinName) {
+        return listedPinDefault(series, toUnisim(typeName), pinName);
+    }
+
+    private static NetType listedPinDefault(Series series, Unisim unisim, String pinName) {
         if (series == null || unisim == Unisim.GND) {
-            return NetType.GND;
+            return null;
         }
         try {
             // The table names the bits of a bus pin (e.g. RAMB36E2's WEA[0]); a bus
@@ -633,15 +706,10 @@ public class ConeBuilder {
             if (tie == null && !basePin.equals(pinName)) {
                 tie = CellPinStaticDefaults.getCellPinDefault(series, unisim, basePin);
             }
-            return tie == null ? NetType.GND : tie;
+            return tie;
         } catch (RuntimeException e) {
-            return NetType.GND;
+            return null;
         }
-    }
-
-    /** @see #pinDefault(Series, Unisim, String) */
-    static NetType pinDefault(Series series, String typeName, String pinName) {
-        return pinDefault(series, toUnisim(typeName), pinName);
     }
 
     private void push(int pin) {
