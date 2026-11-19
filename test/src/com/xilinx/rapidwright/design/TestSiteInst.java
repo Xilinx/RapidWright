@@ -49,7 +49,6 @@ import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
-import com.xilinx.rapidwright.util.VivadoTools;
 import com.xilinx.rapidwright.util.VivadoToolsHelper;
 
 public class TestSiteInst {
@@ -435,7 +434,7 @@ public class TestSiteInst {
         _testRouteSiteVersal(d, "SLICE_X142Y4", 40, 24);
 
         if (FileTools.isVivadoOnPath()) {
-            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(d);
+            ReportRouteStatusResult rrs = VivadoToolsHelper.reportRouteStatus(d);
             // The original design had 14 pre-existing routing errors
             Assertions.assertEquals(14, rrs.netsWithRoutingErrors);
             Assertions.assertEquals(276, rrs.fullyRoutedNets);
