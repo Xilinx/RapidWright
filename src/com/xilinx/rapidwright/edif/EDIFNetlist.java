@@ -1851,21 +1851,20 @@ public class EDIFNetlist extends EDIFName {
     }
 
     /**
-     * Drops everything that is kept for finding parent nets and physical pins.
-     * @deprecated No longer needed after changes to what is connected that are made through the
-     * methods of the netlist classes, which are followed (see
-     * {@link #getParentNet(EDIFHierNet)}). Other changes are not followed:
+     * Drops everything that is kept for finding parent nets and physical pins. This is not needed
+     * after changes to what is connected that are made through the methods of the netlist
+     * classes, which are followed (see {@link #getParentNet(EDIFHierNet)}). It is needed after
+     * the changes that are not followed:
      * <ul>
      * <li>Removing a net or a cell instance through the collection that
      * {@link EDIFCell#getNets()} or {@link EDIFCell#getCellInsts()} returns, or changing the port
-     * instances of a cell instance through {@link EDIFCellInst#getPortInsts()}: use the methods
-     * of the cell, the net and the port instance instead.</li>
+     * instances of a cell instance through {@link EDIFCellInst#getPortInsts()}. The methods of
+     * the cell, the net and the port instance make these changes without it.</li>
      * <li>Renaming a cell that is named VCC or GND, or giving a cell one of these names, which
      * changes the pins that {@link #getPhysicalVccPins()} and {@link #getPhysicalGndPins()}
      * return.</li>
      * </ul>
      */
-    @Deprecated
     public void resetParentNetMap() {
         parentNets.reset();
     }
