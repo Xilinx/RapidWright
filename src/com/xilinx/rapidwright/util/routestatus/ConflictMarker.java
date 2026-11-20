@@ -30,13 +30,14 @@ import static com.xilinx.rapidwright.util.routestatus.NetStatus.ROUTED;
 import static com.xilinx.rapidwright.util.routestatus.NetStatus.STATIC_CLAIMS;
 import static com.xilinx.rapidwright.util.routestatus.NetStatus.UNROUTED;
 import static com.xilinx.rapidwright.util.routestatus.NetStatus.has;
-import static com.xilinx.rapidwright.util.routestatus.RouteStatusEngine.parallelFor;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import com.xilinx.rapidwright.util.ParallelismTools;
 
 /**
  * Marks the nets that use the same nodes (through their routing, or their site pins) as conflicting,
@@ -93,21 +94,27 @@ final class ConflictMarker {
         for (int i = 0; i < numEntries; i++) {
             offsets[i + 1] = offsets[i] + (entries.nodeKeys[i] == null ? 0 : entries.nodeKeys[i].length);
         }
-        parallelFor(numEntries, (i) -> {
-            long[] keys = entries.nodeKeys[i];
-            if (keys == null) {
-                return;
-            }
-            int o = offsets[i];
-            int routing = (entries.numRoutingKeys == null || entries.numRoutingKeys[i] < 0) ? keys.length
-                    : entries.numRoutingKeys[i];
-            for (int j = 0; j < keys.length; j++) {
-                long k = keys[j];
-                long compact = ((k >>> 32) << wireBits) | (k & 0xffffffffL);
-                tagged[o++] = (((compact << entryBits) | i) << 1) | (j >= routing ? 1 : 0);
+        ParallelismTools.chunkedStream(0, numEntries, 1).forEach((r) -> {
+            for (int i = r[0]; i < r[1]; i++) {
+                long[] keys = entries.nodeKeys[i];
+                if (keys == null) {
+                    continue;
+                }
+                int o = offsets[i];
+                int routing = (entries.numRoutingKeys == null || entries.numRoutingKeys[i] < 0) ? keys.length
+                        : entries.numRoutingKeys[i];
+                for (int j = 0; j < keys.length; j++) {
+                    long k = keys[j];
+                    long compact = ((k >>> 32) << wireBits) | (k & 0xffffffffL);
+                    tagged[o++] = (((compact << entryBits) | i) << 1) | (j >= routing ? 1 : 0);
+                }
             }
         });
-        Arrays.parallelSort(tagged);
+        if (ParallelismTools.getParallel()) {
+            Arrays.parallelSort(tagged);
+        } else {
+            Arrays.sort(tagged);
+        }
         long entryMask = (1L << entryBits) - 1;
         int keyShift = entryBits + 1;
         int[] users = new int[16];

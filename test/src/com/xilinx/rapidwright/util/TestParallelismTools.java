@@ -37,8 +37,9 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicIntegerArray;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -438,6 +439,41 @@ public class TestParallelismTools {
         Assertions.assertTrue(ParallelismTools.invokeFirstSubmitRest(new Callable[0]).isEmpty());
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testChunkedStreamOfRanges(boolean parallel) {
+        boolean wasParallel = ParallelismTools.getParallel();
+        try {
+            Assumptions.assumeTrue(ParallelismTools.setParallel(parallel));
+            // Parallel only when parallel processing is enabled, unlike chunkRanges()
+            Assertions.assertEquals(parallel, ParallelismTools.chunkedStream(0, 1000, 10).isParallel());
+            Assertions.assertFalse(ParallelismTools.chunkRanges(0, 1000, 10).isParallel());
+
+            // Every index is in exactly one chunk, whichever threads run the chunks
+            final AtomicIntegerArray seen = new AtomicIntegerArray(1000);
+            ParallelismTools.chunkedStream(3, 1000, 10).forEach((r) -> {
+                for (int i = r[0]; i < r[1]; i++) {
+                    seen.incrementAndGet(i);
+                }
+            });
+            for (int i = 0; i < seen.length(); i++) {
+                Assertions.assertEquals(i < 3 ? 0 : 1, seen.get(i), "index " + i);
+            }
+
+            // In encounter order when collected
+            int next = 3;
+            for (int[] r : ParallelismTools.chunkedStream(3, 1000, 10).collect(Collectors.toList())) {
+                Assertions.assertEquals(next, r[0]);
+                next = r[1];
+            }
+            Assertions.assertEquals(1000, next);
+
+            Assertions.assertEquals(0, ParallelismTools.chunkedStream(5, 5, 10).count());
+        } finally {
+            ParallelismTools.setParallel(wasParallel);
+        }
+    }
+
     @Test
     public void testJoinOrdered() {
         final AtomicIntegerArray runs = new AtomicIntegerArray(NUM_TASKS);
@@ -506,6 +542,43 @@ public class TestParallelismTools {
     }
 
     @Test
+    public void testJoinUnorderedEmpty() {
+        final Iterator<CompletableFuture<Integer>> it = ParallelismTools.joinUnordered(new ArrayList<>());
+        Assertions.assertFalse(it.hasNext());
+        Assertions.assertThrows(NoSuchElementException.class, it::next);
+    }
+
+    @Test
+    public void testJoinUnorderedSkipsReturned() {
+        // Already done, so each is returned in the List's order
+        final int numItems = 1000;
+        final AtomicInteger reads = new AtomicInteger();
+        final List<CompletableFuture<Integer>> futures = new ArrayList<CompletableFuture<Integer>>() {
+            @Override
+            public CompletableFuture<Integer> get(int index) {
+                reads.incrementAndGet();
+                return super.get(index);
+            }
+        };
+        for (int i = 0; i < numItems; i++) {
+            futures.add(CompletableFuture.completedFuture(i));
+        }
+        final Iterator<CompletableFuture<Integer>> it = ParallelismTools.joinUnordered(futures);
+        for (int i = 0; i < numItems; i++) {
+            Assertions.assertEquals(i, ParallelismTools.get(it.next()));
+        }
+        // Those already returned are not read again, so draining them takes linear (not quadratic) time
+        Assertions.assertTrue(reads.get() <= 4 * numItems, "List elements read: " + reads.get());
+
+        // Items added to the end once all have been returned are still included
+        Assertions.assertFalse(it.hasNext());
+        futures.add(CompletableFuture.completedFuture(numItems));
+        Assertions.assertTrue(it.hasNext());
+        Assertions.assertEquals(numItems, ParallelismTools.get(it.next()));
+        Assertions.assertFalse(it.hasNext());
+    }
+
+    @Test
     public void testJoinUnorderedReturnsDoneBeforeRunning() throws InterruptedException {
         boolean wasParallel = ParallelismTools.getParallel();
         // Which cannot be enabled if there is only one processor, or if it was disabled at startup (RW_PARALLEL=0):
@@ -528,6 +601,8 @@ public class TestParallelismTools {
             Iterator<CompletableFuture<Integer>> it = ParallelismTools.joinUnordered(futures);
             Assertions.assertSame(other, it.next());
             Assertions.assertFalse(blocked.isDone());
+            // One not yet returned remains, before the one returned
+            Assertions.assertTrue(it.hasNext());
 
             // Then the blocked one, waited for until it is released by another thread
             new Thread(() -> {

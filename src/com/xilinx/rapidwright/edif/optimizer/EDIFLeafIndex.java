@@ -36,6 +36,7 @@ import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
+import com.xilinx.rapidwright.util.ParallelismTools;
 
 /**
  * A flat, integer-indexed view of the leaf-level connectivity of a hierarchical
@@ -250,12 +251,11 @@ public class EDIFLeafIndex {
                 }
             }
         }
-        List<DefInfo> infos = new ArrayList<>(defList.size());
-        defList.parallelStream().map(EDIFLeafIndex::computeDef).forEachOrdered(infos::add);
+        List<DefInfo> infos = ParallelismTools.invokeAll(defList, EDIFLeafIndex::computeDef);
         for (int i = 0; i < defList.size(); i++) {
             defs.put(defList.get(i), infos.get(i));
         }
-        infos.parallelStream().forEach(this::computeInner);
+        ParallelismTools.forEach(infos, this::computeInner);
         lap("definitions");
 
         // Pass 1: enumerate hierarchical instances and leaves

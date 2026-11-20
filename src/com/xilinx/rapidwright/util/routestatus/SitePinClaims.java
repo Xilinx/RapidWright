@@ -31,7 +31,6 @@ import static com.xilinx.rapidwright.util.routestatus.NodeKeys.concat;
 import static com.xilinx.rapidwright.util.routestatus.NodeKeys.nodeKey;
 import static com.xilinx.rapidwright.util.routestatus.NodeKeys.sortedDistinct;
 import static com.xilinx.rapidwright.util.routestatus.NodeKeys.toSortedDistinct;
-import static com.xilinx.rapidwright.util.routestatus.RouteStatusEngine.parallelFor;
 import static com.xilinx.rapidwright.util.routestatus.SiteRouting.getPrimarySitePinName;
 import static com.xilinx.rapidwright.util.routestatus.SiteRouting.getSitePinNode;
 import static com.xilinx.rapidwright.util.routestatus.SiteRouting.getSitePinNodes;
@@ -47,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -173,16 +173,13 @@ final class SitePinClaims {
         Map<Net, Integer> entryOf = entries.getEntryOfNet();
         List<SiteInst> siteInsts = new ArrayList<>(design.getSiteInsts());
         Set<SiteInst> portSites = getPortSites();
-        int chunks = Math.max(1, Math.min(siteInsts.size() / 1024, ParallelismTools.maxParallelism() * 4));
-        KeyBuffer[] found = new KeyBuffer[chunks];
-        parallelFor(chunks, (c) -> {
-            int from = (int) ((long) siteInsts.size() * c / chunks);
-            int to = (int) ((long) siteInsts.size() * (c + 1) / chunks);
-            found[c] = new KeyBuffer(Math.max(64, Math.min((to - from) * 8, 1 << 16)));
-            for (int s = from; s < to; s++) {
-                addSitePinKeys(siteInsts.get(s), entryOf, portSites, found[c]);
+        List<KeyBuffer> found = ParallelismTools.chunkedStream(0, siteInsts.size(), 1024).map((r) -> {
+            KeyBuffer buffer = new KeyBuffer(Math.max(64, Math.min((r[1] - r[0]) * 8, 1 << 16)));
+            for (int s = r[0]; s < r[1]; s++) {
+                addSitePinKeys(siteInsts.get(s), entryOf, portSites, buffer);
             }
-        });
+            return buffer;
+        }).collect(Collectors.toList());
         int[] counts = new int[entries.size()];
         for (KeyBuffer buffer : found) {
             for (int i = 0; i < buffer.size; i++) {
@@ -292,11 +289,12 @@ final class SitePinClaims {
         }
         // The pins are looked at by segment (rather than by flat net, as a static net may be one
         // huge flat net)
-        List<EDIFHierNet> segments = Collections.synchronizedList(new ArrayList<>());
-        parallelFor(flats.size(), (f) -> segments.addAll(flats.get(f).getSegments(design)));
-        List<Long> found = Collections.synchronizedList(new ArrayList<>());
-        parallelFor(segments.size(), (i) -> {
-            for (EDIFHierPortInst p : RouteStatusNetlist.getLeafPortInsts(segments.get(i))) {
+        List<EDIFHierNet> segments = ParallelismTools.stream(flats)
+                .flatMap((flat) -> flat.getSegments(design).stream()).collect(Collectors.toList());
+        List<Long> found = ParallelismTools.stream(segments).flatMap((segment) -> {
+            // The keys found on this segment, not allocated until needed
+            List<Long> localFound = null;
+            for (EDIFHierPortInst p : RouteStatusNetlist.getLeafPortInsts(segment)) {
                 if (p.isOutput() || !mayBePlacedOnLUT(p.getPortInst().getCellInst().getCellType().getName())) {
                     continue;
                 }
@@ -313,11 +311,16 @@ final class SitePinClaims {
                         continue;
                     }
                     for (Node node : getSitePinNodes(si, belPin.getSiteWireIndex(), true)) {
-                        found.add(nodeKey(node));
+                        if (localFound == null) {
+                            localFound = new ArrayList<>();
+                        }
+                        localFound.add(nodeKey(node));
                     }
                 }
             }
-        });
+            // (flatMap() takes null as no keys)
+            return localFound == null ? null : localFound.stream();
+        }).collect(Collectors.toList());
         if (found.isEmpty()) {
             return;
         }
@@ -399,34 +402,36 @@ final class SitePinClaims {
      * net's (from the placement), in conflict with the other net.
      */
     void addClaimedLoadSitePins() {
-        parallelFor(entries.nets.size(), (i) -> {
-            FlatNet flat = entries.flats.get(i);
-            int st = entries.status[i];
-            boolean unrouted = has(st, UNROUTED) || (has(st, NODRIVER) && !has(st, HAS_ROUTING));
-            if (entries.nets.get(i) != null || flat == null || !unrouted || entries.aliasNets.containsKey(i)) {
-                return;
-            }
-            List<Long> keys = new ArrayList<>();
-            for (LeafPin pin : flat.getLeafPins(design)) {
-                if (pin.isOutput() || !pin.isPlaced()) {
+        ParallelismTools.chunkedStream(0, entries.nets.size(), 1).forEach((r) -> {
+            for (int i = r[0]; i < r[1]; i++) {
+                FlatNet flat = entries.flats.get(i);
+                int st = entries.status[i];
+                boolean unrouted = has(st, UNROUTED) || (has(st, NODRIVER) && !has(st, HAS_ROUTING));
+                if (entries.nets.get(i) != null || flat == null || !unrouted || entries.aliasNets.containsKey(i)) {
                     continue;
                 }
-                SiteInst si = pin.cell.getSiteInst();
-                for (String physPin : pin.getPhysicalPins()) {
-                    BELPin belPin = pin.cell.getBEL().getPin(physPin);
-                    if (belPin == null || si.getNetFromSiteWireIndex(belPin.getSiteWireIndex()) == null) {
+                List<Long> keys = new ArrayList<>();
+                for (LeafPin pin : flat.getLeafPins(design)) {
+                    if (pin.isOutput() || !pin.isPlaced()) {
                         continue;
                     }
-                    for (Node node : getSitePinNodes(si, belPin.getSiteWireIndex(), true)) {
-                        keys.add(nodeKey(node));
+                    SiteInst si = pin.cell.getSiteInst();
+                    for (String physPin : pin.getPhysicalPins()) {
+                        BELPin belPin = pin.cell.getBEL().getPin(physPin);
+                        if (belPin == null || si.getNetFromSiteWireIndex(belPin.getSiteWireIndex()) == null) {
+                            continue;
+                        }
+                        for (Node node : getSitePinNodes(si, belPin.getSiteWireIndex(), true)) {
+                            keys.add(nodeKey(node));
+                        }
                     }
                 }
-            }
-            flat.releaseLeafPins();
-            if (!keys.isEmpty()) {
-                long[] merged = concat(entries.driverPinKeys[i], toSortedDistinct(keys));
-                entries.driverPinKeys[i] = sortedDistinct(merged, merged.length);
-                entries.status[i] |= LOGICAL_ONLY;
+                flat.releaseLeafPins();
+                if (!keys.isEmpty()) {
+                    long[] merged = concat(entries.driverPinKeys[i], toSortedDistinct(keys));
+                    entries.driverPinKeys[i] = sortedDistinct(merged, merged.length);
+                    entries.status[i] |= LOGICAL_ONLY;
+                }
             }
         });
     }

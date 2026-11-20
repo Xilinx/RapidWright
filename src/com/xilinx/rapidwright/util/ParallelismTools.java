@@ -479,19 +479,18 @@ public class ParallelismTools {
      * See also {@link #joinAll(List)}, which steals them in order instead.
      * @param futures A List of Future objects corresponding to previously
      *                submitted tasks.
-     * @param <T> Type returned by all tasks.
      */
-    public static <T> void join(List<? extends Future<? extends T>> futures) {
+    public static void join(List<? extends Future<?>> futures) {
         if (getParallel()) {
             // Walk backwards and try and steal those not done
-            ListIterator<? extends Future<? extends T>> it = futures.listIterator(futures.size());
+            ListIterator<? extends Future<?>> it = futures.listIterator(futures.size());
             while (it.hasPrevious()) {
                 runIfUnclaimed(it.previous());
             }
         }
 
         // Now block to wait for other threads to finish their tasks
-        for (Future<? extends T> f : futures) {
+        for (Future<?> f : futures) {
             get(f);
         }
     }
@@ -632,12 +631,15 @@ public class ParallelismTools {
     public static <E> Iterator<E> joinUnordered(@NotNull List<E> items,
                                                 @NotNull Function<? super E, ? extends CompletableFuture<?>> futureOf) {
         return new Iterator<E>() {
-            // The number of items returned so far, each of whose elements is null
-            private int returned = 0;
+            // The lowest index of an item not yet returned, or items.size() if there is none: every element before it
+            // is null (returned), and its own is not. Items are returned in whatever order they are done, so those
+            // after it may also have been returned already. Searches start from it, rather than scanning again those
+            // already returned on every call
+            private int lowestUnreturnedIndex = 0;
 
             @Override
             public boolean hasNext() {
-                return returned < items.size();
+                return lowestUnreturnedIndex < items.size();
             }
 
             @Override
@@ -651,20 +653,24 @@ public class ParallelismTools {
                         done = indexOf((f) -> runIfUnclaimed(f));
                     }
                     if (done >= 0) {
-                        returned++;
-                        return items.set(done, null);
+                        E item = items.set(done, null);
+                        while (lowestUnreturnedIndex < items.size() && items.get(lowestUnreturnedIndex) == null) {
+                            lowestUnreturnedIndex++;
+                        }
+                        return item;
                     }
                     // Every one has been claimed by another thread (so will complete without this one), and none is
                     // done yet. The exception of the one done, if any, is left for get(), as handle() completes
                     // normally
-                    getUnwrapped(CompletableFuture.anyOf(items.stream().filter((item) -> item != null).map(futureOf)
-                            .toArray(CompletableFuture<?>[]::new)).handle((r, e) -> null));
+                    getUnwrapped(CompletableFuture.anyOf(items.subList(lowestUnreturnedIndex, items.size()).stream()
+                            .filter((item) -> item != null).map(futureOf).toArray(CompletableFuture<?>[]::new))
+                            .handle((r, e) -> null));
                 }
             }
 
             /** The index of the first item not yet returned whose CompletableFuture passes the given test, if any */
             private int indexOf(Predicate<CompletableFuture<?>> test) {
-                for (int i = 0; i < items.size(); i++) {
+                for (int i = lowestUnreturnedIndex; i < items.size(); i++) {
                     E item = items.get(i);
                     if (item != null && test.test(futureOf.apply(item))) {
                         return i;
@@ -839,7 +845,23 @@ public class ParallelismTools {
      *         their order matters), else a sequential one.
      */
     public static <T> Stream<List<T>> chunkedStream(@NotNull List<T> items) {
-        final Stream<List<T>> chunks = chunkRanges(0, items.size()).map(r -> items.subList(r[0], r[1]));
+        return chunkedStream(0, items.size(), 1).map(r -> items.subList(r[0], r[1]));
+    }
+
+    /**
+     * The chunks of {@link #chunkRanges(int, int, int)}, for a task to be run on each chunk in parallel: when parallel
+     * processing is enabled, a parallel stream of them (so use an operation that respects encounter order, such as
+     * forEachOrdered() or collect(), if their order matters), else a sequential one, of a single chunk of all the
+     * indices. Unlike {@link #chunkRanges(int, int, int)}, whose stream is always sequential (e.g. to submit a task
+     * for each chunk in order).
+     * @param start The first index.
+     * @param end One past the last index.
+     * @param minChunkSize The fewest indices in each chunk (but the last).
+     * @return The chunks, in encounter order, each as {@code {from, to}}: the indices from from (inclusive) to to
+     *         (exclusive); none if end is not after start.
+     */
+    public static Stream<int[]> chunkedStream(int start, int end, int minChunkSize) {
+        final Stream<int[]> chunks = chunkRanges(start, end, minChunkSize);
         return getParallel() ? chunks.parallel() : chunks;
     }
 
@@ -848,7 +870,9 @@ public class ParallelismTools {
      * When parallel processing is enabled, a parallel stream is used, where the calling thread
      * splits the items (using the collection's own Spliterator) into roughly four pieces per
      * thread of the common ForkJoinPool (or one per item, if there are fewer), which are
-     * distributed by work stealing, and the calling thread also participates.
+     * distributed by work stealing, and the calling thread also participates. A single item is
+     * run directly on the calling thread, as when parallel processing is disabled, without the
+     * cost of a stream.
      * If the task throws for any item, that exception is rethrown as described for this class;
      * in that case, the task may not have been run for other items, or may still be running.
      * @param items the items to call the task with
@@ -857,7 +881,11 @@ public class ParallelismTools {
      */
     public static <T> void forEach(Collection<T> items, Consumer<T> task) {
         try {
-            stream(items).forEach(task);
+            if (!getParallel() || items.size() <= 1) {
+                items.forEach(task);
+            } else {
+                items.parallelStream().forEach(task);
+            }
         } catch (RuntimeException | Error e) {
             throw rethrow(e);
         }
