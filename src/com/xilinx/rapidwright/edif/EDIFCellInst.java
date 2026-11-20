@@ -126,7 +126,8 @@ public class EDIFCellInst extends EDIFPropertyObject {
      * @param epr The port instance object to remove
      * @return The removed port instance, or null if it was not found.
      */
-    protected EDIFPortInst removePortInst(EDIFPortInst epr) {
+    public EDIFPortInst removePortInst(EDIFPortInst epr) {
+        if (portInsts == null) return null;
         return removePortInst(epr.getCellInst(), epr.getName());
     }
 
@@ -207,6 +208,14 @@ public class EDIFCellInst extends EDIFPropertyObject {
         }
     }
 
+    /**
+     * @return The port instances of this cell instance as they are stored: null, or a sorted array
+     * that may end with unused (null) entries. It must not be changed.
+     */
+    EDIFPortInst[] getPortInstArray() {
+        return portInsts;
+    }
+
     /** Number of port instances on this cell instance (same as getPortInsts().size()). */
     public int getPortInstCount() {
         return EDIFPortInstArray.size(portInsts);
@@ -266,6 +275,10 @@ public class EDIFCellInst extends EDIFPropertyObject {
             this.cellType.decrementNonHierInstantiationCount();
         }
         this.cellType = cellType;
+        if (EDIFNetConnectivity.active) {
+            // The nets on the ports of this instance connect to those of another cell
+            EDIFNetConnectivity.cellInstChanged(this);
+        }
         if (parentCell != null && cellType != null) {
             cellType.incrementNonHierInstantiationCount();
         }

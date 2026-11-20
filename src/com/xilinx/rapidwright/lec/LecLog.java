@@ -1,0 +1,199 @@
+/*
+ * Copyright (c) 2026, Advanced Micro Devices, Inc.
+ * All rights reserved.
+ *
+ * Author: Chris Lavin, Advanced Micro Devices, Inc.
+ *
+ * This file is part of RapidWright.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+package com.xilinx.rapidwright.lec;
+
+import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
+/**
+ * De-duplicating warning collector.
+ *
+ * At the scale this tool targets, a single systematic issue (an unmodeled cell
+ * type, an undriven control pin) can occur hundreds of thousands of times.
+ * Printing each occurrence would bury the report, so warnings are keyed on a
+ * category plus a subject and only the count and a single representative
+ * example are retained.
+ */
+public class LecLog {
+
+    /** Maximum number of distinct example strings retained per warning key. */
+    private static final int MAX_EXAMPLES = 3;
+
+    private final Map<String, Warning> warnings = new LinkedHashMap<>();
+
+    private boolean verbose;
+
+    private PrintStream out;
+
+    public LecLog(boolean verbose, PrintStream out) {
+        this.verbose = verbose;
+        this.out = out;
+    }
+
+    /**
+     * Records one occurrence of a warning.
+     *
+     * @param category Broad grouping, printed as the warning headline.
+     * @param subject  What the warning is about, typically a cell type or pin
+     *                 name. Occurrences sharing a category and subject collapse
+     *                 into a single reported line.
+     * @param example  A concrete instance name or other locator. May be null.
+     */
+    public void warn(String category, String subject, String example) {
+        String key = category + "\0" + subject;
+        Warning w = warnings.get(key);
+        if (w == null) {
+            w = new Warning(category, subject);
+            warnings.put(key, w);
+        }
+        w.count++;
+        if (example != null && w.examples.size() < MAX_EXAMPLES) {
+            w.examples.add(example);
+        }
+    }
+
+    /**
+     * Prints a message only when running in verbose mode. Unlike
+     * {@link #warn(String, String, String)} this is not de-duplicated, so it
+     * must not be called from a per-cell loop.
+     */
+    public void info(String message) {
+        if (verbose) {
+            out.println("INFO: " + message);
+        }
+    }
+
+    public boolean isVerbose() {
+        return verbose;
+    }
+
+    public PrintStream getPrintStream() {
+        return out;
+    }
+
+    /**
+     * @return The total number of occurrences recorded for the given category,
+     *         summed over all subjects.
+     */
+    public long getCount(String category) {
+        long total = 0;
+        for (Warning w : warnings.values()) {
+            if (w.category.equals(category)) {
+                total += w.count;
+            }
+        }
+        return total;
+    }
+
+    /**
+     * @return The distinct subjects recorded under the given category, mapped to
+     *         their occurrence counts, ordered by descending count.
+     */
+    public Map<String, Long> getSubjectCounts(String category) {
+        List<Warning> selected = new ArrayList<>();
+        for (Warning w : warnings.values()) {
+            if (w.category.equals(category)) {
+                selected.add(w);
+            }
+        }
+        selected.sort(Comparator.comparingLong((Warning w) -> -w.count)
+                .thenComparing((Warning w) -> w.subject));
+        Map<String, Long> result = new LinkedHashMap<>();
+        for (Warning w : selected) {
+            result.put(w.subject, w.count);
+        }
+        return result;
+    }
+
+    /**
+     * Prints every collected warning, one line per distinct category and
+     * subject, with the occurrence count and up to
+     * {@value #MAX_EXAMPLES} examples.
+     */
+    public void printWarnings(PrintStream stream) {
+        if (warnings.isEmpty()) {
+            return;
+        }
+        stream.println();
+        stream.println("Warnings:");
+        List<Warning> sorted = new ArrayList<>(warnings.values());
+        sorted.sort(Comparator.comparing((Warning w) -> w.category)
+                .thenComparingLong((Warning w) -> -w.count)
+                .thenComparing((Warning w) -> w.subject));
+        for (Warning w : sorted) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("  WARNING: ").append(w.category).append(": ").append(w.subject);
+            sb.append(" (").append(w.count).append(w.count == 1 ? " occurrence" : " occurrences");
+            sb.append(")");
+            if (!w.examples.isEmpty()) {
+                sb.append(" e.g. ").append(String.join(", ", w.examples));
+            }
+            stream.println(sb);
+        }
+    }
+
+    /**
+     * @return The number of distinct category and subject pairs recorded.
+     */
+    public int getDistinctWarningCount() {
+        return warnings.size();
+    }
+
+    /**
+     * A single de-duplicated warning: its identity, how often it occurred, and a
+     * bounded set of examples.
+     */
+    private static class Warning {
+
+        private final String category;
+
+        private final String subject;
+
+        private final List<String> examples = new ArrayList<>(MAX_EXAMPLES);
+
+        private long count;
+
+        Warning(String category, String subject) {
+            this.category = category;
+            this.subject = subject;
+        }
+    }
+
+    /**
+     * @return An unmodifiable view of every recorded warning key mapped to its
+     *         count, for test assertions.
+     */
+    public Map<String, Long> getAllCounts() {
+        Map<String, Long> result = new LinkedHashMap<>();
+        for (Entry<String, Warning> e : warnings.entrySet()) {
+            Warning w = e.getValue();
+            result.put(w.category + ": " + w.subject, w.count);
+        }
+        return result;
+    }
+}

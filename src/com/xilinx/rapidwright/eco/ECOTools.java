@@ -473,8 +473,8 @@ public class ECOTools {
             }
         }
 
+        // The parent nets looked up below follow the changes made to the netlist above
         final EDIFNetlist netlist = design.getNetlist();
-        netlist.resetParentNetMap();
 
         // Modify the physical netlist
         EDIFCell ecGnd = netlist.getHDIPrimitive(Unisim.GND);
@@ -711,9 +711,8 @@ public class ECOTools {
             }
         }
 
-        // Since we have changed source pins, regenerate the parent net map
+        // The parent nets looked up below follow the changes made to the netlist above
         final EDIFNetlist netlist = design.getNetlist();
-        netlist.resetParentNetMap();
 
         // Modify the physical netlist
         EDIFCell ecGnd = netlist.getHDIPrimitive(Unisim.GND);

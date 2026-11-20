@@ -413,7 +413,6 @@ public class PerformanceExplorer {
             String pblockDcpName = dcpName;
             if (ensureExternalRoutability()) {
                 EDIFTools.removeVivadoBusPreventionAnnotations(design.getNetlist());
-                design.getNetlist().resetParentNetMap();
                 if (getExternalRoutabilitySideFile() == null) {
                     InlineFlopTools.createAndPlaceFlopsInlineOnTopPortsArbitrarily(design, clkName, pblock);
                 } else {
