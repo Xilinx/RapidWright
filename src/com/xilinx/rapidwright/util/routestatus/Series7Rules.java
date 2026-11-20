@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -138,32 +139,33 @@ final class Series7Rules {
         }
         Map<Net, Integer> entryOf = entries.getEntryOfNet();
         Net[] nets = design.getNets().toArray(new Net[0]);
-        Set<Integer> conflicting = ConcurrentHashMap.newKeySet();
-        ParallelismTools.chunkedStream(0, nets.length, 1).forEach((r) -> {
-            for (int n = r[0]; n < r[1]; n++) {
-                Net net = nets[n];
-                if (net.isStaticNet()) {
+        Set<Integer> conflicting = ParallelismTools.stream(nets).flatMap((net) -> {
+            if (net.isStaticNet()) {
+                return null;
+            }
+            List<Integer> localConflicting = null;
+            for (SitePinInst spi : storedPins(net)) {
+                if (!spi.isOutPin() || !Utils.isSLICE(spi.getSiteInst())) {
+                    // (only seen in slices; the site routing of hard blocks, e.g. DSP cascades,
+                    // may carry other segments of the net)
                     continue;
                 }
-                for (SitePinInst spi : storedPins(net)) {
-                    if (!spi.isOutPin() || !Utils.isSLICE(spi.getSiteInst())) {
-                        // (only seen in slices; the site routing of hard blocks, e.g. DSP cascades,
-                        // may carry other segments of the net)
-                        continue;
+                Net other = spi.getSiteInst().getNetFromSiteWire(spi.getSiteWireName());
+                if (other == null || other == net || other.isStaticNet()) {
+                    continue;
+                }
+                Integer a = entryOf.get(net);
+                Integer b = entryOf.get(other);
+                if (a != null && b != null && !a.equals(b)) {
+                    if (localConflicting == null) {
+                        localConflicting = new ArrayList<>();
                     }
-                    Net other = spi.getSiteInst().getNetFromSiteWire(spi.getSiteWireName());
-                    if (other == null || other == net || other.isStaticNet()) {
-                        continue;
-                    }
-                    Integer a = entryOf.get(net);
-                    Integer b = entryOf.get(other);
-                    if (a != null && b != null && !a.equals(b)) {
-                        conflicting.add(a);
-                        conflicting.add(b);
-                    }
+                    localConflicting.add(a);
+                    localConflicting.add(b);
                 }
             }
-        });
+            return localConflicting == null ? null : localConflicting.stream();
+        }).collect(Collectors.toSet());
         for (int i : conflicting) {
             entries.status[i] = (entries.status[i] & ~ROUTED) | CONFLICTS;
         }
