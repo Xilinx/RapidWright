@@ -479,19 +479,18 @@ public class ParallelismTools {
      * See also {@link #joinAll(List)}, which steals them in order instead.
      * @param futures A List of Future objects corresponding to previously
      *                submitted tasks.
-     * @param <T> Type returned by all tasks.
      */
-    public static <T> void join(List<? extends Future<? extends T>> futures) {
+    public static void join(List<? extends Future<?>> futures) {
         if (getParallel()) {
             // Walk backwards and try and steal those not done
-            ListIterator<? extends Future<? extends T>> it = futures.listIterator(futures.size());
+            ListIterator<? extends Future<?>> it = futures.listIterator(futures.size());
             while (it.hasPrevious()) {
                 runIfUnclaimed(it.previous());
             }
         }
 
         // Now block to wait for other threads to finish their tasks
-        for (Future<? extends T> f : futures) {
+        for (Future<?> f : futures) {
             get(f);
         }
     }
