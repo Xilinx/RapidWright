@@ -92,7 +92,7 @@ import com.xilinx.rapidwright.device.FamilyType;
 import com.xilinx.rapidwright.device.Part;
 import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.router.RouteThruHelper;
-import com.xilinx.rapidwright.timing.TimingModel;
+import com.xilinx.rapidwright.timing.family.TimingData;
 
 /**
  * This class is specifically written to allow for efficient file import/export of different semi-primitive
@@ -139,7 +139,7 @@ public class FileTools {
     private static Kryo kryo;
     /** Supporting data folders packed in standalone jars of RapidWright */
     public static final String[] UNPACK_FOLDERS = new String[]{DATA_FOLDER_NAME, TCL_FOLDER_NAME,
-            IMAGES_FOLDER_NAME, TimingModel.TIMING_DATA_DIR};
+            IMAGES_FOLDER_NAME};
     /** Static empty array to save on memory */
     public static int[] emptyIntArray = new int[0];
     /** Static empty array to save on memory */
@@ -1127,6 +1127,15 @@ public class FileTools {
             expectedFiles.add(devResName + DEVICE_FILE_SUFFIX + MD5_DATA_FILE_SUFFIX);
             expectedFiles.add(devResName + DEVICE_CACHE_FILE_SUFFIX);
             expectedFiles.add(getRouteThruFileName(deviceName));
+            // The timing data of the device, if its series has a timing model
+            String timingData = TimingData.getName(part);
+            if (timingData != null) {
+                String timingDataFile = TimingData.getFileName(timingData);
+                if (!expectedFiles.contains(timingDataFile)) {
+                    expectedFiles.add(timingDataFile);
+                    expectedFiles.add(timingDataFile + MD5_DATA_FILE_SUFFIX);
+                }
+            }
         }
         return expectedFiles;
     }

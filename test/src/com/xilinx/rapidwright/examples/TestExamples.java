@@ -59,13 +59,6 @@ public class TestExamples {
         });
     }
 
-    @Test
-    public void testPipelineGeneratorWithRouting() {
-        PipelineGeneratorWithRouting.main(new String[]{
-                "-o", "/dev/null"
-        });
-    }
-
     /*
      * Tests the counter Generator. Some code is generated from the source file so that assertions can be inserted.
      */

@@ -32,8 +32,9 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimator;
 
 /**
  * A graph-based tool based on Depth-first Search to fix illegal routes,
@@ -44,9 +45,12 @@ public class RouteFixer{
     private Map<Node, NodeWithDelay> nodeMap;
     private Set<NodeWithDelay> sources;
     private int vertexId;
+    /** The delay estimator of the routing graph; null when the graph is not timing driven */
+    private DelayEstimator estimator;
 
     public RouteFixer(NetWrapper netp, RouteNodeGraph routingGraph) {
         this.netp = netp;
+        estimator = routingGraph.getDelayEstimator();
         nodeMap = new HashMap<>();
         sources = new HashSet<>();
         vertexId = 0;
@@ -117,8 +121,7 @@ public class RouteFixer{
             Set<NodeWithDelay> nexts = cur.children;
             if (nexts == null || nexts.isEmpty()) continue;
             for (NodeWithDelay next : nexts) {
-                float newCost = cur.cost + next.getDelay()
-                        + DelayEstimatorBase.getExtraDelay(next.getNode(), DelayEstimatorBase.isLong(cur.getNode()));
+                float newCost = cur.cost + next.getDelay() + getExtraDelay(cur.getNode(), next.getNode());
                 if (!next.isVisited() || (next.isVisited() && newCost < next.cost)) {
                     // The second condition is necessary,
                     // because a smaller path delay from the source to the current "next" could be achieved later.
@@ -129,6 +132,28 @@ public class RouteFixer{
                 }
             }
         }
+    }
+
+    /**
+     * The cost of a long node driven by a long node when the graph is not timing-driven (all node delays are then
+     * zero): it makes the merged routes prefer paths with fewer consecutive long nodes, as in earlier releases.
+     */
+    private static final short LONG_TO_LONG_COST = 45;
+
+    private static boolean isLong(Node node) {
+        IntentCode ic = node.getIntentCode();
+        return ic == IntentCode.NODE_VLONG || ic == IntentCode.NODE_HLONG;
+    }
+
+    /**
+     * Gets the extra delay of a node from its driver: that of the delay estimator, or, when not timing-driven,
+     * {@link #LONG_TO_LONG_COST} between consecutive long nodes.
+     */
+    private short getExtraDelay(Node parent, Node child) {
+        if (estimator == null) {
+            return isLong(parent) && isLong(child) ? LONG_TO_LONG_COST : 0;
+        }
+        return estimator.getExtraDelay(parent, child);
     }
 
     private static final Comparator<NodeWithDelay> NodeWithDelayComparator = (a, b) -> Float.compare(a.getDelay(), b.getDelay());

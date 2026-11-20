@@ -25,15 +25,13 @@ package com.xilinx.rapidwright.examples;
 
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.timing.TimingEdge;
-import com.xilinx.rapidwright.timing.TimingGraph;
 import com.xilinx.rapidwright.timing.TimingManager;
-import com.xilinx.rapidwright.timing.TimingVertex;
-import org.jgrapht.GraphPath;
+import com.xilinx.rapidwright.timing.sta.StaClockAnalysis;
+import com.xilinx.rapidwright.timing.sta.TimingReport;
 
 /**
- * Basic example to show reading in a placed and routed DCP and calculating the worst case
- * data path delay.
+ * Basic example to show reading in a placed and routed DCP and reporting its critical path: the data
+ * path of the worst setup check of the timing analysis, whose slack is the worst negative slack (WNS).
  */
 public class ReportTimingExample {
 
@@ -49,22 +47,25 @@ public class ReportTimingExample {
         t.start("Read DCP");
         Design design = Design.readCheckpoint(args[0], CodePerfTracker.SILENT);
 
-        // Instantiate and populate the timing manager for the design
+        // Instantiate and populate the timing manager for the design (its timing graph, and the timing
+        // analysis with the clocks of its constraints)
         t.stop().start("Create TimingManager");
         TimingManager tim = new TimingManager(design);
-        TimingGraph tg = tim.getTimingGraph();
 
-        // Get and print out worst data path delay in design
-        t.stop().start("Get Max Delay");
-        GraphPath<TimingVertex, TimingEdge> criticalPath = tg.getMaxDelayPath();
+        // Get the worst setup check and its data path
+        t.stop().start("Get Critical Path");
+        TimingReport report = new TimingReport(tim.getStaClockAnalysis());
+        StaClockAnalysis.Check worst = report.getWorstSetupCheck();
+        int[] criticalPath = report.getCriticalPath();
 
         // Print runtime summary
         t.stop().printSummary();
 
-        tg.prettyPrintPathDelays(criticalPath);
-        // Previous simple example
-        // System.out.println("\nCritical path: "+ ((int)criticalPath.getWeight())+ " ps");
-        // System.out.println("\nPath details:");
-        // System.out.println(criticalPath.toString().replace(",", ",\n")+"\n");
+        System.out.println("\nCritical path: " + (int) report.getPathDelay(criticalPath) + " ps");
+        if (worst != null) {
+            System.out.println("Requirement: " + (int) worst.getRelation() + " ps, worst slack: "
+                    + (int) worst.getSlack() + " ps");
+        }
+        tim.prettyPrintPathDelays(criticalPath);
     }
 }

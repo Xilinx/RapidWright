@@ -42,6 +42,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
@@ -49,10 +50,13 @@ import com.xilinx.rapidwright.design.NetTools;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.Unisim;
+import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.eco.ECOTools;
 import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.util.CodeGenerator;
@@ -137,13 +141,127 @@ public class TestPartialRouter {
     }
 
     /**
+     * Tests that timing-driven partial routing times the connections whose existing routes it recovers from those
+     * routes rather than from the estimate that it gives unrouted connections, from the start: before the first
+     * routing iteration (whose timing update then adds the fanout delays of their nets' routing), each recovered
+     * connection must be timed at its route's delay plus that of its site pins. One sink of every third net with at
+     * least three sinks is unrouted, so that those nets' other connections are recovered.
+     */
+    @Test
+    @LargeTest(max_memory_gb = 8)
+    public void testTimingDrivenPartialRoutingTimesRecoveredConnections() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+        RWRoute.routeDesignFullNonTimingDriven(design);
+
+        List<SitePinInst> pinsToRoute = new ArrayList<>();
+        int count = 0;
+        for (Net net : design.getNets()) {
+            if (net.isClockNet() || net.isStaticNet() || net.getSinkPins().size() < 3 || count++ % 3 != 0) {
+                continue;
+            }
+            SitePinInst sink = net.getSinkPins().get(0);
+            DesignTools.unroutePins(net, Collections.singletonList(sink));
+            pinsToRoute.add(sink);
+        }
+
+        RWRouteConfig config = new RWRouteConfig(new String[] {"--fixBoundingBox", "--useUTurnNodes"});
+        boolean softPreserve = false;
+        int[] checked = new int[1];
+        PartialRouter router = new PartialRouter(design, config, pinsToRoute, softPreserve) {
+            @Override
+            public void routeIndirectConnectionsIteratively() {
+                // After the pre-routing estimation, before any routing or timing update
+                for (Connection connection : recoveredConnections) {
+                    if (!connection.isRouted() || connection.getStaConnId() < 0) {
+                        continue;
+                    }
+                    float routed = connection.getRouteDelay(delayEstimator) + connection.getTimingPinDelay();
+                    Assertions.assertEquals(routed, connection.getTimingRouteDelay(), 0.01f, connection.toString());
+                    checked[0]++;
+                }
+                super.routeIndirectConnectionsIteratively();
+            }
+        };
+        RWRoute.routeDesign(router);
+        Assertions.assertTrue(checked[0] > 0);
+    }
+
+    /**
+     * Tests that timing-driven partial routing without "--useUTurnNodes" times an existing route that uses a U-turn
+     * node (a node at the device's edge that turns back, which the delay estimator masks with a huge delay so that the
+     * router does not take it) at that node's actual delay: a flop at the west edge of an xcvu3p drives two LUTs, one of
+     * them through a route via the U-turn node INT_X0Y60/WW12_BEG0, which is recovered when the other is routed.
+     */
+    @Test
+    public void testTimingDrivenPartialRoutingTimesRecoveredUTurn() {
+        Design design = new Design("top", "xcvu3p");
+        Cell ff = design.createAndPlaceCell("ff", Unisim.FDRE, "SLICE_X0Y56/CFF");
+        Cell lut = design.createAndPlaceCell("lut", Unisim.LUT1, "SLICE_X9Y62/G6LUT");
+        LUTTools.configureLUT(lut, "O=I0");
+        lut.removePinMapping(lut.getPhysicalPinMapping("I0"));
+        lut.addPinMapping("A1", "I0");
+        Cell lut2 = design.createAndPlaceCell("lut2", Unisim.LUT1, "SLICE_X9Y65/A6LUT");
+        LUTTools.configureLUT(lut2, "O=I0");
+        Cell ff2 = design.createAndPlaceCell("ff2", Unisim.FDRE, "SLICE_X9Y63/AFF");
+        Net q = design.createNet("q");
+        ECOTools.connectNet(design, ff, "Q", q);
+        ECOTools.connectNet(design, lut, "I0", q);
+        ECOTools.connectNet(design, lut2, "I0", q);
+        Net o = design.createNet("o");
+        ECOTools.connectNet(design, lut, "O", o);
+        ECOTools.connectNet(design, ff2, "D", o);
+        Net o2 = design.createNet("o2");
+        ECOTools.connectNet(design, lut2, "O", o2);
+        ECOTools.connectNet(design, ff, "D", o2);
+        design.routeSites();
+
+        // Route the flop to the first LUT (SLICE_X9Y62.G1) through the U-turn node
+        Device device = design.getDevice();
+        String[] path = {"CLEL_R_X0Y56/CLE_CLE_L_SITE_0_CQ", "INT_X0Y56/INT_NODE_SDQ_33_INT_OUT1",
+                "INT_X0Y56/NN4_E_BEG0", "INT_X0Y60/WW12_BEG0", "INT_X5Y60/SDQNODE_E_0_FT1",
+                "INT_X5Y59/NN2_E_BEG7", "INT_X5Y61/INODE_E_58_FT0", "INT_X5Y62/IMUX_E0"};
+        for (int i = 0; i + 1 < path.length; i++) {
+            Node from = device.getNode(path[i]);
+            Node to = device.getNode(path[i + 1]);
+            q.addPIP(from.getAllDownhillPIPs().stream().filter((pip) -> pip.getEndNode().equals(to)).findFirst()
+                    .orElseThrow(() -> new RuntimeException("No PIP from " + from + " to " + to)));
+        }
+        DesignTools.updatePinsIsRouted(q);
+        SitePinInst uturnSink = lut.getSiteInst().getSitePinInst("G1");
+        Assertions.assertTrue(uturnSink.isRouted());
+
+        List<SitePinInst> pinsToRoute = new ArrayList<>();
+        for (Net net : new Net[] {q, o, o2}) {
+            for (SitePinInst sink : net.getSinkPins()) {
+                if (!sink.isRouted()) {
+                    pinsToRoute.add(sink);
+                }
+            }
+        }
+        RWRouteConfig config = new RWRouteConfig(new String[] {"--timingDriven"});
+        Assertions.assertFalse(config.isUseUTurnNodes());
+        boolean softPreserve = false;
+        PartialRouter router = new PartialRouter(design, config, pinsToRoute, softPreserve);
+        RWRoute.routeDesign(router);
+
+        Assertions.assertTrue(router.delayEstimator.masksUTurnNodes());
+        Connection connection = router.recoveredConnections.stream().filter((c) -> c.getSink() == uturnSink)
+                .findFirst().orElseThrow(() -> new RuntimeException("Not recovered"));
+        Assertions.assertTrue(connection.isRouted());
+        Assertions.assertTrue(connection.getRnodes().stream().anyMatch((rnode) -> rnode.getDelay() >= 10000));
+        // About 280 ps, rather than the masked delay of the U-turn node (16383 ps)
+        Assertions.assertTrue(connection.getTimingRouteDelay() < 1000, connection.toString());
+    }
+
+    /**
      * Tests LUT pin swapping in partial routing when a connection whose existing route PartialRouter recovers loses
      * its only alternate sink to another net only after it was computed: its sink, already counted by the recovered
      * route, becomes exclusive but must still be counted only once, after promotion and after routing. (On Versal: a
      * lone 5LUT cell's input on A5, whose only alternate sink is A6.)
      */
-    @Test
-    public void testLutPinSwappingRecoveredSinkMadeExclusiveCountedOnce() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testLutPinSwappingRecoveredSinkMadeExclusiveCountedOnce(boolean timingDriven) {
         Design design = TestRWRoute.createLutLaneDesign("xcvc1902", "SLICE_X40Y61", 'A', null, "LUT1 O=I0 e@A5", false);
         RWRoute.routeDesignFullNonTimingDriven(design);
         Net net = design.getNet("e");
@@ -154,7 +272,8 @@ public class TestPartialRouter {
         Net other = design.createNet("other");
         Node a6IMUX = design.getDevice().getSite("SLICE_X40Y61").getConnectedNode("A6").getAllUphillNodes().get(0);
         Connection[] a5Connection = new Connection[1];
-        RWRouteConfig config = new RWRouteConfig(new String[] {"--nonTimingDriven", "--lutPinSwapping"});
+        RWRouteConfig config = new RWRouteConfig(timingDriven ? new String[] {"--lutPinSwapping"}
+                : new String[] {"--nonTimingDriven", "--lutPinSwapping"});
         PartialRouter router = new PartialRouter(design, config, Collections.singletonList(newSink)) {
             @Override
             protected NetWrapper createNetWrapperAndConnections(Net net) {

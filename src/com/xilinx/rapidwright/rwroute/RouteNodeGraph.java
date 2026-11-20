@@ -56,10 +56,8 @@ import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
 import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.router.RouteThruHelper;
-import com.xilinx.rapidwright.timing.TimingGraph;
 import com.xilinx.rapidwright.timing.TimingManager;
-import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
-import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimator;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -2864,27 +2862,27 @@ public class RouteNodeGraph {
      * Gets the delay estimator that this graph computes its node delays with.
      * @return That delay estimator, or null since this graph is not timing driven.
      */
-    public DelayEstimatorBase<InterconnectInfo> getDelayEstimator() {
+    public DelayEstimator getDelayEstimator() {
         return null;
     }
 
     /**
      * Gets the LUT logic delay with a connection arriving at the given sink rnode (one of its
      * candidate LUT input pins, with LUT pin swapping).
-     * @param timingGraph The timing graph.
+     * @param timingManager The timing manager.
      * @param connection The connection.
      * @param sinkRnode One of the connection's sink rnodes.
-     * @param updateTimingGraph True to also set the corresponding logic edges' delays in the timing graph.
+     * @param updateTiming True to also set the corresponding LUT arcs' delays in the timing analysis.
      * @return The logic delay in ps: zero, since this graph is not timing driven.
      */
-    protected float getLutLogicDelay(TimingGraph timingGraph, Connection connection, RouteNode sinkRnode,
-                                     boolean updateTimingGraph) {
+    protected float getLutLogicDelay(TimingManager timingManager, Connection connection, RouteNode sinkRnode,
+                                     boolean updateTiming) {
         return 0;
     }
 
     /**
-     * Sets, for each of the connection's targets, its LUT logic delay in excess of that of the
-     * fastest target: nothing to do, since this graph is not timing driven.
+     * Sets, for each of the connection's targets, its LUT logic delay (plus sink pin delay) in excess
+     * of that of the fastest target: nothing to do, since this graph is not timing driven.
      * @param state State from the connection that is being routed, with its targets marked.
      * @param timingManager The timing manager (null if not timing driven).
      */
@@ -2892,7 +2890,8 @@ public class RouteNodeGraph {
     }
 
     /**
-     * Gets the given target's LUT logic delay in excess of that of the connection's fastest target.
+     * Gets the given target's LUT logic delay (plus sink pin delay) in excess of that of the connection's
+     * fastest target.
      * @param state State from the connection that is being routed.
      * @param target One of the connection's targets.
      * @return The excess logic delay in ps: zero, since this graph is not timing driven.

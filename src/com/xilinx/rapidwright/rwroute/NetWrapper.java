@@ -50,12 +50,29 @@ public class NetWrapper{
     boolean noAltSourceFound;
     private RouteNode sourceRnode;
     private RouteNode altSourceRnode;
+    /**
+     * Whether the route of a connection of this net changed since the fanout delays of the net's
+     * routing were last computed (see RWRoute's timing update)
+     */
+    private boolean routeChanged = true;
 
     public NetWrapper(int id, Net net) {
         this.id = id;
         this.net = net;
         connections = new ArrayList<>();
         noAltSourceFound = false;
+    }
+
+    /**
+     * Checks if the route of a connection of this net changed since this flag was last cleared.
+     * @return True if it changed.
+     */
+    boolean isRouteChanged() {
+        return routeChanged;
+    }
+
+    void setRouteChanged(boolean routeChanged) {
+        this.routeChanged = routeChanged;
     }
 
     public void computeHPWLAndCenterCoordinates(RouteNodeGraph routingGraph) {
