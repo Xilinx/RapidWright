@@ -29,7 +29,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Generated on: Mon Nov 16 12:17:05 MST 2026
+ * Generated on: Fri Nov 20 14:52:22 MST 2026
  * by: com.xilinx.rapidwright.release.UploadFilesToAzure
  *
  * Versioned list of data files to use in current RapidWright environment
@@ -38,7 +38,7 @@ public class DataVersions {
     public static Map<String,Pair<String,String>> dataVersionMap;
     static {
         dataVersionMap = new HashMap<>();
-        dataVersionMap.put("data/cell_pin_defaults.dat", new Pair<>("cell-pin-defaults-dat", "85d423341dfdc7d62ef686f0079b5154"));
+        dataVersionMap.put("data/cell_pin_defaults.dat", new Pair<>("cell-pin-defaults-dat", "94bac4d954440607b5e2b8e8448b2380"));
         dataVersionMap.put("data/devices/artix7/xa7a100t_db.dat", new Pair<>("xa7a100t-db-dat", "b15c7762b745815d23ce699e95ce6d37"));
         dataVersionMap.put("data/devices/artix7/xa7a12t_db.dat", new Pair<>("xa7a12t-db-dat", "a42bb46c67c4c1f68069a1ee78ed0c28"));
         dataVersionMap.put("data/devices/artix7/xa7a15t_db.dat", new Pair<>("xa7a15t-db-dat", "bac28e9e9bb4b53498edf71b17916ab5"));
