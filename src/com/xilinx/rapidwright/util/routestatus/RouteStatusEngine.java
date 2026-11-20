@@ -66,6 +66,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -287,32 +288,37 @@ public final class RouteStatusEngine {
         List<List<FlatNet>> lists = flatNetlist.getFlatNetLists();
         FlatNet[][] listEntries = new FlatNet[lists.size()][];
         int[] listSizes = new int[lists.size()];
-        List<FlatNet> statics = Collections.synchronizedList(new ArrayList<>());
-        ParallelismTools.chunkedStream(0, lists.size(), 1).forEach((r) -> {
-            for (int l = r[0]; l < r[1]; l++) {
-                List<FlatNet> list = lists.get(l);
-                FlatNet[] listed = new FlatNet[list.size()];
-                int size = 0;
-                for (FlatNet flat : list) {
-                    if (flat.mergedInto != null) {
-                        continue;
-                    }
-                    if (flat.staticType != null && !flat.isUnloadedStaticBusBit()) {
-                        statics.add(flat);
-                        continue;
-                    }
-                    if (isTiedInsideMacro(flat)) {
-                        if (flat.insideMacro && flat.leafLoads > 0) {
-                            macroTies.add(flat);
+        List<FlatNet> statics = ParallelismTools.chunkedStream(0, lists.size(), 1)
+                .flatMap((r) -> {
+                    List<FlatNet> localStatics = null;
+                    for (int l = r[0]; l < r[1]; l++) {
+                        List<FlatNet> list = lists.get(l);
+                        FlatNet[] listed = new FlatNet[list.size()];
+                        int size = 0;
+                        for (FlatNet flat : list) {
+                            if (flat.mergedInto != null) {
+                                continue;
+                            }
+                            if (flat.staticType != null && !flat.isUnloadedStaticBusBit()) {
+                                if (localStatics == null) {
+                                    localStatics = new ArrayList<>();
+                                }
+                                localStatics.add(flat);
+                                continue;
+                            }
+                            if (isTiedInsideMacro(flat)) {
+                                if (flat.insideMacro && flat.leafLoads > 0) {
+                                    macroTies.add(flat);
+                                }
+                                continue;
+                            }
+                            listed[size++] = flat;
                         }
-                        continue;
+                        listEntries[l] = listed;
+                        listSizes[l] = size;
                     }
-                    listed[size++] = flat;
-                }
-                listEntries[l] = listed;
-                listSizes[l] = size;
-            }
-        });
+                    return localStatics == null ? null : localStatics.stream();
+                }).collect(Collectors.toList());
         addTiedMacros(flatNetlist);
         for (FlatNet flat : statics) {
             int t = flat.staticType == NetType.GND ? 0 : 1;

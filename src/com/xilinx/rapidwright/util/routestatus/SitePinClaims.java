@@ -289,10 +289,11 @@ final class SitePinClaims {
         }
         // The pins are looked at by segment (rather than by flat net, as a static net may be one
         // huge flat net)
-        List<EDIFHierNet> segments = Collections.synchronizedList(new ArrayList<>());
-        ParallelismTools.forEach(flats, (flat) -> segments.addAll(flat.getSegments(design)));
-        List<Long> found = Collections.synchronizedList(new ArrayList<>());
-        ParallelismTools.forEach(segments, (segment) -> {
+        List<EDIFHierNet> segments = ParallelismTools.stream(flats)
+                .flatMap((flat) -> flat.getSegments(design).stream()).collect(Collectors.toList());
+        List<Long> found = ParallelismTools.stream(segments).flatMap((segment) -> {
+            // The keys found on this segment, not allocated until needed
+            List<Long> localFound = null;
             for (EDIFHierPortInst p : RouteStatusNetlist.getLeafPortInsts(segment)) {
                 if (p.isOutput() || !mayBePlacedOnLUT(p.getPortInst().getCellInst().getCellType().getName())) {
                     continue;
@@ -310,11 +311,16 @@ final class SitePinClaims {
                         continue;
                     }
                     for (Node node : getSitePinNodes(si, belPin.getSiteWireIndex(), true)) {
-                        found.add(nodeKey(node));
+                        if (localFound == null) {
+                            localFound = new ArrayList<>();
+                        }
+                        localFound.add(nodeKey(node));
                     }
                 }
             }
-        });
+            // (flatMap() takes null as no keys)
+            return localFound == null ? null : localFound.stream();
+        }).collect(Collectors.toList());
         if (found.isEmpty()) {
             return;
         }
