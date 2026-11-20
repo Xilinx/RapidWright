@@ -49,8 +49,7 @@ import com.xilinx.rapidwright.router.UltraScaleClockRouting;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
 import com.xilinx.rapidwright.timing.TimingManager;
-import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
-import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimator;
 import com.xilinx.rapidwright.util.Pair;
 
 /**
@@ -91,7 +90,7 @@ public class PartialRouter extends RWRoute {
     protected static class RouteNodeGraphPartialTimingDriven extends RouteNodeGraphTimingDriven {
         public RouteNodeGraphPartialTimingDriven(Design design,
                                                  RWRouteConfig config,
-                                                 DelayEstimatorBase<InterconnectInfo> delayEstimator) {
+                                                 DelayEstimator delayEstimator) {
             super(design, config, delayEstimator);
         }
 
@@ -127,13 +126,19 @@ public class PartialRouter extends RWRoute {
     }
 
     /**
-     * Gets the nets to time: those with pins to route, and those that never leave their site (no sink site pins,
+     * Gets the nets to time: all nets if the router knobs say so (see
+     * {@link com.xilinx.rapidwright.timing.family.RouterKnobs#isTimeAllNetsInPartialRouting()}); else those with pins
+     * to route, and those that never leave their site (no sink site pins,
      * e.g. a LUT driving the flop beside it), which are never routed but lie on the timing paths of routed
      * connections (without them, such paths would stop at, or restart from, the intra-site net). Only the latter in
      * the sites of the former's pins are taken: any other is cut off from those paths by nets that are not timed.
      */
     @Override
     protected Collection<Net> getTimingNets() {
+        if (routerKnobs.isTimeAllNetsInPartialRouting()) {
+            // Time all nets, so that timing paths through preserved and intra-site nets stay whole
+            return design.getNets();
+        }
         Set<Net> timingNets = new LinkedHashSet<>(netToPins.keySet());
         Set<SiteInst> siteInsts = new LinkedHashSet<>();
         for (Net net : netToPins.keySet()) {
@@ -199,8 +204,7 @@ public class PartialRouter extends RWRoute {
     protected RouteNodeGraph createRouteNodeGraph() {
         if (config.isTimingDriven()) {
             /* An instantiated delay estimator that is used to calculate delay of routing resources */
-            DelayEstimatorBase<InterconnectInfo> estimator = new DelayEstimatorBase<InterconnectInfo>(
-                    design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
+            DelayEstimator estimator = DelayEstimator.create(design, config.isUseUTurnNodes());
             return new RouteNodeGraphPartialTimingDriven(design, config, estimator);
         } else {
             return new RouteNodeGraphPartial(design, config);
@@ -208,9 +212,11 @@ public class PartialRouter extends RWRoute {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     protected TimingManager createTimingManager(ClkRouteTiming clkTiming, Collection<Net> timingNets) {
-        final boolean isPartialRouting = true;
-        return new TimingManager(design, routerTimer, config, clkTiming, timingNets, isPartialRouting,
+        // Unless all nets are timed (see getTimingNets())
+        final boolean isPartialRouting = !routerKnobs.isTimeAllNetsInPartialRouting();
+        return new TimingManager(design, routerTimer, config, timingNets, isPartialRouting,
                 routingGraph.getDelayEstimator());
     }
 
@@ -752,15 +758,17 @@ public class PartialRouter extends RWRoute {
 
             netToPins.put(net, net.getSinkPins());
 
-            // Update the timing graph
+            // Map this net's new connections to their edges in the timing graph. With the router knobs that time all
+            // nets in partial routing (see getTimingNets()), it has the edges of every net; otherwise only those of the
+            // nets being routed and intra-site nets, so a net unpreserved here has none, and its connections stay
+            // untimed (criticality 0)
             if (timingManager != null) {
-                timingManager.getTimingGraph().addNetDelayEdges(net);
                 timingManager.setTimingEdgesOfConnections(netWrapper.getConnections());
                 for (Connection netnewConnection : netWrapper.getConnections()) {
                     if (netnewConnection.isDirect()) {
                         continue;
                     }
-                    netnewConnection.updateRouteDelay();
+                    timingManager.setRouteDelay(netnewConnection, netnewConnection.getRouteDelay(delayEstimator));
                 }
             }
         }
@@ -864,10 +872,6 @@ public class PartialRouter extends RWRoute {
             pinsToRoute = getUnroutedPins(design);
         }
 
-        if (config.isMaskNodesCrossRCLK()) {
-            System.out.println("WARNING: Masking nodes across RCLK for partial routing could result in routability problems.");
-        }
-
         return routeDesign(new PartialRouter(design, config, pinsToRoute, softPreserve));
     }
 
@@ -922,7 +926,7 @@ public class PartialRouter extends RWRoute {
     public static Design routeDesignPartialNonTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
         return routeDesignWithUserDefinedArguments(design, new String[] {
                 "--fixBoundingBox",
-                // use U-turn nodes and no masking of nodes cross RCLK
+                // use U-turn nodes
                 // Pros: maximum routability
                 // Con: might result in delay optimism and a slight increase in runtime
                 "--useUTurnNodes",
@@ -940,7 +944,7 @@ public class PartialRouter extends RWRoute {
     public static Design routeDesignPartialTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
         return routeDesignWithUserDefinedArguments(design, new String[] {
                 "--fixBoundingBox",
-                // use U-turn nodes and no masking of nodes cross RCLK
+                // use U-turn nodes
                 // Pros: maximum routability
                 // Con: might result in delay optimism and a slight increase in runtime
                 "--useUTurnNodes",

@@ -170,7 +170,6 @@ ext.exampleRuns = [
   [name: 'MultGenerator'],
   [name: 'PipelineGenerator'],
   [name: 'SLRCrosserGenerator'],
-  [name: 'PipelineGeneratorWithRouting'],
   [name: 'PolynomialGenerator', args: { -> ['x^2+3*x+5', '16'] }],
   [name: 'CountRoutedNets', args: { -> [rwDcp('picoblaze_ooc_X10Y235.dcp')] }],
   [name: 'FindBlackBoxes', args: { -> [rwDcp('picoblaze_ooc_X10Y235.dcp')] }],
@@ -191,7 +190,8 @@ def exampleTasks = ext.exampleRuns.collect { ex ->
     def exWorkingDir = file("${buildDir}/examples/${ex.name}")
     workingDir = exWorkingDir
     // Without this, FileTools.getRapidWrightPath() falls back to build/classes/java.
-    // Examples using the timing model then can't find the repo's timing data directory.
+    // Examples would then download their own copy of the device files rather than share the
+    // project's data directory with the tests.
     environment 'RAPIDWRIGHT_PATH', projectDir.toString()
     dependsOn initSubmodules
     doFirst {

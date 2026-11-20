@@ -57,6 +57,7 @@ import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.device.SiteTypeEnum;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
+import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
@@ -64,7 +65,7 @@ import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
-import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimator;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -199,6 +200,24 @@ public class RouterHelper {
         }
 
         return null;
+    }
+
+    /**
+     * Gets the LUT input site pin that a sink node of the router leads to: the node's own site pin on
+     * UltraScale/UltraScale+, or on Versal, where the router's sink is the INT IMUX node that drives the
+     * (CLE) site pin's node (see {@link #projectInputPinToINTNode(SitePinInst)}), the site pin of that node.
+     * @param sinkNode The sink node, e.g. a candidate LUT input pin of LUT pin swapping.
+     * @return The site pin, or null if the node leads to none.
+     */
+    public static SitePin getLutInputSitePin(Node sinkNode) {
+        SitePin sitePin = sinkNode.getSitePin();
+        if (sitePin == null) {
+            List<Node> downhills = sinkNode.getAllDownhillNodes();
+            if (downhills.size() == 1) {
+                sitePin = downhills.get(0).getSitePin();
+            }
+        }
+        return sitePin;
     }
 
     /**
@@ -604,11 +623,11 @@ public class RouterHelper {
      * The net's routing is assumed to be loop-free and not multiply-driven.
      * @param net The target net; it may be partially routed, but it must not be static since a
      *            constant source has no route delay that this model describes.
-     * @param estimator An instantiation of DelayEstimatorBase.
+     * @param estimator The delay estimator of the net's device.
      * @return Reached sinks mapped to their sink INT node and route delay.
      * @throws RuntimeException If the net is static.
      */
-    public static Map<SitePinInst, Pair<Node,Short>> getSourceToSinkINTNodeDelays(Net net, DelayEstimatorBase estimator) {
+    public static Map<SitePinInst, Pair<Node,Short>> getSourceToSinkINTNodeDelays(Net net, DelayEstimator estimator) {
         if (net.isStaticNet()) {
             throw new RuntimeException("ERROR: Cannot compute route delays of static net " + net.getName());
         }
@@ -629,9 +648,8 @@ public class RouterHelper {
                     continue;
                 }
                 int delay = driverDelay;
-                if (node.getTile().getTileTypeEnum() == TileTypeEnum.INT) {
-                    delay += computeNodeDelay(estimator, node)
-                            + DelayEstimatorBase.getExtraDelay(node, DelayEstimatorBase.isLong(driver));
+                if (estimator.isInterconnectNode(node)) {
+                    delay += computeNodeDelay(estimator, node) + estimator.getExtraDelay(driver, node);
                 }
                 delayMap.put(node, delay);
                 queue.add(node);
@@ -663,19 +681,35 @@ public class RouterHelper {
 
     /**
      * Computes the delay of a node.
-     * @param estimator An instantiation of the DelayEstimatorBase.
+     * @param estimator The delay estimator of the node's device.
      * @param node The node in question.
      * @return The delay of the node.
-     * @throws RuntimeException If the node is a super long line (an SLR crossing), for which the timing model has no
-     *                          delay.
+     * @throws RuntimeException If the node is a super long line (an SLR crossing) that the estimator charges no
+     *                          delay for.
      */
-    public static short computeNodeDelay(DelayEstimatorBase estimator, Node node) {
-        if (RouteNode.isExitNode(node)) {
-            return estimator.getDelayOf(node);
+    public static short computeNodeDelay(DelayEstimator estimator, Node node) {
+        return computeNodeDelay(estimator, node, null);
+    }
+
+    /**
+     * Computes the delay of a node, as {@link #computeNodeDelay(DelayEstimator, Node)}, given its wires if the caller
+     * already has them (see {@link DelayEstimator#getDelayOf(Node, Wire[])}).
+     * @param estimator The delay estimator of the node's device.
+     * @param node The node in question.
+     * @param wires All the wires of the node, as {@link Node#getAllWiresInNode()} returns them, or null.
+     * @return The delay of the node.
+     * @throws RuntimeException If the node is a super long line (an SLR crossing) that the estimator charges no
+     *                          delay for.
+     */
+    static short computeNodeDelay(DelayEstimator estimator, Node node, Wire[] wires) {
+        if (estimator.isDelayCharged(node)) {
+            return wires == null ? estimator.getDelayOf(node) : estimator.getDelayOf(node, wires);
         }
         IntentCode ic = node.getIntentCode();
         if (ic == IntentCode.NODE_LAGUNA_DATA || ic == IntentCode.NODE_SLL_DATA) {
-            throw new RuntimeException("ERROR: No delay is modelled for super long line " + node);
+            throw new RuntimeException("ERROR: No delay is modelled for super long line " + node + " by "
+                    + estimator.getClass().getSimpleName() + ": timing-driven routing across SLRs needs a delay"
+                    + " estimator that times SLR crossings");
         }
         return 0;
     }

@@ -33,8 +33,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.TileTypeEnum;
-import com.xilinx.rapidwright.timing.TimingEdge;
-import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimator;
 import com.xilinx.rapidwright.util.Pair;
 
 /**
@@ -72,10 +71,16 @@ public class Connection implements Comparable<Connection>{
     private short yMinBB;
     private short yMaxBB;
     /**
-     * {@link TimingEdge} instances associated to a connection.
-     * For LUT_6_2_* pins, there will be two timing edges mapped to the same connection.
+     * The id of the connection of the timing graph that this connection drives (see
+     * {@link com.xilinx.rapidwright.timing.sta.StaGraph#getConnectionId(SitePinInst)}), -1 if not timed
      */
-    private List<TimingEdge> timingEdges;
+    private int staConnId = -1;
+    /** The route delay last set for timing, see {@link #setTimingRouteDelay(float)} */
+    private float timingRouteDelay;
+    /** The delay that timing adds to the route delay of this connection, for {@link #timingPinDelaySource} */
+    private float timingPinDelay;
+    /** The source the {@link #timingPinDelay} is for, null if not computed */
+    private SitePinInst timingPinDelaySource;
     /** The criticality factor to indicate how timing-critical a connection is */
     private float criticality;
     /** List of RouteNodes that make up of the route of a connection */
@@ -174,35 +179,6 @@ public class Connection implements Comparable<Connection>{
     }
 
     /**
-     * Computes criticality of a connection.
-     * @param maxDelay The maximum delay to normalize the slack of a connection.
-     * @param maxCriticality The maximum criticality.
-     * @param criticalityExponent The exponent to separate critical connections and non-critical connections.
-     */
-    public void calculateCriticality(float maxDelay, float maxCriticality, float criticalityExponent) {
-        float minSlack = Float.MAX_VALUE;
-        for (TimingEdge e : getTimingEdges()) {
-            float slack = e.getDst().getRequiredTime() - e.getSrc().getArrivalTime() - e.getDelay();
-            minSlack = Float.min(minSlack, slack);
-        }
-
-        // Negative slacks are not supported, and should not occur if maxDelay was
-        // normalized correctly.
-        assert(minSlack >= 0);
-
-        // At least 0 (and at most 1, as minSlack is not negative): a connection none of whose paths reaches a timing
-        // endpoint (see TimingGraph.setTimingRequirementTopologicalOrder()), or that has no timing edges, is left with
-        // minSlack at Float.MAX_VALUE, and so a base far below -1, which Math.pow() raises to NaN for an exponent that
-        // is not an integer, and (cast to float) to plus infinity for an even one
-        float tempCriticality = Math.max(0f, 1 - minSlack / maxDelay);
-
-        tempCriticality = (float) Math.pow(tempCriticality, criticalityExponent) * maxCriticality;
-
-        if (tempCriticality > criticality)
-            setCriticality(tempCriticality);
-    }
-
-    /**
      * Checks if a connection has any overused rnodes to indicate the congestion status.
      * @return
      */
@@ -227,27 +203,91 @@ public class Connection implements Comparable<Connection>{
         yMinBB = (short) Math.min(yMinBB, rn.getBeginTileYCoordinate() - 1);
         yMaxBB = (short) Math.max(yMaxBB, rn.getEndTileYCoordinate() + 1);
         rnodes.add(rn);
+        markRouteChanged();
     }
 
-    public void updateRouteDelay() {
-        setTimingEdgesDelay(getRouteDelay());
-    }
-
-    public void setTimingEdgesDelay(float routeDelay) {
-        for (TimingEdge e : getTimingEdges()) {
-            e.setRouteDelay(routeDelay);
+    /** Marks the net of this connection as having a changed route, for the incremental fanout delay update */
+    private void markRouteChanged() {
+        if (netWrapper != null && !netWrapper.isRouteChanged()) {
+            netWrapper.setRouteChanged(true);
         }
     }
 
-    private float getRouteDelay() {
-        float routeDelay = getRnodes().get(getRnodes().size() - 1).getDelay();
+    /**
+     * Gets the id of the connection of the timing graph that this connection drives.
+     * @return The id, -1 if this connection is not timed.
+     */
+    public int getStaConnId() {
+        return staConnId;
+    }
+
+    public void setStaConnId(int staConnId) {
+        this.staConnId = staConnId;
+    }
+
+    /**
+     * Gets the route delay last set for timing, see
+     * {@link com.xilinx.rapidwright.timing.TimingManager#setRouteDelay(Connection, float)}.
+     * @return The delay in ps.
+     */
+    public float getTimingRouteDelay() {
+        return timingRouteDelay;
+    }
+
+    /**
+     * Records the route delay of this connection set for timing; called by
+     * {@link com.xilinx.rapidwright.timing.TimingManager#setRouteDelay(Connection, float)}, which
+     * also updates the timing analysis.
+     * @param routeDelay The delay in ps.
+     */
+    public void setTimingRouteDelay(float routeDelay) {
+        timingRouteDelay = routeDelay;
+    }
+
+    /**
+     * Gets the delay that the timing analysis adds to the route delay of this connection, a constant
+     * per connection (see {@link com.xilinx.rapidwright.timing.TimingManager#setRouteDelay(Connection, float)}),
+     * if computed for its current source.
+     * @return The delay in ps, or NaN if not computed for the current source.
+     */
+    public float getTimingPinDelay() {
+        return timingPinDelaySource == source ? timingPinDelay : Float.NaN;
+    }
+
+    /**
+     * Sets the delay that the timing analysis adds to the route delay of this connection, for its
+     * current source.
+     * @param delay The delay in ps.
+     */
+    public void setTimingPinDelay(float delay) {
+        timingPinDelay = delay;
+        timingPinDelaySource = source;
+    }
+
+    /**
+     * Gets the delay of this connection's route, the sum of its rnodes' delays and their extra delays. A node
+     * that the estimator masks (see {@link DelayEstimator#masksUTurnNodes()}), which only an existing route (e.g.
+     * one recovered by partial routing) can use, counts with its unmasked delay.
+     * @param estimator The delay estimator that the rnode delays were computed with.
+     * @return The delay in ps.
+     */
+    float getRouteDelay(DelayEstimator estimator) {
+        float routeDelay = getDelayOf(estimator, getRnodes().get(getRnodes().size() - 1));
         for (int i = getRnodes().size() - 2; i >= 0; i--) {
             RouteNode rnode = getRnodes().get(i);
             RouteNode parent = getRnodes().get(i+1);
-            routeDelay += rnode.getDelay() +
-                    DelayEstimatorBase.getExtraDelay(rnode, DelayEstimatorBase.isLong(parent));
+            routeDelay += getDelayOf(estimator, rnode) + RouteNode.getExtraDelay(estimator, parent, rnode);
         }
         return routeDelay;
+    }
+
+    private static float getDelayOf(DelayEstimator estimator, RouteNode rnode) {
+        float delay = rnode.getDelay();
+        if (delay >= Short.MAX_VALUE / 2 && estimator.masksUTurnNodes()) {
+            // The delay of a masked node (see DelayEstimator.masksUTurnNodes()), which is no estimate
+            return estimator.getUnmaskedDelayOf(rnode);
+        }
+        return delay;
     }
 
     public void setCriticality(float criticality) {
@@ -264,6 +304,7 @@ public class Connection implements Comparable<Connection>{
 
     public void resetRoute() {
         getRnodes().clear();
+        markRouteChanged();
     }
 
     public RouteNode getSourceRnode() {
@@ -396,14 +437,6 @@ public class Connection implements Comparable<Connection>{
         return sink;
     }
 
-    public List<TimingEdge> getTimingEdges() {
-        return timingEdges;
-    }
-
-    public void setTimingEdges(List<TimingEdge> timingEdges) {
-        this.timingEdges = timingEdges;
-    }
-
     public short getHpwl() {
         return hpwl;
     }
@@ -418,6 +451,7 @@ public class Connection implements Comparable<Connection>{
 
     public void setRnodes(List<RouteNode> rnodes) {
         this.rnodes = rnodes;
+        markRouteChanged();
     }
 
     public boolean isDlyPatched() {
@@ -493,7 +527,7 @@ public class Connection implements Comparable<Connection>{
         s.append(", ");
         s.append("sink = " + getSink().getSitePinName());
         s.append(", ");
-        s.append(String.format("delay = %4d ", (short)(getTimingEdges() == null? 0:getTimingEdges().get(0).getNetDelay())));
+        s.append(String.format("delay = %4d ", (short) timingRouteDelay));
         s.append(", ");
         s.append(String.format("criticality = %4.3f ", getCriticality()));
 

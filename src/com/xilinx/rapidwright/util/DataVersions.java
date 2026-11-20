@@ -419,6 +419,9 @@ public class DataVersions {
         dataVersionMap.put("data/devices/zynquplusrfsoc/xqzu67dr_db.dat", new Pair<>("xqzu67dr-db-dat", "4aaf156a983a177cb0ddf09b7fa48d45"));
         dataVersionMap.put("data/partdump.csv", new Pair<>("partdump-csv", "cffc86adac08120ad71bfd93cb8befd6"));
         dataVersionMap.put("data/parts.db", new Pair<>("parts-db", "cc7f2379e67e402bdf833ae36be427f4"));
+        dataVersionMap.put("data/timing/ultrascaleplus/ultrascaleplus_timing.dat", new Pair<>("ultrascaleplus-timing-dat", "ffbd9f8a26f00111d29daab1d5038e2b"));
+        dataVersionMap.put("data/timing/versal/versal_gen1_timing.dat", new Pair<>("versal-gen1-timing-dat", "4e4e284028ea60ed0e1fd1008658f551"));
+        dataVersionMap.put("data/timing/versal/versal_gen2_timing.dat", new Pair<>("versal-gen2-timing-dat", "6ff8275cdfa22ca9d36e5364a642d542"));
         dataVersionMap.put("data/unisim_data.dat", new Pair<>("unisim-data-dat", "a16abc61251674b0e92def5c62419aba"));
         dataVersionMap.put("data/versal_vdistr_trees.dat", new Pair<>("versal-vdistr-trees-dat", "f5e0d91a360a1cdc01d7eaf11b865e0b"));
     }

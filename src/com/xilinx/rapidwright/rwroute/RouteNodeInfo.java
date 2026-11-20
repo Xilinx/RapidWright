@@ -164,7 +164,18 @@ public class RouteNodeInfo {
      * @return That information.
      */
     public static RouteNodeInfo get(Node node, RouteNodeGraph routingGraph) {
-        Wire[] wires = node.getAllWiresInNode();
+        return get(node, node.getAllWiresInNode(), routingGraph);
+    }
+
+    /**
+     * Gets the information that a {@link RouteNode} is built out of, for a given node whose wires
+     * the caller already has (see {@link #get(Node, RouteNodeGraph)}).
+     * @param node Node to describe.
+     * @param wires All the wires of the node, as {@link Node#getAllWiresInNode()} returns them.
+     * @param routingGraph Graph the node is to be a part of, or null.
+     * @return That information.
+     */
+    static RouteNodeInfo get(Node node, Wire[] wires, RouteNodeGraph routingGraph) {
         assert(wires[0].getTile() == node.getTile() && wires[0].getWireIndex() == node.getWireIndex());
         Tile baseTile = node.getTile();
         TileTypeEnum baseTileType = baseTile.getTileTypeEnum();

@@ -36,10 +36,7 @@ import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.timing.TimingManager;
-import com.xilinx.rapidwright.timing.TimingVertex;
-import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
-import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
-import com.xilinx.rapidwright.util.Pair;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimator;
 
 /**
  * An example to report the critical path delay and total wirelength of a routed design.
@@ -53,15 +50,14 @@ public class TimingAndWirelengthReport{
     private int numWireNetsToRoute;
     private int numConnectionsToRoute;
     private TimingManager timingManager;
-    private DelayEstimatorBase<InterconnectInfo> estimator;
+    private DelayEstimator estimator;
     private Map<IntentCode, Long> nodeTypeUsage ;
     private Map<IntentCode, Long> nodeTypeLength;
 
     public TimingAndWirelengthReport(Design design, RWRouteConfig config, boolean isPartialRouting) {
         this.design = design;
-        estimator = new DelayEstimatorBase<>(design.getDevice(),
-                new InterconnectInfo(), config.isUseUTurnNodes(), 0);
-        timingManager = new TimingManager(design, null, config, RWRoute.createClkTimingData(config), design.getNets(), isPartialRouting, estimator);
+        estimator = DelayEstimator.create(design, config.isUseUTurnNodes());
+        timingManager = new TimingManager(design, null, config, design.getNets(), isPartialRouting, estimator);
         wirelength = 0;
         usedNodes = 0;
         nodeTypeUsage = new HashMap<>();
@@ -74,9 +70,9 @@ public class TimingAndWirelengthReport{
     public void computeStatisticsAndReport() {
         computeNetsWirelengthAndDelay();
 
-        Pair<Float, TimingVertex> maxDelayAndTimingVertex = timingManager.calculateArrivalRequiredTimes();
+        timingManager.computeArrivalRequiredTimes();
         System.out.println();
-        timingManager.getCriticalPathInfo(maxDelayAndTimingVertex);
+        timingManager.getCriticalPathInfo();
 
         System.out.println();
         System.out.println("Total nodes: " + usedNodes);
@@ -102,8 +98,8 @@ public class TimingAndWirelengthReport{
                 wirelength += wl;
                 RouterHelper.addNodeTypeLengthToMap(node, wl, nodeTypeUsage, nodeTypeLength);
             }
+            // (The timing analysis times the routed connections from their PIPs)
             timingManager.setTimingEdgesOfConnections(netplus.getConnections());
-            setAccumulativeDelayOfEachNetNode(netplus);
         }
     }
 
@@ -134,29 +130,6 @@ public class TimingAndWirelengthReport{
             connection.setDirect(sinkINTNode == null);
         }
         return netWrapper;
-    }
-
-    /**
-     * Using PIPs to calculate and set accumulative delay for each used node of a routed net that is represented by a {@link NetWrapper} Object.
-     * The delay of each node is the total route delay from the source to the node (inclusive).
-     * @param netWrapper
-     */
-    private void setAccumulativeDelayOfEachNetNode(NetWrapper netWrapper) {
-        Map<SitePinInst, Pair<Node,Short>> sourceToSinkINTNodeDelays =
-                RouterHelper.getSourceToSinkINTNodeDelays(netWrapper.getNet(), estimator);
-
-        for (Connection connection : netWrapper.getConnections()) {
-            if (connection.isDirect() || connection.getTimingEdges() == null) {
-                continue;
-            }
-
-            // On a partially routed net, a sink that the net's routing does not reach is omitted
-            // from the map and so has no accumulated delay to recover; charge it zero, as was the
-            // case before unreached sinks were distinguished from ones of genuinely zero delay.
-            Pair<Node,Short> sinkINTNodeDelay = sourceToSinkINTNodeDelays.get(connection.getSink());
-            short connectionDelay = (sinkINTNodeDelay != null) ? sinkINTNodeDelay.getSecond() : 0;
-            connection.setTimingEdgesDelay(connectionDelay);
-        }
     }
 
     public static void main(String[] args) {

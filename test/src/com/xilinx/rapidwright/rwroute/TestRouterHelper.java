@@ -31,15 +31,16 @@ import com.xilinx.rapidwright.design.TestDesignHelper;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.tools.LUTTools;
 import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
+import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 import com.xilinx.rapidwright.support.rwroute.RouterHelperSupport;
-import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
-import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimator;
 import com.xilinx.rapidwright.util.Pair;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
@@ -410,19 +411,20 @@ public class TestRouterHelper {
      */
     @ParameterizedTest
     @CsvSource({
-            // Sink pin, the INT tile node it projects to, its expected delay, and whether to
-            // reverse the order that the net's PIPs are given in
-            "B3,INT_X54Y135/IMUX_W25,178,false",
-            "B3,INT_X54Y135/IMUX_W25,178,true",
-            "D5,INT_X54Y135/IMUX_W31,174,false",
-            "D5,INT_X54Y135/IMUX_W31,174,true",
-            "H3,INT_X54Y135/IMUX_W33,178,false",
-            "H3,INT_X54Y135/IMUX_W33,178,true",
+            // Sink pin, the INT tile node it projects to, its expected delay (the fitted UltraScale+ model at
+            // SLOW_MAX: e.g. for B3, the delays of its six nodes after the source's), and
+            // whether to reverse the order that the net's PIPs are given in
+            "B3,INT_X54Y135/IMUX_W25,130,false",
+            "B3,INT_X54Y135/IMUX_W25,130,true",
+            "D5,INT_X54Y135/IMUX_W31,130,false",
+            "D5,INT_X54Y135/IMUX_W31,130,true",
+            "H3,INT_X54Y135/IMUX_W33,130,false",
+            "H3,INT_X54Y135/IMUX_W33,130,true",
             // A1 is the only sink reached through the reversed PIP below; walking that PIP in the
-            // direction the device declares for it instead loses the two nodes ahead of it, and
-            // under-reports A1 as 204ps
-            "A1,INT_X54Y136/IMUX_W10,269,false",
-            "A1,INT_X54Y136/IMUX_W10,269,true"
+            // direction the device declares for it instead cuts A1 off from the two nodes ahead of it
+            // (part of its 179 ps)
+            "A1,INT_X54Y136/IMUX_W10,179,false",
+            "A1,INT_X54Y136/IMUX_W10,179,true"
     })
     public void testGetSourceToSinkINTNodeDelays(String sinkPinName, String sinkNodeName,
                                                  short expectedDelay, boolean reversePipOrder) {
@@ -471,7 +473,7 @@ public class TestRouterHelper {
         }
         net.createPin("A1", si136);
 
-        DelayEstimatorBase<InterconnectInfo> estimator = new DelayEstimatorBase<>(device, new InterconnectInfo(), false, 0);
+        DelayEstimator estimator = DelayEstimator.create(device, false);
         Map<SitePinInst, Pair<Node,Short>> sinkNodeDelays = RouterHelper.getSourceToSinkINTNodeDelays(net, estimator);
         Assertions.assertEquals(net.getSinkPins().size(), sinkNodeDelays.size());
 
@@ -505,8 +507,7 @@ public class TestRouterHelper {
         Assertions.assertEquals(sink.getConnectedNode(), sinkPip.getEndNode());
         Assertions.assertNotEquals(source.getConnectedNode(), sinkPip.getStartNode());
 
-        DelayEstimatorBase<InterconnectInfo> estimator =
-                new DelayEstimatorBase<>(device, new InterconnectInfo(), false, 0);
+        DelayEstimator estimator = DelayEstimator.create(device, false);
         Map<SitePinInst, Pair<Node, Short>> sinkNodeDelays =
                 RouterHelper.getSourceToSinkINTNodeDelays(net, estimator);
         Assertions.assertFalse(sinkNodeDelays.containsKey(sink),
@@ -526,8 +527,7 @@ public class TestRouterHelper {
         net.createPin("A1", site);
         net.setPIPs(Collections.singletonList(design.getDevice().getPIP("INT_X54Y136/INT.VCC_WIRE->>IMUX_W10")));
 
-        DelayEstimatorBase<InterconnectInfo> estimator =
-                new DelayEstimatorBase<>(design.getDevice(), new InterconnectInfo(), false, 0);
+        DelayEstimator estimator = DelayEstimator.create(design.getDevice(), false);
         RuntimeException e = Assertions.assertThrows(RuntimeException.class,
                 () -> RouterHelper.getSourceToSinkINTNodeDelays(net, estimator));
         Assertions.assertEquals("ERROR: Cannot compute route delays of static net " + net.getName(),
@@ -557,8 +557,7 @@ public class TestRouterHelper {
             net.setPIPs(Collections.singletonList(directPip));
         }
 
-        DelayEstimatorBase<InterconnectInfo> estimator =
-                new DelayEstimatorBase<>(device, new InterconnectInfo(), false, 0);
+        DelayEstimator estimator = DelayEstimator.create(device, false);
         Map<SitePinInst, Pair<Node, Short>> sinkNodeDelays =
                 RouterHelper.getSourceToSinkINTNodeDelays(net, estimator);
 
@@ -573,5 +572,79 @@ public class TestRouterHelper {
             Assertions.assertNull(sinkNodeDelay,
                     "An unrouted direct connection must not have a routed delay");
         }
+    }
+
+    /**
+     * A delay estimator that charges no delay to super long lines, as one that does not model SLR crossings.
+     */
+    private static DelayEstimator withoutSllDelays(DelayEstimator e) {
+        return new DelayEstimator() {
+            @Override
+            public short getDelayOf(Node node) {
+                return e.getDelayOf(node);
+            }
+
+            @Override
+            public boolean isDelayCharged(Node node) {
+                IntentCode ic = node.getIntentCode();
+                return ic != IntentCode.NODE_LAGUNA_DATA && ic != IntentCode.NODE_SLL_DATA && e.isDelayCharged(node);
+            }
+
+            @Override
+            public short getExtraDelay(Node parent, Node child) {
+                return e.getExtraDelay(parent, child);
+            }
+
+            @Override
+            public float getLookaheadDelayPerTileX() {
+                return e.getLookaheadDelayPerTileX();
+            }
+
+            @Override
+            public float getLookaheadDelayPerTileY() {
+                return e.getLookaheadDelayPerTileY();
+            }
+
+            @Override
+            public short getPreRouteBaseDelay() {
+                return e.getPreRouteBaseDelay();
+            }
+        };
+    }
+
+    /**
+     * Tests that a super long line that the delay estimator does not time gets no delay of 0 anywhere: both the
+     * delay that the timing report computes and the creation of its timing-driven routing node throw.
+     */
+    @Test
+    public void testSuperLongLineWithoutDelay() {
+        Design design = new Design("top", "xcvu9p-flga2104-2L-e");
+        Device device = design.getDevice();
+        DelayEstimator fitted = DelayEstimator.create(device, false);
+        DelayEstimator untimed = withoutSllDelays(fitted);
+        Node sll = null;
+        for (Tile tile : device.getAllTiles()) {
+            for (int w = 0; w < tile.getWireCount() && sll == null; w++) {
+                if (tile.getWireIntentCode(w) == IntentCode.NODE_LAGUNA_DATA) {
+                    sll = Node.getNode(tile, w);
+                }
+            }
+            if (sll != null) {
+                break;
+            }
+        }
+        Assertions.assertNotNull(sll);
+        // The fitted model times it
+        Assertions.assertTrue(fitted.isDelayCharged(sll));
+        Assertions.assertTrue(RouterHelper.computeNodeDelay(fitted, sll) > 0);
+        Assertions.assertFalse(untimed.isDelayCharged(sll));
+        final Node node = sll;
+        RuntimeException e = Assertions.assertThrows(RuntimeException.class,
+                () -> RouterHelper.computeNodeDelay(untimed, node));
+        Assertions.assertTrue(e.getMessage().startsWith("ERROR: No delay is modelled for super long line"));
+        RouteNodeGraphTimingDriven graph = new RouteNodeGraphTimingDriven(design,
+                new RWRouteConfig(new String[] {}), untimed);
+        e = Assertions.assertThrows(RuntimeException.class, () -> graph.getOrCreate(node));
+        Assertions.assertTrue(e.getMessage().startsWith("ERROR: No delay is modelled for super long line"));
     }
 }
