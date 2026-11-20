@@ -47,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -173,15 +174,13 @@ final class SitePinClaims {
         Map<Net, Integer> entryOf = entries.getEntryOfNet();
         List<SiteInst> siteInsts = new ArrayList<>(design.getSiteInsts());
         Set<SiteInst> portSites = getPortSites();
-        int chunks = Math.max(1, Math.min(siteInsts.size() / 1024, ParallelismTools.maxParallelism() * 4));
-        KeyBuffer[] found = new KeyBuffer[chunks];
-        parallelFor(chunks, (c) -> {
-            int from = (int) ((long) siteInsts.size() * c / chunks);
-            int to = (int) ((long) siteInsts.size() * (c + 1) / chunks);
-            found[c] = new KeyBuffer(Math.max(64, Math.min((to - from) * 8, 1 << 16)));
-            for (int s = from; s < to; s++) {
-                addSitePinKeys(siteInsts.get(s), entryOf, portSites, found[c]);
+        List<int[]> ranges = ParallelismTools.chunkRanges(0, siteInsts.size(), 1024).collect(Collectors.toList());
+        List<KeyBuffer> found = ParallelismTools.invokeAll(ranges, (r) -> {
+            KeyBuffer buffer = new KeyBuffer(Math.max(64, Math.min((r[1] - r[0]) * 8, 1 << 16)));
+            for (int s = r[0]; s < r[1]; s++) {
+                addSitePinKeys(siteInsts.get(s), entryOf, portSites, buffer);
             }
+            return buffer;
         });
         int[] counts = new int[entries.size()];
         for (KeyBuffer buffer : found) {

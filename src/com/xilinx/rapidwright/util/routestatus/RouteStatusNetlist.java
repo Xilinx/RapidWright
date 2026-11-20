@@ -39,6 +39,7 @@ import static com.xilinx.rapidwright.util.routestatus.FlatNet.NAMED_BY_DANGLING_
 import static com.xilinx.rapidwright.util.routestatus.FlatNet.NAMED_BY_DRIVER;
 import static com.xilinx.rapidwright.util.routestatus.FlatNet.NAMED_BY_INOUT;
 import static com.xilinx.rapidwright.util.routestatus.FlatNet.NAMED_BY_SEGMENT;
+import static com.xilinx.rapidwright.util.routestatus.RouteStatusEngine.parallelForRange;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -54,8 +55,6 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.RecursiveAction;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -82,6 +81,7 @@ import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.util.IntHashSet;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.ReportRouteStatus;
+import com.xilinx.rapidwright.util.routestatus.RouteStatusEngine.RangeTask;
 
 /**
  * A flattened view of a design's logical netlist, as needed by
@@ -708,17 +708,12 @@ final class RouteStatusNetlist {
                     }
                 }
             }
-            ForkJoinPool.commonPool().submit(() -> cells.parallelStream().forEach(this::getCellInfo)).join();
+            ParallelismTools.forEach(cells, this::getCellInfo);
         }
         CellInfo topInfo = getCellInfo(top);
         computeInstanceCount(topInfo);
         markMacros(topInfo, false);
-        VisitTask root = new VisitTask(topInfo, "", 0, null);
-        if (ParallelismTools.getParallel()) {
-            ForkJoinPool.commonPool().invoke(root);
-        } else {
-            root.compute();
-        }
+        new VisitTask(topInfo, "", 0, null).visit();
         // Merge flat nets connected by feedthroughs (a net connecting two ports of its cell)
         for (FlatNet[] merge : pendingMerges) {
             FlatNet a = merge[0].find();
@@ -735,19 +730,11 @@ final class RouteStatusNetlist {
                 }
             }
         };
-        if (ParallelismTools.getParallel()) {
-            ForkJoinPool.commonPool().submit(() -> lists.parallelStream().forEach(finish)).join();
-        } else {
-            lists.forEach(finish);
-        }
-    }
-
-    private interface RangeTask {
-        void run(int from, int to);
+        ParallelismTools.forEach(lists, finish);
     }
 
     /** Visits one hierarchical instance, with the flat nets bound to its cell's ports. */
-    private class VisitTask extends RecursiveAction {
+    private class VisitTask {
         final CellInfo info;
         final String prefix;
         /** The hash code of the prefix, computed from the parent's (as String.hashCode() would) */
@@ -761,8 +748,7 @@ final class RouteStatusNetlist {
             this.portBinding = portBinding;
         }
 
-        @Override
-        protected void compute() {
+        void visit() {
             // Look up the placement of leaf cells and prepare the port bindings of hierarchical children
             int numChildren = info.children.length;
             SiteInst[] leafSites = new SiteInst[numChildren];
@@ -800,38 +786,27 @@ final class RouteStatusNetlist {
                 String name = eci.getName();
                 int childPrefixHash = (prefixHash * pow31(name.length()) + name.hashCode()) * 31 + '/';
                 VisitTask task = new VisitTask(childInfo, prefix + name + "/", childPrefixHash, childBindings[c]);
-                if (childInfo.leafCount >= MIN_PARALLEL_INSTANCES && getPool() != null) {
+                if (childInfo.leafCount >= MIN_PARALLEL_INSTANCES && ParallelismTools.getParallel()) {
                     if (forked == null) {
                         forked = new ArrayList<>();
                     }
                     forked.add(task);
                 } else {
-                    task.compute();
+                    task.visit();
                 }
             }
             if (forked != null) {
-                invokeAll(forked);
+                ParallelismTools.forEach(forked, VisitTask::visit);
             }
         }
 
-        /** Runs the task over [0, n), in parallel chunks if n is large and running in a pool. */
+        /** Runs the task over [0, n), in parallel chunks if n is large and parallel processing is enabled. */
         private void forRange(int n, RangeTask task) {
-            if (n <= 2 * CHUNK || getPool() == null) {
+            if (n <= 2 * CHUNK) {
                 task.run(0, n);
                 return;
             }
-            List<RecursiveAction> chunks = new ArrayList<>();
-            for (int from = 0; from < n; from += CHUNK) {
-                final int f = from;
-                final int to = Math.min(n, from + CHUNK);
-                chunks.add(new RecursiveAction() {
-                    @Override
-                    protected void compute() {
-                        task.run(f, to);
-                    }
-                });
-            }
-            invokeAll(chunks);
+            parallelForRange(n, CHUNK, task);
         }
 
         /** Visits the nets [from, to) of the instance: creates or extends their flat nets. */

@@ -38,6 +38,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.xilinx.rapidwright.util.ParallelismTools;
+
 /**
  * Marks the nets that use the same nodes (through their routing, or their site pins) as conflicting,
  * by sorting the keys of the nodes used by all nets.
@@ -107,7 +109,11 @@ final class ConflictMarker {
                 tagged[o++] = (((compact << entryBits) | i) << 1) | (j >= routing ? 1 : 0);
             }
         });
-        Arrays.parallelSort(tagged);
+        if (ParallelismTools.getParallel()) {
+            Arrays.parallelSort(tagged);
+        } else {
+            Arrays.sort(tagged);
+        }
         long entryMask = (1L << entryBits) - 1;
         int keyShift = entryBits + 1;
         int[] users = new int[16];

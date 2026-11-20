@@ -28,15 +28,13 @@ import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.isBusRa
 import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.isPrimitive;
 import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.pow31;
 import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.slot;
+import static com.xilinx.rapidwright.util.routestatus.RouteStatusEngine.parallelFor;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ForkJoinTask;
-import java.util.concurrent.RecursiveAction;
 
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.edif.EDIFCell;
@@ -44,6 +42,7 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPort;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
+import com.xilinx.rapidwright.util.ParallelismTools;
 
 /** The connectivity of a (non-leaf) cell definition, precomputed once for all its instances. */
 final class CellInfo {
@@ -128,8 +127,7 @@ final class CellInfo {
                 Arrays.fill(ownOutputs, offset, offset + Math.max(1, port.getWidth()), true);
             }
         }
-        boolean parallel = ForkJoinTask.inForkJoinPool();
-        children = toArray(cell.getCellInsts(), new EDIFCellInst[0], parallel);
+        children = toArray(cell.getCellInsts(), new EDIFCellInst[0]);
         childIsLeaf = new boolean[children.length];
         // Per hierarchical child: the port slots of its cell, and which are connected inside
         childOffsets = new Map[children.length];
@@ -139,13 +137,13 @@ final class CellInfo {
         childIsBlackBox = new boolean[children.length];
         childTies = new int[children.length][];
         Map<EDIFCellInst, Integer> childIndex = initChildren(netlist);
-        nets = toArray(cell.getNets(), new EDIFNet[0], parallel);
+        nets = toArray(cell.getNets(), new EDIFNet[0]);
         nameHashes = new int[nets.length];
         namePows = new int[nets.length];
         notNets = new boolean[nets.length];
         start = new int[nets.length + 1];
         staticTypes = new NetType[nets.length];
-        Chunk[] chunks = initNetChunks(offsets, childIndex, parallel);
+        Chunk[] chunks = initNetChunks(offsets, childIndex);
         int total = 0;
         for (Chunk chunk : chunks) {
             total += chunk.size;
@@ -190,27 +188,12 @@ final class CellInfo {
     }
 
     /** Tallies the port instances of the nets, each chunk of nets into its own arrays (in parallel). */
-    private Chunk[] initNetChunks(Map<EDIFPort, Integer> offsets, Map<EDIFCellInst, Integer> childIndex,
-                                  boolean parallel) {
+    private Chunk[] initNetChunks(Map<EDIFPort, Integer> offsets, Map<EDIFCellInst, Integer> childIndex) {
         int numChunks = Math.max(1, (nets.length + CHUNK - 1) / CHUNK);
         Chunk[] chunks = new Chunk[numChunks];
-        if (numChunks > 4 && parallel) {
-            List<RecursiveAction> tasks = new ArrayList<>();
-            for (int c = 0; c < numChunks; c++) {
-                final int i = c;
-                tasks.add(new RecursiveAction() {
-                    @Override
-                    protected void compute() {
-                        chunks[i] = initNets(i * CHUNK, Math.min(nets.length, (i + 1) * CHUNK), offsets, childIndex);
-                    }
-                });
-            }
-            ForkJoinTask.invokeAll(tasks);
-        } else {
-            for (int c = 0; c < numChunks; c++) {
-                chunks[c] = initNets(c * CHUNK, Math.min(nets.length, (c + 1) * CHUNK), offsets, childIndex);
-            }
-        }
+        parallelFor(numChunks, (c) -> {
+            chunks[c] = initNets(c * CHUNK, Math.min(nets.length, (c + 1) * CHUNK), offsets, childIndex);
+        });
         return chunks;
     }
 
@@ -333,10 +316,10 @@ final class CellInfo {
         }
     }
 
-    /** Copies a (large) collection into an array, in parallel if in a fork join pool. */
-    private static <T> T[] toArray(Collection<T> collection, T[] empty, boolean parallel) {
-        if (parallel && collection.size() > 4 * CHUNK) {
-            return collection.parallelStream().toArray((n) -> Arrays.copyOf(empty, n));
+    /** Copies a (large) collection into an array, in parallel if parallel processing is enabled. */
+    private static <T> T[] toArray(Collection<T> collection, T[] empty) {
+        if (ParallelismTools.getParallel() && collection.size() > 4 * CHUNK) {
+            return ParallelismTools.stream(collection).toArray((n) -> Arrays.copyOf(empty, n));
         }
         return collection.toArray(empty);
     }

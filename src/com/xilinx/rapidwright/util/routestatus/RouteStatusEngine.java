@@ -66,6 +66,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -811,26 +812,27 @@ public final class RouteStatusEngine {
         void run(int i);
     }
 
+    interface RangeTask {
+        void run(int from, int to);
+    }
+
     /** Runs the task for every index in [0, n), in parallel chunks. */
     static void parallelFor(int n, IndexTask task) {
-        int chunks = Math.min(n, ParallelismTools.maxParallelism() * 4);
-        if (chunks <= 1 || !ParallelismTools.getParallel()) {
-            for (int i = 0; i < n; i++) {
+        parallelForRange(n, 1, (from, to) -> {
+            for (int i = from; i < to; i++) {
                 task.run(i);
             }
-            return;
-        }
-        Runnable[] runnables = new Runnable[chunks];
-        for (int c = 0; c < chunks; c++) {
-            final int from = (int) ((long) n * c / chunks);
-            final int to = (int) ((long) n * (c + 1) / chunks);
-            runnables[c] = () -> {
-                for (int i = from; i < to; i++) {
-                    task.run(i);
-                }
-            };
-        }
-        ParallelismTools.invokeAll(runnables);
+        });
+    }
+
+    /**
+     * Runs the task on chunks of the indices in [0, n) (see {@link ParallelismTools#chunkRanges(int, int, int)}), in
+     * parallel if parallel processing is enabled, else on a single chunk of all of them.
+     * @param minChunkSize The fewest indices in each chunk (but the last).
+     */
+    static void parallelForRange(int n, int minChunkSize, RangeTask task) {
+        List<int[]> ranges = ParallelismTools.chunkRanges(0, n, minChunkSize).collect(Collectors.toList());
+        ParallelismTools.forEach(ranges, (r) -> task.run(r[0], r[1]));
     }
 
     /**
