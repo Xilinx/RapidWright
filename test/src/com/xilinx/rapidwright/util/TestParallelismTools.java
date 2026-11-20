@@ -438,6 +438,41 @@ public class TestParallelismTools {
         Assertions.assertTrue(ParallelismTools.invokeFirstSubmitRest(new Callable[0]).isEmpty());
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    public void testChunkedStreamOfRanges(boolean parallel) {
+        boolean wasParallel = ParallelismTools.getParallel();
+        try {
+            Assumptions.assumeTrue(ParallelismTools.setParallel(parallel));
+            // Parallel only when parallel processing is enabled, unlike chunkRanges()
+            Assertions.assertEquals(parallel, ParallelismTools.chunkedStream(0, 1000, 10).isParallel());
+            Assertions.assertFalse(ParallelismTools.chunkRanges(0, 1000, 10).isParallel());
+
+            // Every index is in exactly one chunk, whichever threads run the chunks
+            final AtomicIntegerArray seen = new AtomicIntegerArray(1000);
+            ParallelismTools.chunkedStream(3, 1000, 10).forEach((r) -> {
+                for (int i = r[0]; i < r[1]; i++) {
+                    seen.incrementAndGet(i);
+                }
+            });
+            for (int i = 0; i < seen.length(); i++) {
+                Assertions.assertEquals(i < 3 ? 0 : 1, seen.get(i), "index " + i);
+            }
+
+            // In encounter order when collected
+            int next = 3;
+            for (int[] r : ParallelismTools.chunkedStream(3, 1000, 10).collect(Collectors.toList())) {
+                Assertions.assertEquals(next, r[0]);
+                next = r[1];
+            }
+            Assertions.assertEquals(1000, next);
+
+            Assertions.assertEquals(0, ParallelismTools.chunkedStream(5, 5, 10).count());
+        } finally {
+            ParallelismTools.setParallel(wasParallel);
+        }
+    }
+
     @Test
     public void testJoinOrdered() {
         final AtomicIntegerArray runs = new AtomicIntegerArray(NUM_TASKS);

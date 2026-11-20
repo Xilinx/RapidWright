@@ -2161,13 +2161,8 @@ public class RouteNodeGraph {
     }
 
     public void preserveAsync(Net net, List<SitePinInst> pins) {
-        ParallelismTools.submit(asyncPreserveOutstanding, () -> {
-            try {
-                preserve(net, pins);
-            } catch (Throwable t) {
-                t.printStackTrace();
-            }
-        });
+        // If preserve() throws, it is rethrown by awaitPreserve() (or here, if parallel processing is disabled)
+        ParallelismTools.submit(asyncPreserveOutstanding, () -> preserve(net, pins));
     }
 
     public void preserve(Net net) {
@@ -2180,14 +2175,14 @@ public class RouteNodeGraph {
 
     public void awaitPreserve() {
         asyncPreserveOutstanding.tryComplete();
-        // Uninterruptibly (as before). First runs any of those calls' tasks not yet started on this thread, rather than
-        // only blocking, then blocks for those already started: it helps only that once, which is enough, as the
-        // calling thread submitted all of them before this and none of them submits any more (unlike
-        // ParallelismTools.join(CountedCompleter), which keeps helping). Never completes exceptionally, as each task
-        // catches what it throws
-        asyncPreserveOutstanding.quietlyJoin();
-        // Only once done (all of its children have completed, and this was its only join), so that it can be reused
-        // for any later calls to preserveAsync()
+        // Uninterruptibly (as before): an interrupted wait would otherwise return while tasks are still modifying this
+        // graph, and calling this again would count tryComplete() above twice. First runs any of those calls' tasks
+        // not yet started on this thread, rather than only blocking. If any of them threw, that is rethrown here,
+        // possibly while others are still running: so it is then left as it is (not reinitialized), and this graph
+        // must not be used any further
+        asyncPreserveOutstanding.join();
+        // Only once done normally (all of its children have completed, and this was its only join), so that it can be
+        // reused for any later calls to preserveAsync()
         asyncPreserveOutstanding.reinitialize();
     }
 

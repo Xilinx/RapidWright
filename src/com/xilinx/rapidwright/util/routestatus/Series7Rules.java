@@ -25,7 +25,6 @@ package com.xilinx.rapidwright.util.routestatus;
 import static com.xilinx.rapidwright.util.routestatus.NetStatus.CONFLICTS;
 import static com.xilinx.rapidwright.util.routestatus.NetStatus.ROUTED;
 import static com.xilinx.rapidwright.util.routestatus.NetStatus.has;
-import static com.xilinx.rapidwright.util.routestatus.RouteStatusEngine.parallelFor;
 import static com.xilinx.rapidwright.util.routestatus.SiteRouting.getLogicalCell;
 import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isBlockRamSite;
 import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isClockBufferSite;
@@ -37,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -49,6 +49,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
+import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.Utils;
 
 /**
@@ -138,12 +139,11 @@ final class Series7Rules {
         }
         Map<Net, Integer> entryOf = entries.getEntryOfNet();
         Net[] nets = design.getNets().toArray(new Net[0]);
-        Set<Integer> conflicting = ConcurrentHashMap.newKeySet();
-        parallelFor(nets.length, (n) -> {
-            Net net = nets[n];
+        Set<Integer> conflicting = ParallelismTools.stream(nets).flatMap((net) -> {
             if (net.isStaticNet()) {
-                return;
+                return null;
             }
+            List<Integer> localConflicting = null;
             for (SitePinInst spi : storedPins(net)) {
                 if (!spi.isOutPin() || !Utils.isSLICE(spi.getSiteInst())) {
                     // (only seen in slices; the site routing of hard blocks, e.g. DSP cascades,
@@ -157,11 +157,15 @@ final class Series7Rules {
                 Integer a = entryOf.get(net);
                 Integer b = entryOf.get(other);
                 if (a != null && b != null && !a.equals(b)) {
-                    conflicting.add(a);
-                    conflicting.add(b);
+                    if (localConflicting == null) {
+                        localConflicting = new ArrayList<>();
+                    }
+                    localConflicting.add(a);
+                    localConflicting.add(b);
                 }
             }
-        });
+            return localConflicting == null ? null : localConflicting.stream();
+        }).collect(Collectors.toSet());
         for (int i : conflicting) {
             entries.status[i] = (entries.status[i] & ~ROUTED) | CONFLICTS;
         }
