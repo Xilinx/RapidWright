@@ -77,9 +77,6 @@ public class TestEDIFTools {
             EDIFTools.connectPortInstsThruHier(srcPortInst, snkPortInst, UNIQUE_SUFFIX);
         }
 
-        netlist.resetParentNetMap();
-
-
         List<EDIFHierNet> netAliases = netlist.getNetAliases(srcPortInst.getHierarchicalNet());
         Assertions.assertEquals(netAliases.size(), 16);
         boolean containsSnkNet = false;

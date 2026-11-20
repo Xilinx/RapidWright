@@ -47,7 +47,7 @@ import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
-import com.xilinx.rapidwright.util.VivadoTools;
+import com.xilinx.rapidwright.util.VivadoToolsHelper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -253,7 +253,7 @@ public class TestRelocationTools {
                 expectSuccess);
 
         if (expectSuccess && FileTools.isVivadoOnPath()) {
-            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(design1);
+            ReportRouteStatusResult rrs = VivadoToolsHelper.reportRouteStatus(design1);
             Assertions.assertEquals(expectedNetsWithRoutingErrors, rrs.netsWithRoutingErrors);
         }
     }

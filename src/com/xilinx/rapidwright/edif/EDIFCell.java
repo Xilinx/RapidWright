@@ -68,10 +68,13 @@ public class EDIFCell extends EDIFPropertyObject {
 
     private PortMap ports;
 
-    private CompactStringMap<EDIFNet> internalPortMap;
+    private PortNetMap internalPortMap;
 
     // One final class per map type, so that the JIT compiler can inline keyOf() into lookups
     private static final class InstanceMap extends CompactStringMap<EDIFCellInst> {
+        /** True once a shallow copy of the cell shares these cell instances with it */
+        boolean isShared;
+
         InstanceMap() {
             super(true);
         }
@@ -83,6 +86,9 @@ public class EDIFCell extends EDIFPropertyObject {
     }
 
     private static final class NetMap extends CompactStringMap<EDIFNet> {
+        /** True once a shallow copy of the cell shares these nets with it */
+        boolean isShared;
+
         NetMap() {
             super(true);
         }
@@ -91,6 +97,11 @@ public class EDIFCell extends EDIFPropertyObject {
         protected String keyOf(EDIFNet value) {
             return value.getName();
         }
+    }
+
+    private static final class PortNetMap extends CompactStringMap<EDIFNet> {
+        /** True once a shallow copy of the cell shares the nets on its ports with it */
+        boolean isShared;
     }
 
     private static final class PortMap extends CompactStringMap<EDIFPort> {
@@ -106,6 +117,16 @@ public class EDIFCell extends EDIFPropertyObject {
     }
 
     private EDIFName view = DEFAULT_VIEW;
+
+    /**
+     * What depends on this cell among the connectivity recorded for the nets of the cells that
+     * instantiate it (see {@link EDIFNetConnectivity}), other than through the nets of this cell:
+     * null if nothing, {@link EDIFNetConnectivity#LEAF_CELL_USED} if this cell was used as a leaf
+     * cell (or its ports for the pins of one), or else the connectivity (a set as kept by
+     * {@link EDIFNetConnectivity#addTo(Object, EDIFNetConnectivity)}) of the nets on a port of
+     * an instance of this cell that had no net inside this cell.
+     */
+    private Object connectivityWatchers;
 
     /**
      * An atomically updated variable to track the number of `EDIFCellInst`
@@ -147,6 +168,11 @@ public class EDIFCell extends EDIFPropertyObject {
         ports = orig.ports;
         internalPortMap = orig.internalPortMap;
         view = orig.view;
+        // From now on, what one of the two cells gets or loses of these is that of the other one
+        // too, see contentsToBeAdded() and portConnected()
+        if (instances != null) instances.isShared = true;
+        if (nets != null) nets.isShared = true;
+        if (internalPortMap != null) internalPortMap.isShared = true;
     }
 
     /**
@@ -238,6 +264,7 @@ public class EDIFCell extends EDIFPropertyObject {
      * @return The instance added to the cell.
      */
     public EDIFCellInst addCellInst(EDIFCellInst instance) {
+        contentsToBeAdded(instances != null && instances.isShared && instances.isEmpty());
         if (instances == null) instances = new InstanceMap();
         instance.setParentCell(this);
         EDIFCellInst collision = instances.put(instance.getName(), instance);
@@ -257,6 +284,7 @@ public class EDIFCell extends EDIFPropertyObject {
      * @return The instance added to the cell.
      */
     public EDIFCellInst addCellInstUniqueName(EDIFCellInst instance) {
+        contentsToBeAdded(instances != null && instances.isShared && instances.isEmpty());
         if (instances == null) instances = new InstanceMap();
         instance.setParentCell(this);
         if (instances.get(instance.getName()) == instance) {
@@ -282,6 +310,7 @@ public class EDIFCell extends EDIFPropertyObject {
      * @return The net that was added.
      */
     public EDIFNet addNet(EDIFNet net) {
+        contentsToBeAdded(nets != null && nets.isShared && nets.isEmpty());
         if (nets == null) nets = new NetMap();
         net.setParentCell(this);
         EDIFNet collision = nets.put(net.getName(), net);
@@ -309,7 +338,12 @@ public class EDIFCell extends EDIFPropertyObject {
     public EDIFNet removeNet(String name) {
         if (nets == null) return null;
         trackChange(EDIFChangeType.NET_REMOVE, name);
-        return nets.remove(name);
+        EDIFNet removedNet = nets.remove(name);
+        if (removedNet != null && EDIFNetConnectivity.active) {
+            removedNet.connectivityChanged();
+            contentsRemoved(nets.isShared && nets.isEmpty());
+        }
+        return removedNet;
     }
 
     /**
@@ -418,6 +452,7 @@ public class EDIFCell extends EDIFPropertyObject {
         if (removedInstance != null) {
             assert(removedInstance.getParentCell() == this);
             removedInstance.setParentCell(null);
+            contentsRemoved(instances.isShared && instances.isEmpty());
         }
         return removedInstance;
     }
@@ -541,8 +576,11 @@ public class EDIFCell extends EDIFPropertyObject {
      * @param internalNet  The net inside this cell to match with the port ref name.
      */
     public void addInternalPortMapEntry(String portInstName, EDIFNet internalNet) {
-        if (internalPortMap == null) internalPortMap = new CompactStringMap<>();
-        internalPortMap.put(portInstName, internalNet);
+        if (internalPortMap == null) internalPortMap = new PortNetMap();
+        EDIFNet oldNet = internalPortMap.put(portInstName, internalNet);
+        if (EDIFNetConnectivity.active) {
+            internalNetChanged(oldNet, internalNet);
+        }
     }
 
     /**
@@ -553,7 +591,145 @@ public class EDIFCell extends EDIFPropertyObject {
      */
     public EDIFNet removeInternalPortMapEntry(String portInstName) {
         if (internalPortMap == null) return null;
-        return internalPortMap.remove(portInstName);
+        EDIFNet oldNet = internalPortMap.remove(portInstName);
+        if (oldNet != null && EDIFNetConnectivity.active) {
+            internalNetChanged(oldNet, null);
+        }
+        return oldNet;
+    }
+
+    /**
+     * Drops what is recorded for finding parent nets (see {@link EDIFNetConnectivity}) and
+     * depends on the net inside this cell on one of its ports.
+     * @param oldNet The net that was on the port, or null if it had none.
+     * @param newNet The net that is on the port, or null if it has none.
+     */
+    private void internalNetChanged(EDIFNet oldNet, EDIFNet newNet) {
+        if (oldNet != newNet) {
+            if (oldNet != null) {
+                oldNet.connectivityChanged();
+            }
+            if (newNet != null) {
+                newNet.connectivityChanged();
+            }
+        }
+        if (newNet != null) {
+            portConnected();
+        }
+        EDIFNetConnectivity.netlistChanged();
+    }
+
+    /**
+     * To be called when a port of this cell may have got a net inside this cell: drops what is
+     * recorded for finding parent nets (see {@link EDIFNetConnectivity}) for the nets on a port
+     * of an instance of this cell that had none.
+     */
+    void portConnected() {
+        if (internalPortMap != null && internalPortMap.isShared) {
+            // The port is also one of the cell that shares the nets on the ports of this cell (a
+            // shallow copy of it, or the cell it is a copy of), which this cell does not know
+            resetConnectivity();
+            return;
+        }
+        if (connectivityWatchers != null) {
+            Object watchers;
+            synchronized (this) {
+                watchers = connectivityWatchers;
+                connectivityWatchers = null;
+            }
+            if (watchers == EDIFNetConnectivity.LEAF_CELL_USED) {
+                resetConnectivity();
+            } else {
+                EDIFNetConnectivity.invalidate(watchers);
+            }
+        }
+    }
+
+    /**
+     * To be called before a net or a cell instance is added to this cell.
+     * @param toSharedEmpty True if it is the first of the nets, or of the cell instances, that
+     * this cell shares with another cell: a shallow copy of it, or the cell it is a copy of.
+     */
+    private void contentsToBeAdded(boolean toSharedEmpty) {
+        if (EDIFNetConnectivity.active) {
+            // A cell that was used as a leaf cell will no longer be one: this cell, or the one
+            // that shares these contents, which this cell does not know
+            if (toSharedEmpty || (connectivityWatchers != null && isLeafCellOrBlackBox())) {
+                resetConnectivity();
+            }
+            EDIFNetConnectivity.netlistChanged();
+        }
+    }
+
+    /**
+     * To be called after a net or a cell instance was removed from this cell.
+     * @param sharedNowEmpty True if it was the last of the nets, or of the cell instances, that
+     * this cell shares with another cell (see {@link #contentsToBeAdded(boolean)}).
+     */
+    private void contentsRemoved(boolean sharedNowEmpty) {
+        if (EDIFNetConnectivity.active) {
+            if (sharedNowEmpty || isLeafCellOrBlackBox()) {
+                // The pins of the instances of this cell are now leaf cell pins, or those of the
+                // cell that shares these contents and has no others
+                resetConnectivity();
+            }
+            EDIFNetConnectivity.netlistChanged();
+        }
+    }
+
+    /**
+     * To be called when the direction of a port of this cell has changed.
+     */
+    void portDirectionChanged() {
+        if (EDIFNetConnectivity.active) {
+            if (connectivityWatchers != null) {
+                // Whether a pin of a leaf cell is a source depends on its direction
+                resetConnectivity();
+            }
+            EDIFNetConnectivity.netlistChanged();
+        }
+    }
+
+    /**
+     * Drops everything recorded for finding parent nets (see {@link EDIFNetConnectivity}), as it
+     * is not known what depends on this cell: in all netlists, as a cell can be instantiated in
+     * a netlist other than its own.
+     */
+    private void resetConnectivity() {
+        synchronized (this) {
+            connectivityWatchers = null;
+        }
+        EDIFNetConnectivity.resetAll();
+    }
+
+    /**
+     * Records that connectivity was computed with a pin of an instance of this cell as a leaf
+     * cell pin (or with a port of this cell as the port of a leaf cell pin), so that all of it is
+     * dropped once this is no longer a leaf cell, or when the direction of a port of it changes.
+     */
+    void setConnectivityUsed() {
+        if (connectivityWatchers != EDIFNetConnectivity.LEAF_CELL_USED) {
+            synchronized (this) {
+                // This replaces what is kept for the ports of this cell that have no net inside
+                // (see addConnectivityWatcher()), which would not tell of this once it is dropped
+                connectivityWatchers = EDIFNetConnectivity.LEAF_CELL_USED;
+            }
+        }
+    }
+
+    /**
+     * Records that connectivity was computed with a port of an instance of this cell that has no
+     * net inside this cell, so that it is dropped once a port of this cell gets one.
+     */
+    void addConnectivityWatcher(EDIFNetConnectivity watcher) {
+        synchronized (this) {
+            Object watchers = connectivityWatchers;
+            // A cell that was used as a leaf cell (or its ports for the pins of one) stays known
+            // as that: everything is dropped once a port of it gets a net, see portConnected()
+            if (watchers != EDIFNetConnectivity.LEAF_CELL_USED) {
+                connectivityWatchers = EDIFNetConnectivity.addTo(watchers, watcher);
+            }
+        }
     }
 
     /**
@@ -574,6 +750,9 @@ public class EDIFCell extends EDIFPropertyObject {
         ports = null;
         // A leaf cell has no nets, so any internal port map it has is shared with the other cell
         internalPortMap = null;
+        if (EDIFNetConnectivity.active) {
+            resetConnectivity();
+        }
         Map<EDIFPort, EDIFPort> copies = new IdentityHashMap<>();
         for (EDIFPort port : sharedPorts.values()) {
             copies.put(port, addPort(new EDIFPort(port)));
@@ -757,6 +936,10 @@ public class EDIFCell extends EDIFPropertyObject {
         instances = null;
         nets = null;
         internalPortMap = null;
+        if (EDIFNetConnectivity.active) {
+            // It is a leaf cell from now on
+            resetConnectivity();
+        }
     }
 
 

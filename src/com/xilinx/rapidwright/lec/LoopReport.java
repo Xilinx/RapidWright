@@ -1,0 +1,139 @@
+/*
+ * Copyright (c) 2026, Advanced Micro Devices, Inc.
+ * All rights reserved.
+ *
+ * Author: Chris Lavin, Advanced Micro Devices, Inc.
+ *
+ * This file is part of RapidWright.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ */
+
+package com.xilinx.rapidwright.lec;
+
+import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * The genuine combinational loops found while building cones.
+ *
+ * There is a sharp line here. A carry chain or a
+ * multiplier compression tree is cyclic when viewed as a graph of whole cells
+ * but acyclic at bit level, and must <b>not</b> be reported; the per output pin
+ * dependency model in {@link PrimitiveModel} is what makes those disappear. A
+ * cycle that survives at bit level is a real logic loop and must be reported as
+ * an error rather than silently accepted.
+ *
+ * Loops are recorded rather than thrown so that one run finds all of them, and
+ * are de-duplicated by the set of pins involved so that a loop reachable from a
+ * hundred different cones is reported once.
+ */
+public class LoopReport {
+
+    private final List<String[]> cycles = new ArrayList<>();
+
+    private final Set<String> seen = new HashSet<>();
+
+    /**
+     * Records a cycle if it has not been seen before.
+     *
+     * @param pinNames The pins forming the cycle, in dependency order.
+     * @return True if this cycle is new.
+     */
+    public boolean record(String[] pinNames) {
+        String[] sorted = pinNames.clone();
+        Arrays.sort(sorted);
+        String key = String.join("\0", sorted);
+        if (!seen.add(key)) {
+            return false;
+        }
+        cycles.add(pinNames);
+        return true;
+    }
+
+    public int getCount() {
+        return cycles.size();
+    }
+
+    public boolean isEmpty() {
+        return cycles.isEmpty();
+    }
+
+    public List<String[]> getCycles() {
+        return cycles;
+    }
+
+    /**
+     * @return A name for a cycle that does not depend on where the traversal
+     *         happened to enter it.
+     *
+     *         The same loop reached from two different cones is reported
+     *         starting at two different pins, so comparing loops between the two
+     *         netlists has to be done on the set of pins involved rather than on
+     *         the order they were listed in.
+     */
+    public static String canonicalKey(String[] cycle) {
+        String[] sorted = cycle.clone();
+        Arrays.sort(sorted);
+        return String.join(" ", sorted);
+    }
+
+    /** @return The canonical key of every distinct cycle found. */
+    public Set<String> getCanonicalKeys() {
+        Set<String> keys = new LinkedHashSet<>();
+        for (String[] cycle : cycles) {
+            keys.add(canonicalKey(cycle));
+        }
+        return keys;
+    }
+
+    /** @return The cycle with the given canonical key, or null. */
+    public String[] getCycle(String canonicalKey) {
+        for (String[] cycle : cycles) {
+            if (canonicalKey(cycle).equals(canonicalKey)) {
+                return cycle;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Prints each distinct loop as a chain of pins, closing back on the pin it
+     * started from.
+     */
+    public void print(PrintStream out, int maxCycles) {
+        if (cycles.isEmpty()) {
+            return;
+        }
+        out.println();
+        out.println("Combinational loops: " + cycles.size());
+        int shown = 0;
+        for (String[] cycle : cycles) {
+            if (shown++ >= maxCycles) {
+                out.println("  ... " + (cycles.size() - maxCycles) + " more");
+                break;
+            }
+            out.println("  loop of " + cycle.length + " pins:");
+            for (String pin : cycle) {
+                out.println("    " + pin);
+            }
+            out.println("    -> " + cycle[0]);
+        }
+    }
+}

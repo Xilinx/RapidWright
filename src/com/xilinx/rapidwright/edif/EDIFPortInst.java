@@ -196,6 +196,15 @@ public class EDIFPortInst implements Comparable<EDIFPortInst> {
      */
     public void setIndex(int index) {
         this.index = index;
+        connectivityChanged();
+    }
+
+    /** Tells the net this port inst is on, if any, that what it connects to has changed. */
+    private void connectivityChanged() {
+        EDIFNet net = parentNet;
+        if (net != null && EDIFNetConnectivity.active) {
+            EDIFNetConnectivity.portInstChanged(net, this);
+        }
     }
 
     public EDIFCell getParentCell() {
@@ -234,10 +243,12 @@ public class EDIFPortInst implements Comparable<EDIFPortInst> {
         if (cellInst != null) {
             cellInst.addPortInst(this, deferSort);
         }
+        connectivityChanged();
     }
 
     protected void setCellInstRaw(EDIFCellInst cellInst) {
         this.cellInst = cellInst;
+        connectivityChanged();
     }
 
     /**
@@ -268,6 +279,7 @@ public class EDIFPortInst implements Comparable<EDIFPortInst> {
 
     public void setPort(EDIFPort port) {
         this.port = port;
+        connectivityChanged();
     }
 
     public EDIFDirection getDirection() {
@@ -302,7 +314,14 @@ public class EDIFPortInst implements Comparable<EDIFPortInst> {
      * @param parentNet the parentNet to set
      */
     public void setParentNet(EDIFNet parentNet) {
+        EDIFNet oldNet = this.parentNet;
         this.parentNet = parentNet;
+        if (oldNet != parentNet) {
+            if (oldNet != null) {
+                oldNet.connectivityChanged();
+            }
+            connectivityChanged();
+        }
     }
 
     public static final byte[] EXPORT_CONST_PORTREF = "(portref ".getBytes(StandardCharsets.UTF_8);

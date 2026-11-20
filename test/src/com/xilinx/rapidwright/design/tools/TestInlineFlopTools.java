@@ -168,7 +168,6 @@ public class TestInlineFlopTools {
 
         PBlock pblock = new PBlock(design.getDevice(), pblockRange);
         createAndPlaceFlopInlineAtSpecificBEL(design, "clk", inPort, harnessBel, pblock);
-        design.getNetlist().resetParentNetMap();
         createAndPlaceFlopInlineAtSpecificBEL(design, "clk", outPort, harnessBel, pblock);
         InlineFlopTools.removeInlineFlops(design);
         for (Cell c : design.getCells()) {
@@ -210,7 +209,6 @@ public class TestInlineFlopTools {
 
         PBlock pblock = new PBlock(design.getDevice(), pblockRange);
         createAndPlaceFlopInlineAtSpecificBEL(design, "clk", inPort, harnessBel, pblock);
-        design.getNetlist().resetParentNetMap();
         createAndPlaceFlopInlineAtSpecificBEL(design, "clk", outPort, harnessBel, pblock);
 
         String inlineCell = "in" + InlineFlopTools.INLINE_SUFFIX;

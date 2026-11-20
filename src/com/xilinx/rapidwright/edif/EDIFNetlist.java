@@ -98,18 +98,11 @@ public class EDIFNetlist extends EDIFName {
 
     private Map<String,EDIFPropertyValue> metax;
 
-    // The parent net and physical pin maps are built on first use. Each is completely built before
-    // it is assigned (under this netlist's lock), so that threads reading the netlist at the same
-    // time never see a map under construction. physicalNetPinMap is assigned after the GND/VCC pin
-    // lists, and parentNetMap last. Once assigned, a map or list is never changed, except that
-    // until the parent net map is built, getNetAliases() adds the pins of new parent nets to
-    // physicalNetPinMap (then a ConcurrentHashMap) and replaces the GND/VCC pin lists with copies.
-    private volatile Map<EDIFHierNet,EDIFHierNet> parentNetMap;
-    private volatile Map<String,String> parentNetMapNames;
-
-    private volatile Map<EDIFHierNet, List<EDIFHierPortInst>> physicalNetPinMap;
-    private volatile List<EDIFHierPortInst> physicalGndPins;
-    private volatile List<EDIFHierPortInst> physicalVccPins;
+    /**
+     * Finds the parent nets, the aliases and the physical pins of the nets of this netlist, on
+     * demand, and keeps up with the changes made to the netlist.
+     */
+    private final EDIFParentNets parentNets = new EDIFParentNets(this);
 
     protected int nameSpaceUniqueCount = 0;
 
@@ -370,6 +363,8 @@ public class EDIFNetlist extends EDIFName {
         if (topCellInstance != null) {
             topCellInstance.setName(newName);
         }
+        // The hierarchical nets that are kept have another name now
+        EDIFNetConnectivity.netlistChanged();
     }
 
     /**
@@ -1556,8 +1551,7 @@ public class EDIFNetlist extends EDIFName {
             if (p.getNet().getName().equals(EDIFTools.LOGICAL_VCC_NET_NAME)) return d.getVccNet();
         }
 
-        Map<EDIFHierNet,EDIFHierNet> parentNetMap = getParentNetMap();
-        EDIFHierNet parentNet = parentNetMap.get(p.getHierarchicalNet());
+        EDIFHierNet parentNet = getParentNet(p.getHierarchicalNet());
         Net n = parentNet == null ? null : d.getNet(parentNet.getHierarchicalNetName());
         if (n == null) {
             if (parentNet == null) {
@@ -1765,184 +1759,15 @@ public class EDIFNetlist extends EDIFName {
 
     /**
      * Gets all equivalent nets in the netlist from the provided net.
-     * The returned list also includes the provided net. If the parent net map is not built, the
-     * leaf cell pins of these nets are recorded as the physical pins of their parent net (see
-     * {@link #getPhysicalNetPinMap()}), unless they already are; building the map records them all.
+     * The returned list also includes the provided net.
      * @param initialNet The net to use as a starting point in the search.
      * @return A list of all electrically connected nets in the netlist that are equivalent.
-     * @throws RuntimeException If the net has more than one source, or has connections but no
-     * source.
+     * @throws RuntimeException If the net has more than one source, has connections but no
+     * source, or is not a net of the netlist: a net of the former cell of a cell instance that
+     * was given another cell, for example.
      */
     public List<EDIFHierNet> getNetAliases(EDIFHierNet initialNet) {
-        List<EDIFHierNet> aliases = new ArrayList<>();
-        // Search into private collections, then record the pins under the lock
-        Map<EDIFHierNet, List<EDIFHierPortInst>> netPins = new HashMap<>(2);
-        List<EDIFHierPortInst> gndPins = new ArrayList<>(0);
-        List<EDIFHierPortInst> vccPins = new ArrayList<>(0);
-        EDIFHierNet parentNet = recordParentNet(initialNet, aliases, netPins, gndPins, vccPins);
-        if (parentNet != null) {
-            recordPhysicalPins(parentNet, netPins.get(parentNet), gndPins, vccPins);
-        }
-        return aliases;
-    }
-
-    /**
-     * Records the physical pins of a parent net found by {@link #getNetAliases(EDIFHierNet)}, unless
-     * the parent net map is built (which records the pins of every parent net) or they are already
-     * recorded. Threads reading the physical pin maps at the same time without the lock see either
-     * no map, or a map with the complete pins of each parent net in it; the GND/VCC pin lists they
-     * read are never changed, as new pins are added to copies.
-     */
-    private synchronized void recordPhysicalPins(EDIFHierNet parentNet, List<EDIFHierPortInst> pins,
-                                                 List<EDIFHierPortInst> gndPins,
-                                                 List<EDIFHierPortInst> vccPins) {
-        Map<EDIFHierNet, List<EDIFHierPortInst>> map = physicalNetPinMap;
-        if (parentNetMap != null || (map != null && map.containsKey(parentNet))) {
-            return;
-        }
-        List<EDIFHierPortInst> allGndPins = (map == null) ? new ArrayList<>() : physicalGndPins;
-        List<EDIFHierPortInst> allVccPins = (map == null) ? new ArrayList<>() : physicalVccPins;
-        if (!gndPins.isEmpty()) {
-            allGndPins = new ArrayList<>(allGndPins);
-            allGndPins.addAll(gndPins);
-        }
-        if (!vccPins.isEmpty()) {
-            allVccPins = new ArrayList<>(allVccPins);
-            allVccPins.addAll(vccPins);
-        }
-        physicalGndPins = allGndPins;
-        physicalVccPins = allVccPins;
-        if (map == null) {
-            map = new ConcurrentHashMap<>();
-            map.put(parentNet, pins);
-            physicalNetPinMap = map;
-        } else {
-            map.put(parentNet, pins);
-        }
-    }
-
-    /**
-     * Does what {@link #getNetAliases(EDIFHierNet)} does, and returns the parent net.
-     * @param initialNet The net to use as a starting point in the search.
-     * @param aliases All electrically connected nets in the netlist that are equivalent are added
-     * to it.
-     * @param physicalNetPinMap The map to record the physical pins of the parent net in.
-     * @param physicalGndPins The list to add the physical pins to if the parent net is GND.
-     * @param physicalVccPins The list to add the physical pins to if the parent net is VCC.
-     * @return The parent net, or null if the net has no connections.
-     * @throws RuntimeException If the net has more than one source, or has connections but no
-     * source.
-     */
-    private EDIFHierNet recordParentNet(EDIFHierNet initialNet, List<EDIFHierNet> aliases,
-                                        Map<EDIFHierNet, List<EDIFHierPortInst>> physicalNetPinMap,
-                                        List<EDIFHierPortInst> physicalGndPins,
-                                        List<EDIFHierPortInst> physicalVccPins) {
-        List<EDIFHierPortInst> leafCellPins = new ArrayList<>();
-        EDIFHierPortInst source = findParentPortInst(initialNet, aliases, leafCellPins);
-        if (source != null) {
-            switch (identifyNetType(source)) {
-                case GND:
-                    physicalGndPins.addAll(leafCellPins);
-                    break;
-                case VCC:
-                    physicalVccPins.addAll(leafCellPins);
-                    break;
-            }
-            EDIFHierNet parentNet = source.getHierarchicalNet();
-            physicalNetPinMap.put(parentNet, leafCellPins);
-            return parentNet;
-        } else if (initialNet.getNet().getPortInsts().size() != 0) {
-            throw new RuntimeException("ERROR: Couldn't identify parent net, no output pins (or top level output port) found.");
-        }
-        return null;
-    }
-
-    /**
-     * Finds the source port inst of the parent net of the provided net, by searching all its
-     * equivalent nets in the netlist as {@link #getNetAliases(EDIFHierNet)} does. Nothing in the
-     * netlist is changed.
-     * @param initialNet The net to use as a starting point in the search.
-     * @param aliases If not null, all electrically connected nets in the netlist that are
-     * equivalent are added to it.
-     * @param leafCellPins If not null, all leaf cell pins on those nets are added to it.
-     * @return The source port inst of the parent net, or null if none was found.
-     * @throws RuntimeException If the net has more than one source.
-     */
-    private EDIFHierPortInst findParentPortInst(EDIFHierNet initialNet, List<EDIFHierNet> aliases,
-            List<EDIFHierPortInst> leafCellPins) {
-        Queue<EDIFHierNet> queue = new ArrayDeque<>();
-        queue.add(initialNet);
-        HashSet<EDIFHierNet> visited = new HashSet<>();
-
-        EDIFHierPortInst source = null;
-        EDIFHierPortInst fallbackSource = null;
-        boolean multipleFallbackSources = false;
-        while (!queue.isEmpty()) {
-            EDIFHierNet net = queue.poll();
-            if (!visited.add(net)) {
-                continue;
-            }
-            if (aliases != null) {
-                aliases.add(net);
-            }
-            for (EDIFPortInst relP : net.getNet().getPortInsts()) {
-                EDIFHierPortInst p = new EDIFHierPortInst(net.getHierarchicalInst(), relP);
-
-                boolean isCellPin = relP.getCellInst() != null && relP.getCellInst().getCellType().isLeafCellOrBlackBox();
-                if (leafCellPins != null && isCellPin) {
-                    leafCellPins.add(p);
-                }
-
-
-                boolean isTopLevelPortInst = p.getHierarchicalInst().isTopLevelInst() && relP.getCellInst() == null;
-                boolean isToplevelInput = isTopLevelPortInst && p.isInput();
-                if (isToplevelInput || (isCellPin && p.isOutput())) {
-                    if (source != null) {
-                        throw new RuntimeException("Multiple sources!");
-                    }
-                    source = p;
-                }
-
-                // For top-level INOUT ports, consider the possibility that it might be an input
-                // and thus a parent net. Whether more than one is an error depends on whether
-                // any other source is found, so is only decided once all aliases are visited.
-                boolean isToplevelInout = isTopLevelPortInst && !p.isInput() && !p.isOutput();
-                if (isToplevelInout) {
-                    if (fallbackSource != null) {
-                        multipleFallbackSources = true;
-                    } else {
-                        fallbackSource = p;
-                    }
-                }
-
-                if (p.getPortInst().getCellInst() == null) {
-                    // Moving up in hierarchy
-                    if (!p.getHierarchicalInst().isTopLevelInst()) {
-                        final EDIFHierPortInst upPort = p.getPortInParent();
-                        if (upPort != null && upPort.getNet() != null) {
-                            queue.add(upPort.getHierarchicalNet());
-                        }
-                    }
-                } else {
-                    // Moving down in hierarchy
-                    EDIFHierNet otherNet = p.getInternalNet();
-                    if (otherNet == null) {
-                        // Looks unconnected
-                        continue;
-                    }
-                    queue.add(otherNet);
-                }
-            }
-        }
-
-        if (source != null) {
-            return source;
-        }
-        // No other source was found, so the source is the fallback (top-level inout), if unique
-        if (multipleFallbackSources) {
-            throw new RuntimeException("Multiple sources!");
-        }
-        return fallbackSource;
+        return parentNets.getNetAliases(initialNet);
     }
 
     /**
@@ -1952,182 +1777,116 @@ public class EDIFNetlist extends EDIFName {
      * @return The physical/parent net name or null if none could be found.
      */
     public String getParentNetName(String netAlias) {
-        EDIFHierNet parentNet = getParentNetMap().get(getHierNetFromName(netAlias));
+        EDIFHierNet parentNet = parentNets.getParentNet(getHierNetFromName(netAlias));
         return (parentNet != null) ? parentNet.getHierarchicalNetName() : null;
-    }
-    /**
-     * Gets the canonical net for this net name.  This corresponds to the driving net
-     * in the netlist and/or the physical net name.
-     * @param netAlias An absolute net name alias (from logical netlist)
-     * @return The physical/parent net name or null if none could be found.
-     */
-    public EDIFHierNet getParentNet(EDIFHierNet netAlias) {
-        return getParentNetMap().get(netAlias);
     }
 
     /**
-     * Finds the canonical net of a net, as {@link #getParentNet(EDIFHierNet)} does, but without
-     * building the parent net map of the whole netlist if it is not already built: only the net's
-     * own aliases are searched. This is much cheaper for looking up a few nets in a large netlist,
-     * though each lookup costs a search, so {@link #getParentNet(EDIFHierNet)} is better for many.
+     * Gets the canonical net for this net.  This corresponds to the driving net in the netlist
+     * and/or the physical net name: the net of its source, which is a leaf cell output pin, a
+     * top-level input port or, for a net that has neither, a top-level inout port.
+     * <p>
+     * Only what the lookup needs is examined and kept: nothing is built for the netlist as a
+     * whole, and changes to what is connected that are made through the methods of the netlist
+     * classes (adding or removing nets, port instances or cell instances, changing the cell of
+     * an instance, populating a black box, etc) are followed. This can be called from several
+     * threads at the same time, as long as no thread changes the netlist meanwhile.
+     * @param netAlias A net in the netlist. Only the parent cells along its hierarchy are checked
+     * (see below): a net that was removed from its cell with port insts left on it, or a net of
+     * another netlist, has the parent net that a search starting from it finds.
+     * @return The physical/parent net or null if the net has no source, or is not a net of the
+     * netlist: a net of the former cell of a cell instance that was given another cell, for
+     * example.
+     * @throws RuntimeException If the net has more than one source.
+     */
+    public EDIFHierNet getParentNet(EDIFHierNet netAlias) {
+        return parentNets.getParentNet(netAlias);
+    }
+
+    /**
+     * Finds the canonical net of a net. This is the same as {@link #getParentNet(EDIFHierNet)},
+     * which no longer builds a map of the whole netlist.
      * @param netAlias A net in the netlist.
      * @return The parent net, or null if the net has no source.
      * @throws RuntimeException If the net has more than one source.
      */
     public EDIFHierNet findParentNet(EDIFHierNet netAlias) {
-        Map<EDIFHierNet,EDIFHierNet> map = parentNetMap;
-        if (map != null) {
-            return map.get(netAlias);
-        }
-        EDIFHierPortInst source = findParentPortInst(netAlias, null, null);
-        return (source != null) ? source.getHierarchicalNet() : null;
+        return parentNets.getParentNet(netAlias);
     }
 
     /**
      * Gets the map of all canonical net for every net alias.  This corresponds to the driving net
      * in the netlist and/or the physical net name.
+     * <p>
+     * The map only finds what it is asked for: a lookup ({@link Map#get(Object)},
+     * {@link Map#containsKey(Object)}) finds the parent net of that net, as
+     * {@link #getParentNet(EDIFHierNet)} does. Only iterating over the map, or asking for its
+     * size, finds the parent nets of all nets of the netlist (which are then kept until the
+     * netlist changes), and throws a RuntimeException if a net of the netlist has more than one
+     * source. The map cannot be changed, and always reflects the netlist as it is.
      * @return the map
+     * @deprecated Use {@link #getParentNet(EDIFHierNet)}, which is what looking up a net in this
+     * map does.
      */
+    @Deprecated
     public Map<EDIFHierNet,EDIFHierNet> getParentNetMap() {
-        Map<EDIFHierNet,EDIFHierNet> map = parentNetMap;
-        if (map == null) {
-            generateParentNetMap();
-            map = parentNetMap;
-        }
-        return map;
+        return parentNets.getParentNetMap();
     }
-
 
     /**
      * Gets the map of all canonical net for every net alias.  This corresponds to the driving net
      * in the netlist and/or the physical net name.
      *
-     * This is the same as of {@link #getParentNetMap()}, but converted to Strings.
+     * This is the same as of {@link #getParentNetMap()}, but converted to Strings. Looking up a
+     * name finds the net of that name as {@link #getHierNetFromName(String)} does, like
+     * {@link #getParentNetName(String)}. Iterating over the map, or asking for its size, throws
+     * an IllegalStateException if two nets that have a parent net have the same hierarchical name.
      * @return the map
+     * @deprecated Use {@link #getParentNetName(String)}, which is what looking up a name in this
+     * map does.
      */
+    @Deprecated
     public Map<String, String> getParentNetMapNames() {
-        Map<String, String> names = parentNetMapNames;
-        if (names == null) {
-            synchronized (this) {
-                names = parentNetMapNames;
-                if (names == null) {
-                    names = getParentNetMap().entrySet().stream().collect(Collectors.toMap(
-                        n->n.getKey().getHierarchicalNetName(),
-                        n->n.getValue().getHierarchicalNetName()
-                    ));
-                    parentNetMapNames = names;
-                }
-            }
-        }
-        return names;
+        return parentNets.getParentNetNameMap();
     }
 
     /**
-     * Resets the internal parent net map of the netlist.  This is necessary any time modifications
-     * are made to the netlist (add/remove/change cells/nets, removing/adding black boxes, etc).
+     * Drops everything that is kept for finding parent nets and physical pins. This is not needed
+     * after changes to what is connected that are made through the methods of the netlist
+     * classes, which are followed (see {@link #getParentNet(EDIFHierNet)}). It is needed after
+     * the changes that are not followed:
+     * <ul>
+     * <li>Removing a net or a cell instance through the collection that
+     * {@link EDIFCell#getNets()} or {@link EDIFCell#getCellInsts()} returns. The methods of the
+     * cell make these changes without it.</li>
+     * <li>Changing the port instances of a cell instance through the list that
+     * {@link EDIFCellInst#getPortInsts()} returns.</li>
+     * <li>Renaming a cell that is named VCC or GND, or giving a cell one of these names, which
+     * changes the pins that {@link #getPhysicalVccPins()} and {@link #getPhysicalGndPins()}
+     * return.</li>
+     * </ul>
+     * A port instance that is taken off its cell instance while it is on a net (through that
+     * list, or with {@link EDIFCellInst#removePortInst(EDIFPortInst)}) is only half
+     * disconnected: what is found for its net and for the nets inside the cell instance can
+     * then depend on which of them is looked up first, also after this method. Removing the
+     * port instance from its net as well, with {@link EDIFNet#removePortInst(EDIFPortInst)},
+     * completes the change and is followed, whichever is done first.
      */
-    public synchronized void resetParentNetMap() {
-        parentNetMap = null;
-        parentNetMapNames = null;
-        physicalNetPinMap = null;
-        physicalGndPins = null;
-        physicalVccPins = null;
+    public void resetParentNetMap() {
+        parentNets.reset();
     }
 
     /**
-     * Checks whether the parent net map is currently built, without building it. It is built lazily
-     * by {@link #getParentNetMap()} and dropped by {@link #resetParentNetMap()}.
-     * @return True if the parent net map is built, false otherwise.
+     * Checks whether the parent nets of all nets of the netlist have been found and are kept,
+     * which only iterating over {@link #getParentNetMap()}, {@link #getParentNetMapNames()} or
+     * {@link #getPhysicalNetPinMap()} (or asking for their size) does, until the netlist changes.
+     * @return True if the parent nets of all nets are kept, false otherwise.
+     * @deprecated Nothing has to be built to look up parent nets, see
+     * {@link #getParentNet(EDIFHierNet)}.
      */
+    @Deprecated
     public boolean isParentNetMapBuilt() {
-        return parentNetMap != null;
-    }
-
-    /**
-     * Builds the parent net map and the physical pin maps, unless another thread built them first.
-     * Each map is completely built before it is assigned to its field.
-     */
-    private synchronized void generateParentNetMap() {
-        if (parentNetMap != null) {
-            return;
-        }
-        long start = 0;
-        if (DEBUG) {
-            start = System.currentTimeMillis();
-        }
-        Map<EDIFHierNet,EDIFHierNet> parentNetMap = new HashMap<>();
-        Map<EDIFHierNet, List<EDIFHierPortInst>> physicalNetPinMap;
-        List<EDIFHierPortInst> physicalGndPins;
-        List<EDIFHierPortInst> physicalVccPins;
-        if (this.physicalNetPinMap == null) {
-            physicalNetPinMap = new HashMap<>();
-            physicalGndPins = new ArrayList<>();
-            physicalVccPins = new ArrayList<>();
-        } else {
-            // Keep the physical pins already recorded by getNetAliases(), as before, but add to
-            // copies so that the published lists and map are not changed while they are read
-            physicalNetPinMap = new HashMap<>(this.physicalNetPinMap);
-            physicalGndPins = new ArrayList<>(this.physicalGndPins);
-            physicalVccPins = new ArrayList<>(this.physicalVccPins);
-        }
-        EDIFCell c = getTopCell();
-        EDIFHierCellInst topCellInst = getTopHierCellInst();
-        Queue<EDIFHierPortInst> queue = new LinkedList<>();
-        // All parent nets are either top-level inputs/inouts or outputs of leaf cells
-        // Here we gather all top-level inputs/inouts
-        for (EDIFNet n : c.getNets()) {
-            for (EDIFPortInst p : n.getPortInsts()) {
-                if (p.isTopLevelPort() && !p.isOutput()) {
-                    queue.add(new EDIFHierPortInst(topCellInst, p));
-                }
-            }
-        }
-        // Here we search for all leaf cell insts
-        Queue<EDIFHierCellInst> instQueue = new LinkedList<>();
-        instQueue.add(getTopHierCellInst());
-        while (!instQueue.isEmpty()) {
-            EDIFHierCellInst currInst = instQueue.poll();
-            for (EDIFCellInst eci : currInst.getInst().getCellType().getCellInsts()) {
-                // Checks if cell is primitive or black box
-                if (eci.getCellType().getCellInsts().size() == 0 && eci.getCellType().getNets().size() == 0) {
-                    for (EDIFPortInst portInst : eci.getPortInsts()) {
-                        if (portInst.isOutput() && portInst.getNet() != null) {
-                            queue.add(new EDIFHierPortInst(currInst, portInst));
-                        }
-                    }
-                } else {
-                    instQueue.add(currInst.getChild(eci));
-                }
-            }
-        }
-
-        for (EDIFHierPortInst pr : queue) {
-            assert(pr.getNet() != null);
-            EDIFHierNet net = pr.getHierarchicalNet();
-            if (parentNetMap.containsKey(net)) {
-                // Already mapped from another possible source of the same net
-                continue;
-            }
-            // The queued port may not be the source (e.g. a top-level inout next to a top-level
-            // input), so map the aliases to the parent net that the search resolves, just as
-            // findParentNet() does
-            List<EDIFHierNet> aliases = new ArrayList<>();
-            EDIFHierNet parentNet = recordParentNet(net, aliases, physicalNetPinMap, physicalGndPins,
-                    physicalVccPins);
-            for (EDIFHierNet alias : aliases) {
-                parentNetMap.put(alias, parentNet);
-            }
-        }
-        // Publish the complete maps: the GND/VCC pin lists before physicalNetPinMap, which guards
-        // them, and parentNetMap last
-        this.physicalGndPins = physicalGndPins;
-        this.physicalVccPins = physicalVccPins;
-        this.physicalNetPinMap = physicalNetPinMap;
-        this.parentNetMap = parentNetMap;
-        if (DEBUG) {
-            long stop = System.currentTimeMillis();
-            System.out.println("generateParentNetMap() runtime: " + (stop-start)/1000.0f +" seconds ");
-        }
+        return parentNets.isComplete();
     }
 
     /**
@@ -2177,28 +1936,22 @@ public class EDIFNetlist extends EDIFName {
      *
      * No special handling for static nets is performed. Therefore, only the local connectivity is visible. To see
      * all globally connected static pins, use {@link #getPhysicalVccPins()} and {@link #getPhysicalGndPins()}.
+     * <p>
+     * The map only finds what it is asked for, like {@link #getParentNetMap()}: a lookup finds
+     * the physical pins of that parent net (see {@link #getPhysicalPins(EDIFHierNet)}), and only
+     * iterating over the map, or asking for its size, finds those of all parent nets.
      * @return the physicalNetPinMap
      */
     public Map<EDIFHierNet, List<EDIFHierPortInst>> getPhysicalNetPinMap() {
-        Map<EDIFHierNet, List<EDIFHierPortInst>> map = physicalNetPinMap;
-        if (map == null) {
-            generateParentNetMap();
-            map = physicalNetPinMap;
-        }
-        return map;
+        return parentNets.getPhysicalPinMap();
     }
-
-
 
     /**
      * Get all Physical vcc pins
      * @return the physical vcc pins
      */
     public List<EDIFHierPortInst> getPhysicalVccPins() {
-        if (physicalNetPinMap == null) {
-            generateParentNetMap();
-        }
-        return physicalVccPins;
+        return parentNets.getPhysicalVccPins();
     }
 
     /**
@@ -2206,22 +1959,21 @@ public class EDIFNetlist extends EDIFName {
      * @return the physical ground pins
      */
     public List<EDIFHierPortInst> getPhysicalGndPins() {
-        if (physicalNetPinMap == null) {
-            generateParentNetMap();
-        }
-        return physicalGndPins;
+        return parentNets.getPhysicalGndPins();
     }
 
     /**
-     * Get the physical pins of this net.
+     * Get the physical pins of this net: the leaf cell pins on the net and its aliases, in the
+     * order a search of the aliases from the net finds them. They are found when first asked for,
+     * and kept until the netlist changes.
      *
      * No special handling for static nets is performed. Therefore, only the local connectivity is visible. To see
      * all globally connected static pins, use {@link #getPhysicalVccPins()} and {@link #getPhysicalGndPins()}.
      * @param parentNet the parent net, as returned by {@link #getParentNet(EDIFHierNet)}
-     * @return all pins
+     * @return all pins, or null if the net is not a parent net. The list must not be changed.
      */
     public List<EDIFHierPortInst> getPhysicalPins(EDIFHierNet parentNet) {
-        return getPhysicalNetPinMap().get(parentNet);
+        return parentNets.getPhysicalPins(parentNet);
     }
 
 
@@ -2238,10 +1990,10 @@ public class EDIFNetlist extends EDIFName {
      */
     public List<EDIFHierPortInst> getPhysicalPins(String parentNetName) {
         if (parentNetName.equals(Net.GND_NET)) {
-            return physicalGndPins;
+            return getPhysicalGndPins();
         }
         if (parentNetName.equals(Net.VCC_NET)) {
-            return physicalVccPins;
+            return getPhysicalVccPins();
         }
         return getPhysicalPins(getHierNetFromName(parentNetName));
     }
@@ -2260,8 +2012,7 @@ public class EDIFNetlist extends EDIFName {
             case VCC:
                 return getPhysicalVccPins();
             default:
-                final EDIFHierNet hierNet = net.getLogicalHierNet();
-                return getPhysicalNetPinMap().get(hierNet);
+                return getPhysicalPins(net.getLogicalHierNet());
         }
     }
 
@@ -2381,9 +2132,6 @@ public class EDIFNetlist extends EDIFName {
      * @param series The architecture series targeted by this netlist.
      */
     public void expandMacroUnisims(Series series) {
-        //Invalidate Cached Data
-        resetParentNetMap();
-
         EDIFLibrary macros = Design.getMacroPrimitives(series);
         EDIFLibrary netlistPrims = getHDIPrimitivesLibrary();
 
@@ -2722,9 +2470,6 @@ public class EDIFNetlist extends EDIFName {
         if (external != null) {
             blackBoxExternalCells();
         }
-
-        // Invalidate parent net map due to macro collapses
-        resetParentNetMap();
     }
 
     public void blackBoxExternalCells() {

@@ -49,6 +49,12 @@ public class EDIFNet extends EDIFPropertyObject {
     /** null or a non-empty sorted array (see {@link EDIFPortInstArray}) */
     private EDIFPortInst[] portInsts;
 
+    /**
+     * What this net (and the nets of its cell connected to it) connects to in its cell and below,
+     * null if it is not recorded. Kept by {@link EDIFNetConnectivity}.
+     */
+    volatile EDIFNetConnectivity connectivity;
+
     public EDIFNet(String name, EDIFCell parentCell) {
         super(name);
         if (parentCell != null) parentCell.addNet(this);
@@ -102,6 +108,28 @@ public class EDIFNet extends EDIFPropertyObject {
         } else {
             portInsts = EDIFPortInstArray.add(portInsts, portInst);
         }
+        if (EDIFNetConnectivity.active) {
+            EDIFNetConnectivity.portInstChanged(this, portInst);
+        }
+    }
+
+    /**
+     * To be called when a port inst was added to or removed from this net, or when a port inst on
+     * it changed its port or cell inst: what is recorded for finding parent nets is dropped for
+     * this net, and for those it was used for (see {@link EDIFNetConnectivity}).
+     */
+    void connectivityChanged() {
+        if (EDIFNetConnectivity.active) {
+            EDIFNetConnectivity.netChanged(this);
+        }
+    }
+
+    /**
+     * @return The port instances of this net as they are stored: null, or a sorted array that may
+     * end with unused (null) entries. It must not be changed.
+     */
+    EDIFPortInst[] getPortInstArray() {
+        return portInsts;
     }
 
     public void trackChanges(EDIFChangeType type, EDIFCellInst inst, String portInstName) {
@@ -255,6 +283,14 @@ public class EDIFNet extends EDIFPropertyObject {
         @Override
         void store(EDIFPortInst[] s) {
             portInsts = s;
+            connectivityChanged();
+        }
+
+        @Override
+        public EDIFPortInst set(int index, EDIFPortInst element) {
+            EDIFPortInst old = super.set(index, element);
+            connectivityChanged();
+            return old;
         }
     }
 
@@ -352,6 +388,7 @@ public class EDIFNet extends EDIFPropertyObject {
         EDIFPortInst tmp = EDIFPortInstArray.get(portInsts, idx);
         portInsts = EDIFPortInstArray.removeAt(portInsts, idx);
         tmp.setParentNet(null);
+        connectivityChanged();
         return tmp;
     }
 
@@ -366,8 +403,13 @@ public class EDIFNet extends EDIFPropertyObject {
      * @param parentCell the parentCell to set
      */
     public void setParentCell(EDIFCell parentCell) {
+        EDIFCell oldCell = this.parentCell;
         this.parentCell = parentCell;
         parentCell.trackChange(EDIFChangeType.NET_ADD, getName());
+        if (oldCell != parentCell) {
+            // The ports this net is connected to are those of another cell
+            connectivityChanged();
+        }
     }
 
     /**
