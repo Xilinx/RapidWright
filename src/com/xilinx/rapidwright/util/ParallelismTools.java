@@ -838,7 +838,23 @@ public class ParallelismTools {
      *         their order matters), else a sequential one.
      */
     public static <T> Stream<List<T>> chunkedStream(@NotNull List<T> items) {
-        final Stream<List<T>> chunks = chunkRanges(0, items.size()).map(r -> items.subList(r[0], r[1]));
+        return chunkedStream(0, items.size(), 1).map(r -> items.subList(r[0], r[1]));
+    }
+
+    /**
+     * The chunks of {@link #chunkRanges(int, int, int)}, for a task to be run on each chunk in parallel: when parallel
+     * processing is enabled, a parallel stream of them (so use an operation that respects encounter order, such as
+     * forEachOrdered() or collect(), if their order matters), else a sequential one, of a single chunk of all the
+     * indices. Unlike {@link #chunkRanges(int, int, int)}, whose stream is always sequential (e.g. to submit a task
+     * for each chunk in order).
+     * @param start The first index.
+     * @param end One past the last index.
+     * @param minChunkSize The fewest indices in each chunk (but the last).
+     * @return The chunks, in encounter order, each as {@code {from, to}}: the indices from from (inclusive) to to
+     *         (exclusive); none if end is not after start.
+     */
+    public static Stream<int[]> chunkedStream(int start, int end, int minChunkSize) {
+        final Stream<int[]> chunks = chunkRanges(start, end, minChunkSize);
         return getParallel() ? chunks.parallel() : chunks;
     }
 
@@ -847,7 +863,9 @@ public class ParallelismTools {
      * When parallel processing is enabled, a parallel stream is used, where the calling thread
      * splits the items (using the collection's own Spliterator) into roughly four pieces per
      * thread of the common ForkJoinPool (or one per item, if there are fewer), which are
-     * distributed by work stealing, and the calling thread also participates.
+     * distributed by work stealing, and the calling thread also participates. A single item is
+     * run directly on the calling thread, as when parallel processing is disabled, without the
+     * cost of a stream.
      * If the task throws for any item, that exception is rethrown as described for this class;
      * in that case, the task may not have been run for other items, or may still be running.
      * @param items the items to call the task with
@@ -856,7 +874,11 @@ public class ParallelismTools {
      */
     public static <T> void forEach(Collection<T> items, Consumer<T> task) {
         try {
-            stream(items).forEach(task);
+            if (!getParallel() || items.size() <= 1) {
+                items.forEach(task);
+            } else {
+                items.parallelStream().forEach(task);
+            }
         } catch (RuntimeException | Error e) {
             throw rethrow(e);
         }
