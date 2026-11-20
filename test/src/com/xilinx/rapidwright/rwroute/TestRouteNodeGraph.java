@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
@@ -39,9 +40,42 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.util.ParallelismTools;
 
-// A hang (e.g. a task that is never run) fails the test rather than stalling the build
+// Stops a test whose own thread waits for too long. It cannot stop awaitPreserve(), which waits uninterruptibly: see
+// awaitPreserve(RouteNodeGraph, boolean)
 @Timeout(value = 120, unit = TimeUnit.SECONDS)
 public class TestRouteNodeGraph {
+
+    /** How long (in seconds) anything here waits for another thread, before the test fails */
+    private static final long WAIT_SECONDS = 60;
+
+    /**
+     * Calls awaitPreserve() on a (daemon) thread of its own, and waits only so long for it to return. Its wait is
+     * uninterruptible, so JUnit's timeout (which interrupts the test's thread) could not stop a call that never
+     * returns were it made on the test's thread: the test would hang, rather than fail. Made on another thread, the
+     * test fails instead, and that thread, as a daemon, does not keep the JVM from exiting.
+     * @param routingGraph The graph to call awaitPreserve() on.
+     * @param interrupted Whether the calling thread has been interrupted when it calls awaitPreserve().
+     * @return What awaitPreserve() threw (null if it returned normally).
+     */
+    private static Throwable awaitPreserve(RouteNodeGraph routingGraph, boolean interrupted)
+            throws InterruptedException {
+        final AtomicReference<Throwable> thrown = new AtomicReference<>();
+        Thread thread = new Thread(() -> {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
+            try {
+                routingGraph.awaitPreserve();
+            } catch (Throwable e) {
+                thrown.set(e);
+            }
+        }, "awaitPreserve");
+        thread.setDaemon(true);
+        thread.start();
+        thread.join(TimeUnit.SECONDS.toMillis(WAIT_SECONDS));
+        Assertions.assertFalse(thread.isAlive(), "awaitPreserve() did not return within " + WAIT_SECONDS + " s");
+        return thrown.get();
+    }
 
     /**
      * awaitPreserve() must not return (or throw) while a preserveAsync() task is still running, even if the calling
@@ -62,7 +96,10 @@ public class TestRouteNodeGraph {
                 public void preserve(Net net, List<SitePinInst> pins) {
                     started.countDown();
                     try {
-                        release.await();
+                        // Bounded, so that a thread of the pool is not held forever if the test fails
+                        if (!release.await(WAIT_SECONDS, TimeUnit.SECONDS)) {
+                            throw new IllegalStateException("preserve() was not released");
+                        }
                     } catch (InterruptedException e) {
                         throw new RuntimeException(e);
                     }
@@ -70,8 +107,8 @@ public class TestRouteNodeGraph {
                 }
             };
             routingGraph.preserveAsync(design.createNet("net"));
-            // Only a thread of the pool can have started it, as this thread has not waited for it yet
-            Assertions.assertTrue(started.await(60, TimeUnit.SECONDS));
+            // Only a thread of the pool can have started it, as no thread has waited for it yet
+            Assertions.assertTrue(started.await(WAIT_SECONDS, TimeUnit.SECONDS));
 
             Thread releaser = new Thread(() -> {
                 try {
@@ -81,21 +118,15 @@ public class TestRouteNodeGraph {
                 }
                 release.countDown();
             });
+            releaser.setDaemon(true);
             releaser.start();
-            Thread.currentThread().interrupt();
-            try {
-                routingGraph.awaitPreserve();
-                Assertions.assertTrue(finished.get(), "awaitPreserve() returned while its task was still running");
-            } finally {
-                // Clear this thread's interrupt status, for the tests that follow
-                Thread.interrupted();
-            }
-            releaser.join();
+            Assertions.assertNull(awaitPreserve(routingGraph, true));
+            Assertions.assertTrue(finished.get(), "awaitPreserve() returned while its task was still running");
 
             // Reusable: a later task is waited for too
             finished.set(false);
             routingGraph.preserveAsync(design.createNet("net2"));
-            routingGraph.awaitPreserve();
+            Assertions.assertNull(awaitPreserve(routingGraph, false));
             Assertions.assertTrue(finished.get());
         } finally {
             release.countDown();
@@ -106,7 +137,7 @@ public class TestRouteNodeGraph {
     /** An exception thrown by a preserveAsync() task is rethrown, rather than only printed */
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
-    public void testAwaitPreserveRethrows(boolean parallel) {
+    public void testAwaitPreserveRethrows(boolean parallel) throws InterruptedException {
         final boolean wasParallel = ParallelismTools.getParallel();
         Assumptions.assumeTrue(ParallelismTools.setParallel(parallel));
         try {
@@ -119,10 +150,14 @@ public class TestRouteNodeGraph {
             };
             Net net = design.createNet("net");
             // By awaitPreserve(), or by preserveAsync() itself when parallel processing is disabled
-            Assertions.assertThrows(IllegalStateException.class, () -> {
+            Throwable thrown;
+            try {
                 routingGraph.preserveAsync(net);
-                routingGraph.awaitPreserve();
-            });
+                thrown = awaitPreserve(routingGraph, false);
+            } catch (IllegalStateException e) {
+                thrown = e;
+            }
+            Assertions.assertTrue(thrown instanceof IllegalStateException, "thrown: " + thrown);
         } finally {
             ParallelismTools.setParallel(wasParallel);
         }
