@@ -1857,13 +1857,20 @@ public class EDIFNetlist extends EDIFName {
      * the changes that are not followed:
      * <ul>
      * <li>Removing a net or a cell instance through the collection that
-     * {@link EDIFCell#getNets()} or {@link EDIFCell#getCellInsts()} returns, or changing the port
-     * instances of a cell instance through {@link EDIFCellInst#getPortInsts()}. The methods of
-     * the cell, the net and the port instance make these changes without it.</li>
+     * {@link EDIFCell#getNets()} or {@link EDIFCell#getCellInsts()} returns. The methods of the
+     * cell make these changes without it.</li>
+     * <li>Changing the port instances of a cell instance through the list that
+     * {@link EDIFCellInst#getPortInsts()} returns.</li>
      * <li>Renaming a cell that is named VCC or GND, or giving a cell one of these names, which
      * changes the pins that {@link #getPhysicalVccPins()} and {@link #getPhysicalGndPins()}
      * return.</li>
      * </ul>
+     * A port instance that is taken off its cell instance while it is on a net (through that
+     * list, or with {@link EDIFCellInst#removePortInst(EDIFPortInst)}) is only half
+     * disconnected: what is found for its net and for the nets inside the cell instance can
+     * then depend on which of them is looked up first, also after this method. Removing the
+     * port instance from its net as well, with {@link EDIFNet#removePortInst(EDIFPortInst)},
+     * completes the change and is followed, whichever is done first.
      */
     public void resetParentNetMap() {
         parentNets.reset();

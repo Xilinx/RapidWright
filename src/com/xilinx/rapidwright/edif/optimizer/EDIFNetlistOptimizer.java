@@ -74,7 +74,6 @@ public class EDIFNetlistOptimizer {
         int emptyHier = editor.cleanup(opts.isSweep());
         stats.addRemoved(EDIFOptStats.Phase.SWEEP, emptyHier);
         netlist.removeUnusedCellsFromAllWorkLibraries();
-        netlist.resetParentNetMap();
         stats.addTime("Cleanup", System.nanoTime() - t);
         if (report != null) {
             report.finish();

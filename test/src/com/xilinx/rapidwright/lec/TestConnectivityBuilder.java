@@ -126,15 +126,18 @@ public class TestConnectivityBuilder {
             "routethru_luts.dcp", "versal_cout_hq2.dcp" })
     public void testAgreesWithParentNetMap(String dcp) {
         EDIFNetlist netlist = loadLogical(dcp);
-        Map<String, String> theirs;
+        Map<String, Integer> mine = buildNodeMap(netlist);
+        Map<String, String> theirs = new HashMap<>();
         try {
-            theirs = netlist.getParentNetMapNames();
+            for (String net : mine.keySet()) {
+                theirs.put(net, netlist.getParentNetName(net));
+            }
         } catch (RuntimeException e) {
             Assertions.assertTrue(false, "Fixture " + dcp + " is not single driver, so it cannot "
                     + "be used as an oracle: " + e.getMessage());
             return;
         }
-        assertSamePartition(buildNodeMap(netlist), theirs);
+        assertSamePartition(mine, theirs);
     }
 
     /**

@@ -39,6 +39,7 @@ import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFDirection;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierNet;
+import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFPort;
@@ -1489,10 +1490,12 @@ public class TestReportRouteStatus {
         design.writeCheckpoint(tempDir.resolve(dcp));
         EDIFCell cell = design.getNetlist().getHDIPrimitivesLibrary().getCell(macro);
         Assertions.assertTrue(cell != null && !cell.isLeafCellOrBlackBox());
-        Map<EDIFHierNet, EDIFHierNet> parentNets = design.getNetlist().getParentNetMap();
+        // The physical pins found for a net are kept until the netlist changes
+        EDIFHierNet net = design.getNetlist().getPhysicalNetPinMap().keySet().iterator().next();
+        List<EDIFHierPortInst> pins = design.getNetlist().getPhysicalPins(net);
         ReportRouteStatusResult afterWrite = ReportRouteStatus.reportRouteStatus(design, true);
-        // (with no macro collapsed, the netlist is left alone: its parent net map is kept)
-        Assertions.assertSame(parentNets, design.getNetlist().getParentNetMap());
+        // (with no macro collapsed, the netlist is left alone: what was found for it is kept)
+        Assertions.assertSame(pins, design.getNetlist().getPhysicalPins(net));
         Assertions.assertEquals(before.toString(), afterWrite.toString());
         Assertions.assertEquals(before.netsByStatus, afterWrite.netsByStatus);
 
