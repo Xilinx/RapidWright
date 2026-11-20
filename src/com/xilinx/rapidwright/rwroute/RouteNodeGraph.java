@@ -2175,10 +2175,12 @@ public class RouteNodeGraph {
 
     public void awaitPreserve() {
         asyncPreserveOutstanding.tryComplete();
-        // Runs any of those calls' tasks not yet started on this thread, rather than only blocking. If any of them
-        // threw, that is rethrown here, possibly while others are still running: so it is then left as it is (not
-        // reinitialized), and this graph must not be used any further
-        ParallelismTools.join(asyncPreserveOutstanding);
+        // Uninterruptibly (as before): an interrupted wait would otherwise return while tasks are still modifying this
+        // graph, and calling this again would count tryComplete() above twice. First runs any of those calls' tasks
+        // not yet started on this thread, rather than only blocking. If any of them threw, that is rethrown here,
+        // possibly while others are still running: so it is then left as it is (not reinitialized), and this graph
+        // must not be used any further
+        asyncPreserveOutstanding.join();
         // Only once done normally (all of its children have completed, and this was its only join), so that it can be
         // reused for any later calls to preserveAsync()
         asyncPreserveOutstanding.reinitialize();
