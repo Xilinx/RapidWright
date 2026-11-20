@@ -1669,8 +1669,6 @@ public class EDIFTools {
             duplicateMultiInstCell(design, curr, toUniqueify);
         }
 
-        netlist.resetParentNetMap();
-
         return true;
     }
 

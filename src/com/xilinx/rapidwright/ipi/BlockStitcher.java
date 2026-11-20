@@ -145,9 +145,22 @@ public class BlockStitcher {
         EDIFNetlist n = design.getNetlist();
         // Create a reverse parent net map (Parent Net -> Children Nets: all logical nets that are physically equivalent)
         HashMap<EDIFHierNet,ArrayList<EDIFHierNet>> reverseMap = new HashMap<>();
-        for (Entry<EDIFHierNet,EDIFHierNet> e : n.getParentNetMap().entrySet()) {
-            ArrayList<EDIFHierNet> l = reverseMap.computeIfAbsent(e.getValue(), k -> new ArrayList<>());
-            l.add(e.getKey());
+        Queue<EDIFHierCellInst> hierInsts = new LinkedList<>();
+        hierInsts.add(n.getTopHierCellInst());
+        while (!hierInsts.isEmpty()) {
+            EDIFHierCellInst hierInst = hierInsts.poll();
+            for (EDIFNet net : hierInst.getCellType().getNets()) {
+                EDIFHierNet hierNet = new EDIFHierNet(hierInst, net);
+                EDIFHierNet parentNet = n.getParentNet(hierNet);
+                if (parentNet != null) {
+                    reverseMap.computeIfAbsent(parentNet, k -> new ArrayList<>()).add(hierNet);
+                }
+            }
+            for (EDIFCellInst child : hierInst.getCellType().getCellInsts()) {
+                if (!child.getCellType().isLeafCellOrBlackBox()) {
+                    hierInsts.add(hierInst.getChild(child));
+                }
+            }
         }
 
         HashSet<String> addedPorts = new HashSet<>();

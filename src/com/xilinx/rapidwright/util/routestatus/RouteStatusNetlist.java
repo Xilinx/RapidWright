@@ -90,11 +90,10 @@ import com.xilinx.rapidwright.util.ReportRouteStatus;
  * level ports it connects to. Built in one top-down pass over the hierarchy (in parallel over
  * subtrees), without materializing hierarchical net objects.
  *
- * {@link EDIFNetlist#getParentNetMap()} and {@link EDIFNetlist#getPhysicalPins(EDIFHierNet)} are not
- * used: their maps are cached, and go stale after logical edits (e.g. disconnecting a driver), they
- * cannot represent the nets with several drivers or none that the report must classify, and they
- * build an object per hierarchical net, which costs time and memory on large designs. Neither do
- * they give the counts and the naming that Vivado's report uses.
+ * {@link EDIFNetlist#getParentNet(EDIFHierNet)} and {@link EDIFNetlist#getPhysicalPins(EDIFHierNet)}
+ * are not used: they cannot represent the nets with several drivers or none that the report must
+ * classify, and they need an object per hierarchical net, which costs time and memory on large
+ * designs. Neither do they give the counts and the naming that Vivado's report uses.
  */
 final class RouteStatusNetlist {
 
