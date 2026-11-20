@@ -66,7 +66,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.stream.Collectors;
 
 import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
@@ -289,28 +288,30 @@ public final class RouteStatusEngine {
         FlatNet[][] listEntries = new FlatNet[lists.size()][];
         int[] listSizes = new int[lists.size()];
         List<FlatNet> statics = Collections.synchronizedList(new ArrayList<>());
-        parallelFor(lists.size(), (l) -> {
-            List<FlatNet> list = lists.get(l);
-            FlatNet[] listed = new FlatNet[list.size()];
-            int size = 0;
-            for (FlatNet flat : list) {
-                if (flat.mergedInto != null) {
-                    continue;
-                }
-                if (flat.staticType != null && !flat.isUnloadedStaticBusBit()) {
-                    statics.add(flat);
-                    continue;
-                }
-                if (isTiedInsideMacro(flat)) {
-                    if (flat.insideMacro && flat.leafLoads > 0) {
-                        macroTies.add(flat);
+        ParallelismTools.chunkedStream(0, lists.size(), 1).forEach((r) -> {
+            for (int l = r[0]; l < r[1]; l++) {
+                List<FlatNet> list = lists.get(l);
+                FlatNet[] listed = new FlatNet[list.size()];
+                int size = 0;
+                for (FlatNet flat : list) {
+                    if (flat.mergedInto != null) {
+                        continue;
                     }
-                    continue;
+                    if (flat.staticType != null && !flat.isUnloadedStaticBusBit()) {
+                        statics.add(flat);
+                        continue;
+                    }
+                    if (isTiedInsideMacro(flat)) {
+                        if (flat.insideMacro && flat.leafLoads > 0) {
+                            macroTies.add(flat);
+                        }
+                        continue;
+                    }
+                    listed[size++] = flat;
                 }
-                listed[size++] = flat;
+                listEntries[l] = listed;
+                listSizes[l] = size;
             }
-            listEntries[l] = listed;
-            listSizes[l] = size;
         });
         addTiedMacros(flatNetlist);
         for (FlatNet flat : statics) {
@@ -326,11 +327,13 @@ public final class RouteStatusEngine {
         }
         numFlat = listOffsets[lists.size()];
         FlatNet[] flats = new FlatNet[numFlat];
-        parallelFor(lists.size(), (l) -> {
-            for (int j = 0; j < listSizes[l]; j++) {
-                listEntries[l][j].entry = listOffsets[l] + j;
+        ParallelismTools.chunkedStream(0, lists.size(), 1).forEach((r) -> {
+            for (int l = r[0]; l < r[1]; l++) {
+                for (int j = 0; j < listSizes[l]; j++) {
+                    listEntries[l][j].entry = listOffsets[l] + j;
+                }
+                System.arraycopy(listEntries[l], 0, flats, listOffsets[l], listSizes[l]);
             }
-            System.arraycopy(listEntries[l], 0, flats, listOffsets[l], listSizes[l]);
         });
         entries.flats.addAll(Arrays.asList(flats));
         entries.names.addAll(Collections.nCopies(numFlat, null));
@@ -419,25 +422,27 @@ public final class RouteStatusEngine {
     private int[] findFlatNetsOfPhysicalNets(RouteStatusNetlist flatNetlist, Net[] physNets, Net[] flatPhysNets) {
         int[] aliasOrPhysicalOnly = new int[physNets.length];
         flatNetlist.prepareSegmentLookup();
-        parallelFor(physNets.length, (i) -> {
-            Net net = physNets[i];
-            if (net.isStaticNet() || net.isUsedNet()) {
-                return;
-            }
-            RouteStatusNetlist.Segment seg = flatNetlist.getSegment(net.getName());
-            if (seg == null) {
-                aliasOrPhysicalOnly[i] = PHYSICAL_ONLY;
-                return;
-            }
-            FlatNet flat = seg.flat.find();
-            if (flat.entry < 0) {
-                // Not an entry of its own (e.g. a static net)
-                return;
-            }
-            if (seg.names(flat)) {
-                flatPhysNets[flat.entry] = net;
-            } else if (!net.getSiteInsts().isEmpty() || net.hasPIPs()) {
-                aliasOrPhysicalOnly[i] = flat.entry + 1;
+        ParallelismTools.chunkedStream(0, physNets.length, 1).forEach((r) -> {
+            for (int i = r[0]; i < r[1]; i++) {
+                Net net = physNets[i];
+                if (net.isStaticNet() || net.isUsedNet()) {
+                    continue;
+                }
+                RouteStatusNetlist.Segment seg = flatNetlist.getSegment(net.getName());
+                if (seg == null) {
+                    aliasOrPhysicalOnly[i] = PHYSICAL_ONLY;
+                    continue;
+                }
+                FlatNet flat = seg.flat.find();
+                if (flat.entry < 0) {
+                    // Not an entry of its own (e.g. a static net)
+                    continue;
+                }
+                if (seg.names(flat)) {
+                    flatPhysNets[flat.entry] = net;
+                } else if (!net.getSiteInsts().isEmpty() || net.hasPIPs()) {
+                    aliasOrPhysicalOnly[i] = flat.entry + 1;
+                }
             }
         });
         return aliasOrPhysicalOnly;
@@ -528,19 +533,21 @@ public final class RouteStatusEngine {
 
     /** Classifies each entry (in parallel), see {@link #classifyNet(Net, FlatNet, int)}. */
     private void classifyEntries() {
-        parallelFor(entries.size(), (i) -> {
-            Net net = entries.nets.get(i);
-            FlatNet flat = entries.flats.get(i);
-            if (i == dummyEntry) {
-                // Routing that reserves resources (for partial reconfiguration) is neither checked
-                // nor conflicting
-                boolean locked = net.getPIPs().stream().anyMatch(PIP::isPIPFixed);
-                entries.status[i] = (net.hasPIPs() ? HAS_ROUTING : 0) | (locked ? LOCKED_NODES : 0) | INTRASITE;
-                return;
-            }
-            entries.status[i] = (net == null && flat == null) ? INTRASITE : classifyNet(net, flat, i);
-            if (flat != null) {
-                flat.releaseLeafPins();
+        ParallelismTools.chunkedStream(0, entries.size(), 1).forEach((r) -> {
+            for (int i = r[0]; i < r[1]; i++) {
+                Net net = entries.nets.get(i);
+                FlatNet flat = entries.flats.get(i);
+                if (i == dummyEntry) {
+                    // Routing that reserves resources (for partial reconfiguration) is neither checked
+                    // nor conflicting
+                    boolean locked = net.getPIPs().stream().anyMatch(PIP::isPIPFixed);
+                    entries.status[i] = (net.hasPIPs() ? HAS_ROUTING : 0) | (locked ? LOCKED_NODES : 0) | INTRASITE;
+                    continue;
+                }
+                entries.status[i] = (net == null && flat == null) ? INTRASITE : classifyNet(net, flat, i);
+                if (flat != null) {
+                    flat.releaseLeafPins();
+                }
             }
         });
     }
@@ -806,33 +813,6 @@ public final class RouteStatusEngine {
             }
         }
         return false;
-    }
-
-    interface IndexTask {
-        void run(int i);
-    }
-
-    interface RangeTask {
-        void run(int from, int to);
-    }
-
-    /** Runs the task for every index in [0, n), in parallel chunks. */
-    static void parallelFor(int n, IndexTask task) {
-        parallelForRange(n, 1, (from, to) -> {
-            for (int i = from; i < to; i++) {
-                task.run(i);
-            }
-        });
-    }
-
-    /**
-     * Runs the task on chunks of the indices in [0, n) (see {@link ParallelismTools#chunkRanges(int, int, int)}), in
-     * parallel if parallel processing is enabled, else on a single chunk of all of them.
-     * @param minChunkSize The fewest indices in each chunk (but the last).
-     */
-    static void parallelForRange(int n, int minChunkSize, RangeTask task) {
-        List<int[]> ranges = ParallelismTools.chunkRanges(0, n, minChunkSize).collect(Collectors.toList());
-        ParallelismTools.forEach(ranges, (r) -> task.run(r[0], r[1]));
     }
 
     /**

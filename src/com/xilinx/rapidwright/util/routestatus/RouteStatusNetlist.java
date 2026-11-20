@@ -39,7 +39,6 @@ import static com.xilinx.rapidwright.util.routestatus.FlatNet.NAMED_BY_DANGLING_
 import static com.xilinx.rapidwright.util.routestatus.FlatNet.NAMED_BY_DRIVER;
 import static com.xilinx.rapidwright.util.routestatus.FlatNet.NAMED_BY_INOUT;
 import static com.xilinx.rapidwright.util.routestatus.FlatNet.NAMED_BY_SEGMENT;
-import static com.xilinx.rapidwright.util.routestatus.RouteStatusEngine.parallelForRange;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -81,7 +80,6 @@ import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.util.IntHashSet;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.ReportRouteStatus;
-import com.xilinx.rapidwright.util.routestatus.RouteStatusEngine.RangeTask;
 
 /**
  * A flattened view of a design's logical netlist, as needed by
@@ -733,6 +731,10 @@ final class RouteStatusNetlist {
         ParallelismTools.forEach(lists, finish);
     }
 
+    private interface RangeTask {
+        void run(int from, int to);
+    }
+
     /** Visits one hierarchical instance, with the flat nets bound to its cell's ports. */
     private class VisitTask {
         final CellInfo info;
@@ -806,7 +808,7 @@ final class RouteStatusNetlist {
                 task.run(0, n);
                 return;
             }
-            parallelForRange(n, CHUNK, task);
+            ParallelismTools.chunkedStream(0, n, CHUNK).forEach((r) -> task.run(r[0], r[1]));
         }
 
         /** Visits the nets [from, to) of the instance: creates or extends their flat nets. */

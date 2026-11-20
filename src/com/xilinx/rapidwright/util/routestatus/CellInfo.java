@@ -28,7 +28,6 @@ import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.isBusRa
 import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.isPrimitive;
 import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.pow31;
 import static com.xilinx.rapidwright.util.routestatus.RouteStatusNetlist.slot;
-import static com.xilinx.rapidwright.util.routestatus.RouteStatusEngine.parallelFor;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -191,8 +190,15 @@ final class CellInfo {
     private Chunk[] initNetChunks(Map<EDIFPort, Integer> offsets, Map<EDIFCellInst, Integer> childIndex) {
         int numChunks = Math.max(1, (nets.length + CHUNK - 1) / CHUNK);
         Chunk[] chunks = new Chunk[numChunks];
-        parallelFor(numChunks, (c) -> {
-            chunks[c] = initNets(c * CHUNK, Math.min(nets.length, (c + 1) * CHUNK), offsets, childIndex);
+        if (numChunks == 1) {
+            // A single chunk, tallied directly
+            chunks[0] = initNets(0, nets.length, offsets, childIndex);
+            return chunks;
+        }
+        ParallelismTools.chunkedStream(0, numChunks, 1).forEach((r) -> {
+            for (int c = r[0]; c < r[1]; c++) {
+                chunks[c] = initNets(c * CHUNK, Math.min(nets.length, (c + 1) * CHUNK), offsets, childIndex);
+            }
         });
         return chunks;
     }

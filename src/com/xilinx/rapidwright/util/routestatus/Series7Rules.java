@@ -25,7 +25,6 @@ package com.xilinx.rapidwright.util.routestatus;
 import static com.xilinx.rapidwright.util.routestatus.NetStatus.CONFLICTS;
 import static com.xilinx.rapidwright.util.routestatus.NetStatus.ROUTED;
 import static com.xilinx.rapidwright.util.routestatus.NetStatus.has;
-import static com.xilinx.rapidwright.util.routestatus.RouteStatusEngine.parallelFor;
 import static com.xilinx.rapidwright.util.routestatus.SiteRouting.getLogicalCell;
 import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isBlockRamSite;
 import static com.xilinx.rapidwright.util.routestatus.SiteRouting.isClockBufferSite;
@@ -49,6 +48,7 @@ import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.device.SitePin;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierPortInst;
+import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.Utils;
 
 /**
@@ -139,26 +139,28 @@ final class Series7Rules {
         Map<Net, Integer> entryOf = entries.getEntryOfNet();
         Net[] nets = design.getNets().toArray(new Net[0]);
         Set<Integer> conflicting = ConcurrentHashMap.newKeySet();
-        parallelFor(nets.length, (n) -> {
-            Net net = nets[n];
-            if (net.isStaticNet()) {
-                return;
-            }
-            for (SitePinInst spi : storedPins(net)) {
-                if (!spi.isOutPin() || !Utils.isSLICE(spi.getSiteInst())) {
-                    // (only seen in slices; the site routing of hard blocks, e.g. DSP cascades,
-                    // may carry other segments of the net)
+        ParallelismTools.chunkedStream(0, nets.length, 1).forEach((r) -> {
+            for (int n = r[0]; n < r[1]; n++) {
+                Net net = nets[n];
+                if (net.isStaticNet()) {
                     continue;
                 }
-                Net other = spi.getSiteInst().getNetFromSiteWire(spi.getSiteWireName());
-                if (other == null || other == net || other.isStaticNet()) {
-                    continue;
-                }
-                Integer a = entryOf.get(net);
-                Integer b = entryOf.get(other);
-                if (a != null && b != null && !a.equals(b)) {
-                    conflicting.add(a);
-                    conflicting.add(b);
+                for (SitePinInst spi : storedPins(net)) {
+                    if (!spi.isOutPin() || !Utils.isSLICE(spi.getSiteInst())) {
+                        // (only seen in slices; the site routing of hard blocks, e.g. DSP cascades,
+                        // may carry other segments of the net)
+                        continue;
+                    }
+                    Net other = spi.getSiteInst().getNetFromSiteWire(spi.getSiteWireName());
+                    if (other == null || other == net || other.isStaticNet()) {
+                        continue;
+                    }
+                    Integer a = entryOf.get(net);
+                    Integer b = entryOf.get(other);
+                    if (a != null && b != null && !a.equals(b)) {
+                        conflicting.add(a);
+                        conflicting.add(b);
+                    }
                 }
             }
         });
