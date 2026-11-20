@@ -631,12 +631,15 @@ public class ParallelismTools {
     public static <E> Iterator<E> joinUnordered(@NotNull List<E> items,
                                                 @NotNull Function<? super E, ? extends CompletableFuture<?>> futureOf) {
         return new Iterator<E>() {
-            // The number of items returned so far, each of whose elements is null
-            private int returned = 0;
+            // The lowest index of an item not yet returned, or items.size() if there is none: every element before it
+            // is null (returned), and its own is not. Items are returned in whatever order they are done, so those
+            // after it may also have been returned already. Searches start from it, rather than scanning again those
+            // already returned on every call
+            private int lowestUnreturnedIndex = 0;
 
             @Override
             public boolean hasNext() {
-                return returned < items.size();
+                return lowestUnreturnedIndex < items.size();
             }
 
             @Override
@@ -650,20 +653,24 @@ public class ParallelismTools {
                         done = indexOf((f) -> runIfUnclaimed(f));
                     }
                     if (done >= 0) {
-                        returned++;
-                        return items.set(done, null);
+                        E item = items.set(done, null);
+                        while (lowestUnreturnedIndex < items.size() && items.get(lowestUnreturnedIndex) == null) {
+                            lowestUnreturnedIndex++;
+                        }
+                        return item;
                     }
                     // Every one has been claimed by another thread (so will complete without this one), and none is
                     // done yet. The exception of the one done, if any, is left for get(), as handle() completes
                     // normally
-                    getUnwrapped(CompletableFuture.anyOf(items.stream().filter((item) -> item != null).map(futureOf)
-                            .toArray(CompletableFuture<?>[]::new)).handle((r, e) -> null));
+                    getUnwrapped(CompletableFuture.anyOf(items.subList(lowestUnreturnedIndex, items.size()).stream()
+                            .filter((item) -> item != null).map(futureOf).toArray(CompletableFuture<?>[]::new))
+                            .handle((r, e) -> null));
                 }
             }
 
             /** The index of the first item not yet returned whose CompletableFuture passes the given test, if any */
             private int indexOf(Predicate<CompletableFuture<?>> test) {
-                for (int i = 0; i < items.size(); i++) {
+                for (int i = lowestUnreturnedIndex; i < items.size(); i++) {
                     E item = items.get(i);
                     if (item != null && test.test(futureOf.apply(item))) {
                         return i;
