@@ -42,7 +42,11 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import java.util.zip.CRC32;
 import java.util.zip.Deflater;
@@ -298,5 +302,47 @@ public class TestFileTools {
         // An invalid download never replaces the file there
         Assertions.assertArrayEquals(existing, Files.readAllBytes(dst));
         assertNoTemporaryFiles(dir);
+    }
+
+    /**
+     * Two concurrent calls of {@link FileTools#isDataBinary(java.io.InputStream)}, one on text and one on binary
+     * data, forced into the interleaving that a shared read buffer gets wrong: the text check has read its bytes
+     * but not yet scanned them when the binary check reads (and finishes). Each call must judge its own data.
+     */
+    @Test
+    public void testIsDataBinaryConcurrent() throws Exception {
+        byte[] text = "(edif top\n  (edifVersion 2 0 0)\n".getBytes(StandardCharsets.US_ASCII);
+        byte[] binary = new byte[64];
+        CountDownLatch textRead = new CountDownLatch(1);
+        CountDownLatch binaryDone = new CountDownLatch(1);
+        AtomicBoolean waited = new AtomicBoolean();
+        // Text stream whose read pauses after filling the caller's buffer until the binary check has finished
+        ByteArrayInputStream textStream = new ByteArrayInputStream(text) {
+            @Override
+            public int read(byte[] b) {
+                return read(b, 0, b.length);
+            }
+
+            @Override
+            public synchronized int read(byte[] b, int off, int len) {
+                int n = super.read(b, off, len);
+                textRead.countDown();
+                try {
+                    waited.set(binaryDone.await(30, TimeUnit.SECONDS));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                return n;
+            }
+        };
+        AtomicReference<Boolean> textResult = new AtomicReference<>();
+        Thread textThread = new Thread(() -> textResult.set(FileTools.isDataBinary(textStream)));
+        textThread.start();
+        Assertions.assertTrue(textRead.await(30, TimeUnit.SECONDS));
+        Assertions.assertTrue(FileTools.isDataBinary(new ByteArrayInputStream(binary)));
+        binaryDone.countDown();
+        textThread.join(30_000);
+        Assertions.assertTrue(waited.get());
+        Assertions.assertEquals(Boolean.FALSE, textResult.get());
     }
 }
