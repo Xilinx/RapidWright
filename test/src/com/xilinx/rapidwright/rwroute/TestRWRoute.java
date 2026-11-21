@@ -34,6 +34,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +62,7 @@ import com.xilinx.rapidwright.design.SiteInst;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.design.tools.LUTTools;
+import com.xilinx.rapidwright.device.BELPin;
 import com.xilinx.rapidwright.device.Device;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.PIP;
@@ -75,6 +77,7 @@ import com.xilinx.rapidwright.eco.ECOTools;
 import com.xilinx.rapidwright.edif.EDIFCell;
 import com.xilinx.rapidwright.edif.EDIFCellInst;
 import com.xilinx.rapidwright.edif.EDIFHierCellInst;
+import com.xilinx.rapidwright.edif.EDIFHierPortInst;
 import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFNetlist;
 import com.xilinx.rapidwright.edif.EDIFTools;
@@ -82,7 +85,10 @@ import com.xilinx.rapidwright.interchange.Interchange;
 import com.xilinx.rapidwright.support.ChangeTrackingAssertions;
 import com.xilinx.rapidwright.support.LargeTest;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
-import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
+import com.xilinx.rapidwright.timing.TimingManager;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimator;
+import com.xilinx.rapidwright.timing.family.TimingFamilies;
+import com.xilinx.rapidwright.timing.sta.StaGraph;
 import com.xilinx.rapidwright.util.FileTools;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.ReportRouteStatusResult;
@@ -301,6 +307,51 @@ public class TestRWRoute {
         assertAllSourcesRoutedFlagSet(design);
         assertAllPinsRouted(design);
         VivadoToolsHelper.assertFullyRouted(design);
+    }
+
+    /**
+     * The timing-driven router times its routes as an analysis of the routed design does: the same critical path
+     * delay, and the same route delay on every connection of the timing graph but those that several router
+     * connections share (a LUT RAM write address on several site pins), which take the largest of theirs.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "picoblaze_ooc_X10Y235.dcp",
+            "picoblaze_2022.2.dcp"
+    })
+    public void testTimingDrivenRouterTimesItsRoutes(String path) {
+        Design design = RapidWrightDCP.loadDCP(path);
+        RWRouteConfig config = new RWRouteConfig(new String[0]);
+        RWRoute router = new RWRoute(design, config);
+        RWRoute.routeDesign(router);
+        TimingManager routerTiming = router.timingManager;
+        TimingManager fresh = new TimingManager(design, null, config, design.getNets(), false,
+                DelayEstimator.create(design, config.isUseUTurnNodes()));
+        Assertions.assertEquals(fresh.computeArrivalRequiredTimes(), routerTiming.computeArrivalRequiredTimes(), 0.5f);
+
+        Map<Integer, Integer> numRouterConnections = new HashMap<>();
+        for (Connection c : router.indirectConnections) {
+            numRouterConnections.merge(c.getStaConnId(), 1, Integer::sum);
+        }
+        StaGraph g = routerTiming.getStaGraph();
+        StaGraph f = fresh.getStaGraph();
+        Map<SitePinInst, Integer> freshOfSink = new IdentityHashMap<>();
+        for (int c = 0; c < f.getNumConnections(); c++) {
+            freshOfSink.put(f.getConnectionSink(c), c);
+        }
+        int numCompared = 0;
+        for (int c = 0; c < g.getNumConnections(); c++) {
+            Integer fc = freshOfSink.get(g.getConnectionSink(c));
+            Assertions.assertNotNull(fc);
+            if (numRouterConnections.getOrDefault(c, 0) > 1) {
+                Assertions.assertTrue(g.getConnectionRouteMax(c) >= f.getConnectionRouteMax(fc) - 0.5f);
+                continue;
+            }
+            Assertions.assertEquals(f.getConnectionRouteMax(fc), g.getConnectionRouteMax(c), 0.5f,
+                    g.getConnectionSink(c).toString());
+            numCompared++;
+        }
+        Assertions.assertTrue(numCompared > 0.9 * g.getNumConnections());
     }
 
     /**
@@ -1082,16 +1133,17 @@ public class TestRWRoute {
 
     /**
      * Gets a route's delay as RWRoute computes it (Connection.getRouteDelay()): the sum of its nodes' delays
-     * (RouteNode.getDelay()), plus DelayEstimatorBase.getExtraDelay() for each long that follows a long.
+     * (RouteNode.getDelay()), plus the extra delay of each node driven by the one before it
+     * (RouteNode.getExtraDelay()).
+     * @param estimator The delay estimator of the router's routing graph.
      * @param route The route's nodes, from source to sink.
      * @return That delay, in ps.
      */
-    static float getRouteDelay(List<RouteNode> route) {
+    static float getRouteDelay(DelayEstimator estimator, List<RouteNode> route) {
         float delay = route.get(0).getDelay();
         for (int i = 1; i < route.size(); i++) {
             RouteNode rnode = route.get(i);
-            delay += rnode.getDelay() + DelayEstimatorBase.getExtraDelay(rnode,
-                    DelayEstimatorBase.isLong(route.get(i - 1)));
+            delay += rnode.getDelay() + RouteNode.getExtraDelay(estimator, route.get(i - 1), rnode);
         }
         return delay;
     }
@@ -1110,6 +1162,7 @@ public class TestRWRoute {
     static List<RouteNode> getFastestRoute(RWRoute router) {
         Assertions.assertEquals(1, router.indirectConnections.size());
         RouteNodeGraph graph = router.routingGraph;
+        DelayEstimator estimator = graph.getDelayEstimator();
         Connection connection = router.indirectConnections.get(0);
         // Every node that a crossing takes is accessible only to a connection that crosses SLRs, for which
         // RouteNodeGraph.isAccessible() reads the path (RouteNode.getPrev()) that this search does not set
@@ -1132,13 +1185,12 @@ public class TestRWRoute {
                 // Reached again by a faster path since
                 continue;
             }
-            boolean longParent = DelayEstimatorBase.isLong(rnode);
             for (RouteNode child : rnode.getChildren(graph)) {
                 if (child != sink && (child.getType().isAnyExclusiveSink() ||
                         !graph.isAccessible(child, rnode, connection))) {
                     continue;
                 }
-                float childDelay = delay + child.getDelay() + DelayEstimatorBase.getExtraDelay(child, longParent);
+                float childDelay = delay + child.getDelay() + RouteNode.getExtraDelay(estimator, rnode, child);
                 Float known = delays.get(child);
                 if (known == null || childDelay < known) {
                     delays.put(child, childDelay);
@@ -1159,12 +1211,12 @@ public class TestRWRoute {
     /**
      * Describes a route for a message: each node's INT tile coordinates, wire name and delay (as getRouteDelay()).
      */
-    private static String describeRoute(List<RouteNode> route) {
+    private static String describeRoute(DelayEstimator estimator, List<RouteNode> route) {
         StringBuilder s = new StringBuilder();
         for (int i = 0; i < route.size(); i++) {
             RouteNode rnode = route.get(i);
-            float delay = rnode.getDelay() + ((i == 0) ? 0 : DelayEstimatorBase.getExtraDelay(rnode,
-                    DelayEstimatorBase.isLong(route.get(i - 1))));
+            float delay = rnode.getDelay() + ((i == 0) ? 0 : RouteNode.getExtraDelay(estimator, route.get(i - 1),
+                    rnode));
             s.append(i == 0 ? "" : ", ").append(rnode.getTile().getName()).append('/').append(rnode.getWireName());
             if (delay != 0) {
                 s.append(" (").append((int) delay).append(')');
@@ -1186,8 +1238,7 @@ public class TestRWRoute {
      * whose delay, under RWRoute's own delay model (getRouteDelay(), as Connection.getRouteDelay()), is within
      * {@link #LOWER_BOUND_LEEWAY} of the least delay of any route in RWRoute's routing graph (getFastestRoute()), or of
      * its known excess over it ({@link #DELAY_KNOWN_EXCESS}). The counterpart of
-     * testCostWithinLowerBoundNonTimingDriven(), on UltraScale+ only: RWRoute routes timing-driven only with timing
-     * data, which only UltraScale+ has (in $RAPIDWRIGHT_PATH/timing).
+     * testCostWithinLowerBoundNonTimingDriven(), on UltraScale+ (xcvu9p).
      * <p>
      * Each connection is routed with RWRoute's default timing-driven configuration as PartialRouter applies it
      * (routeDesignPartialTimingDriven()), between placed cells, its sink LUT driving a flop (see
@@ -1211,8 +1262,7 @@ public class TestRWRoute {
      * DSP or URAM column between them; the rows cover every direction at several distances (half tiles, rows), from LUT
      * and flop outputs, to inputs of all eight LUTs and of all six numbers.
      * <p>
-     * TODO: rows that cross an SLR boundary, once super long lines have a delay (RouterHelper.computeNodeDelay() throws
-     * on one).
+     * Rows that cross an SLR boundary are not covered.
      * @param partName Part.
      * @param srcSitePin Source pin, as "SITE.PIN": a LUT output ([A-H]_O) or a flop output ([A-H]Q).
      * @param dstSitePin Sink pin, as "SITE.PIN": a LUT input ([A-H][1-6]).
@@ -1295,16 +1345,19 @@ public class TestRWRoute {
         PartialRouter rwroute = (timingWeight == null)
                 ? routeSingleConnectionTimingDriven(partName, srcSitePin, dstSitePin)
                 : routeSingleConnectionTimingDriven(partName, srcSitePin, dstSitePin, "--timingWeight", timingWeight);
-        // RWRoute's MAX_CRITICALITY: the connection's only timing path is the critical path
-        Assertions.assertEquals(0.99f, rwroute.indirectConnections.get(0).getCriticality());
+        // The router knobs' maximum criticality: the connection's only timing path is the critical path
+        Assertions.assertEquals(rwroute.routerKnobs.getMaxCriticality(), rwroute.indirectConnections.get(0).getCriticality(),
+                1e-6f);
+        DelayEstimator estimator = rwroute.routingGraph.getDelayEstimator();
         List<RouteNode> route = getRoute(rwroute);
         List<RouteNode> fastest = getFastestRoute(rwroute);
-        float delay = getRouteDelay(route);
-        float leastDelay = getRouteDelay(fastest);
+        float delay = getRouteDelay(estimator, route);
+        float leastDelay = getRouteDelay(estimator, fastest);
         float expected = DELAY_KNOWN_EXCESS.getOrDefault(partName + "," + srcSitePin + "," + dstSitePin +
                 (timingWeight == null ? "" : "," + timingWeight), leastDelay);
         String message = "delay " + delay + ", expected " + expected + ", least " + leastDelay + ", ratio " +
-                delay / leastDelay + "; RWRoute: " + describeRoute(route) + "; fastest: " + describeRoute(fastest);
+                delay / leastDelay + "; RWRoute: " + describeRoute(estimator, route) + "; fastest: " +
+                describeRoute(estimator, fastest);
         System.out.println(srcSitePin + " -> " + dstSitePin + ": " + message);
         Assertions.assertTrue(delay >= leastDelay, "faster than the fastest route: " + message);
         Assertions.assertTrue(delay <= expected * (1 + LOWER_BOUND_LEEWAY), "more than expected: " + message);
@@ -1476,6 +1529,63 @@ public class TestRWRoute {
             // Only test one part per series
             break;
         }
+    }
+
+    /**
+     * UltraScale devices have no timing model: timing-driven routing (the default) warns once and routes
+     * non-timing-driven, also with the partial router, and a timing analysis of the design fails with a message
+     * naming the series that have a timing model.
+     */
+    @Test
+    public void testUltraScaleRoutesNonTimingDriven() {
+        Design design = new Design("top", Device.KCU105);
+        Assertions.assertEquals(Series.UltraScale, design.getSeries());
+        Cell src = design.createAndPlaceCell("src", Unisim.FDRE, "SLICE_X10Y60/AFF");
+        Cell dst = design.createAndPlaceCell("dst", Unisim.FDRE, "SLICE_X12Y70/AFF");
+        Cell src2 = design.createAndPlaceCell("src2", Unisim.FDRE, "SLICE_X10Y61/AFF");
+        Cell dst2 = design.createAndPlaceCell("dst2", Unisim.FDRE, "SLICE_X14Y80/AFF");
+        Net net = design.createNet("net");
+        net.connect(src, "Q");
+        net.connect(dst, "D");
+        String warning = "WARNING: " + TimingFamilies.getUnsupportedMessage(Series.UltraScale)
+                + ": routing non-timing-driven.";
+        Assertions.assertEquals("WARNING: No timing model for the UltraScale series; RapidWright has timing models"
+                + " for the [UltraScalePlus, Versal] series: routing non-timing-driven.", warning);
+
+        PrintStream originalOut = System.out;
+        ByteArrayOutputStream capture = new ByteArrayOutputStream();
+        try {
+            System.setOut(new PrintStream(capture, true));
+            RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--timingDriven"});
+        } finally {
+            System.setOut(originalOut);
+        }
+        String out = capture.toString();
+        System.out.print(out);
+        Assertions.assertTrue(out.contains(warning), out);
+        Assertions.assertEquals(out.indexOf(warning), out.lastIndexOf(warning), out);
+        Assertions.assertTrue(net.hasPIPs());
+
+        // The partial router
+        Net net2 = design.createNet("net2");
+        net2.connect(src2, "Q");
+        net2.connect(dst2, "D");
+        capture.reset();
+        try {
+            System.setOut(new PrintStream(capture, true));
+            PartialRouter.routeDesignWithUserDefinedArguments(design, new String[] {"--timingDriven"});
+        } finally {
+            System.setOut(originalOut);
+        }
+        out = capture.toString();
+        System.out.print(out);
+        Assertions.assertEquals(out.indexOf(warning), out.lastIndexOf(warning), out);
+        Assertions.assertTrue(out.contains(warning), out);
+        Assertions.assertTrue(net2.hasPIPs());
+
+        UnsupportedOperationException e = Assertions.assertThrows(UnsupportedOperationException.class,
+                () -> new TimingManager(design));
+        Assertions.assertEquals(TimingFamilies.getUnsupportedMessage(Series.UltraScale), e.getMessage());
     }
 
     @Test
@@ -1757,11 +1867,87 @@ public class TestRWRoute {
         System.out.print(routeCapture);
         System.out.print(reportCapture);
 
-        // The A1..A6 -> O6 logic delays are 150/125/100/90/50/35 ps, whereas routing to the different
-        // input pins of the same LUT differs by much less (e.g. the A1..A6 site pin delays are 74..43 ps),
-        // so the input must move to one of the two fastest pins
+        // The A1..A6 -> O6 logic delays of the fitted cell arcs are 135/111/90/81/46/33 ps at
+        // SLOW_MAX, whereas routing to the
+        // different input pins of the same LUT differs by much less (e.g. the A1..A6 sink pin delays of the
+        // fitted interconnect model span 18 ps), so the input must move to one of the two fastest pins
         String pin = lut.getPhysicalPinMapping("I0");
         Assertions.assertTrue(pin.equals("A5") || pin.equals("A6"), "I0 routed to pin " + pin);
+        Assertions.assertEquals(getCriticalPathDelay(reportCapture.toString()),
+                getCriticalPathDelay(routeCapture.toString()));
+    }
+
+    /**
+     * As {@link #testTimingDrivenLutPinSwapping()}, on Versal, where the router's sinks are the INT nodes that drive
+     * the LUT input site pins: the A1..A6 -&gt; O6 logic delays of the fitted cell arcs (the default) are
+     * 103/95/69/58/39/23 ps at SLOW_MAX, so an input placed on A1 must move to one of the two fastest pins, and
+     * RWRoute's own critical path must match a fresh timing analysis of the routed design.
+     */
+    @Test
+    public void testTimingDrivenLutPinSwappingVersal() {
+        Design design = createLutLaneDesign("xcvc1902", "SLICE_X40Y61", 'A', "LUT1 O=I0 a@A1", null, false);
+
+        ByteArrayOutputStream routeCapture = new ByteArrayOutputStream();
+        ByteArrayOutputStream reportCapture = new ByteArrayOutputStream();
+        PrintStream originalOut = System.out;
+        try {
+            System.setOut(new PrintStream(routeCapture, true));
+            RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--lutPinSwapping"});
+            System.setOut(new PrintStream(reportCapture, true));
+            RWRouteConfig config = new RWRouteConfig(new String[0]);
+            config.setTimingDriven(true);
+            new TimingAndWirelengthReport(design, config, false).computeStatisticsAndReport();
+        } finally {
+            System.setOut(originalOut);
+        }
+        System.out.print(routeCapture);
+        System.out.print(reportCapture);
+
+        assertAllPinsRouted(design);
+        Cell lut = design.getCell("lut6");
+        String pin = lut.getPhysicalPinMapping("I0");
+        Assertions.assertTrue(pin.equals("A5") || pin.equals("A6"), "I0 routed to pin " + pin);
+        assertLutInputsOnRoutedSitePins(lut);
+        Assertions.assertEquals(getCriticalPathDelay(reportCapture.toString()),
+                getCriticalPathDelay(routeCapture.toString()));
+    }
+
+    /**
+     * Tests that RWRoute's final critical path, after its routes are finalized, includes the fanout delays
+     * of the branching nodes of the routed nets, as a fresh timing analysis of the routed design does: a
+     * flop drives eight LUTs, each driving a flop.
+     */
+    @Test
+    public void testTimingDrivenCriticalPathWithFanout() {
+        Design design = new Design("top", "xcvu3p");
+        Cell ff = design.createAndPlaceCell("ff", Unisim.FDRE, "SLICE_X40Y60/AFF");
+        Net q = design.createNet("q");
+        ECOTools.connectNet(design, ff, "Q", q);
+        for (int i = 0; i < 8; i++) {
+            String site = "SLICE_X" + (36 + i) + "Y" + (70 + 3 * i);
+            Cell lut = design.createAndPlaceCell("lut" + i, Unisim.LUT1, site + "/A6LUT");
+            LUTTools.configureLUT(lut, "O=I0");
+            ECOTools.connectNet(design, lut, "I0", q);
+            Cell f = design.createAndPlaceCell("f" + i, Unisim.FDRE, site + "/AFF");
+            Net o = design.createNet("o" + i);
+            ECOTools.connectNet(design, lut, "O", o);
+            ECOTools.connectNet(design, f, "D", o);
+        }
+        design.routeSites();
+
+        ByteArrayOutputStream routeCapture = new ByteArrayOutputStream();
+        ByteArrayOutputStream reportCapture = new ByteArrayOutputStream();
+        PrintStream originalOut = System.out;
+        try {
+            System.setOut(new PrintStream(routeCapture, true));
+            RWRoute.routeDesignFullTimingDriven(design);
+            System.setOut(new PrintStream(reportCapture, true));
+            new TimingManager(design).getCriticalPathInfo();
+        } finally {
+            System.setOut(originalOut);
+        }
+        System.out.print(routeCapture);
+        System.out.print(reportCapture);
         Assertions.assertEquals(getCriticalPathDelay(reportCapture.toString()),
                 getCriticalPathDelay(routeCapture.toString()));
     }
@@ -1800,6 +1986,51 @@ public class TestRWRoute {
         Assertions.assertNotNull(i1);
         Assertions.assertNotEquals(i0, i1);
         Assertions.assertEquals(3, q.getPins().size());
+    }
+
+    /**
+     * Tests timing-driven routing with LUT pin swapping on a design with distributed RAM: the
+     * address inputs of a single-port RAM on a D LUT of a SLICEM are both read addresses (on the
+     * D LUT's input pins) and write addresses (on the H LUT's input pins, shared with the other
+     * RAMs of the slice). The timing graph times such a cell pin through its write address pin, so
+     * the connection to the read address pin shares its timing connection with a connection to an
+     * H pin, which also drives the RAMs on the other LUTs; only the LUT(s) that the connection's
+     * own sink pin drives may be weighed with its candidate pins.
+     */
+    @Test
+    public void testTimingDrivenLutPinSwappingLutRam() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_ooc_X10Y235.dcp");
+
+        // The case above: a D LUT input that drives an address of a RAM whose cell pin is
+        // routed from an H pin
+        boolean found = false;
+        for (Net net : design.getNets()) {
+            for (SitePinInst sink : net.getSinkPins()) {
+                if (!sink.isLUTInputPin() || sink.getName().charAt(0) != 'D') {
+                    continue;
+                }
+                List<EDIFHierPortInst> hports = DesignTools.getPortInstsFromSitePinInst(sink);
+                if (hports.isEmpty()) {
+                    continue;
+                }
+                EDIFHierPortInst hport = hports.get(0);
+                Cell cell = design.getCell(hport.getFullHierarchicalInstName());
+                if (cell == null || !cell.getType().startsWith("RAM")) {
+                    continue;
+                }
+                String routed = DesignTools.getRoutedSitePin(cell, net, hport.getPortInst().getName());
+                found |= routed != null && routed.charAt(0) == 'H';
+            }
+        }
+        Assertions.assertTrue(found);
+
+        RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--lutPinSwapping"});
+        for (Net net : design.getNets()) {
+            if (net.getSource() == null || net.isStaticNet()) {
+                continue;
+            }
+            assertAllPinsRouted(net);
+        }
     }
 
     /**
@@ -2041,6 +2272,32 @@ public class TestRWRoute {
     }
 
     /**
+     * Checks that each input of a LUT cell mapped to one of its LUT's A1-A6 pins is driven by a net through a routed
+     * site pin of that net, whose intra-site routing reaches the BEL pin that the cell's pin mapping gives.
+     */
+    private static void assertLutInputsOnRoutedSitePins(Cell cell) {
+        SiteInst si = cell.getSiteInst();
+        for (Map.Entry<String, String> e : cell.getPinMappingsP2L().entrySet()) {
+            String physicalPin = e.getKey();
+            if (!physicalPin.matches("A[1-6]")) {
+                continue;
+            }
+            BELPin belPin = cell.getBEL().getPin(physicalPin);
+            Net net = si.getNetFromSiteWire(belPin.getSiteWireName());
+            String sitePinName = belPin.getConnectedSitePinName();
+            Assertions.assertNotNull(net, cell + "." + e.getValue() + " on " + physicalPin);
+            if (net.isStaticNet()) {
+                continue;
+            }
+            SitePinInst spi = si.getSitePinInst(sitePinName);
+            Assertions.assertNotNull(spi, cell + "." + e.getValue() + " on " + sitePinName);
+            Assertions.assertEquals(net, spi.getNet(), spi.toString());
+            // (A net without a source, e.g. from a top-level port of an out-of-context design, is not routed)
+            Assertions.assertTrue(spi.isRouted() || net.getSource() == null, spi.toString());
+        }
+    }
+
+    /**
      * Checks a Versal LUT lane's pin mappings against what Vivado 2026.1 accepts (from exhaustive LOCK_PINS +
      * place_cell experiments): a cell on the 5LUT, or on the 6LUT while the 5LUT is used, uses at most one of A5, A6
      * and CASC, unless the two form a LUT6_2 (the 6LUT cell using A6 and one of A5/CASC, and the 5LUT cell not using
@@ -2095,6 +2352,7 @@ public class TestRWRoute {
             "xcvu3p,false",
             "xcvu3p,true",
             "xcvc1902,false",
+            "xcvc1902,true",
     })
     public void testLutPinSwappingLut6_2(String partName, boolean timingDriven) {
         boolean versal = PartNameTools.getPart(partName).getSeries() == Series.Versal;
@@ -2132,12 +2390,13 @@ public class TestRWRoute {
      * (output on O5) uses A5 and the 5LUT cell A6 for inputs of their own; with A1 blocked, the shared inputs on
      * A1-A3 must end up on A2-A4.
      */
-    @Test
-    public void testVersalLutPinSwappingTwoLutsDifferentTopPins() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testVersalLutPinSwappingTwoLutsDifferentTopPins(boolean timingDriven) {
         Design design = createLutLaneDesign("xcvc1902", "SLICE_X40Y61", 'A',
                 "LUT4/O5 O=I0^I1^I2^I3 a@A1 b@A2 c@A3 e@A5",
                 "LUT4 O=I0&I1&I2&I3 a@A1 b@A2 c@A3 f@A6", false);
-        Map<String, Set<String>> candidates = routeLutPinSwapping(design, false, "SLICE_X40Y61/A1");
+        Map<String, Set<String>> candidates = routeLutPinSwapping(design, timingDriven, "SLICE_X40Y61/A1");
 
         Set<String> a1a4 = new HashSet<>(Arrays.asList("A1", "A2", "A3", "A4"));
         Set<String> a2a4 = new HashSet<>(Arrays.asList("A2", "A3", "A4"));
@@ -2171,14 +2430,14 @@ public class TestRWRoute {
      * on A2-A4.
      */
     @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    public void testVersalLutPinSwappingTwoLutsSharedInputs(boolean lut6OutputO5) {
+    @CsvSource({"false,false", "true,false", "false,true", "true,true"})
+    public void testVersalLutPinSwappingTwoLutsSharedInputs(boolean lut6OutputO5, boolean timingDriven) {
         Design design = createLutLaneDesign("xcvc1902", "SLICE_X40Y61", 'A',
                 lut6OutputO5 ? "LUT5/O5 O=I0^I1^I2^I3^I4 a@A1 b@A2 c@A3 d@A4 e@A5"
                              : "LUT4 O=I0^I1^I2^I3 a@A1 b@A2 c@A3 e@A5",
                 lut6OutputO5 ? "LUT5 O=I0&I1&I2&I3&I4 a@A1 b@A2 c@A3 d@A4 e@A5"
                              : "LUT4 O=I0&I1&I2&I3 a@A1 b@A2 c@A3 e@A5", false);
-        Map<String, Set<String>> candidates = routeLutPinSwapping(design, false,
+        Map<String, Set<String>> candidates = routeLutPinSwapping(design, timingDriven,
                 lut6OutputO5 ? "SLICE_X40Y61/A5" : "SLICE_X40Y61/A1");
 
         Set<String> a1a4 = new HashSet<>(Arrays.asList("A1", "A2", "A3", "A4"));
@@ -2211,12 +2470,12 @@ public class TestRWRoute {
      * and that on A5 on A6).
      */
     @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    public void testVersalLutPinSwappingOneLut(boolean lut5Only) {
+    @CsvSource({"false,false", "true,false", "false,true", "true,true"})
+    public void testVersalLutPinSwappingOneLut(boolean lut5Only, boolean timingDriven) {
         String spec = "LUT3 O=I0^I1^I2 a@A1 b@A2 c@" + (lut5Only ? "A5" : "A3");
         Design design = createLutLaneDesign("xcvc1902", "SLICE_X40Y61", 'A',
                 lut5Only ? null : spec, lut5Only ? spec : null, false);
-        Map<String, Set<String>> candidates = routeLutPinSwapping(design, false, lut5Only
+        Map<String, Set<String>> candidates = routeLutPinSwapping(design, timingDriven, lut5Only
                 ? new String[] {"SLICE_X40Y61/A1", "SLICE_X40Y61/A5"}
                 : new String[] {"SLICE_X40Y61/A1", "SLICE_X40Y61/A2", "SLICE_X40Y61/A3"});
 
@@ -2255,12 +2514,14 @@ public class TestRWRoute {
      * late): a lone 5LUT cell's input on A5, whose only alternate is A6, loses it, so it must get an exclusive sink
      * on A5 and be routed there.
      */
-    @Test
-    public void testVersalLutPinSwappingAltSinkPreservedLate() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testVersalLutPinSwappingAltSinkPreservedLate(boolean timingDriven) {
         Design design = createLutLaneDesign("xcvc1902", "SLICE_X40Y61", 'A', null, "LUT1 O=I0 e@A5", false);
         Net other = design.createNet("other");
         Node a6IMUX = design.getDevice().getSite("SLICE_X40Y61").getConnectedNode("A6").getAllUphillNodes().get(0);
-        RWRouteConfig config = new RWRouteConfig(new String[] {"--nonTimingDriven", "--lutPinSwapping"});
+        RWRouteConfig config = new RWRouteConfig(timingDriven ? new String[] {"--lutPinSwapping"}
+                : new String[] {"--nonTimingDriven", "--lutPinSwapping"});
         RWRoute router = new RWRoute(design, config) {
             @Override
             protected NetWrapper createNetWrapperAndConnections(Net net) {
@@ -2286,15 +2547,17 @@ public class TestRWRoute {
      * loses in turn, so it too must get an exclusive sink, on A6. (The other net is then unpreserved, as
      * PartialRouter.ensureSinkRoutability() does for stale routing on an exclusive sink, so that A6 can be reached.)
      */
-    @Test
-    public void testVersalLutPinSwappingAltSinksExclusiveInTurn() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testVersalLutPinSwappingAltSinksExclusiveInTurn(boolean timingDriven) {
         Design design = createLutLaneDesign("xcvc1902", "SLICE_X40Y61", 'A',
                 "LUT4/O5 O=I0^I1^I2^I3 a@A1 b@A2 c@A3 e@A5",
                 "LUT4 O=I0&I1&I2&I3 a@A1 b@A2 c@A3 f@A6", false);
         Net other = design.createNet("other");
         Node a6IMUX = design.getDevice().getSite("SLICE_X40Y61").getConnectedNode("A6").getAllUphillNodes().get(0);
         Map<String, Connection> topConnections = new HashMap<>();
-        RWRouteConfig config = new RWRouteConfig(new String[] {"--nonTimingDriven", "--lutPinSwapping"});
+        RWRouteConfig config = new RWRouteConfig(timingDriven ? new String[] {"--lutPinSwapping"}
+                : new String[] {"--nonTimingDriven", "--lutPinSwapping"});
         RWRoute router = new RWRoute(design, config) {
             @Override
             protected NetWrapper createNetWrapperAndConnections(Net net) {
@@ -2339,14 +2602,14 @@ public class TestRWRoute {
      * output on O6); in both, with A1 blocked, the inputs on A1-A3 must end up on A2-A4.
      */
     @ParameterizedTest
-    @ValueSource(strings = {"lone", "both", "one"})
-    public void testVersalLutPinSwappingCascade(String lut5) {
+    @CsvSource({"lone,false", "both,false", "one,false", "lone,true", "both,true", "one,true"})
+    public void testVersalLutPinSwappingCascade(String lut5, boolean timingDriven) {
         boolean lut5Used = !lut5.equals("lone");
         Design design = createLutLaneDesign("xcvc1902", "SLICE_X40Y61", 'B',
                 "LUT3 O=I0^I1^I2 z@CASC a@A1 b@A2",
                 lut5.equals("both") ? "LUT2 O=I0&I1 z@CASC c@A3" : lut5.equals("one") ? "LUT2 O=I0&I1 c@A3 e@A5" : null,
                 false);
-        Map<String, Set<String>> candidates = routeLutPinSwapping(design, false, lut5Used
+        Map<String, Set<String>> candidates = routeLutPinSwapping(design, timingDriven, lut5Used
                 ? new String[] {"SLICE_X40Y61/B1"}
                 : new String[] {"SLICE_X40Y61/B1", "SLICE_X40Y61/B2", "SLICE_X40Y61/B3"});
 
@@ -2384,11 +2647,13 @@ public class TestRWRoute {
 
     /**
      * Tests LUT pin swapping on a whole Versal design placed and routed by Vivado (with LUT6_2s, cells using CASC, and
-     * LUT inputs tied to VCC/GND): every pin must be routed, some LUT inputs swapped, and every lane must still be one
-     * that Vivado accepts (see {@link #assertVersalLaneLegal(Cell, Cell)}).
+     * LUT inputs tied to VCC/GND), timing-driven or not: every pin must be routed, some LUT inputs swapped, every lane
+     * must still be one that Vivado accepts (see {@link #assertVersalLaneLegal(Cell, Cell)}), and every LUT input must
+     * be on a site pin of its net that is routed to the BEL pin that the cell's pin mapping gives.
      */
-    @Test
-    public void testNonTimingDrivenRoutingOnVersalDeviceWithLutPinSwapping() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testRoutingOnVersalDeviceWithLutPinSwapping(boolean timingDriven) {
         Design design = RapidWrightDCP.loadDCP("picoblaze_2022.2.dcp");
         design.setTrackNetChanges(true);
         Map<Cell, String> before = new HashMap<>();
@@ -2398,7 +2663,8 @@ public class TestRWRoute {
             }
         }
 
-        RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--nonTimingDriven", "--lutPinSwapping"});
+        RWRoute.routeDesignWithUserDefinedArguments(design, timingDriven ? new String[] {"--lutPinSwapping"}
+                : new String[] {"--nonTimingDriven", "--lutPinSwapping"});
 
         Assertions.assertFalse(design.getModifiedNets().isEmpty());
         assertModifiedNetsRouted(design);
@@ -2416,6 +2682,9 @@ public class TestRWRoute {
                     assertVersalLaneLegal(lut6, lut5);
                 }
             }
+        }
+        for (Cell cell : before.keySet()) {
+            assertLutInputsOnRoutedSitePins(cell);
         }
 
         if (FileTools.isVivadoOnPath()) {
@@ -2564,6 +2833,51 @@ public class TestRWRoute {
             VivadoToolsHelper.assertFullyRouted(d);
 
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"picoblaze_2022.2.dcp", "versal_slr_crossing.dcp"})
+    public void testTimingDrivenRoutingOnVersalDevice(String dcpName) {
+        Design design = RapidWrightDCP.loadDCP(dcpName);
+        RWRoute.routeDesignFullTimingDriven(design);
+        assertAllSourcesRoutedFlagSet(design);
+        assertAllPinsRouted(design);
+        VivadoToolsHelper.assertFullyRouted(design);
+    }
+
+    @Test
+    public void testTimingDrivenSllLookaheadVersalSLRCrossing() {
+        Design design = RapidWrightDCP.loadDCP("versal_slr_crossing.dcp");
+        RWRoute.routeDesignWithUserDefinedArguments(design, new String[] {"--timingDriven", "--sllLookahead"});
+        assertAllSourcesRoutedFlagSet(design);
+        assertAllPinsRouted(design);
+        VivadoToolsHelper.assertFullyRouted(design);
+    }
+
+    /**
+     * Tests the delay that timing-driven routing charges, in its estimate and on entering the sending chain of a super
+     * long line, for each super long line still to take: never more than the cheapest SLR crossing's (so that the
+     * estimate stays a lower bound across SLRs), which is more than the delay of the rows that a super long line spans
+     * at the estimate's rate (75 on Versal, 60 on UltraScale+), so the rows' delay; with --sllLookahead, always the
+     * cheapest SLR crossing's.
+     * @param partName Part of a device with more than one SLR.
+     * @param sllLookahead Whether "--sllLookahead" is given.
+     */
+    @ParameterizedTest
+    @CsvSource({"xcv80-lsva4737-2MHP-e-S,false", "xcv80-lsva4737-2MHP-e-S,true",
+            "xcvu9p-flgb2104-2-i,false", "xcvu9p-flgb2104-2-i,true"})
+    public void testSllDelayTimingDriven(String partName, boolean sllLookahead) {
+        Design design = new Design("top", partName);
+        RWRouteConfig config = new RWRouteConfig(sllLookahead ? new String[] {"--timingDriven", "--sllLookahead"}
+                : new String[] {"--timingDriven"});
+        RWRoute router = new RWRoute(design, config);
+        router.preprocess();
+        router.initialize();
+        Device device = design.getDevice();
+        float crossing = TimingFamilies.of(device).getSlrModel(device, router.delayEstimator).getSllDelay();
+        float rows = router.routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES * router.getDelayPerRowPs();
+        Assertions.assertTrue(crossing > rows, crossing + " " + rows);
+        Assertions.assertEquals(sllLookahead ? crossing : Math.min(crossing, rows), router.getSllDelayPs());
     }
 
     @Test

@@ -27,8 +27,7 @@ package com.xilinx.rapidwright.rwroute;
 import com.xilinx.rapidwright.design.Design;
 import com.xilinx.rapidwright.interchange.Interchange;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
-import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimator;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 
@@ -91,7 +90,7 @@ public class CUFR extends RWRoute {
     }
 
     public static class RouteNodeGraphCUFRTimingDriven extends RouteNodeGraphTimingDriven {
-        public RouteNodeGraphCUFRTimingDriven(Design design, RWRouteConfig config, DelayEstimatorBase<InterconnectInfo> delayEstimator) {
+        public RouteNodeGraphCUFRTimingDriven(Design design, RWRouteConfig config, DelayEstimator delayEstimator) {
             super(design, config, delayEstimator);
         }
 
@@ -104,7 +103,7 @@ public class CUFR extends RWRoute {
     protected RouteNodeGraph createRouteNodeGraph() {
         if (config.isTimingDriven()) {
             /* An instantiated delay estimator that is used to calculate delay of routing resources */
-            DelayEstimatorBase<InterconnectInfo> estimator = new DelayEstimatorBase<>(design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
+            DelayEstimator estimator = DelayEstimator.create(design, config.isUseUTurnNodes());
             return new RouteNodeGraphCUFRTimingDriven(design, config, estimator);
         } else {
             return new RouteNodeGraphCUFR(design, config);

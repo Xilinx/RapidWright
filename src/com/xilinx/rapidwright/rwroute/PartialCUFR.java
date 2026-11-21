@@ -35,8 +35,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.interchange.Interchange;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
-import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
-import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimator;
 import com.xilinx.rapidwright.util.ParallelismTools;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 
@@ -72,7 +71,7 @@ public class PartialCUFR extends PartialRouter {
 
     public static class RouteNodeGraphPartialCUFRTimingDriven extends RouteNodeGraphPartialTimingDriven {
         public RouteNodeGraphPartialCUFRTimingDriven(Design design, RWRouteConfig config,
-                DelayEstimatorBase<InterconnectInfo> delayEstimator) {
+                DelayEstimator delayEstimator) {
             super(design, config, delayEstimator);
         }
 
@@ -85,8 +84,7 @@ public class PartialCUFR extends PartialRouter {
     protected RouteNodeGraph createRouteNodeGraph() {
         if (config.isTimingDriven()) {
             /* An instantiated delay estimator that is used to calculate delay of routing resources */
-            DelayEstimatorBase<InterconnectInfo> estimator = new DelayEstimatorBase<InterconnectInfo>(
-                    design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
+            DelayEstimator estimator = DelayEstimator.create(design, config.isUseUTurnNodes());
             return new RouteNodeGraphPartialCUFRTimingDriven(design, config, estimator);
         } else {
             return new RouteNodeGraphPartialCUFR(design, config);
@@ -173,7 +171,7 @@ public class PartialCUFR extends PartialRouter {
         return routeDesignWithUserDefinedArguments(design, new String[] {
                         "--hus",
                         "--fixBoundingBox",
-                        // use U-turn nodes and no masking of nodes cross RCLK
+                        // use U-turn nodes
                         // Pros: maximum routability
                         // Con: might result in delay optimism and a slight increase in runtime
                         "--useUTurnNodes",
@@ -192,7 +190,7 @@ public class PartialCUFR extends PartialRouter {
         return routeDesignWithUserDefinedArguments(design, new String[] {
                         "--hus",
                         "--fixBoundingBox",
-                        // use U-turn nodes and no masking of nodes cross RCLK
+                        // use U-turn nodes
                         // Pros: maximum routability
                         // Con: might result in delay optimism and a slight increase in runtime
                         "--useUTurnNodes",
@@ -236,10 +234,6 @@ public class PartialCUFR extends PartialRouter {
         if (pinsToRoute == null) {
             preprocess(design);
             pinsToRoute = getUnroutedPins(design);
-        }
-
-        if (config.isMaskNodesCrossRCLK()) {
-            System.out.println("WARNING: Masking nodes across RCLK for partial routing could result in routability problems.");
         }
 
         if (!config.isHus()) {

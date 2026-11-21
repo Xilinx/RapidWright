@@ -23,169 +23,88 @@
 
 package com.xilinx.rapidwright.rwroute;
 
-import com.xilinx.rapidwright.design.Cell;
 import com.xilinx.rapidwright.design.Design;
-import com.xilinx.rapidwright.device.BEL;
-import com.xilinx.rapidwright.device.BELPin;
-import com.xilinx.rapidwright.device.Device;
+import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
-import com.xilinx.rapidwright.device.Tile;
-import com.xilinx.rapidwright.device.TileTypeEnum;
-import com.xilinx.rapidwright.timing.DelayModel;
-import com.xilinx.rapidwright.timing.TimingEdge;
-import com.xilinx.rapidwright.timing.TimingGraph;
+import com.xilinx.rapidwright.device.Site;
+import com.xilinx.rapidwright.device.SitePin;
+import com.xilinx.rapidwright.device.Wire;
 import com.xilinx.rapidwright.timing.TimingManager;
-import com.xilinx.rapidwright.timing.TimingVertex;
-import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
-import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimator;
 
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Extends {@link RouteNodeGraph} with timing-driven capabilities.
  */
 public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
     /** The instantiated delayEstimator to compute delays */
-    protected final DelayEstimatorBase<InterconnectInfo> delayEstimator;
-    /** A flag to indicate if the routing resource exclusion should disable exclusion of nodes cross RCLK */
-    protected final boolean maskNodesCrossRCLK;
-
-    private static final Set<String> excludeAboveRclkString;
-    private static final Set<String> excludeBelowRclkString;
-    static {
-        // these nodes are bleeding down
-        excludeAboveRclkString = new HashSet<String>() {{
-            add("SDQNODE_E_0_FT1");
-            add("SDQNODE_E_2_FT1");
-            add("SDQNODE_W_0_FT1");
-            add("SDQNODE_W_2_FT1");
-            add("EE12_BEG0");
-            add("WW2_E_BEG0");
-            add("WW2_W_BEG0");
-        }};
-        // these nodes are bleeding up
-        excludeBelowRclkString = new HashSet<String>() {{
-            add("SDQNODE_E_91_FT0");
-            add("SDQNODE_E_93_FT0");
-            add("SDQNODE_E_95_FT0");
-            add("SDQNODE_W_91_FT0");
-            add("SDQNODE_W_93_FT0");
-            add("SDQNODE_W_95_FT0");
-            add("EE12_BEG7");
-            add("WW1_W_BEG7");
-        }};
-    }
+    protected final DelayEstimator delayEstimator;
 
     protected RouteNodeGraphTimingDriven(Design design,
                                          RWRouteConfig config,
-                                         DelayEstimatorBase<InterconnectInfo> delayEstimator) {
+                                         DelayEstimator delayEstimator) {
         super(design, config);
         this.delayEstimator = delayEstimator;
-        this.maskNodesCrossRCLK = config.isMaskNodesCrossRCLK();
-
-        excludeAboveRclk = new HashSet<>();
-        excludeBelowRclk = new HashSet<>();
-        Device device = design.getDevice();
-        Tile intTile = device.getArbitraryTileOfType(TileTypeEnum.INT);
-        String[] wireNames = intTile.getWireNames();
-        for (int wireIndex = 0; wireIndex < intTile.getWireCount(); wireIndex++) {
-            String wireName = wireNames[wireIndex];
-            if (excludeAboveRclkString.contains(wireName)) {
-                excludeAboveRclk.add(wireIndex);
-            }
-            if (excludeBelowRclkString.contains(wireName)) {
-                excludeBelowRclk.add(wireIndex);
-            }
-        }
     }
 
-    private final Set<Integer> excludeAboveRclk;
-    private final Set<Integer> excludeBelowRclk;
-
     @Override
-    public DelayEstimatorBase<InterconnectInfo> getDelayEstimator() {
+    public DelayEstimator getDelayEstimator() {
         return delayEstimator;
     }
 
     /**
      * Gets the LUT logic delay with a connection arriving at the given sink rnode (one of its
-     * candidate LUT input pins, with LUT pin swapping): the worst of the timing graph's logic edges
-     * from the LUT input(s) that the connection feeds, or zero if there are none (the timing graph
-     * has no logic edge from an input that the LUT's function does not depend on), or if the
-     * connection's sink pin cannot be swapped. These delays depend only on the LUT BEL and its
-     * pins, so they are looked up in the delay model rather than stored per connection.
-     * @param timingGraph The timing graph.
+     * candidate LUT input pins, with LUT pin swapping): the worst of the timing analysis' LUT arcs
+     * from the LUT input(s) that the connection feeds, with the input on that pin, or zero if there
+     * are none (an input that the LUT's function does not depend on has no arc), or if the
+     * connection's sink pin cannot be swapped. The delays are those of the timing analysis' arc
+     * provider (the fitted cell arcs by default), looked up as needed rather than stored per
+     * connection.
+     * @param timingManager The timing manager.
      * @param connection The connection.
      * @param sinkRnode One of the connection's sink rnodes.
-     * @param updateTimingGraph True to also set those logic edges' delays in the timing graph.
+     * @param updateTiming True to also set those LUT arcs' delays in the timing analysis.
      * @return The logic delay in ps.
      */
     @Override
-    protected float getLutLogicDelay(TimingGraph timingGraph, Connection connection, RouteNode sinkRnode,
-                                     boolean updateTimingGraph) {
+    protected float getLutLogicDelay(TimingManager timingManager, Connection connection, RouteNode sinkRnode,
+                                     boolean updateTiming) {
         // Only LUT pin swapping gives a connection alternate sinks
         if (!connection.hasAltSinks()) {
             return 0;
         }
-        DelayModel delayModel = timingGraph.getintraSiteAndLogicDelayModel();
-        String sitePinName = sinkRnode.getSitePin().getPinName();
-        float worst = 0;
-        for (TimingEdge edge : connection.getTimingEdges()) {
-            TimingVertex input = edge.getDst();
-            String inputName = input.getName();
-            Cell cell = design.getCell(inputName.substring(0, inputName.lastIndexOf('/')));
-            BEL bel = cell.getBEL();
-            if (!bel.isLUT()) {
-                // The connection reaches this cell (e.g. a CARRY8) through a LUT routethru, whose logic delay is not
-                // modelled per LUT input pin
-                continue;
-            }
-            String inputPin = null;
-            for (BELPin belPin : bel.getPins()) {
-                if (belPin.isInput() && sitePinName.equals(belPin.getConnectedSitePinName())) {
-                    inputPin = belPin.getName();
-                    break;
-                }
-            }
-            if (inputPin == null) {
-                throw new RuntimeException("ERROR: Site pin " + sitePinName + " does not drive an input of " + bel);
-            }
-            short belIdx = delayModel.getBELIndex(bel.getName());
-            for (TimingEdge logic : timingGraph.outgoingEdgesOf(input)) {
-                String outputName = logic.getDst().getName();
-                String outputPin = cell.getPhysicalPinMapping(outputName.substring(outputName.lastIndexOf('/') + 1));
-                short delay = delayModel.getLogicDelay(belIdx, inputPin, outputPin);
-                if (delay < 0) {
-                    throw new RuntimeException("ERROR: No logic delay from " + bel + "." + inputPin + " to " + outputPin);
-                }
-                if (updateTimingGraph) {
-                    logic.setLogicDelay(delay);
-                }
-                worst = Math.max(worst, delay);
-            }
-        }
-        return worst;
+        String pinName = RouterHelper.getLutInputSitePin(sinkRnode).getPinName();
+        return timingManager.getLutLogicDelay(connection, pinName, updateTiming);
     }
 
     /**
-     * Sets, for each of the connection's targets (its candidate LUT input pins), its LUT logic
-     * delay in excess of that of the fastest target.
+     * Sets, for each of the connection's targets (its candidate LUT input pins), the delay that the
+     * timing analysis charges for arriving there in excess of that of the fastest target: its LUT
+     * logic delay (see {@link #getLutLogicDelay}) plus the delay of the sink pin (see
+     * {@link DelayEstimator#getPinDelay(SitePinInst, Site, String)}).
      * @param state State from the connection that is being routed, with its targets marked.
      * @param timingManager The timing manager.
      */
     @Override
     protected void setTargetExcessLogicDelays(RWRoute.ConnectionState state, TimingManager timingManager) {
-        TimingGraph timingGraph = timingManager.getTimingGraph();
         List<RouteNode> targets = state.targets;
         float[] excess = state.targetExcessLogicDelays;
         assert(targets.size() <= excess.length);
+        Connection connection = state.connection;
+        if (!connection.hasAltSinks()) {
+            // A single target
+            Arrays.fill(excess, 0, targets.size(), 0f);
+            return;
+        }
         float fastest = Float.MAX_VALUE;
         for (int i = 0; i < targets.size(); i++) {
-            excess[i] = getLutLogicDelay(timingGraph, state.connection, targets.get(i), false);
+            SitePin sitePin = RouterHelper.getLutInputSitePin(targets.get(i));
+            excess[i] = timingManager.getLutLogicDelay(connection, sitePin.getPinName(), false)
+                    + delayEstimator.getPinDelay(connection.getSource(), sitePin.getSite(), sitePin.getPinName());
             fastest = Math.min(fastest, excess[i]);
         }
         for (int i = 0; i < targets.size(); i++) {
@@ -227,15 +146,36 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
 
         /** The delay of this rnode computed based on the timing model */
         private final float delay;
+        /** The class of this rnode's node for {@link DelayEstimator#getExtraDelay(int, int)} */
+        private final byte delayClass;
+        /**
+         * Scratch of the fanout delay update of the router: the stamp of the net whose routing tree
+         * last visited this rnode, and the first child of this rnode in that tree
+         */
+        int fanoutStamp;
+        RouteNode fanoutChild;
 
         protected RouteNodeTimingDriven(RouteNodeGraphTimingDriven routingGraph, Node node, RouteNodeType type) {
-            super(routingGraph, node, type);
-            delay = RouterHelper.computeNodeDelay(routingGraph.delayEstimator, node);
+            this(routingGraph, node, type, node.getAllWiresInNode());
+        }
+
+        private RouteNodeTimingDriven(RouteNodeGraphTimingDriven routingGraph, Node node, RouteNodeType type,
+                                      Wire[] wires) {
+            super(routingGraph, node, type, wires);
+            DelayEstimator estimator = routingGraph.delayEstimator;
+            // As every other user of the estimator (e.g. the timing report)
+            delay = RouterHelper.computeNodeDelay(estimator, node, wires);
+            delayClass = (byte) estimator.getExtraDelayClass(node);
         }
 
         @Override
         public float getDelay() {
             return delay;
+        }
+
+        @Override
+        int getDelayClass() {
+            return delayClass;
         }
 
         @Override
@@ -261,23 +201,5 @@ public class RouteNodeGraphTimingDriven extends RouteNodeGraph {
     @Override
     protected RouteNode create(Node node, RouteNodeType type) {
         return new RouteNodeTimingDriven(this, node, type);
-    }
-
-    @Override
-    protected boolean isExcluded(RouteNode parent, Node child) {
-        if (super.isExcluded(parent, child))
-            return true;
-        if (maskNodesCrossRCLK) {
-            Tile tile = child.getTile();
-            if (tile.getTileTypeEnum() == TileTypeEnum.INT) {
-                int y = tile.getTileYCoordinate();
-                if ((y-30)%60 == 0) { // above RCLK
-                    return excludeAboveRclk.contains(child.getWireIndex());
-                } else if ((y-29)%60 == 0) { // below RCLK
-                    return excludeBelowRclk.contains(child.getWireIndex());
-                }
-            }
-        }
-        return false;
     }
 }

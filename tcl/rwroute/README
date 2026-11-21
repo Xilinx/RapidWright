@@ -1,9 +1,11 @@
 #------------------------------------------------------------------------------------------------------------
 This directory contains the scripts to produce data to be used with RWRoute for
-1) dump_all_dsp_delay.tcl         to list logic delays of each DSP in a placed design.
-2) find_clock_tree_template.tcl   to produce a clock tree and its skews over the given list of clock regions.
-3) find_clock_route_template.tcl  to find route templates and their delays in a clock network, 
+1) find_clock_tree_template.tcl   to produce a clock tree and its skews over the given list of clock regions.
+2) find_clock_route_template.tcl  to find route templates and their delays in a clock network, 
                                   needed to route a high fanout signal inside the clock network.
+
+The clock route templates (RWRoute's --clkRouteTiming option) are deprecated and will be removed in
+the next release.
 
 All data listed above can be reused in other designs as well. It is our intend to accumulate the data so that 
 we have a complete set of data. To accomplish that, we need the community to submit their data obtained from 
@@ -13,17 +15,10 @@ these scripts. However, we do not have a mechanism to receive and combine them a
 #------------------------------------------------------------------------------------------------------------
 Directory structure:
 
-./dump_all_dsp_delay.tcl
 ./find_clock_tree_template.tcl
 ./find_clock_route_template.tcl
-./helper_proc/                        A directory containing helper proc for the three Tcl files above
+./helper_proc/                        A directory containing helper proc for the two Tcl files above
     clock_modeling_util.tcl
-./test_data/                          A directory containing data for testing each of the three Tcl files.
-                                      The data include input and output for the default input.
-                                      There is one subdirectory for each Tcl file.
-    dump_all_dsp_delay/               
-    find_clock_tree_template/
-    find_clock_route_template/
 
 
 #------------------------------------------------------------------------------------------------------------
@@ -48,13 +43,6 @@ vivado &
 
 
 2) At Vivado prompt:
-
-To dump all dsp delay
-
-open_checkpoint <placed dcp>
-source ../dump_all_dsp_delay.tcl -notrace
-dump_all_dsp_delay
-
 
 To build clock tree template 
 

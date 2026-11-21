@@ -293,10 +293,6 @@ public class PartialDFXRouter extends PartialRouter {
             pinsToRoute = getUnroutedPins(design);
         }
 
-        if (config.isMaskNodesCrossRCLK()) {
-            System.out.println("WARNING: Masking nodes across RCLK for partial routing could result in routability problems.");
-        }
-
         return routeDesign(new PartialDFXRouter(design, config, pinsToRoute, softPreserve));
     }
 
@@ -319,7 +315,7 @@ public class PartialDFXRouter extends PartialRouter {
     public static Design routeDesignPartialNonTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
         return routeDesignWithUserDefinedArguments(design, new String[] {
                         "--fixBoundingBox",
-                        // use U-turn nodes and no masking of nodes cross RCLK
+                        // use U-turn nodes
                         // Pros: maximum routability
                         // Con: might result in delay optimism and a slight increase in runtime
                         "--useUTurnNodes",
@@ -337,7 +333,7 @@ public class PartialDFXRouter extends PartialRouter {
     public static Design routeDesignPartialTimingDriven(Design design, Collection<SitePinInst> pinsToRoute, boolean softPreserve) {
         return routeDesignWithUserDefinedArguments(design, new String[] {
                         "--fixBoundingBox",
-                        // use U-turn nodes and no masking of nodes cross RCLK
+                        // use U-turn nodes
                         // Pros: maximum routability
                         // Con: might result in delay optimism and a slight increase in runtime
                         "--useUTurnNodes",

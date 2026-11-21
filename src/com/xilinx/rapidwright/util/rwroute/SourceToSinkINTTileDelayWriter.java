@@ -34,8 +34,7 @@ import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.SitePinInst;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.rwroute.RouterHelper;
-import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
-import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimator;
 import com.xilinx.rapidwright.util.Pair;
 
 /**
@@ -58,7 +57,7 @@ public class SourceToSinkINTTileDelayWriter {
         String inputDcpName = args[0].substring(args[0].lastIndexOf("/")+1);
         Design design = Design.readCheckpoint(args[0]);
         boolean useUTurnNodes = false;
-        DelayEstimatorBase estimator = new DelayEstimatorBase(design.getDevice(), new InterconnectInfo(), useUTurnNodes, 0);
+        DelayEstimator estimator = DelayEstimator.create(design, useUTurnNodes);
 
         Net net = design.getNet(args[2]);
         if (net == null) {
