@@ -2154,6 +2154,10 @@ public class RouteNodeGraph {
             } else {
                 preserve(startNode, net);
             }
+            if (pip.isEndWireNull()) {
+                // A stub with only a start wire (e.g. on the clock net of an out-of-context design): no end node
+                continue;
+            }
             preserve(pip.getEndNode(), net);
         }
     }
