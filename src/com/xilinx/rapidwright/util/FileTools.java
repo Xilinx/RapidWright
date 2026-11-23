@@ -1821,15 +1821,14 @@ public class FileTools {
     }
 
     public static final int BINARY_CHECK_LENGTH = 8192;
-    private static byte[] binaryCheckData;
 
     public static boolean isDataBinary(InputStream is) {
         if (!is.markSupported()) {
             throw new RuntimeException("ERROR: Cannot determine if input stream is binary without mark support.");
         }
-        if (binaryCheckData == null) {
-            binaryCheckData = new byte[BINARY_CHECK_LENGTH];
-        }
+        // One buffer per call: a shared static buffer let concurrent callers (e.g. two checkpoints read on two
+        // threads) overwrite each other's bytes, so a text EDIF could be reported as binary (encrypted)
+        byte[] binaryCheckData = new byte[BINARY_CHECK_LENGTH];
         boolean isBinary = false;
         try {
             is.mark(BINARY_CHECK_LENGTH+1);
