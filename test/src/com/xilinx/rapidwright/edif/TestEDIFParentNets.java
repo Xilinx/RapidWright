@@ -22,6 +22,9 @@
 
 package com.xilinx.rapidwright.edif;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,6 +45,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -51,6 +55,7 @@ import com.xilinx.rapidwright.design.DesignTools;
 import com.xilinx.rapidwright.design.Net;
 import com.xilinx.rapidwright.design.NetType;
 import com.xilinx.rapidwright.design.SitePinInst;
+import com.xilinx.rapidwright.design.Unisim;
 import com.xilinx.rapidwright.eco.ECOTools;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
 
@@ -1700,5 +1705,71 @@ public class TestEDIFParentNets {
         Assertions.assertTrue(changes > 300);
         // Not every seed gives a cell instance with nets below it another cell
         Assertions.assertTrue(formerCellNets > 0 || seed > 2);
+    }
+
+    /**
+     * Once parent nets have been looked up in a netlist, netlist changes are followed (see
+     * {@link EDIFNetConnectivity}). The parallel parser links the port insts of different cells
+     * at the same time, so linking a port inst must not look into the cell it instantiates, which
+     * another thread may be linking (this raced on large netlists). Nothing is recorded for a
+     * netlist being parsed, so nothing is lost by not following its linking: its parent nets are
+     * those of the netlist it was written from.
+     */
+    @Test
+    public void testParallelParseAfterParentNetLookup(@TempDir Path dir) throws IOException {
+        final int numCells = 64;
+        final int numPorts = 64;
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("top");
+        EDIFLibrary work = netlist.getWorkLibrary();
+        EDIFCell top = netlist.getTopCell();
+        EDIFCell prevSub = null;
+        List<String> netNames = new ArrayList<>();
+        for (int i = 0; i < numCells; i++) {
+            // A cell whose ports each have a net inside, and a driver on its first port
+            EDIFCell sub = new EDIFCell(work, "sub" + i);
+            for (int j = 0; j < numPorts; j++) {
+                EDIFPort port = sub.createPort("p" + j, EDIFDirection.INPUT, 1);
+                sub.createNet("n" + j).createPortInst(port);
+            }
+            EDIFCellInst lut = sub.createChildCellInst("lut", netlist.getHDIPrimitive(Unisim.LUT1));
+            sub.getNet("n0").createPortInst("O", lut);
+            if (prevSub != null) {
+                // A cell that instantiates the previous one, on all of its ports
+                EDIFCell parent = new EDIFCell(work, "parent" + i);
+                EDIFCellInst inst = parent.createChildCellInst("inst", prevSub);
+                for (int j = 0; j < numPorts; j++) {
+                    parent.createNet("w" + j).createPortInst("p" + j, inst);
+                    netNames.add("parent" + i + "/w" + j);
+                    netNames.add("parent" + i + "/inst/n" + j);
+                }
+                top.createChildCellInst("parent" + i, parent);
+            }
+            prevSub = sub;
+        }
+        Path edf = dir.resolve("parents.edf");
+        netlist.exportEDIF(edf, true);
+        List<String> expected = new ArrayList<>();
+        for (String name : netNames) {
+            expected.add(netlist.getParentNetName(name));
+        }
+        Assertions.assertEquals("parent1/inst/n0", netlist.getParentNetName("parent1/w0"));
+
+        // Parse with several workers, so that different cells are linked by different threads
+        final int numWorkers = 8;
+        long size = Files.size(edf);
+        List<ParseStart> offsets = new ArrayList<>();
+        for (int i = 0; i < numWorkers; i++) {
+            offsets.add(new ParseStart("worker" + i, i * size / numWorkers, true));
+        }
+        for (int i = 0; i < 4; i++) {
+            try (ParallelEDIFParserTestSpecificOffsets parser = new ParallelEDIFParserTestSpecificOffsets(edf,
+                    128, offsets)) {
+                EDIFNetlist parsed = parser.parseEDIFNetlist();
+                Assertions.assertEquals(numWorkers, parser.getSuccessfulThreads());
+                for (int j = 0; j < netNames.size(); j++) {
+                    Assertions.assertEquals(expected.get(j), parsed.getParentNetName(netNames.get(j)));
+                }
+            }
+        }
     }
 }

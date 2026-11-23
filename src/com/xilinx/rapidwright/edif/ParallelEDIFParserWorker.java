@@ -312,7 +312,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
         }
         // Keep the net in the port inst itself, rather than in a separate object per port inst, until
         // ParentCellPortInsts.linkAndAdd() adds the port inst to it
-        portInst.setParentNet(net);
+        portInst.setParsedParentNet(net);
         currentLinks.portInsts.add(portInst);
     }
 
@@ -414,6 +414,9 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
          */
         public void linkAndAdd(Map<EDIFCell, EDIFReadLegalNameCache> portRenamesByCell,
                                Map<EDIFCell, EDIFPortCache> portCaches, StringPool uniquifier) {
+            // The port insts are linked without keeping up to date what is recorded for finding parent nets (see
+            // EDIFNet.addParsedPortInst()): nothing is recorded for this netlist yet, and doing so would read the
+            // internal port maps of the cells instantiated here, which other threads may be linking meanwhile
             for (EDIFPortInst portInst : portInsts) {
                 linkPort(portInst, portRenamesByCell, portCaches);
                 name(portInst, uniquifier);
@@ -422,7 +425,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
                 if (portInst.getCellInst() != null) {
                     portInst.getCellInst().addPortInst(portInst, true);
                 }
-                portInst.getNet().addPortInst(portInst, true);
+                portInst.getNet().addParsedPortInst(portInst);
             }
             sortAndTrimPortInstLists();
         }
@@ -437,7 +440,7 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
             // The cell may have been parsed by any worker, which recorded its ports' renames
             final EDIFReadLegalNameCache portRenames = portRenamesByCell.getOrDefault(cell, NO_PORT_RENAMES);
             if (cell.getPorts().size() < PORT_LOOKUP_MAP_THRESHOLD) {
-                portInst.setPort(cell.getPortByLegalName(portInst.getName(), portRenames));
+                portInst.setParsedPort(cell.getPortByLegalName(portInst.getName(), portRenames));
                 return;
             }
             EDIFPortCache edifPortCache = portCaches.get(cell);
@@ -448,14 +451,14 @@ public class ParallelEDIFParserWorker extends AbstractEDIFParserWorker implement
             if (port == null) {
                 throw new RuntimeException("did not find port "+portInst.getName()+" in cache");
             }
-            portInst.setPort(port);
+            portInst.setParsedPort(port);
         }
 
         private void name(EDIFPortInst portInst, StringPool uniquifier) {
             // Here we must accommodate single bit busses that have collided with their
             // namesake and update the port instance to reference a single bit bussed port
             if (portInst.getIndex() == -1 && portInst.getPort().isBus() && portInst.getPort().getWidth() == 1) {
-                portInst.setIndex(0);
+                portInst.setParsedIndex(0);
             }
             String portInstName = portInst.getPortInstNameFromPort();
             portInst.setName(uniquifier.uniquifyName(portInstName));
