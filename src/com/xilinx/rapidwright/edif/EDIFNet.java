@@ -93,6 +93,22 @@ public class EDIFNet extends EDIFPropertyObject {
      * will be added consecutively (such as parsing a netlist).
      */
     public void addPortInst(EDIFPortInst portInst, boolean deferSort) {
+        addPortInst(portInst, deferSort, false);
+    }
+
+    /**
+     * Adds a port inst to this net of a netlist that is being parsed, without keeping up to date
+     * what is recorded for finding parent nets (see {@link EDIFNetConnectivity}): nothing is
+     * recorded for a netlist that is being parsed, and doing so would read cells that other
+     * parser threads may change meanwhile. The caller is responsible to sort the port insts, as
+     * for {@link #addPortInst(EDIFPortInst, boolean)} with deferSort set.
+     * @param portInst The port instance to add to this net.
+     */
+    void addParsedPortInst(EDIFPortInst portInst) {
+        addPortInst(portInst, true, true);
+    }
+
+    private void addPortInst(EDIFPortInst portInst, boolean deferSort, boolean parsed) {
         boolean isParentCellNonNull = parentCell != null;
         EDIFCellInst inst = portInst.getCellInst();
         if (isParentCellNonNull && inst == null) {
@@ -108,7 +124,7 @@ public class EDIFNet extends EDIFPropertyObject {
         } else {
             portInsts = EDIFPortInstArray.add(portInsts, portInst);
         }
-        if (EDIFNetConnectivity.active) {
+        if (!parsed && EDIFNetConnectivity.active) {
             EDIFNetConnectivity.portInstChanged(this, portInst);
         }
     }
