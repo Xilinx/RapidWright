@@ -60,6 +60,7 @@ import com.xilinx.rapidwright.device.PartNameTools;
 import com.xilinx.rapidwright.device.Series;
 import com.xilinx.rapidwright.edif.compare.EDIFNetlistComparator;
 import com.xilinx.rapidwright.support.RapidWrightDCP;
+import com.xilinx.rapidwright.util.FileTools;
 
 class TestEDIFNetlist {
 
@@ -95,6 +96,26 @@ class TestEDIFNetlist {
         primCell.createCellInst("test" + prim, netlist.getTopCell());
 
         return design;
+    }
+
+    @Test
+    void testAddTclLoadEncryptedCells(@TempDir Path tempDir) {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("top");
+        new EDIFCell(netlist.getWorkLibrary(), "encrypted");
+        String edn = tempDir.resolve("edns").resolve("encrypted.edn").toString();
+        netlist.setEncryptedCells(new ArrayList<>(Arrays.asList(edn)));
+        Path dcp = tempDir.resolve("top.dcp");
+        EDIFTools.writeTclLoadScriptForPartialEncryptedDesigns(netlist, dcp, PART_NAME);
+        Path tclPath = FileTools.replaceExtension(dcp, EDIFTools.LOAD_TCL_SUFFIX);
+
+        EDIFNetlist loaded = EDIFTools.createNewNetlist("top");
+        new EDIFCell(loaded.getWorkLibrary(), "encrypted");
+        loaded.addTclLoadEncryptedCells(tclPath);
+        Assertions.assertEquals(Arrays.asList(edn), loaded.getEncryptedCells());
+
+        // Reading the script again (as when it was also read with the netlist) adds nothing
+        loaded.addTclLoadEncryptedCells(tclPath);
+        Assertions.assertEquals(Arrays.asList(edn), loaded.getEncryptedCells());
     }
 
     @Test
