@@ -162,7 +162,7 @@ public class TestNOCDesign {
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         noc.writeTraffic(out);
-        JSONObject written = new JSONObject(out.toString(StandardCharsets.UTF_8));
+        JSONObject written = new JSONObject(new String(out.toByteArray(), StandardCharsets.UTF_8));
         Assertions.assertTrue(written.getJSONArray("LogicalInstances").length() == 0);
         Assertions.assertTrue(written.getJSONArray("Paths").length() == 0);
         Assertions.assertEquals(960, written.getJSONObject("SystemProperties").getInt("Frequency"));
@@ -286,7 +286,7 @@ public class TestNOCDesign {
         // Fields RapidWright does not model are written back unchanged
         ByteArrayOutputStream traffic = new ByteArrayOutputStream();
         noc.writeTraffic(traffic);
-        JSONObject t = new JSONObject(traffic.toString(StandardCharsets.UTF_8));
+        JSONObject t = new JSONObject(new String(traffic.toByteArray(), StandardCharsets.UTF_8));
         JSONObject orig = new JSONObject(GEN2_TRAFFIC);
         // Clients are written in no particular order
         Map<String, JSONObject> origClients = new java.util.HashMap<>();
@@ -305,7 +305,8 @@ public class TestNOCDesign {
         // The solution keeps every component: 2 ports per DDRMC5E, unused ports included
         ByteArrayOutputStream solution = new ByteArrayOutputStream();
         noc.writeSolution(solution);
-        Map<String, List<JSONObject>> comps = componentsBySite(new JSONObject(solution.toString(StandardCharsets.UTF_8)));
+        Map<String, List<JSONObject>> comps = componentsBySite(
+                new JSONObject(new String(solution.toByteArray(), StandardCharsets.UTF_8)));
         Map<String, List<JSONObject>> origComps = componentsBySite(new JSONObject(GEN2_SOLUTION));
         Assertions.assertTrue(comps.keySet().containsAll(origComps.keySet()));
         for (String site : comps.keySet()) {
@@ -321,7 +322,7 @@ public class TestNOCDesign {
         nmu.setLocation("NOC2_NMU512_X0Y5");
         solution.reset();
         noc.writeSolution(solution);
-        comps = componentsBySite(new JSONObject(solution.toString(StandardCharsets.UTF_8)));
+        comps = componentsBySite(new JSONObject(new String(solution.toByteArray(), StandardCharsets.UTF_8)));
         Assertions.assertEquals(1, comps.get("NOC2_NMU512_X0Y5").size());
         Assertions.assertEquals(nmu.getName(), comps.get("NOC2_NMU512_X0Y5").get(0).getString("TrafficLInst"));
         Assertions.assertEquals(1, comps.get("NOC2_NMU512_X1Y5").size());
@@ -332,7 +333,7 @@ public class TestNOCDesign {
         mc.setLocation("DDRMC5E_X4Y0");
         solution.reset();
         noc.writeSolution(solution);
-        comps = componentsBySite(new JSONObject(solution.toString(StandardCharsets.UTF_8)));
+        comps = componentsBySite(new JSONObject(new String(solution.toByteArray(), StandardCharsets.UTF_8)));
         Assertions.assertEquals(2, comps.get("DDRMC5E_X4Y0").size());
         for (JSONObject c : comps.get("DDRMC5E_X4Y0")) {
             Assertions.assertEquals(mc.getName(), c.getString("TrafficLInst"));
@@ -379,7 +380,8 @@ public class TestNOCDesign {
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         noc.writeSolution(out);
-        org.json.JSONArray written = new JSONObject(out.toString(StandardCharsets.UTF_8)).getJSONArray("Paths");
+        org.json.JSONArray written = new JSONObject(new String(out.toByteArray(), StandardCharsets.UTF_8))
+                .getJSONArray("Paths");
         org.json.JSONArray orig = new JSONObject(solution).getJSONArray("Paths");
         Assertions.assertEquals(2, written.length());
         for (int i = 0; i < orig.length(); i++) {
@@ -437,7 +439,7 @@ public class TestNOCDesign {
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         noc.writeTraffic(out);
-        JSONObject written = new JSONObject(out.toString(StandardCharsets.UTF_8));
+        JSONObject written = new JSONObject(new String(out.toByteArray(), StandardCharsets.UTF_8));
         JSONObject client = null;
         for (int i = 0; i < written.getJSONArray("LogicalInstances").length(); i++) {
             JSONObject c = written.getJSONArray("LogicalInstances").getJSONObject(i);
