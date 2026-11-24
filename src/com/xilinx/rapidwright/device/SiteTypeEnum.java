@@ -27,7 +27,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Tue Jun 09 13:13:33 MDT 2026
+ * Generated on: Wed Nov 11 16:44:19 MST 2026
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  *
  * Enumeration of SiteTypeEnum type for all valid devices within Vivado.
@@ -135,6 +135,7 @@ public enum SiteTypeEnum {
     CONFIG_SITE,
     CPM5,
     CPM5N,
+    CPM6,
     CPM_EXT,
     CPM_MAIN,
     CSEC_SITE,
@@ -145,6 +146,7 @@ public enum SiteTypeEnum {
     DDRMC5,
     DDRMC5C,
     DDRMC5E,
+    DDRMC5X,
     DDRMC_RIU,
     DFE_A,
     DFE_B,
@@ -192,6 +194,8 @@ public enum SiteTypeEnum {
     GTHE3_COMMON,
     GTHE4_CHANNEL,
     GTHE4_COMMON,
+    GTM2_QUAD,
+    GTM2_REFCLK,
     GTM_DUAL,
     GTM_QUAD,
     GTM_REFCLK,
@@ -347,6 +351,7 @@ public enum SiteTypeEnum {
     PMVBRAM,
     PMVIOB,
     PS11,
+    PS11_B,
     PS7,
     PS8,
     PS9,

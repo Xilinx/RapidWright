@@ -39,7 +39,10 @@ import com.xilinx.rapidwright.rwroute.RWRouteConfig;
  * To obtain a template file, please refer to find_clock_route_template.tcl under $RAPIDWRIGHT_PATH/tcl/rwroute.
  * When a clock route timing template file is ready, please use "--clkRouteTiming" option (see {@link RWRouteConfig})
  * to enable RWRoute to use the file for timing-driven clock routing.
+ * @deprecated Clock route templates are routing templates and legacy estimates rather than timing;
+ * they will be removed in the next release.
  */
+@Deprecated
 public class ClkRouteTiming {
     /** Name of the BUFGCE, or the name of the timing data file */
     private String bufgce;

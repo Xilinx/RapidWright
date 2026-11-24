@@ -282,6 +282,34 @@ public class EDIFPortInst implements Comparable<EDIFPortInst> {
         connectivityChanged();
     }
 
+    /**
+     * Sets the port of a port inst of a netlist that is being parsed, without keeping up to date
+     * what is recorded for finding parent nets, see {@link EDIFNet#addParsedPortInst(EDIFPortInst)}.
+     * @param port The port.
+     */
+    void setParsedPort(EDIFPort port) {
+        this.port = port;
+    }
+
+    /**
+     * Sets the index of a port inst of a netlist that is being parsed, without keeping up to date
+     * what is recorded for finding parent nets, see {@link EDIFNet#addParsedPortInst(EDIFPortInst)}.
+     * @param index The index.
+     */
+    void setParsedIndex(int index) {
+        this.index = index;
+    }
+
+    /**
+     * Sets the net of a port inst of a netlist that is being parsed, without adding the port inst
+     * to it or keeping up to date what is recorded for finding parent nets, see
+     * {@link EDIFNet#addParsedPortInst(EDIFPortInst)}.
+     * @param parentNet The net.
+     */
+    void setParsedParentNet(EDIFNet parentNet) {
+        this.parentNet = parentNet;
+    }
+
     public EDIFDirection getDirection() {
         return getPort().getDirection();
     }

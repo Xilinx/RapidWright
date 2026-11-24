@@ -1,0 +1,176 @@
+# Object queries of an XDC file on the public design verilog_ethernet.dcp (test/RapidWrightDCP) and the
+# objects that Vivado 2026.1 returns for them, as printed by xdc_queries.tcl (in this directory):
+#   Q <query>
+#   R <number of objects> <their names, sorted>, or for more than 50 objects (except pins)
+#   R <number of objects> md5:<MD5 of the sorted names joined by newlines>
+#   E <the error Vivado gives>
+# and S <command> for the commands between the queries that set the current instance.
+Q get_cells clk*
+R 5 clk90_bufg_inst clk_200_bufg_inst clk_bufg_inst clk_ibufg_inst clk_mmcm_inst
+Q get_cells sync_reset_inst/sync_reg_reg[*]
+R 4 sync_reset_inst/sync_reg_reg[0] sync_reset_inst/sync_reg_reg[1] sync_reset_inst/sync_reg_reg[2] sync_reset_inst/sync_reg_reg[3]
+Q get_cells {sync_reset_inst/sync_reg_reg[*]}
+R 4 sync_reset_inst/sync_reg_reg[0] sync_reset_inst/sync_reg_reg[1] sync_reset_inst/sync_reg_reg[2] sync_reset_inst/sync_reg_reg[3]
+Q get_cells sync_reset_inst/sync_reg_reg[2]
+R 1 sync_reset_inst/sync_reg_reg[2]
+Q get_cells {core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/eth_mac_1g_inst/axis_gmii_rx_inst/eth_crc_8/i_/crc_state[2?]_i_2}
+R 5 core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/eth_mac_1g_inst/axis_gmii_rx_inst/eth_crc_8/i_/crc_state[21]_i_2 core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/eth_mac_1g_inst/axis_gmii_rx_inst/eth_crc_8/i_/crc_state[24]_i_2 core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/eth_mac_1g_inst/axis_gmii_rx_inst/eth_crc_8/i_/crc_state[25]_i_2 core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/eth_mac_1g_inst/axis_gmii_rx_inst/eth_crc_8/i_/crc_state[27]_i_2 core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/eth_mac_1g_inst/axis_gmii_rx_inst/eth_crc_8/i_/crc_state[29]_i_2
+Q get_cells core_inst/eth_mac_inst/*
+R 3 core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst core_inst/eth_mac_inst/rx_fifo core_inst/eth_mac_inst/tx_fifo
+Q get_cells
+R 48 GND GND_1 VCC clk90_bufg_inst clk_200_bufg_inst clk_bufg_inst clk_ibufg_inst clk_mmcm_inst core_inst idelayctrl_inst ip_addr_mem_reg_i_11 ip_addr_mem_reg_i_12 ip_addr_mem_reg_i_13 ip_addr_mem_reg_i_15 ip_addr_mem_reg_i_17 ip_addr_mem_reg_i_18 ip_addr_mem_reg_i_19 ip_addr_mem_reg_i_20 ip_addr_mem_reg_i_21 led_OBUF[0]_inst led_OBUF[1]_inst led_OBUF[2]_inst led_OBUF[3]_inst led_OBUF[4]_inst led_OBUF[5]_inst led_OBUF[6]_inst led_OBUF[7]_inst phy_reset_n_OBUF_inst phy_rx_clk_IBUF_inst phy_rx_ctl_IBUF_inst phy_rx_ctl_idelay phy_rxd_IBUF[0]_inst phy_rxd_IBUF[1]_inst phy_rxd_IBUF[2]_inst phy_rxd_IBUF[3]_inst phy_rxd_idelay_0 phy_rxd_idelay_1 phy_rxd_idelay_2 phy_rxd_idelay_3 phy_tx_clk_OBUF_inst phy_tx_ctl_OBUF_inst phy_txd_OBUF[0]_inst phy_txd_OBUF[1]_inst phy_txd_OBUF[2]_inst phy_txd_OBUF[3]_inst reset_n_IBUF_inst sync_reset_inst uart_txd_OBUF_inst
+Q get_cells -hierarchical clk_bufg_inst
+R 1 clk_bufg_inst
+Q get_cells -hierarchical {sync_reg_reg[?]}
+R 4 sync_reset_inst/sync_reg_reg[0] sync_reset_inst/sync_reg_reg[1] sync_reset_inst/sync_reg_reg[2] sync_reset_inst/sync_reg_reg[3]
+Q get_cells -hierarchical sync_reset_inst/*
+R 0
+Q get_cells -hierarchical {*/sync_reg_reg[0]}
+R 0
+Q get_cells -hierarchical {i_/crc_state[29]_i_2}
+R 2 core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/eth_mac_1g_inst/axis_gmii_rx_inst/eth_crc_8/i_/crc_state[29]_i_2 core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/eth_mac_1g_inst/axis_gmii_tx_inst/eth_crc_8/i_/crc_state[29]_i_2
+Q get_cells -hierarchical {*crc_state[29]_i_2}
+R 2 core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/eth_mac_1g_inst/axis_gmii_rx_inst/eth_crc_8/i_/crc_state[29]_i_2 core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/eth_mac_1g_inst/axis_gmii_tx_inst/eth_crc_8/i_/crc_state[29]_i_2
+Q get_cells -hierarchical {eth_crc_8/i_/crc_state[29]_i_2}
+R 0
+Q get_cells -hierarchical
+R 5531 md5:5427141e1290a2e3360b4bab3da45c89
+Q get_cells -nocase CLK_BUFG_INST
+E ERROR: [Vivado 12-587] get_cells: '-nocase' can only be used with '-regexp'.
+Q get_cells -regexp {clk.*_inst}
+R 5 clk90_bufg_inst clk_200_bufg_inst clk_bufg_inst clk_ibufg_inst clk_mmcm_inst
+Q get_cells -hierarchical -filter {REF_NAME == BUFG}
+R 3 clk90_bufg_inst clk_200_bufg_inst clk_bufg_inst
+Q get_cells -hierarchical -filter {REF_NAME == bufg}
+R 0
+Q get_cells -hierarchical -filter {ref_name == BUFG}
+R 3 clk90_bufg_inst clk_200_bufg_inst clk_bufg_inst
+Q get_cells -hierarchical -filter {REF_NAME == "BUFG"}
+R 3 clk90_bufg_inst clk_200_bufg_inst clk_bufg_inst
+Q get_cells -hierarchical -filter {REF_NAME =~ IDELAY* && NAME !~ *_3}
+R 5 idelayctrl_inst phy_rx_ctl_idelay phy_rxd_idelay_0 phy_rxd_idelay_1 phy_rxd_idelay_2
+Q get_cells -hierarchical -filter {PARENT == sync_reset_inst}
+R 10 sync_reset_inst/GND sync_reset_inst/VCC sync_reset_inst/phy_reset_n_OBUF_inst_i_1 sync_reset_inst/rd_ptr_reg_rep[11]_i_1__0 sync_reset_inst/sync_reg[3]_i_1 sync_reset_inst/sync_reg_reg[0] sync_reset_inst/sync_reg_reg[1] sync_reset_inst/sync_reg_reg[2] sync_reset_inst/sync_reg_reg[3] sync_reset_inst/wr_ptr_cur_reg[11]_i_1
+Q get_cells -hierarchical -filter {IS_SEQUENTIAL && PARENT == sync_reset_inst}
+R 4 sync_reset_inst/sync_reg_reg[0] sync_reset_inst/sync_reg_reg[1] sync_reset_inst/sync_reg_reg[2] sync_reset_inst/sync_reg_reg[3]
+Q get_cells -hierarchical -filter {!IS_PRIMITIVE && NAME =~ core_inst/eth_mac_inst/*}
+R 15 core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/eth_mac_1g_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/eth_mac_1g_inst/axis_gmii_rx_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/eth_mac_1g_inst/axis_gmii_rx_inst/eth_crc_8 core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/eth_mac_1g_inst/axis_gmii_tx_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/eth_mac_1g_inst/axis_gmii_tx_inst/eth_crc_8 core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst/clk_oddr_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst/data_oddr_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst/rx_ssio_ddr_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst/rx_ssio_ddr_inst/data_iddr_inst core_inst/eth_mac_inst/rx_fifo core_inst/eth_mac_inst/rx_fifo/fifo_inst core_inst/eth_mac_inst/tx_fifo core_inst/eth_mac_inst/tx_fifo/fifo_inst
+Q get_cells -hierarchical -filter {(REF_NAME == BUFG || REF_NAME == IBUF) && NAME =~ clk*}
+R 4 clk90_bufg_inst clk_200_bufg_inst clk_bufg_inst clk_ibufg_inst
+Q get_cells -hierarchical -filter {NOSUCH_PROP == x && PARENT == sync_reset_inst}
+R 0
+Q get_cells -hierarchical -filter {NOSUCH_PROP != x && PARENT == sync_reset_inst}
+R 0
+Q get_cells -hierarchical -filter {PRIMITIVE_LEVEL != INTERNAL && PARENT == sync_reset_inst}
+R 10 sync_reset_inst/GND sync_reset_inst/VCC sync_reset_inst/phy_reset_n_OBUF_inst_i_1 sync_reset_inst/rd_ptr_reg_rep[11]_i_1__0 sync_reset_inst/sync_reg[3]_i_1 sync_reset_inst/sync_reg_reg[0] sync_reset_inst/sync_reg_reg[1] sync_reset_inst/sync_reg_reg[2] sync_reset_inst/sync_reg_reg[3] sync_reset_inst/wr_ptr_cur_reg[11]_i_1
+Q get_cells -hierarchical -filter {REF_NAME == BUFG garbage}
+E ERROR: [Common 17-263] There was a syntax error while parsing filter expression: 'REF_NAME == BUFG garbage' at position '17'
+Q get_cells -hierarchical -filter {(REF_NAME == BUFG}
+E ERROR: [Common 17-263] There was a syntax error while parsing filter expression: '(REF_NAME == BUFG' at position '0'
+Q get_cells -hierarchical -filter {REF_NAME == BUFG)}
+E ERROR: [Common 17-263] There was a syntax error while parsing filter expression: 'REF_NAME == BUFG)' at position '16'
+Q get_cells -of_objects [get_pins clk_bufg_inst/O]
+R 1 clk_bufg_inst
+Q get_cells -of_objects [get_pins clk_bufg_inst/O] clk*
+E ERROR: [Vivado 12-615] Cannot specify '-patterns' with '-of_objects'.
+Q get_cells -of_objects [get_nets sync_reset_inst/sync_reg_reg_n_0_[0]]
+R 2 sync_reset_inst/sync_reg_reg[0] sync_reset_inst/sync_reg_reg[1]
+Q get_cells $no_such_variable
+E can't read "no_such_variable": no such variable
+Q get_cells {}
+R 0
+Q get_cells -hierarchical {}
+R 0
+Q get_cells [get_cells nosuch]
+R 0
+Q list [get_cells clk_bufg_inst] [get_cells clk90_bufg_inst]
+R 2 clk90_bufg_inst clk_bufg_inst
+Q get_pins clk_bufg_inst/*
+R 2 clk_bufg_inst/I clk_bufg_inst/O
+Q get_pins sync_reset_inst/sync_reg_reg[*]/C
+R 4 sync_reset_inst/sync_reg_reg[0]/C sync_reset_inst/sync_reg_reg[1]/C sync_reset_inst/sync_reg_reg[2]/C sync_reset_inst/sync_reg_reg[3]/C
+Q get_pins -hierarchical {sync_reg_reg[0]/C}
+R 1 sync_reset_inst/sync_reg_reg[0]/C
+Q get_pins -hierarchical {sync_reset_inst/sync_reg_reg[0]/C}
+R 0
+Q get_pins -hierarchical {i_/crc_state[29]_i_2/O}
+R 2 core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/eth_mac_1g_inst/axis_gmii_rx_inst/eth_crc_8/i_/crc_state[29]_i_2/O core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/eth_mac_1g_inst/axis_gmii_tx_inst/eth_crc_8/i_/crc_state[29]_i_2/O
+Q get_pins -hierarchical -filter {NAME =~ sync_reset_inst/*/D}
+R 4 sync_reset_inst/sync_reg_reg[0]/D sync_reset_inst/sync_reg_reg[1]/D sync_reset_inst/sync_reg_reg[2]/D sync_reset_inst/sync_reg_reg[3]/D
+Q get_pins -of_objects [get_cells clk_mmcm_inst] CLKOUT*
+E ERROR: [Vivado 12-615] Cannot specify '-patterns' with '-of_objects'.
+Q get_pins -of_objects [get_cells clk_mmcm_inst] -filter {DIRECTION == OUT && IS_CONNECTED && REF_PIN_NAME =~ CLK*}
+R 4 clk_mmcm_inst/CLKFBOUT clk_mmcm_inst/CLKOUT0 clk_mmcm_inst/CLKOUT1 clk_mmcm_inst/CLKOUT2
+Q get_pins -of_objects [get_cells {sync_reset_inst/sync_reg_reg[0]}] -filter {REF_PIN_NAME != CINT}
+R 5 sync_reset_inst/sync_reg_reg[0]/C sync_reset_inst/sync_reg_reg[0]/CE sync_reset_inst/sync_reg_reg[0]/D sync_reset_inst/sync_reg_reg[0]/PRE sync_reset_inst/sync_reg_reg[0]/Q
+Q get_pins {sync_reset_inst/sync_reg_reg[0]/CINT}
+R 0
+Q get_pins -of_objects [list [get_cells clk_bufg_inst] [get_cells clk90_bufg_inst]] -filter {DIRECTION == OUT}
+R 2 clk90_bufg_inst/O clk_bufg_inst/O
+Q get_pins -of_objects [get_nets clk_int]
+R 12 clk_bufg_inst/O core_inst/clk_int ip_addr_mem_reg_i_11/C ip_addr_mem_reg_i_12/C ip_addr_mem_reg_i_13/C ip_addr_mem_reg_i_15/C ip_addr_mem_reg_i_17/C ip_addr_mem_reg_i_18/C ip_addr_mem_reg_i_19/C ip_addr_mem_reg_i_20/C ip_addr_mem_reg_i_21/C sync_reset_inst/clk_int
+Q get_pins -leaf -of_objects [get_nets {eth_mac_inst/rx_fifo/fifo_inst/m_rst_sync3_reg}]
+R 5 core_inst/eth_mac_inst/rx_fifo/fifo_inst/m_axis_tvalid_pipe_reg[0]_i_1__1/I4 core_inst/eth_mac_inst/rx_fifo/fifo_inst/m_drop_frame_reg_i_2__0/I4 core_inst/eth_mac_inst/rx_fifo/fifo_inst/m_rst_sync3_reg_reg/Q core_inst/eth_mac_inst/rx_fifo/fifo_inst/rd_ptr_reg_rep[11]_i_2__0/I3 sync_reset_inst/rd_ptr_reg_rep[11]_i_1__0/I1
+Q get_pins
+R 328 GND/G GND_1/G VCC/P clk90_bufg_inst/I clk90_bufg_inst/O clk_200_bufg_inst/I clk_200_bufg_inst/O clk_bufg_inst/I clk_bufg_inst/O clk_ibufg_inst/I clk_ibufg_inst/O clk_mmcm_inst/CLKFBIN clk_mmcm_inst/CLKFBOUT clk_mmcm_inst/CLKFBOUTB clk_mmcm_inst/CLKFBSTOPPED clk_mmcm_inst/CLKIN1 clk_mmcm_inst/CLKIN2 clk_mmcm_inst/CLKINSEL clk_mmcm_inst/CLKINSTOPPED clk_mmcm_inst/CLKOUT0 clk_mmcm_inst/CLKOUT0B clk_mmcm_inst/CLKOUT1 clk_mmcm_inst/CLKOUT1B clk_mmcm_inst/CLKOUT2 clk_mmcm_inst/CLKOUT2B clk_mmcm_inst/CLKOUT3 clk_mmcm_inst/CLKOUT3B clk_mmcm_inst/CLKOUT4 clk_mmcm_inst/CLKOUT5 clk_mmcm_inst/CLKOUT6 clk_mmcm_inst/DADDR[0] clk_mmcm_inst/DADDR[1] clk_mmcm_inst/DADDR[2] clk_mmcm_inst/DADDR[3] clk_mmcm_inst/DADDR[4] clk_mmcm_inst/DADDR[5] clk_mmcm_inst/DADDR[6] clk_mmcm_inst/DCLK clk_mmcm_inst/DEN clk_mmcm_inst/DI[0] clk_mmcm_inst/DI[10] clk_mmcm_inst/DI[11] clk_mmcm_inst/DI[12] clk_mmcm_inst/DI[13] clk_mmcm_inst/DI[14] clk_mmcm_inst/DI[15] clk_mmcm_inst/DI[1] clk_mmcm_inst/DI[2] clk_mmcm_inst/DI[3] clk_mmcm_inst/DI[4] clk_mmcm_inst/DI[5] clk_mmcm_inst/DI[6] clk_mmcm_inst/DI[7] clk_mmcm_inst/DI[8] clk_mmcm_inst/DI[9] clk_mmcm_inst/DO[0] clk_mmcm_inst/DO[10] clk_mmcm_inst/DO[11] clk_mmcm_inst/DO[12] clk_mmcm_inst/DO[13] clk_mmcm_inst/DO[14] clk_mmcm_inst/DO[15] clk_mmcm_inst/DO[1] clk_mmcm_inst/DO[2] clk_mmcm_inst/DO[3] clk_mmcm_inst/DO[4] clk_mmcm_inst/DO[5] clk_mmcm_inst/DO[6] clk_mmcm_inst/DO[7] clk_mmcm_inst/DO[8] clk_mmcm_inst/DO[9] clk_mmcm_inst/DRDY clk_mmcm_inst/DWE clk_mmcm_inst/LOCKED clk_mmcm_inst/PSCLK clk_mmcm_inst/PSDONE clk_mmcm_inst/PSEN clk_mmcm_inst/PSINCDEC clk_mmcm_inst/PWRDWN clk_mmcm_inst/RST core_inst/D[0] core_inst/D[1] core_inst/D[2] core_inst/D[3] core_inst/D[4] core_inst/D[5] core_inst/D[6] core_inst/D[7] core_inst/D[8] core_inst/Q[0] core_inst/Q[1] core_inst/Q[2] core_inst/Q[3] core_inst/Q[4] core_inst/Q[5] core_inst/Q[6] core_inst/Q[7] core_inst/SR[0] core_inst/clk90_int core_inst/clk_int core_inst/input_clk core_inst/input_d[0] core_inst/input_d[1] core_inst/input_d[2] core_inst/input_d[3] core_inst/input_d[4] core_inst/ip_addr_mem_reg core_inst/ip_addr_mem_reg_0 core_inst/ip_addr_mem_reg_1 core_inst/ip_addr_mem_reg_2 core_inst/ip_addr_mem_reg_3 core_inst/ip_addr_mem_reg_4 core_inst/ip_addr_mem_reg_5 core_inst/ip_addr_mem_reg_6 core_inst/ip_addr_mem_reg_7 core_inst/m_rst_sync3_reg core_inst/phy_tx_clk_OBUF core_inst/q[0] core_inst/q[1] core_inst/q[2] core_inst/q[3] core_inst/q[4] core_inst/rd_ptr_gray_reg core_inst/s_rst_sync3_reg core_inst/store_query core_inst/sync_reg[0] idelayctrl_inst/RDY idelayctrl_inst/REFCLK idelayctrl_inst/RST ip_addr_mem_reg_i_11/C ip_addr_mem_reg_i_11/CE ip_addr_mem_reg_i_11/D ip_addr_mem_reg_i_11/Q ip_addr_mem_reg_i_11/R ip_addr_mem_reg_i_12/C ip_addr_mem_reg_i_12/CE ip_addr_mem_reg_i_12/D ip_addr_mem_reg_i_12/Q ip_addr_mem_reg_i_12/R ip_addr_mem_reg_i_13/C ip_addr_mem_reg_i_13/CE ip_addr_mem_reg_i_13/D ip_addr_mem_reg_i_13/Q ip_addr_mem_reg_i_13/R ip_addr_mem_reg_i_15/C ip_addr_mem_reg_i_15/CE ip_addr_mem_reg_i_15/D ip_addr_mem_reg_i_15/Q ip_addr_mem_reg_i_15/R ip_addr_mem_reg_i_17/C ip_addr_mem_reg_i_17/CE ip_addr_mem_reg_i_17/D ip_addr_mem_reg_i_17/Q ip_addr_mem_reg_i_17/R ip_addr_mem_reg_i_18/C ip_addr_mem_reg_i_18/CE ip_addr_mem_reg_i_18/D ip_addr_mem_reg_i_18/Q ip_addr_mem_reg_i_18/R ip_addr_mem_reg_i_19/C ip_addr_mem_reg_i_19/CE ip_addr_mem_reg_i_19/D ip_addr_mem_reg_i_19/Q ip_addr_mem_reg_i_19/R ip_addr_mem_reg_i_20/C ip_addr_mem_reg_i_20/CE ip_addr_mem_reg_i_20/D ip_addr_mem_reg_i_20/Q ip_addr_mem_reg_i_20/R ip_addr_mem_reg_i_21/C ip_addr_mem_reg_i_21/CE ip_addr_mem_reg_i_21/D ip_addr_mem_reg_i_21/Q ip_addr_mem_reg_i_21/R led_OBUF[0]_inst/I led_OBUF[0]_inst/O led_OBUF[1]_inst/I led_OBUF[1]_inst/O led_OBUF[2]_inst/I led_OBUF[2]_inst/O led_OBUF[3]_inst/I led_OBUF[3]_inst/O led_OBUF[4]_inst/I led_OBUF[4]_inst/O led_OBUF[5]_inst/I led_OBUF[5]_inst/O led_OBUF[6]_inst/I led_OBUF[6]_inst/O led_OBUF[7]_inst/I led_OBUF[7]_inst/O phy_reset_n_OBUF_inst/I phy_reset_n_OBUF_inst/O phy_rx_clk_IBUF_inst/I phy_rx_clk_IBUF_inst/O phy_rx_ctl_IBUF_inst/I phy_rx_ctl_IBUF_inst/O phy_rx_ctl_idelay/C phy_rx_ctl_idelay/CE phy_rx_ctl_idelay/CINVCTRL phy_rx_ctl_idelay/CNTVALUEIN[0] phy_rx_ctl_idelay/CNTVALUEIN[1] phy_rx_ctl_idelay/CNTVALUEIN[2] phy_rx_ctl_idelay/CNTVALUEIN[3] phy_rx_ctl_idelay/CNTVALUEIN[4] phy_rx_ctl_idelay/CNTVALUEOUT[0] phy_rx_ctl_idelay/CNTVALUEOUT[1] phy_rx_ctl_idelay/CNTVALUEOUT[2] phy_rx_ctl_idelay/CNTVALUEOUT[3] phy_rx_ctl_idelay/CNTVALUEOUT[4] phy_rx_ctl_idelay/DATAIN phy_rx_ctl_idelay/DATAOUT phy_rx_ctl_idelay/IDATAIN phy_rx_ctl_idelay/INC phy_rx_ctl_idelay/LD phy_rx_ctl_idelay/LDPIPEEN phy_rx_ctl_idelay/REGRST phy_rxd_IBUF[0]_inst/I phy_rxd_IBUF[0]_inst/O phy_rxd_IBUF[1]_inst/I phy_rxd_IBUF[1]_inst/O phy_rxd_IBUF[2]_inst/I phy_rxd_IBUF[2]_inst/O phy_rxd_IBUF[3]_inst/I phy_rxd_IBUF[3]_inst/O phy_rxd_idelay_0/C phy_rxd_idelay_0/CE phy_rxd_idelay_0/CINVCTRL phy_rxd_idelay_0/CNTVALUEIN[0] phy_rxd_idelay_0/CNTVALUEIN[1] phy_rxd_idelay_0/CNTVALUEIN[2] phy_rxd_idelay_0/CNTVALUEIN[3] phy_rxd_idelay_0/CNTVALUEIN[4] phy_rxd_idelay_0/CNTVALUEOUT[0] phy_rxd_idelay_0/CNTVALUEOUT[1] phy_rxd_idelay_0/CNTVALUEOUT[2] phy_rxd_idelay_0/CNTVALUEOUT[3] phy_rxd_idelay_0/CNTVALUEOUT[4] phy_rxd_idelay_0/DATAIN phy_rxd_idelay_0/DATAOUT phy_rxd_idelay_0/IDATAIN phy_rxd_idelay_0/INC phy_rxd_idelay_0/LD phy_rxd_idelay_0/LDPIPEEN phy_rxd_idelay_0/REGRST phy_rxd_idelay_1/C phy_rxd_idelay_1/CE phy_rxd_idelay_1/CINVCTRL phy_rxd_idelay_1/CNTVALUEIN[0] phy_rxd_idelay_1/CNTVALUEIN[1] phy_rxd_idelay_1/CNTVALUEIN[2] phy_rxd_idelay_1/CNTVALUEIN[3] phy_rxd_idelay_1/CNTVALUEIN[4] phy_rxd_idelay_1/CNTVALUEOUT[0] phy_rxd_idelay_1/CNTVALUEOUT[1] phy_rxd_idelay_1/CNTVALUEOUT[2] phy_rxd_idelay_1/CNTVALUEOUT[3] phy_rxd_idelay_1/CNTVALUEOUT[4] phy_rxd_idelay_1/DATAIN phy_rxd_idelay_1/DATAOUT phy_rxd_idelay_1/IDATAIN phy_rxd_idelay_1/INC phy_rxd_idelay_1/LD phy_rxd_idelay_1/LDPIPEEN phy_rxd_idelay_1/REGRST phy_rxd_idelay_2/C phy_rxd_idelay_2/CE phy_rxd_idelay_2/CINVCTRL phy_rxd_idelay_2/CNTVALUEIN[0] phy_rxd_idelay_2/CNTVALUEIN[1] phy_rxd_idelay_2/CNTVALUEIN[2] phy_rxd_idelay_2/CNTVALUEIN[3] phy_rxd_idelay_2/CNTVALUEIN[4] phy_rxd_idelay_2/CNTVALUEOUT[0] phy_rxd_idelay_2/CNTVALUEOUT[1] phy_rxd_idelay_2/CNTVALUEOUT[2] phy_rxd_idelay_2/CNTVALUEOUT[3] phy_rxd_idelay_2/CNTVALUEOUT[4] phy_rxd_idelay_2/DATAIN phy_rxd_idelay_2/DATAOUT phy_rxd_idelay_2/IDATAIN phy_rxd_idelay_2/INC phy_rxd_idelay_2/LD phy_rxd_idelay_2/LDPIPEEN phy_rxd_idelay_2/REGRST phy_rxd_idelay_3/C phy_rxd_idelay_3/CE phy_rxd_idelay_3/CINVCTRL phy_rxd_idelay_3/CNTVALUEIN[0] phy_rxd_idelay_3/CNTVALUEIN[1] phy_rxd_idelay_3/CNTVALUEIN[2] phy_rxd_idelay_3/CNTVALUEIN[3] phy_rxd_idelay_3/CNTVALUEIN[4] phy_rxd_idelay_3/CNTVALUEOUT[0] phy_rxd_idelay_3/CNTVALUEOUT[1] phy_rxd_idelay_3/CNTVALUEOUT[2] phy_rxd_idelay_3/CNTVALUEOUT[3] phy_rxd_idelay_3/CNTVALUEOUT[4] phy_rxd_idelay_3/DATAIN phy_rxd_idelay_3/DATAOUT phy_rxd_idelay_3/IDATAIN phy_rxd_idelay_3/INC phy_rxd_idelay_3/LD phy_rxd_idelay_3/LDPIPEEN phy_rxd_idelay_3/REGRST phy_tx_clk_OBUF_inst/I phy_tx_clk_OBUF_inst/O phy_tx_ctl_OBUF_inst/I phy_tx_ctl_OBUF_inst/O phy_txd_OBUF[0]_inst/I phy_txd_OBUF[0]_inst/O phy_txd_OBUF[1]_inst/I phy_txd_OBUF[1]_inst/O phy_txd_OBUF[2]_inst/I phy_txd_OBUF[2]_inst/O phy_txd_OBUF[3]_inst/I phy_txd_OBUF[3]_inst/O reset_n_IBUF_inst/I reset_n_IBUF_inst/O sync_reset_inst/Q[0] sync_reset_inst/SR[0] sync_reset_inst/clk_int sync_reset_inst/m_rst_sync3_reg sync_reset_inst/mmcm_locked sync_reset_inst/phy_reset_n_OBUF sync_reset_inst/rd_ptr_gray_reg sync_reset_inst/s_rst_sync3_reg uart_txd_OBUF_inst/I uart_txd_OBUF_inst/O
+Q get_pins G
+R 0
+Q get_nets {eth_mac_inst/rx_fifo/fifo_inst/m_rst_sync3_reg}
+R 1 eth_mac_inst/rx_fifo/fifo_inst/m_rst_sync3_reg
+Q get_nets sync_reset_inst/*
+R 14 sync_reset_inst/<const0> sync_reset_inst/<const1> sync_reset_inst/Q[0] sync_reset_inst/SR[0] sync_reset_inst/clk_int sync_reset_inst/m_rst_sync3_reg sync_reset_inst/mmcm_locked sync_reset_inst/phy_reset_n_OBUF sync_reset_inst/rd_ptr_gray_reg sync_reset_inst/rst0 sync_reset_inst/s_rst_sync3_reg sync_reset_inst/sync_reg_reg_n_0_[0] sync_reset_inst/sync_reg_reg_n_0_[1] sync_reset_inst/sync_reg_reg_n_0_[2]
+Q get_nets -hierarchical {sync_reset_inst/*}
+R 0
+Q get_nets -hierarchical {sync_reg_reg_n_0_[?]}
+R 3 sync_reset_inst/sync_reg_reg_n_0_[0] sync_reset_inst/sync_reg_reg_n_0_[1] sync_reset_inst/sync_reg_reg_n_0_[2]
+Q get_nets -of_objects [get_pins clk_bufg_inst/O]
+R 1 clk_int
+Q get_nets
+R 87 md5:2236697432242fe612d7c96d125dcb8b
+Q get_ports led[3]
+R 1 led[3]
+Q get_ports led
+R 8 led[0] led[1] led[2] led[3] led[4] led[5] led[6] led[7]
+Q get_ports -filter {DIRECTION == IN && NAME =~ btn*}
+R 5 btnc btnd btnl btnr btnu
+Q get_ports -of_objects [get_nets clk]
+R 1 clk
+Q get_ports
+R 40 btnc btnd btnl btnr btnu clk led[0] led[1] led[2] led[3] led[4] led[5] led[6] led[7] phy_int_n phy_pme_n phy_reset_n phy_rx_clk phy_rx_ctl phy_rxd[0] phy_rxd[1] phy_rxd[2] phy_rxd[3] phy_tx_clk phy_tx_ctl phy_txd[0] phy_txd[1] phy_txd[2] phy_txd[3] reset_n sw[0] sw[1] sw[2] sw[3] sw[4] sw[5] sw[6] sw[7] uart_rxd uart_txd
+Q get_ports {}
+R 0
+Q get_clocks
+R 6 clk clk90_mmcm_out clk_200_mmcm_out clk_mmcm_out mmcm_clkfb phy_rx_clk
+Q get_clocks -nocase CLK
+E ERROR: [Vivado 12-587] get_clocks: '-nocase' can only be used with '-regexp'.
+Q get_clocks -of_objects [get_ports clk]
+R 1 clk
+Q get_clocks -of_objects [get_ports clk] nomatch*
+E ERROR: [Vivado 12-615] Cannot specify '-patterns' with '-of_objects'.
+Q get_clocks -include_generated_clocks clk
+R 5 clk clk90_mmcm_out clk_200_mmcm_out clk_mmcm_out mmcm_clkfb
+Q get_clocks -of_objects [get_pins clk_bufg_inst/O]
+R 1 clk_mmcm_out
+S current_instance core_inst
+Q get_cells eth_mac_inst/*
+R 3 core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst core_inst/eth_mac_inst/rx_fifo core_inst/eth_mac_inst/tx_fifo
+S current_instance eth_mac_inst
+Q get_cells *
+R 3 core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst core_inst/eth_mac_inst/rx_fifo core_inst/eth_mac_inst/tx_fifo
+S current_instance ..
+Q get_cells *_inst
+R 4 core_inst/eth_axis_rx_inst core_inst/eth_axis_tx_inst core_inst/eth_mac_inst core_inst/udp_complete_inst
+S current_instance ../udp_complete_inst
+Q get_cells *
+R 20 core_inst/GND core_inst/VCC core_inst/eth_axis_rx_inst core_inst/eth_axis_tx_inst core_inst/eth_mac_inst core_inst/led_reg_reg[0] core_inst/led_reg_reg[1] core_inst/led_reg_reg[2] core_inst/led_reg_reg[3] core_inst/led_reg_reg[4] core_inst/led_reg_reg[5] core_inst/led_reg_reg[6] core_inst/led_reg_reg[7] core_inst/match_cond_reg_reg core_inst/no_match_reg_reg core_inst/s_select_ip_reg_i_1 core_inst/s_select_udp_reg_i_1 core_inst/udp_complete_inst core_inst/udp_payload_fifo core_inst/valid_last_reg
+S current_instance nosuch
+Q get_cells -hierarchical *_inst
+R 42 core_inst/eth_axis_rx_inst core_inst/eth_axis_tx_inst core_inst/eth_mac_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/eth_mac_1g_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/eth_mac_1g_inst/axis_gmii_rx_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/eth_mac_1g_inst/axis_gmii_tx_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst/clk_oddr_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst/clk_oddr_inst/oddr[0].oddr_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst/data_oddr_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst/data_oddr_inst/oddr[0].oddr_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst/data_oddr_inst/oddr[1].oddr_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst/data_oddr_inst/oddr[2].oddr_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst/data_oddr_inst/oddr[3].oddr_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst/data_oddr_inst/oddr[4].oddr_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst/rx_ssio_ddr_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst/rx_ssio_ddr_inst/data_iddr_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst/rx_ssio_ddr_inst/data_iddr_inst/iddr[0].iddr_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst/rx_ssio_ddr_inst/data_iddr_inst/iddr[1].iddr_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst/rx_ssio_ddr_inst/data_iddr_inst/iddr[2].iddr_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst/rx_ssio_ddr_inst/data_iddr_inst/iddr[3].iddr_inst core_inst/eth_mac_inst/eth_mac_1g_rgmii_inst/rgmii_phy_if_inst/rx_ssio_ddr_inst/data_iddr_inst/iddr[4].iddr_inst core_inst/eth_mac_inst/rx_fifo/fifo_inst core_inst/eth_mac_inst/tx_fifo/fifo_inst core_inst/udp_complete_inst core_inst/udp_complete_inst/ip_arb_mux_inst core_inst/udp_complete_inst/ip_arb_mux_inst/arb_inst core_inst/udp_complete_inst/ip_complete_inst core_inst/udp_complete_inst/ip_complete_inst/arp_inst core_inst/udp_complete_inst/ip_complete_inst/arp_inst/arp_cache_inst core_inst/udp_complete_inst/ip_complete_inst/arp_inst/arp_eth_rx_inst core_inst/udp_complete_inst/ip_complete_inst/arp_inst/arp_eth_tx_inst core_inst/udp_complete_inst/ip_complete_inst/eth_arb_mux_inst core_inst/udp_complete_inst/ip_complete_inst/eth_arb_mux_inst/arb_inst core_inst/udp_complete_inst/ip_complete_inst/ip_inst core_inst/udp_complete_inst/ip_complete_inst/ip_inst/ip_eth_rx_inst core_inst/udp_complete_inst/ip_complete_inst/ip_inst/ip_eth_tx_inst core_inst/udp_complete_inst/udp_inst core_inst/udp_complete_inst/udp_inst/udp_checksum_gen_inst core_inst/udp_complete_inst/udp_inst/udp_ip_rx_inst core_inst/udp_complete_inst/udp_inst/udp_ip_tx_inst
+S current_instance -quiet
+S current_instance /core_inst
+Q get_cells eth_mac_inst
+R 0
+S current_instance sync_reset_inst
+Q get_cells -hierarchical *
+R 10 sync_reset_inst/GND sync_reset_inst/VCC sync_reset_inst/phy_reset_n_OBUF_inst_i_1 sync_reset_inst/rd_ptr_reg_rep[11]_i_1__0 sync_reset_inst/sync_reg[3]_i_1 sync_reset_inst/sync_reg_reg[0] sync_reset_inst/sync_reg_reg[1] sync_reset_inst/sync_reg_reg[2] sync_reset_inst/sync_reg_reg[3] sync_reset_inst/wr_ptr_cur_reg[11]_i_1
+S current_instance

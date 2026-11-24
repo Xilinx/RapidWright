@@ -34,6 +34,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Assertions;
@@ -197,6 +198,10 @@ public class TestDesign {
                     () -> design.writeCheckpoint(tempDir.resolve("parallelEdifExportFailure.dcp"))));
         } finally {
             ParallelismTools.setParallel(wasParallel);
+            // The pieces of the DCP still being written then finish in the background, each
+            // deleting its temporary file once done: wait for them, so that they do not open
+            // files during the next test
+            ForkJoinPool.commonPool().awaitQuiescence(60, TimeUnit.SECONDS);
         }
     }
 

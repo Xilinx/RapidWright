@@ -29,6 +29,8 @@ import com.xilinx.rapidwright.device.IntentCode;
 import com.xilinx.rapidwright.device.Node;
 import com.xilinx.rapidwright.device.Tile;
 import com.xilinx.rapidwright.device.TileTypeEnum;
+import com.xilinx.rapidwright.device.Wire;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimator;
 import com.xilinx.rapidwright.util.RuntimeTracker;
 import com.xilinx.rapidwright.util.Utils;
 
@@ -153,8 +155,19 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
     protected final static boolean enableComprehensiveAssertions = false;
 
     protected RouteNode(RouteNodeGraph routingGraph, Node node, RouteNodeType type) {
+        this(routingGraph, node, type, node.getAllWiresInNode());
+    }
+
+    /**
+     * Creates a rnode given the wires of its node, which subclasses can also use.
+     * @param routingGraph The graph the rnode is part of.
+     * @param node The node.
+     * @param type The type of the rnode, or null to determine it.
+     * @param wires All the wires of the node, as {@link Node#getAllWiresInNode()} returns them.
+     */
+    protected RouteNode(RouteNodeGraph routingGraph, Node node, RouteNodeType type, Wire[] wires) {
         super(node);
-        RouteNodeInfo nodeInfo = RouteNodeInfo.get(node, routingGraph);
+        RouteNodeInfo nodeInfo = RouteNodeInfo.get(node, wires, routingGraph);
         this.type = (byte) ((type == null) ? nodeInfo.type : type).ordinal();
         endHalfTileXCoordinate = nodeInfo.endHalfTileXCoordinate;
         endTileYCoordinate = nodeInfo.endTileYCoordinate;
@@ -464,6 +477,32 @@ public class RouteNode extends Node implements Comparable<RouteNode> {
                         type == RouteNodeType.EXCLUSIVE_SINK_NON_LOCAL && visited == 0)
         );
         this.type = (byte) type.ordinal();
+    }
+
+    /**
+     * Gets the class of this rnode's node for {@link DelayEstimator#getExtraDelay(int, int)}.
+     * @return The class, or -1 if not known (see {@link DelayEstimator#getExtraDelayClass(Node)}).
+     */
+    int getDelayClass() {
+        return -1;
+    }
+
+    /**
+     * Gets the extra delay of a rnode driven by another (see
+     * {@link DelayEstimator#getExtraDelay(Node, Node)}), with a table lookup when both know their
+     * delay class.
+     * @param estimator The delay estimator.
+     * @param parent The rnode driving the child.
+     * @param child The rnode in question.
+     * @return The extra delay in ps.
+     */
+    static short getExtraDelay(DelayEstimator estimator, RouteNode parent, RouteNode child) {
+        int parentClass = parent.getDelayClass();
+        int childClass = child.getDelayClass();
+        if (parentClass >= 0 && childClass >= 0) {
+            return estimator.getExtraDelay(parentClass, childClass);
+        }
+        return estimator.getExtraDelay(parent, child);
     }
 
     /**

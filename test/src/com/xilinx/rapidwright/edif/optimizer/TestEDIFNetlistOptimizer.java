@@ -1227,22 +1227,46 @@ public class TestEDIFNetlistOptimizer {
                 u0.getPortInst("w").getNet());
     }
 
-    @Test
-    public void testOrphanNetRemovalIsLinearInFanout() {
-        // A preserved flip-flop survives while all its loads are swept: its net is removed
+    /**
+     * Sweeps the given number of LUTs, whose inputs are spread over the given number of nets
+     * driven by preserved flip-flops, and the same number of nets of inputs: the flip-flops
+     * survive while their nets are removed.
+     * @return The time taken to apply the edits, in nanoseconds.
+     */
+    private static long sweepLoadsOfPreservedFlops(int loads, int nets) {
         OptProbes.B b = new OptProbes.B("orphan");
-        b.in("clk", "a", "c");
-        b.fdre("F", "a", "1", "0", "n", "0").addProperty("DONT_TOUCH", "TRUE");
-        int loads = 400000;
+        b.in("clk", "a");
+        for (int i = 0; i < nets; i++) {
+            b.in("c" + i);
+            b.fdre("F" + i, "a", "1", "0", "n" + i, "0").addProperty("DONT_TOUCH", "TRUE");
+        }
         for (int i = 0; i < loads; i++) {
-            b.lut("L" + i, "6", "d" + i, "n", "c");
+            b.lut("L" + i, "6", "d" + i, "n" + (i % nets), "c" + (i % nets));
         }
         EDIFOptStats stats = EDIFTools.optimizeNetlist(b.nl, new EDIFOptOptions());
         Assertions.assertEquals(loads, stats.getRemoved(EDIFOptStats.Phase.SWEEP));
-        Assertions.assertNull(b.top.getCellInst("F").getPortInst("Q"));
-        // Disconnecting the pins one at a time takes about 7s here (2s otherwise)
-        Assertions.assertTrue(stats.getTimes().get("Apply edits") < 5_000_000_000L,
-                stats.getTimes().toString());
+        for (int i = 0; i < nets; i++) {
+            Assertions.assertNull(b.top.getCellInst("F" + i).getPortInst("Q"));
+        }
+        return stats.getTimes().get("Apply edits");
+    }
+
+    @Test
+    public void testOrphanNetRemovalIsLinearInFanout() {
+        // The same sweep, with the loads on 2 nets or spread over 2000 nets: disconnecting the
+        // pins of a net one at a time is quadratic in its fanout, and makes the first several
+        // times slower than the second (about as fast otherwise). Comparing the two rather than
+        // checking a time keeps the test independent of the machine's speed, and the fastest of
+        // 3 runs of each leaves out pauses of the machine
+        int loads = 300000;
+        long fewNets = Long.MAX_VALUE;
+        long manyNets = Long.MAX_VALUE;
+        for (int i = 0; i < 3; i++) {
+            manyNets = Math.min(manyNets, sweepLoadsOfPreservedFlops(loads, 1000));
+            fewNets = Math.min(fewNets, sweepLoadsOfPreservedFlops(loads, 1));
+        }
+        Assertions.assertTrue(fewNets < 2 * manyNets,
+                "2 nets: " + fewNets + " ns, 2000 nets: " + manyNets + " ns");
     }
 
     /** Two tri-state buffers drive output o; without A, only B does. */

@@ -27,7 +27,7 @@ package com.xilinx.rapidwright.device;
 
 
 /**
- * Generated on: Tue Jun 09 13:13:33 MDT 2026
+ * Generated on: Wed Nov 11 16:44:19 MST 2026
  * by: com.xilinx.rapidwright.release.SiteAndTileTypeUpdater
  *
  * Enumeration of IOBankType type for all valid devices within Vivado.
@@ -39,6 +39,7 @@ public enum IOBankType {
     BT_HIGH_PERFORMANCE,
     BT_HIGH_RANGE,
     BT_MGT,
+    BT_MMI,
     BT_NO_USER_IO,
     BT_PSS,
     BT_X5,

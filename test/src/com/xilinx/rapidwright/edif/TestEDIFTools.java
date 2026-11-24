@@ -433,6 +433,23 @@ public class TestEDIFTools {
 
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testTclLoadScriptLinksOutOfContext(boolean outOfContext, @TempDir Path dir) {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("top");
+        List<String> encryptedCells = new ArrayList<>();
+        encryptedCells.add(dir.resolve("encrypted.edn").toString());
+        netlist.addEncryptedCells(encryptedCells);
+        Path dcp = dir.resolve("top.dcp");
+
+        EDIFTools.writeTclLoadScriptForPartialEncryptedDesigns(netlist, dcp, "xcvu3p-ffvc1517-2-e", outOfContext);
+
+        List<String> lines = FileTools.getLinesFromTextFile(
+                dir.resolve("top" + EDIFTools.LOAD_TCL_SUFFIX).toString());
+        Assertions.assertEquals("link_design -part xcvu3p-ffvc1517-2-e" + (outOfContext ? " -mode out_of_context" : ""),
+                lines.get(lines.size() - 1));
+    }
+
     @Test
     public void testEnsurePreservedInterfaceVivado(@TempDir Path dir) {
         Design design = RapidWrightDCP.loadDCP("bnn.dcp");

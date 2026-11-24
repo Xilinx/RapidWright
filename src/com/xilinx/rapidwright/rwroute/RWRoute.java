@@ -38,7 +38,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -71,9 +70,10 @@ import com.xilinx.rapidwright.router.RouteThruHelper;
 import com.xilinx.rapidwright.tests.CodePerfTracker;
 import com.xilinx.rapidwright.timing.ClkRouteTiming;
 import com.xilinx.rapidwright.timing.TimingManager;
-import com.xilinx.rapidwright.timing.TimingVertex;
-import com.xilinx.rapidwright.timing.delayestimator.DelayEstimatorBase;
-import com.xilinx.rapidwright.timing.delayestimator.InterconnectInfo;
+import com.xilinx.rapidwright.timing.delayestimator.DelayEstimator;
+import com.xilinx.rapidwright.timing.family.RouterKnobs;
+import com.xilinx.rapidwright.timing.family.SlrModel;
+import com.xilinx.rapidwright.timing.family.TimingFamilies;
 import com.xilinx.rapidwright.util.MessageGenerator;
 import com.xilinx.rapidwright.util.Pair;
 import com.xilinx.rapidwright.util.RuntimeTracker;
@@ -145,6 +145,17 @@ public class RWRoute {
     private Set<RouteNode> overUsedRnodes;
     /** Class encapsulating the routing resource graph */
     protected RouteNodeGraph routingGraph;
+    /** The delay estimator of the routing graph; null when not timing driven */
+    protected DelayEstimator delayEstimator;
+    /**
+     * When timing-driven on a device with more than one SLR, the delay in ps that the delay estimate (see
+     * addEstimate()) charges for each super long line still to be taken, in place of the delay of the rows that it
+     * spans, and that the crossing discount charges for the super long line of a sending chain (see
+     * evaluateCostAndPush()): the delay of the cheapest SLR crossing (SlrModel) or, if less, that of the rows; with
+     * {@link RWRouteConfig#isSllLookahead()}, always the cheapest SLR crossing's. Either never exceeds the delay of an
+     * SLR crossing. NaN otherwise.
+     */
+    private float sllDelayPs = Float.NaN;
     /** Count of rnodes created in the current routing iteration */
     protected long rnodesCreatedThisIteration;
     /** State necessary to route the included connection */
@@ -166,6 +177,12 @@ public class RWRoute {
     private final AtomicLong nodesPushed;
     private final AtomicLong nodesPopped;
 
+    /** The settings of timing-driven routing that depend on the timing model of the device's series */
+    protected RouterKnobs routerKnobs;
+    /** The maximum criticality constraint of connection of this device, see {@link RouterKnobs#getMaxCriticality()} */
+    private float maxCriticality;
+    /** The present congestion multiplier, see {@link RWRouteConfig#getPresentCongestionMultiplier()} */
+    private float presentCongestionMultiplier;
     /**
      * Relative margin by which the partial price of the next child wire in order (see
      * getSdqLookaheadOrderedFloor()) must reach the floor so far for the search for a lower one to stop: that price
@@ -200,8 +217,6 @@ public class RWRoute {
      */
     private int[][] sdqLookaheadOrders;
 
-    /** The maximum criticality constraint of connection */
-    private static final float MAX_CRITICALITY = 0.99f;
     /** The minimum criticality of connections that should be re-routed, updated after each iteration */
     protected float minRerouteCriticality;
     /** The list of critical connections */
@@ -210,8 +225,10 @@ public class RWRoute {
     protected TimingManager timingManager;
     /** A map from nodes to delay values, used for timing update after fixing routes */
     private Map<Node, Float> nodesDelays;
-    /** The maximum delay and associated timing vertex */
-    private Pair<Float, TimingVertex> maxDelayAndTimingVertex;
+    /** The maximum delay (latest arrival time) of the last timing update, 0 before the first */
+    private float maxDelay;
+    /** Stamp of the net being visited by {@link #updateRouteDelaysWithFanout()} */
+    private int fanoutStamp;
 
     /** A map storing routes from CLK_OUT to different INT tiles that connect to sink pins of a global clock net */
     protected Map<String, List<String>> routesToSinkINTTiles;
@@ -248,6 +265,14 @@ public class RWRoute {
         nodesPushed = new AtomicLong();
         nodesPopped = new AtomicLong();
 
+        if (config.isTimingDriven() && SUPPORTED_SERIES.contains(design.getSeries())
+                && !TimingFamilies.isSupported(design.getSeries())) {
+            // UltraScale devices, which RWRoute routes but have no timing model (the configuration is changed, so
+            // that the subclasses and the routing graph see it)
+            System.out.println("WARNING: " + TimingFamilies.getUnsupportedMessage(design.getSeries())
+                    + ": routing non-timing-driven.");
+            config.setTimingDriven(false);
+        }
         if (design.getSeries() == Series.Versal) {
             if (config.isLutRoutethru()) {
                 throw new RuntimeException("ERROR: '--lutRoutethru' not yet supported on Versal.");
@@ -292,6 +317,7 @@ public class RWRoute {
         preprocess(design);
     }
 
+    @SuppressWarnings("deprecation") // ClkRouteTiming, the deprecated clock route templates
     protected void initialize() {
         routerTimer = new RuntimeTrackerTree("Route design", config.isVerbose());
         rnodesTimer = routerTimer.createStandAloneRuntimeTracker("rnodes creation");
@@ -299,6 +325,13 @@ public class RWRoute {
         updateCongestionCosts = routerTimer.createStandAloneRuntimeTracker("update congestion costs");
         routerTimer.createRuntimeTracker("Initialization", routerTimer.getRootRuntimeTracker()).start();
 
+        // (A series without a timing model is routed non-timing-driven, see the constructor)
+        RouterKnobs familyKnobs = TimingFamilies.isSupported(design.getSeries())
+                ? TimingFamilies.of(design.getDevice()).getRouterKnobs() : RouterKnobs.DEFAULT;
+        routerKnobs = familyKnobs.withOverrides();
+        if (config.isVerbose() || routerKnobs != familyKnobs) {
+            System.out.println("INFO: Router knobs: " + routerKnobs);
+        }
         minRerouteCriticality = config.getMinRerouteCriticality();
         criticalConnections = new ArrayList<>();
 
@@ -306,7 +339,56 @@ public class RWRoute {
         routingGraph = createRouteNodeGraph();
         if (config.isTimingDriven()) {
             nodesDelays = new HashMap<>();
+            delayEstimator = routingGraph.getDelayEstimator();
+            // The delay estimate (see addEstimate()): the least delay per INT column and row that never exceeds a
+            // route's, or with the anisotropic lookahead, the best route's (the admissible ones times the router knobs'
+            // ratios) times the lookahead weight
+            float perTileX = delayEstimator.getAdmissibleLookaheadDelayPerTileX();
+            float perTileY = delayEstimator.getAdmissibleLookaheadDelayPerTileY();
+            if (Float.isNaN(perTileX) || Float.isNaN(perTileY)) {
+                System.out.println("WARNING: No admissible lookahead delays for this device's delay estimator,"
+                        + " no delay estimate");
+                perTileX = 0;
+                perTileY = 0;
+            } else if (RouterKnobs.isAnisotropicLookaheadSelected()) {
+                if (routerKnobs.hasLookaheadRatios()) {
+                    float weight = RouterKnobs.getLookaheadWeight();
+                    System.out.println("INFO: Anisotropic lookahead, weight " + weight
+                            + " times the best route's delays per INT column and row ("
+                            + routerKnobs.getLookaheadRatioX() + ", " + routerKnobs.getLookaheadRatioY()
+                            + " times the admissible ones)");
+                    perTileX *= weight * routerKnobs.getLookaheadRatioX();
+                    perTileY *= weight * routerKnobs.getLookaheadRatioY();
+                } else {
+                    System.out.println("WARNING: No anisotropic lookahead for this device's delay estimator,"
+                            + " using the estimator's admissible lookahead delays");
+                }
+            }
+            // (Those are in units of 100 ps per INT tile)
+            delayPerHalfTilePs = 100f * perTileX / 2;
+            delayPerRowPs = 100f * perTileY;
+            if (design.getDevice().getNumOfSLRs() > 1) {
+                SlrModel slrModel = TimingFamilies.of(design.getDevice()).getSlrModel(design.getDevice(), delayEstimator);
+                // The rows that a super long line spans, at the estimate's rate per row, need not be a lower bound of
+                // an SLR crossing, so the lesser of the two is charged (e.g. on xcv80, 75 rows at about 5.6 ps, 420 ps,
+                // against about 590 ps for the cheapest SLL between two SLRs)
+                final float rowsDelayPs = routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES * delayPerRowPs;
+                sllDelayPs = config.isSllLookahead() ? slrModel.getSllDelay()
+                        : Math.min(slrModel.getSllDelay(), rowsDelayPs);
+                if (config.isSllLookahead() || config.isVerbose()) {
+                    System.out.println("INFO: SLL lookahead: " + slrModel + ", " + sllDelayPs
+                            + " ps per super long line (" + rowsDelayPs + " ps over its rows)");
+                }
+            }
         }
+        presentCongestionMultiplier = config.getPresentCongestionMultiplier();
+        if (config.isTimingDriven() && routerKnobs.hasTimingDrivenPresentCongestionMultiplier()
+                && !config.isPresentCongestionMultiplierSet()) {
+            // E.g. timing-driven routes on Versal suffer more from congestion detours than they gain
+            // from resolving congestion faster
+            presentCongestionMultiplier = routerKnobs.getTimingDrivenPresentCongestionMultiplier();
+        }
+        maxCriticality = routerKnobs.getMaxCriticality();
         routethruHelper = new RouteThruHelper(design.getDevice());
         presentCongestionFactor = config.getInitialPresentCongestionFactor();
         lutPinSwapping = config.isLutPinSwapping();
@@ -321,10 +403,10 @@ public class RWRoute {
             routesToSinkINTTiles = clkTiming == null? null : clkTiming.getRoutesToSinkINTTiles();
             Collection<Net> timingNets = getTimingNets();
             timingManager = createTimingManager(clkTiming, timingNets);
+            // Map the connections to those of the timing graph
             timingManager.setTimingEdgesOfConnections(indirectConnections);
-            DelayEstimatorBase<InterconnectInfo> estimator = routingGraph.getDelayEstimator();
-            minDelayPerHalfTilePs = estimator.getMinDelayPerTile(InterconnectInfo.Orientation.HORIZONTAL) / 2;
-            minDelayPerRowPs = estimator.getMinDelayPerTile(InterconnectInfo.Orientation.VERTICAL);
+            // (Its index of the connections by site pin is built again if a net is mapped later)
+            timingManager.getStaGraph().releaseIndices();
         }
 
         sortedIndirectConnections = new ArrayList<>(indirectConnections.size());
@@ -344,6 +426,7 @@ public class RWRoute {
      * Creates clock routing related inputs based on the {@link RWRouteConfig} instance.
      * @param config The {@link RWRouteConfig} instance to use.
      */
+    @SuppressWarnings("deprecation")
     public static ClkRouteTiming createClkTimingData(RWRouteConfig config) {
         String clkRouteTimingFile = config.getClkRouteTiming();
         if (clkRouteTimingFile != null) {
@@ -355,8 +438,7 @@ public class RWRoute {
     protected RouteNodeGraph createRouteNodeGraph() {
         if (config.isTimingDriven()) {
             /* An instantiated delay estimator that is used to calculate delay of routing resources */
-            DelayEstimatorBase<InterconnectInfo> estimator = new DelayEstimatorBase<InterconnectInfo>(
-                    design.getDevice(), new InterconnectInfo(), config.isUseUTurnNodes(), 0);
+            DelayEstimator estimator = DelayEstimator.create(design, config.isUseUTurnNodes());
             return new RouteNodeGraphTimingDriven(design, config, estimator);
         } else {
             return new RouteNodeGraph(design, config);
@@ -367,9 +449,10 @@ public class RWRoute {
         return design.getNets();
     }
 
+    @SuppressWarnings("deprecation")
     protected TimingManager createTimingManager(ClkRouteTiming clkTiming, Collection<Net> timingNets) {
         final boolean isPartialRouting = false;
-        return new TimingManager(design, routerTimer, config, clkTiming, timingNets, isPartialRouting,
+        return new TimingManager(design, routerTimer, config, timingNets, isPartialRouting,
                 routingGraph.getDelayEstimator());
     }
 
@@ -1050,19 +1133,12 @@ public class RWRoute {
     }
 
     /**
-     * Gets the site pin that a LUT input sink rnode leads to: the rnode itself on UltraScale/UltraScale+,
-     * or the (CLE) site pin node that it drives on Versal.
+     * Gets the site pin that a LUT input sink rnode leads to, see {@link RouterHelper#getLutInputSitePin(Node)}.
      * @param sinkRnode The sink rnode.
      * @return The site pin.
      */
     SitePin getLutInputSitePin(RouteNode sinkRnode) {
-        SitePin sitePin = sinkRnode.getSitePin();
-        if (sitePin == null && routingGraph.isVersal) {
-            List<Node> downhills = sinkRnode.getAllDownhillNodes();
-            assert(downhills.size() == 1);
-            sitePin = downhills.get(0).getSitePin();
-        }
-        return sitePin;
+        return RouterHelper.getLutInputSitePin(sinkRnode);
     }
 
     /**
@@ -1192,18 +1268,28 @@ public class RWRoute {
      */
     private void preRoutingEstimation() {
         if (config.isTimingDriven()) {
+            // The clock nets are routed now
+            timingManager.refreshClockTiming();
             estimateDelayOfConnections();
-            maxDelayAndTimingVertex = timingManager.calculateArrivalRequiredTimes();
-            timingManager.calculateCriticality(indirectConnections, MAX_CRITICALITY, config.getCriticalityExponent());
-            System.out.printf("INFO: Estimated pre-routing max delay: %4d\n", (short) maxDelayAndTimingVertex.getFirst().floatValue());
+            maxDelay = timingManager.computeArrivalRequiredTimes();
+            timingManager.calculateCriticality(indirectConnections, maxCriticality, config.getCriticalityExponent());
+            System.out.printf("INFO: Estimated pre-routing max delay: %4d\n", (int) maxDelay);
         }
     }
 
     /**
      * A simple approach to estimate delay of each connection and update route delay of its timing edges.
+     * Connections that are already routed (e.g. recovered by PartialRouter from their net's preserved
+     * routing) are timed from their route instead.
      */
     private void estimateDelayOfConnections() {
         for (Connection connection : indirectConnections) {
+            if (connection.isRouted() && !connection.getRnodes().isEmpty()) {
+                // (The fanout delays of its net's routing are added by the first updateTiming(), if the delay
+                // estimator has them)
+                timingManager.setRouteDelay(connection, connection.getRouteDelay(delayEstimator));
+                continue;
+            }
             RouteNode source = connection.getSourceRnode();
             RouteNode[] children = source.getChildren(routingGraph);
             // An output pin with no children is blocked: swap to the alternate output, unless the connection is
@@ -1213,9 +1299,14 @@ public class RWRoute {
                 source = connection.getSourceRnode();
                 children = source.getChildren(routingGraph);
             }
+            if (children.length == 0) {
+                // No way out of the source (e.g. blocked by preserved routing): keep the timing
+                // model's estimate rather than a placeholder delay that would dwarf every path
+                continue;
+            }
             short estDelay = (short) 10000;
             for (RouteNode child : children) {
-                short tmpDelay = 113;
+                short tmpDelay = delayEstimator.getPreRouteBaseDelay();
                 tmpDelay += child.getDelay();
                 if (tmpDelay < estDelay) {
                     estDelay = tmpDelay;
@@ -1223,7 +1314,7 @@ public class RWRoute {
 
             }
             estDelay += source.getDelay();
-            connection.setTimingEdgesDelay(estDelay);
+            timingManager.setRouteDelay(connection, estDelay);
         }
     }
 
@@ -1437,6 +1528,12 @@ public class RWRoute {
                 }
             }
 
+            if (!source.isRouted() && (altSource == null || !altSource.isRouted())) {
+                // No connection of this net was routed (they are all unroutable), so neither source
+                // replaced the other: keep both on the net
+                continue;
+            }
+
             // If the alt source was previously routed, and is no longer, let's remove it
             if (altSource != null && altSourcePreviouslyRouted && !altSource.isRouted()) {
                 // If altSource is not routed, then source must be routed
@@ -1518,10 +1615,99 @@ public class RWRoute {
         updateTimingTimer.start();
         timingWeight = Math.min(timingWeight * config.getTimingMultiplier(), 1f);
         oneMinusTimingWeight = 1 - timingWeight;
-        maxDelayAndTimingVertex = timingManager.calculateArrivalRequiredTimes();
+        if (delayEstimator.hasFanoutDelays()) {
+            updateRouteDelaysWithFanout();
+        }
+        maxDelay = timingManager.computeArrivalRequiredTimes();
         timingManager.calculateCriticality(sortedIndirectConnections,
-                MAX_CRITICALITY, config.getCriticalityExponent());
+                maxCriticality, config.getCriticalityExponent());
         updateTimingTimer.stop();
+    }
+
+    /**
+     * Updates the route delays of all routed indirect connections to include the fanout delays of
+     * their nets' routing trees (see {@link DelayEstimator#getFanoutDelay(Node, int)}), which depend
+     * on all the connections of a net, so a connection's own route delay does not include them.
+     * Only the nets whose routing changed since the last update are visited (see
+     * {@link NetWrapper#isRouteChanged()}); those of the others are unchanged.
+     */
+    private void updateRouteDelaysWithFanout() {
+        for (NetWrapper netWrapper : nets.values()) {
+            if (!netWrapper.isRouteChanged()) continue;
+            netWrapper.setRouteChanged(false);
+            if (netWrapper.getConnections().size() < 2) continue;
+            // Each rnode of the net's routing keeps its first child, with the net's stamp; the sets
+            // of children are only kept for those with more than one
+            int stamp = ++fanoutStamp;
+            Map<RouteNode, Set<RouteNode>> branches = null;
+            // The number of the net's connections routed through each rnode that more than one goes through
+            // (see DelayEstimator.getFanoutLoadDelay()): one more for each visit after the first
+            Map<RouteNode, int[]> loads = null;
+            for (Connection connection : netWrapper.getConnections()) {
+                if (connection.isDirect()) continue;
+                List<RouteNode> rnodes = connection.getRnodes();
+                for (int i = 0; i < rnodes.size() - 1; i++) {
+                    RouteNode child = rnodes.get(i);
+                    RouteNodeGraphTimingDriven.RouteNodeTimingDriven parent =
+                            (RouteNodeGraphTimingDriven.RouteNodeTimingDriven) rnodes.get(i + 1);
+                    if (parent.fanoutStamp == stamp) {
+                        if (loads == null) {
+                            loads = new IdentityHashMap<>();
+                        }
+                        loads.computeIfAbsent(parent, k -> new int[]{1})[0]++;
+                    }
+                    if (parent.fanoutStamp != stamp) {
+                        parent.fanoutStamp = stamp;
+                        parent.fanoutChild = child;
+                    } else if (parent.fanoutChild != child) {
+                        if (branches == null) {
+                            branches = new IdentityHashMap<>();
+                        }
+                        Set<RouteNode> set = branches.get(parent);
+                        if (set == null) {
+                            set = Collections.newSetFromMap(new IdentityHashMap<>());
+                            set.add(parent.fanoutChild);
+                            branches.put(parent, set);
+                        }
+                        set.add(child);
+                    }
+                }
+            }
+            // A sink rnode that other connections are routed through (e.g. an UltraScale+ bounce node) leads to its
+            // own sink pin too
+            for (Connection connection : netWrapper.getConnections()) {
+                if (connection.isDirect() || connection.getRnodes().isEmpty()) continue;
+                RouteNode sink = connection.getRnodes().get(0);
+                if (((RouteNodeGraphTimingDriven.RouteNodeTimingDriven) sink).fanoutStamp == stamp) {
+                    if (loads == null) {
+                        loads = new IdentityHashMap<>();
+                    }
+                    loads.computeIfAbsent(sink, k -> new int[]{1})[0]++;
+                }
+            }
+            for (Connection connection : netWrapper.getConnections()) {
+                List<RouteNode> rnodes = connection.getRnodes();
+                // Connections whose routes were fixed after routing no longer match their rnodes
+                if (connection.isDirect() || connection.isDlyPatched() || rnodes.isEmpty()) continue;
+                float fanoutDelay = 0;
+                if (branches != null || loads != null) {
+                    // Rnodes are ordered sink-first; the sink has no children of this net (but leads to more
+                    // than its own sink pin if another connection is routed through it)
+                    for (int i = 0; i < rnodes.size(); i++) {
+                        RouteNode rnode = rnodes.get(i);
+                        Set<RouteNode> nodeChildren = branches == null || i == 0 ? null : branches.get(rnode);
+                        if (nodeChildren != null) {
+                            fanoutDelay += delayEstimator.getFanoutDelay(rnode, nodeChildren.size());
+                        }
+                        int[] n = loads == null ? null : loads.get(rnode);
+                        if (n != null) {
+                            fanoutDelay += delayEstimator.getFanoutLoadDelay(rnode, n[0]);
+                        }
+                    }
+                }
+                timingManager.setRouteDelay(connection, connection.getRouteDelay(delayEstimator) + fanoutDelay);
+            }
+        }
     }
 
     /**
@@ -1612,7 +1798,7 @@ public class RWRoute {
                     rnodesCreationTime,
                     connectionsRoutedThisIteration.get(),
                     overUsed,
-                    (short)(maxDelayAndTimingVertex == null? 0 : maxDelayAndTimingVertex.getFirst()),
+                    (int) maxDelay,
                     iterationRuntime * 1e-9);
         } else {
             System.out.printf("%4d       %12d  %8.2f   %11d  %10d   %5s  %9.2f\n",
@@ -1636,7 +1822,7 @@ public class RWRoute {
         checkHus();
 
         // Inflate the present congestion factor
-        presentCongestionFactor *= config.getPresentCongestionMultiplier();
+        presentCongestionFactor *= presentCongestionMultiplier;
         presentCongestionFactor = Math.min(presentCongestionFactor, config.getMaxPresentCongestionFactor());
 
         updateCost();
@@ -1682,10 +1868,10 @@ public class RWRoute {
             if (congestedConnRatio < config.getHusActivateThreshold()) {
                 // Activate HUS: slow down the present cost growth and increase historical cost growth instead
                 float husAlpha = config.getHusAlpha();
-                if (husAlpha >= config.getPresentCongestionMultiplier()) {
+                if (husAlpha >= presentCongestionMultiplier) {
                     System.out.println("WARNING: HUS alpha is not less than the current present congestion multiplier.");
                 }
-                config.setPresentCongestionMultiplier(husAlpha);
+                presentCongestionMultiplier = husAlpha;
 
                 float husBeta = config.getHusBeta();
                 if (husBeta <= historicalCongestionFactor) {
@@ -1963,7 +2149,7 @@ public class RWRoute {
      */
     protected static class ConnectionState {
         /** Priority queue of all candidate nodes to be considered for routing this connection */
-        protected final PriorityQueue<RouteNode> queue;
+        protected final RouteNodeQueue queue;
         /** The list of nodes marked as a target for this connection */
         protected final List<RouteNode> targets;
 
@@ -1979,7 +2165,8 @@ public class RWRoute {
         protected float estWlWeight;
         protected float dlyWeight;
         /**
-         * If timing driven: each target sink's LUT logic delay in excess of the fastest one's, indexed as the leading
+         * If timing driven: each target sink's LUT logic delay plus sink pin delay in excess of the fastest one's
+         * (see RouteNodeGraph.setTargetExcessLogicDelays()), indexed as the leading
          * entries of targets (the connection's sinks that are targets; never a marked driver, see setFinishCosts())
          */
         protected final float[] targetExcessLogicDelays = new float[LUTTools.MAX_LUT_SIZE];
@@ -2005,7 +2192,8 @@ public class RWRoute {
         protected boolean driversMarked;
         /**
          * Least of what a driver adds for a sink pushed from it (see getSinkFinishCost()), over the connection's sinks
-         * that are targets; only computed (else zero) for a connection with alternate sinks
+         * that are targets and any driver; only computed (else zero) for a connection with alternate sinks or when
+         * timing-driven (see getDriverFinishCost())
          */
         protected float minSinkCost;
         /**
@@ -2038,7 +2226,7 @@ public class RWRoute {
         protected boolean laOrdered;
 
         protected ConnectionState() {
-            this.queue = new PriorityQueue<>();
+            this.queue = new RouteNodeQueue();
             this.targets = new ArrayList<>();
         }
     }
@@ -2063,7 +2251,7 @@ public class RWRoute {
         state.sinkINodeCost = connection.isSinkDrivenByINodes() ? getUncongestedNodeCost(state,
                 RouteNode.LOCAL_BASE_COST, sinkRnode.getEndTileXCoordinate(), sinkRnode.getBeginTileYCoordinate()) : 0;
 
-        PriorityQueue<RouteNode> queue = state.queue;
+        RouteNodeQueue queue = state.queue;
         assert(queue.isEmpty());
 
         prepareSdqLookahead(state);
@@ -2099,10 +2287,10 @@ public class RWRoute {
                                            "       Backtracking terminated at " + rnodes.get(rnodes.size() -1));
             }
             if (config.isTimingDriven()) {
-                connection.updateRouteDelay();
+                timingManager.setRouteDelay(connection, connection.getRouteDelay(delayEstimator));
                 // With LUT pin swapping, the route may arrive at a different LUT pin: keep the timing graph's
                 // logic delays in step, for the criticalities of the next iteration (and the final report)
-                routingGraph.getLutLogicDelay(timingManager.getTimingGraph(), connection, connection.getRnodes().get(0), true);
+                routingGraph.getLutLogicDelay(timingManager, connection, connection.getRnodes().get(0), true);
             }
             assert(connection.isRouted());
         } else {
@@ -2141,14 +2329,31 @@ public class RWRoute {
         if (sinkRnode == null) {
             return null;
         }
-        PriorityQueue<RouteNode> queue = state.queue;
+        RouteNodeQueue queue = state.queue;
         nodesPushed.addAndGet(queue.size());
         queue.clear();
-        evaluateCostAndPush(state, driver, config.isTimingDriven() && DelayEstimatorBase.isLong(driver), sinkRnode);
+        evaluateCostAndPush(state, driver, sinkRnode);
         RouteNode popped = queue.poll();
         assert(popped == sinkRnode);
+        // The sink costs what the driver's lower bound took it to (see getDriverFinishCost()): its exact push cost from
+        // the driver, the delay of that hop included
+        assert(isExactPushCost(state, driver, sinkRnode));
         state.nodesPopped++;
         return popped;
+    }
+
+    /**
+     * Checks that the path cost that evaluateCostAndPush() gave a node pushed from its parent is the parent's path
+     * cost plus the node's push cost from that parent (see getPushCost()), to within rounding.
+     * @param state State from the connection that is being routed.
+     * @param parent The parent.
+     * @param rnode The node, pushed from that parent.
+     * @return True if so.
+     */
+    private boolean isExactPushCost(ConnectionState state, RouteNode parent, RouteNode rnode) {
+        final float pushed = rnode.getUpstreamPathCost() - parent.getUpstreamPathCost();
+        final float expected = getPushCost(state, rnode, parent);
+        return Math.abs(pushed - expected) <= 1e-4f * Math.max(1f, rnode.getUpstreamPathCost());
     }
 
     /**
@@ -2172,7 +2377,7 @@ public class RWRoute {
             if (!child.isTarget() || child.isVisited(sequence) || !isValidSink(connection, child)) {
                 continue;
             }
-            float cost = getSinkFinishCost(state, child);
+            float cost = getSinkFinishCost(state, child, driver);
             if (cost < cheapestCost) {
                 cheapest = child;
                 cheapestCost = cost;
@@ -2185,8 +2390,9 @@ public class RWRoute {
      * Gets what is added to the path cost of a marked driver of a connection's sinks to give its lower bound, as it is
      * pushed: the least, over the sinks (the sink or alternate sinks) among its own children, of what
      * evaluateCostAndPush() would add to its path cost to give that sink's lower bound (see getSinkFinishCost()), less
-     * the least of that over all the connection's sinks (ConnectionState.minSinkCost). For a connection without
-     * alternate sinks, that is exactly zero.
+     * the least of that over all the connection's sinks and drivers (ConnectionState.minSinkCost). For a connection
+     * without alternate sinks, that is exactly zero unless timing-driven, when the delay of the hop from the driver
+     * to the sink (see getHopDelay()) differs between drivers.
      * @param state State from the connection that is being routed.
      * @param driver The driver being pushed.
      * @return That cost.
@@ -2194,19 +2400,26 @@ public class RWRoute {
     private float getDriverFinishCost(ConnectionState state, RouteNode driver) {
         final Connection connection = state.connection;
         if (!connection.hasAltSinks()) {
-            return 0;
+            if (!config.isTimingDriven()) {
+                return 0;
+            }
+            final float cost = getSinkFinishCost(state, connection.getSinkRnode(), driver) - state.minSinkCost;
+            // minSinkCost is a lower bound on that of any driver
+            assert(cost >= 0);
+            return cost;
         }
         float cheapestCost = Float.MAX_VALUE;
         for (RouteNode child : driver.getChildren(routingGraph)) {
             if (!child.isTarget() || !isValidSink(connection, child)) {
                 continue;
             }
-            cheapestCost = Math.min(cheapestCost, getSinkFinishCost(state, child));
+            cheapestCost = Math.min(cheapestCost, getSinkFinishCost(state, child, driver));
         }
         assert(cheapestCost < Float.MAX_VALUE);
         if (cheapestCost == Float.MAX_VALUE) {
             cheapestCost = state.minSinkCost;
         }
+        assert(cheapestCost >= state.minSinkCost);
         return cheapestCost - state.minSinkCost;
     }
 
@@ -2231,9 +2444,11 @@ public class RWRoute {
      * UltraScale+ PINBOUNCE feedthrough, BOUNCE_*_FT[01], which ends in the next row, so is charged one row).
      * @param state State from the connection that is being routed.
      * @param sink The sink in question.
+     * @param driver The driver that it is pushed from, or null for the least that this can be from any driver (see
+     *               getPushCost()).
      * @return That cost.
      */
-    private float getSinkFinishCost(ConnectionState state, RouteNode sink) {
+    private float getSinkFinishCost(ConnectionState state, RouteNode sink, RouteNode driver) {
         final Connection connection = state.connection;
         final RouteNode sinkRnode = connection.getSinkRnode();
         final int countSourceUses = sink.countConnectionsOfUser(connection.getNetWrapper());
@@ -2244,7 +2459,7 @@ public class RWRoute {
                 sinkRnode.getEndHalfTileXCoordinate());
         final int deltaY = Math.abs(sink.getEndTileYCoordinate() - sinkRnode.getBeginTileYCoordinate());
         assert(!connection.isCrossSLR() || sinkRnode.getSLRIndex(routingGraph) == sink.getSLRIndex(routingGraph));
-        return addEstimate(state, getPushCost(state, sink), deltaHalfX, deltaY, sharingFactor);
+        return addEstimate(state, getPushCost(state, sink, driver), deltaHalfX, deltaY, sharingFactor);
     }
 
     protected void enlargeBoundingBox(Connection connection) {
@@ -2359,10 +2574,9 @@ public class RWRoute {
      * @param rnode The rnode popped out from the queue.
      */
     private void exploreAndExpand(ConnectionState state, RouteNode rnode) {
-        final boolean longParent = config.isTimingDriven() && DelayEstimatorBase.isLong(rnode);
         final Connection connection = state.connection;
         final int sequence = state.sequence;
-        final PriorityQueue<RouteNode> queue = state.queue;
+        final RouteNodeQueue queue = state.queue;
         final NetWrapper netWrapper = connection.getNetWrapper();
         final RouteNodeType rnodeType = rnode.getType();
 
@@ -2376,7 +2590,7 @@ public class RWRoute {
                        (config.isTimingDriven() && connection.hasAltSinks()));
 
                 // Note: it is possible this is a cheaper path to childRNode; however, because the
-                // PriorityQueue class does not support (efficiently) reducing the cost of nodes
+                // The queue does not support (efficiently) reducing the cost of nodes
                 // already in the queue, this opportunity is discarded
                 continue;
             }
@@ -2507,7 +2721,7 @@ public class RWRoute {
                 }
             }
 
-            evaluateCostAndPush(state, rnode, longParent, childRNode);
+            evaluateCostAndPush(state, rnode, childRNode);
             if (state.earlyTermination) {
                 assert(queue.size() == 1 && queue.peek().isTarget() && !queue.peek().willOverUse(netWrapper));
                 // Target is uncongested and the only thing in the (previously cleared) queue, abandon immediately
@@ -2547,26 +2761,42 @@ public class RWRoute {
 
     /**
      * Evaluates the cost of a child of a rnode and pushes the child into the queue after cost evaluation.
+     * @param state State from the connection that is being routed.
+     * @param rnode The parent rnode of the child in question.
+     * @param longParent Unused, since the delay estimator now determines the extra delay from the parent.
+     * @param childRnode The child rnode in question.
+     * @deprecated Use {@link #evaluateCostAndPush(ConnectionState, RouteNode, RouteNode)} instead, which is the one
+     * the router calls.
+     */
+    @Deprecated
+    protected final void evaluateCostAndPush(ConnectionState state,
+                                       RouteNode rnode,
+                                       boolean longParent,
+                                       RouteNode childRnode) {
+        evaluateCostAndPush(state, rnode, childRnode);
+    }
+
+    /**
+     * Evaluates the cost of a child of a rnode and pushes the child into the queue after cost evaluation.
      * For a connection that must cross SLRs, each super long line (an UltraScale/UltraScale+ UBUMP or a Versal SLL)
      * that it must still take is charged at its span at the estimate's rate per row, as though it were any other wire.
      * That is far more than its true cost (by more than 30 for a Versal SLL of 75 rows), so a node entering the sending
      * side of a chain leading to a super long line towards the sink (see isDiscountedSendingChainNode()) is given the
      * crossing discount: that chain, its super long line and its receiving chain at their true cost (see
-     * getSendingChainCost()) in place of that span. The super long line's benefit is thereby front-loaded onto the sending chain: the lower bound falls on
-     * entering it, and each node further along the chain inherits that lower bound (less
-     * {@link RouteNode#SLL_CHAIN_TIE_BREAK}) while its path cost claws back what was charged, so that the chain is
-     * followed depth-first, rather than first exploring further towards the sink by other wires. The discount is
-     * withheld (the node is priced as if it were not on a chain) from a sending-chain node that this net would
-     * overuse, so that connections are not pulled into super long lines that they would overuse. The super long line
-     * and the nodes after it are priced as any other node.
+     * getSendingChainCost()), and when timing-driven the delay that the estimate charged for that super long line
+     * (sllDelayPs, no more than its true delay), in place of that span. The super long line's benefit is thereby
+     * front-loaded onto the sending chain: the lower bound falls on entering it, and each node further along the chain
+     * inherits that lower bound (less {@link RouteNode#SLL_CHAIN_TIE_BREAK}) while its path cost claws back what was
+     * charged, so that the chain is followed depth-first, rather than first exploring further towards the sink by
+     * other wires. The discount is withheld (the node is priced as if it were not on a chain) from a sending-chain node
+     * that this net would overuse, so that connections are not pulled into super long lines that they would overuse.
+     * The super long line and the nodes after it are priced as any other node.
      * @param state State from the connection that is being routed.
      * @param rnode The parent rnode of the child in question.
-     * @param longParent A boolean value to indicate if the parent is a Long node
      * @param childRnode The child rnode in question.
      */
     protected void evaluateCostAndPush(ConnectionState state,
                                        RouteNode rnode,
-                                       boolean longParent,
                                        RouteNode childRnode) {
         final Connection connection = state.connection;
         final int countSourceUses = childRnode.countConnectionsOfUser(connection.getNetWrapper());
@@ -2588,9 +2818,10 @@ public class RWRoute {
         // A target is one of the connection's sinks or a marked driver of them (see setFinishCosts())
         final boolean childIsTargetSink = childRnode.isTarget() && isValidSink(connection, childRnode);
         if (config.isTimingDriven()) {
-            newPartialPathCost += state.dlyWeight * (childRnode.getDelay() + DelayEstimatorBase.getExtraDelay(childRnode, longParent));
+            newPartialPathCost += state.dlyWeight * getHopDelay(rnode, childRnode);
             if (childIsTargetSink) {
-                // With LUT pin swapping, each candidate LUT input pin has its own logic delay through the LUT
+                // With LUT pin swapping, each candidate LUT input pin has its own logic delay through the LUT (and
+                // its own sink pin delay)
                 newPartialPathCost += state.dlyWeight * routingGraph.getTargetExcessLogicDelay(state, childRnode);
             }
         }
@@ -2601,6 +2832,10 @@ public class RWRoute {
             // driver, so only shifting the drivers relative to all other nodes, whose lower bounds charge no sink; see
             // getDriverFinishCost()), which is exact unless that sink is pushed by another driver before this one is
             // popped (see finishAtSinkDriver())
+            // Its push cost from its parent is no less than the cheapest driver's that setFinishCosts() priced
+            // (sinkHalfTileCost, from which every other node's charges at the sink's half tile and drvExcess derive)
+            assert(newPartialPathCost - rnode.getUpstreamPathCost() >=
+                    state.sinkHalfTileCost - 1e-4f * Math.max(1f, newPartialPathCost));
             push(state, childRnode, newPartialPathCost, newPartialPathCost + getDriverFinishCost(state, childRnode));
             return;
         }
@@ -2749,7 +2984,7 @@ public class RWRoute {
         float newTotalPathCost;
         if (sendingHalfX < 0) {
             newTotalPathCost = getLowerBound(state, newPartialPathCost, deltaHalfX, deltaY + deltaSLR * sllLength,
-                    sharingFactor, finishCost, wire);
+                    deltaSLR, sharingFactor, finishCost, wire);
             if (!wire && deltaSLR == 0 && deltaHalfX == 0 && deltaY == 0 && !childRnode.isINode() &&
                     !childRnode.isTarget()) {
                 // At the sink's half tile, where the estimate is zero, a node other than an INODE (e.g. a bounce or GNODE)
@@ -2823,15 +3058,23 @@ public class RWRoute {
             // RXD* also drives INODEs; on Versal, the landing [A-H]Q* also drives BNODEs, which drive INODEs; nor
             // does one to a Versal sink on the receiving chain), for which this lower bound is then above the true
             // cost by up to DEPTH_FIRST_BIAS
-            newTotalPathCost = getLowerBound(state,
-                    newPartialPathCost + getSendingChainCost(state, childRnode, sendingHalfX, sendingY) / sharingFactor,
+            float chainPathCost = newPartialPathCost +
+                    getSendingChainCost(state, childRnode, sendingHalfX, sendingY) / sharingFactor;
+            if (config.isTimingDriven()) {
+                // The delay of the super long line, as the estimate charged it before the chain was entered (see
+                // addEstimate()), which is no more than that of its SLR crossing; not divided by the sharing factor,
+                // as delay never is
+                chainPathCost += state.dlyWeight * sllDelayPs;
+            }
+            newTotalPathCost = getLowerBound(state, chainPathCost,
                     getDeltaHalfX(sinkRnode, landHalfX, sinkHalfX), landDeltaY + (deltaSLR - 1) * sllLength,
-                    sharingFactor, finishCost, true);
+                    deltaSLR - 1, sharingFactor, finishCost, true);
         }
         // A discounted node's lower bound is lower than if it were charged as not being on a chain (at the span
-        // estimate), which it must be for the discount to be one
+        // estimate), which it must be for the discount to be one (to within rounding: when timing-driven, both charge
+        // the super long line's delay, added in a different order)
         assert(sendingHalfX < 0 || newTotalPathCost <= getLowerBound(state, newPartialPathCost, deltaHalfX,
-                deltaY + deltaSLR * sllLength, sharingFactor, finishCost, wire));
+                deltaY + deltaSLR * sllLength, deltaSLR, sharingFactor, finishCost, wire) * (1 + 1e-6f));
 
         if (state.driversMarked && childRnode.isTarget() && !rnode.isTarget()) {
             // A sink pushed from an unmarked driver (see setFinishCosts()): shifted as the marked drivers are (see
@@ -3137,9 +3380,9 @@ public class RWRoute {
      * floor of an SDQ node is no more than the lower bound of such a child wire (rounding included). That is the SDQ
      * node's path cost plus the child wire's node cost as getNodeCost() gives it (its historical and present
      * congestion costs, and the multiplier of an overused node, taken at their least, 1), its wirelength cost and, if
-     * timing-driven, its delay cost, taken as 0 (it is at least 0, and each term is added to the path cost in turn,
-     * so that leaving one out cannot raise the sum, rounding included); plus the estimate from where it ends (see
-     * addEstimate(), which includes the delay estimate if timing-driven); plus finishCost (see
+     * timing-driven, its delay cost, taken as 0 (it is at least 0, see getHopDelay(), and each term is added to the
+     * path cost in turn, so that leaving one out cannot raise the sum, rounding included); plus the estimate from
+     * where it ends (see addEstimate(), which includes the delay estimate if timing-driven); plus finishCost (see
      * getSdqLookaheadChildFinishCost()) and DEPTH_FIRST_BIAS. Used both when timing-driven and when not.
      * @param state State from the connection that is being routed.
      * @param upstreamPathCost The SDQ node's path cost.
@@ -3270,7 +3513,27 @@ public class RWRoute {
      */
     private float getLowerBound(ConnectionState state, float partialPathCost, int deltaHalfX, int deltaY,
                                 float sharingFactor, float finishCost, boolean wire) {
-        float lowerBound = addEstimate(state, partialPathCost, deltaHalfX, deltaY, sharingFactor) + finishCost;
+        return getLowerBound(state, partialPathCost, deltaHalfX, deltaY, 0, sharingFactor, finishCost, wire);
+    }
+
+    /**
+     * Gets the lower bound that evaluateCostAndPush() gives a node, as
+     * {@link #getLowerBound(ConnectionState, float, int, int, float, float, boolean)}, for a node with super long
+     * lines still to take (see addEstimate()).
+     * @param state State from the connection that is being routed.
+     * @param partialPathCost The node's path cost (and, on entering a sending chain, the chain's cost).
+     * @param deltaHalfX Horizontal distance to the sink, in half tiles.
+     * @param deltaY Vertical distance to the sink, in rows, including the span of each super long line still to take.
+     * @param sllsLeft The number of super long lines still to take.
+     * @param sharingFactor Sharing factor of the node.
+     * @param finishCost What every node other than a target is charged (see evaluateCostAndPush()).
+     * @param wire True if the node is a single, double, quad or long (or stands for the one that will follow it).
+     * @return That lower bound.
+     */
+    private float getLowerBound(ConnectionState state, float partialPathCost, int deltaHalfX, int deltaY,
+                                int sllsLeft, float sharingFactor, float finishCost, boolean wire) {
+        float lowerBound = addEstimate(state, partialPathCost, deltaHalfX, deltaY, sllsLeft, sharingFactor) +
+                finishCost;
         if (wire) {
             lowerBound += state.rnodeCostWeight * RouteNode.DEPTH_FIRST_BIAS;
         }
@@ -3278,13 +3541,31 @@ public class RWRoute {
     }
 
     /**
-     * Least delay, in ps, of travelling one half tile horizontally and one row vertically, for the delay estimate (see
-     * addEstimate()) when timing-driven: per tile of its nominal length, of the fastest single, double, quad or long
-     * in each axis (DelayEstimatorBase.getMinDelayPerTile()), e.g. on UltraScale+ an HLONG at 92ps per 6 INT tiles
-     * (12 half tiles) and a VLONG at 86ps per 12 rows.
+     * Delay, in ps, of travelling one half tile horizontally and one row vertically, for the delay estimate (see
+     * addEstimate()) when timing-driven: by default the least, per tile of its nominal length, of any wire in each
+     * axis, which never exceeds a route's (the delay estimator's admissible lookahead delays, see
+     * DelayEstimator.getAdmissibleLookaheadDelayPerTileX()); with the anisotropic lookahead (see
+     * {@link RouterKnobs#LOOKAHEAD_ANISOTROPIC}), the best route's times the lookahead weight.
      */
-    private float minDelayPerHalfTilePs;
-    private float minDelayPerRowPs;
+    private float delayPerHalfTilePs;
+    private float delayPerRowPs;
+
+    /**
+     * Gets the delay that the delay estimate charges for each super long line still to be taken (see
+     * {@link #sllDelayPs}), once initialized; for tests.
+     * @return That delay in ps, NaN if not timing-driven on a device with more than one SLR.
+     */
+    float getSllDelayPs() {
+        return sllDelayPs;
+    }
+
+    /**
+     * Gets the delay per row of the delay estimate (see {@link #delayPerRowPs}), once initialized; for tests.
+     * @return That delay in ps.
+     */
+    float getDelayPerRowPs() {
+        return delayPerRowPs;
+    }
 
     /**
      * Adds the estimate of the cost still to reach the sink to a lower bound.
@@ -3296,14 +3577,36 @@ public class RWRoute {
      * @return The lower bound with the estimate added.
      */
     private float addEstimate(ConnectionState state, float lowerBound, int deltaHalfX, int deltaY, float sharingFactor) {
+        return addEstimate(state, lowerBound, deltaHalfX, deltaY, 0, sharingFactor);
+    }
+
+    /**
+     * Adds the estimate of the cost still to reach the sink to a lower bound, for a node with super long lines still
+     * to take.
+     * @param state State from the connection that is being routed.
+     * @param lowerBound Lower bound so far.
+     * @param deltaHalfX Horizontal distance to the sink, in half tiles.
+     * @param deltaY Vertical distance to the sink, in rows, including the span of each super long line still to take.
+     * @param sllsLeft The number of super long lines still to take.
+     * @param sharingFactor Sharing factor of the node in question.
+     * @return The lower bound with the estimate added.
+     */
+    private float addEstimate(ConnectionState state, float lowerBound, int deltaHalfX, int deltaY, int sllsLeft,
+                              float sharingFactor) {
         // Horizontal distance counts half as much per half tile as vertical distance does per tile
         float distanceToSink = 0.5f * deltaHalfX + deltaY;
         lowerBound += state.estWlWeight * distanceToSink / sharingFactor;
         if (config.isTimingDriven()) {
-            // The least delay still to come, at the fastest wires in each axis, weighted as path delay is (dlyWeight), so
-            // that it does not exceed any wire's delay over its nominal length whatever the timing weight (or timing
-            // multiplier)
-            lowerBound += state.dlyWeight * (deltaHalfX * minDelayPerHalfTilePs + deltaY * minDelayPerRowPs);
+            // The delay still to come (by default the least, at the fastest wires in each axis; see
+            // delayPerHalfTilePs), weighted as path delay is (dlyWeight), so that it does not exceed any wire's delay
+            // over its nominal length whatever the timing weight (or timing multiplier)
+            float delay = deltaHalfX * delayPerHalfTilePs + deltaY * delayPerRowPs;
+            if (sllsLeft > 0) {
+                // Each super long line still to take is charged sllDelayPs instead of the delay of the rows it spans
+                assert(!Float.isNaN(sllDelayPs));
+                delay += sllsLeft * (sllDelayPs - routingGraph.SUPER_LONG_LINE_LENGTH_IN_TILES * delayPerRowPs);
+            }
+            lowerBound += state.dlyWeight * delay;
         }
         return lowerBound;
     }
@@ -3529,8 +3832,10 @@ public class RWRoute {
         final boolean hasAltSinks = connection.hasAltSinks();
         final List<RouteNode> targets = state.targets;
         final int firstDriver = targets.size();
-        // The connection's cheapest sink is only needed with alternate sinks (see getDriverFinishCost())
-        float minSinkCost = hasAltSinks ? Float.MAX_VALUE : 0;
+        // The connection's cheapest sink is only needed with alternate sinks or when timing-driven (see
+        // getDriverFinishCost())
+        final boolean needsMinSinkCost = hasAltSinks || config.isTimingDriven();
+        float minSinkCost = needsMinSinkCost ? Float.MAX_VALUE : 0;
         state.minUnmarkedDriverCost = Float.MAX_VALUE;
         state.minUnmarkedDriver = null;
         boolean markable = true;
@@ -3539,8 +3844,9 @@ public class RWRoute {
         for (int i = 0; i < firstDriver && markable; i++) {
             final RouteNode target = targets.get(i);
             assert(isValidSink(connection, target));
-            if (hasAltSinks) {
-                minSinkCost = Math.min(minSinkCost, getSinkFinishCost(state, target));
+            if (needsMinSinkCost) {
+                // From any driver (whose hop delay to the sink is then the least it can be, see getHopDelay())
+                minSinkCost = Math.min(minSinkCost, getSinkFinishCost(state, target, null));
             }
             final int[] driverWires = routingGraph.getSinkDriverWires(target);
             if (driverWires != null) {
@@ -3556,7 +3862,7 @@ public class RWRoute {
         if (markable) {
             for (int i = firstDriver; i < targets.size(); i++) {
                 RouteNode driver = targets.get(i);
-                float cost = getPushCost(state, driver);
+                float cost = getPushCost(state, driver, null);
                 if (cost < minDriverCost) {
                     minDriverCost = cost;
                     minDriver = driver;
@@ -3676,7 +3982,7 @@ public class RWRoute {
         }
         if (connection.hasAltSinks() && !hasFreeSinkChild(driver, connection)) {
             // Left unmarked, so that it can be passed through
-            float cost = getPushCost(state, driver);
+            float cost = getPushCost(state, driver, null);
             if (cost < state.minUnmarkedDriverCost) {
                 state.minUnmarkedDriverCost = cost;
                 state.minUnmarkedDriver = driver;
@@ -3800,14 +4106,16 @@ public class RWRoute {
     }
 
     /**
-     * Gets the cost that evaluateCostAndPush() adds to the path cost of a node on pushing it: exactly (with the same
-     * sharing factor, see getCountSharingUses()), other than the extra delay of a long after a long, which is left
-     * out (the node being a sink, or a driver of one that may be marked, see isMarkableDriver(), never a long).
+     * Gets the cost that evaluateCostAndPush() adds to the path cost of a node on pushing it from a given parent:
+     * exactly (with the same sharing factor, see getCountSharingUses()), including the delay of the hop from that
+     * parent (see getHopDelay()); or, if the parent is not known, a lower bound on what it adds whatever the parent,
+     * with the least delay that the hop can have.
      * @param state State from the connection that is being routed.
      * @param rnode The node in question.
+     * @param parent The parent that it is pushed from, or null if not known.
      * @return That cost, or a lower bound on it.
      */
-    private float getPushCost(ConnectionState state, RouteNode rnode) {
+    private float getPushCost(ConnectionState state, RouteNode rnode, RouteNode parent) {
         final Connection connection = state.connection;
         final int countSourceUses = rnode.countConnectionsOfUser(connection.getNetWrapper());
         final float sharingFactor = 1 + state.shareWeight * getCountSharingUses(state, rnode, countSourceUses);
@@ -3817,13 +4125,34 @@ public class RWRoute {
         float cost = state.rnodeCostWeight * nodeCost;
         cost += state.rnodeWLWeight * 0.5f * rnode.getHalfTileWirelength() / sharingFactor;
         if (config.isTimingDriven()) {
-            cost += state.dlyWeight * rnode.getDelay();
+            cost += state.dlyWeight * getHopDelay(parent, rnode);
             if (rnode.isTarget() && isValidSink(connection, rnode)) {
-                // As evaluateCostAndPush(): with LUT pin swapping, each candidate LUT input pin has its own logic delay
+                // As evaluateCostAndPush(): with LUT pin swapping, each candidate LUT input pin has its own logic and
+                // sink pin delays
                 cost += state.dlyWeight * routingGraph.getTargetExcessLogicDelay(state, rnode);
             }
         }
         return cost;
+    }
+
+    /**
+     * Gets the delay, in ps, that a node is charged for on being pushed when timing-driven (weighted by the
+     * connection's dlyWeight): its own delay plus the extra delay of the hop from its parent
+     * (RouteNode.getExtraDelay()), which may be negative (with the fitted timing models, a transition between node
+     * classes), taken as at least 0. So no hop lowers a path's cost, and the lower bounds that take the delay of a
+     * node not yet reached as at least 0 (e.g. getSdqLookaheadChildBound(), getSendingChainCost()) hold whatever the
+     * estimator's transitions. (No hop with a negative sum was found in the routing graphs of xcvu3p, xcvu9p,
+     * xcvp1002 or xcv80 with the fitted models, whose least extra delays are -8 and -12 ps.)
+     * @param parent The node's parent, or null if not known: then the least extra delay of any hop into a node of
+     *               its class (DelayEstimator.getLeastExtraDelay()), so that the result is a lower bound on that
+     *               of any parent.
+     * @param rnode The node in question.
+     * @return That delay.
+     */
+    private float getHopDelay(RouteNode parent, RouteNode rnode) {
+        final float extra = (parent == null) ? delayEstimator.getLeastExtraDelay(rnode.getDelayClass())
+                : RouteNode.getExtraDelay(delayEstimator, parent, rnode);
+        return Math.max(0, rnode.getDelay() + extra);
     }
 
     /**
@@ -3871,7 +4200,7 @@ public class RWRoute {
 
     private void printTimingInfo() {
         if (!sortedIndirectConnections.isEmpty()) {
-            timingManager.getCriticalPathInfo(maxDelayAndTimingVertex);
+            timingManager.getCriticalPathInfo();
         }
     }
 
@@ -3991,10 +4320,6 @@ public class RWRoute {
     }
 
     private static Design routeDesign(Design design, RWRouteConfig config) {
-        if (config.isTimingDriven() && !config.isMaskNodesCrossRCLK()) {
-            System.out.println("WARNING: Not masking nodes across RCLK could result in delay optimism.");
-        }
-
         return routeDesign(new RWRoute(design, config));
     }
 
