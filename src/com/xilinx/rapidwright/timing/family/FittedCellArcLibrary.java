@@ -56,8 +56,8 @@ import java.util.regex.Pattern;
  * <li>Among those, the arc whose configuration (cell and macro properties, and the pseudo
  * properties {@code @from} and {@code @to}, the logical pin base names of the arc's pins) matches
  * best wins: the one with the smallest mismatch weight (4 for register properties, whose name ends
- * in REG or REG_&lt;letter&gt;, 1 otherwise; unset properties have the value {@value #NONE}), then
- * the one with the most properties, then the first.</li>
+ * in REG or REG_&lt;letter&gt;, 1 otherwise; unset properties have the value {@code "<none>"},
+ * {@link #NONE}), then the one with the most properties, then the first.</li>
  * <li>Gate properties (register and mode properties such as AREG, A_INPUT, CREG, AMULTSEL or
  * LOOKB of the arc's own group, found from Vivado's timing arcs of characterized designs) decide
  * whether an arc exists: arcs whose gate properties do not all match the cell's are skipped. If none
