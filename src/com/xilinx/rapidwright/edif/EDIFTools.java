@@ -1283,10 +1283,27 @@ public class EDIFTools {
      */
     public static void exportEDIF(OutputStream out, Path dcpFileName, EDIFNetlist edif,
                                   String partName) throws IOException {
+        exportEDIF(out, dcpFileName, edif, partName, false);
+    }
+
+    /**
+     * As {@link #exportEDIF(OutputStream, Path, EDIFNetlist, String)}, for a design that may be
+     * out of context.
+     * @param out The output stream
+     * @param dcpFileName The name of the DCP file associated with this netlist
+     * @param edif The netlist of the design
+     * @param partName The target part for this design
+     * @param outOfContext Whether the design is out of context, so that the Tcl load script of a
+     * netlist with encrypted cells links it as such (see
+     * {@link #writeTclLoadScriptForPartialEncryptedDesigns(EDIFNetlist, Path, String, boolean)}).
+     * @throws IOException If writing the EDIF fails.
+     */
+    public static void exportEDIF(OutputStream out, Path dcpFileName, EDIFNetlist edif,
+                                  String partName, boolean outOfContext) throws IOException {
         ensureCorrectPartInEDIF(edif, partName);
         edif.exportEDIF(out);
         if (dcpFileName != null && edif.hasEncryptedCells()) {
-            writeTclLoadScriptForPartialEncryptedDesigns(edif, dcpFileName, partName);
+            writeTclLoadScriptForPartialEncryptedDesigns(edif, dcpFileName, partName, outOfContext);
         }
     }
 
@@ -1309,6 +1326,22 @@ public class EDIFTools {
 
     public static void writeTclLoadScriptForPartialEncryptedDesigns(EDIFNetlist edif,
                                                             Path dcpFileName, String partName) {
+        writeTclLoadScriptForPartialEncryptedDesigns(edif, dcpFileName, partName, false);
+    }
+
+    /**
+     * Writes a Tcl script next to the DCP file that opens the design in Vivado with its encrypted
+     * cells: it reads their files and the DCP, then links the design.
+     * @param edif The netlist of the design
+     * @param dcpFileName The name of the DCP file associated with this netlist
+     * @param partName The target part for this design
+     * @param outOfContext Whether the design is out of context: it is then linked with
+     * {@code -mode out_of_context}, without which Vivado (from 2026.2) inserts I/O buffers on its
+     * top-level ports, which are not placed.
+     */
+    public static void writeTclLoadScriptForPartialEncryptedDesigns(EDIFNetlist edif,
+                                                            Path dcpFileName, String partName,
+                                                            boolean outOfContext) {
         ArrayList<String> lines = new ArrayList<String>();
         if (Params.RW_COPY_EDNS_ON_DCP_WRITE && edif.getEncryptedCells().size() > 0) {
             Path destDir = dcpFileName.getParent();
@@ -1342,7 +1375,7 @@ public class EDIFTools {
 
         lines.add("read_checkpoint {" + pathDCPFileName + "}");
         lines.add("set_property top "+edif.getName()+" [current_fileset]");
-        lines.add("link_design -part " + partName);
+        lines.add("link_design -part " + partName + (outOfContext ? " -mode out_of_context" : ""));
         Path tclFileName = FileTools.replaceExtension(pathDCPFileName, LOAD_TCL_SUFFIX);
         try {
             Files.write(tclFileName, lines);
