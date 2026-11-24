@@ -93,14 +93,14 @@ public class TestEdifCellLookup {
     public void testWildcardAndRegexpNamesAsFullScan() {
         EDIFNetlist nl = netlist();
         RegularEdifCellLookup lookup = new RegularEdifCellLookup(nl);
-        List<String> wild = List.of("a/x*", "a*/x0", "a*/x?", "a/y", "a/z*", "?b*/x0", "*/x1*", "m/s*/x1", "m/*/y",
-                "m/s1/fifo[*].reg", "q/x*", "a/x0/*", "*");
+        List<String> wild = Arrays.asList("a/x*", "a*/x0", "a*/x?", "a/y", "a/z*", "?b*/x0", "*/x1*", "m/s*/x1",
+                "m/*/y", "m/s1/fifo[*].reg", "q/x*", "a/x0/*", "*");
         for (String p : wild) {
             Set<String> got = lookup.getHierCellInstsFromWildcardName(p)
                     .map(EDIFHierCellInst::getFullHierarchicalInstName).collect(Collectors.toCollection(TreeSet::new));
             Assertions.assertEquals(bruteForce(lookup, p, FilenameUtils::wildcardMatch), got, p);
         }
-        List<String> rx = List.of("a/x[01]", "a.*/x1.*", "m/s\\d/y", "(?i)A/X0", "m/s1/fifo\\[3\\]\\.reg");
+        List<String> rx = Arrays.asList("a/x[01]", "a.*/x1.*", "m/s\\d/y", "(?i)A/X0", "m/s1/fifo\\[3\\]\\.reg");
         for (String p : rx) {
             Set<String> got = lookup.getHierCellInstsFromRegexpName(p)
                     .map(EDIFHierCellInst::getFullHierarchicalInstName).collect(Collectors.toCollection(TreeSet::new));
@@ -126,7 +126,7 @@ public class TestEdifCellLookup {
                 return current.getFullHierarchicalInstName().toUpperCase();
             }
         };
-        for (String p : List.of("A/X*", "M/S*/X1", "A*/X0", "M/S1/FIFO[*].REG")) {
+        for (String p : Arrays.asList("A/X*", "M/S*/X1", "A*/X0", "M/S1/FIFO[*].REG")) {
             Set<String> got = upper.getHierCellInstsFromWildcardName(p)
                     .map(EDIFHierCellInst::getFullHierarchicalInstName).collect(Collectors.toCollection(TreeSet::new));
             Set<String> want = new TreeSet<>();
