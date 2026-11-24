@@ -121,6 +121,90 @@ public class TestPartialRouter {
     }
 
     /**
+     * Tests a net whose source is routed (by the routing it keeps) but none of whose connections can be routed: every
+     * node driving its sink pin's node is used by other nets. Its source must stay its source; it was removed from the
+     * net, as if its (missing) alternate source had replaced it.
+     */
+    @Test
+    @LargeTest(max_memory_gb = 8)
+    public void testUnroutableConnectionKeepsRoutedSource() {
+        Design design = RapidWrightDCP.loadDCP("picoblaze_partial.dcp");
+        DesignTools.updatePinsIsRouted(design);
+        Set<Node> usedNodes = new HashSet<>();
+        for (Net n : design.getNets()) {
+            for (PIP pip : n.getPIPs()) {
+                usedNodes.add(pip.getStartNode());
+                usedNodes.add(pip.getEndNode());
+            }
+        }
+
+        // A routed signal net with one sink pin and no alternate source, whose PIP from its source leads to a node
+        // that does not drive its sink pin's node
+        Net net = null;
+        PIP sourcePIP = null;
+        for (Net n : design.getNets()) {
+            if (n.getType() != NetType.WIRE || n.isClockNet() || n.getSinkPins().size() != 1 || n.getSource() == null
+                    || !n.getSource().isRouted() || n.getAlternateSource() != null) {
+                continue;
+            }
+            Node sourceNode = n.getSource().getConnectedNode();
+            List<Node> sinkUphill = n.getSinkPins().get(0).getConnectedNode().getAllUphillNodes();
+            if (sinkUphill.contains(sourceNode)) {
+                continue;
+            }
+            for (PIP pip : n.getPIPs()) {
+                if (pip.getStartNode().equals(sourceNode) && !sinkUphill.contains(pip.getEndNode())) {
+                    net = n;
+                    sourcePIP = pip;
+                    break;
+                }
+            }
+            if (net != null) {
+                break;
+            }
+        }
+        Assertions.assertNotNull(net);
+        SitePinInst source = net.getSource();
+        SitePinInst sink = net.getSinkPins().get(0);
+
+        // Keep only the net's PIP from its source, so that its source stays routed, and use every free node that
+        // drives the sink pin's node by another net
+        for (PIP pip : net.getPIPs()) {
+            usedNodes.remove(pip.getStartNode());
+            usedNodes.remove(pip.getEndNode());
+        }
+        net.setPIPs(new ArrayList<>(Collections.singletonList(sourcePIP)));
+        usedNodes.add(sourcePIP.getStartNode());
+        usedNodes.add(sourcePIP.getEndNode());
+        sink.setRouted(false);
+        Net blocker = design.createNet("blocker");
+        for (Node node : sink.getConnectedNode().getAllUphillNodes()) {
+            if (usedNodes.contains(node)) {
+                continue;
+            }
+            PIP blockingPIP = null;
+            for (PIP pip : node.getAllUphillPIPs()) {
+                if (!usedNodes.contains(pip.getStartNode()) || blocker.getPIPs().stream()
+                        .anyMatch(p -> p.getStartNode().equals(pip.getStartNode()))) {
+                    blockingPIP = pip;
+                    break;
+                }
+            }
+            Assertions.assertNotNull(blockingPIP);
+            blocker.addPIP(blockingPIP);
+            usedNodes.add(blockingPIP.getStartNode());
+        }
+
+        boolean softPreserve = false;
+        PartialRouter.routeDesignPartialNonTimingDriven(design, Collections.singletonList(sink), softPreserve);
+
+        Assertions.assertFalse(sink.isRouted());
+        Assertions.assertSame(source, net.getSource());
+        Assertions.assertSame(source, source.getSiteInst().getSitePinInst(source.getName()));
+        Assertions.assertEquals(net.hasPIPs(), source.isRouted());
+    }
+
+    /**
      * Tests timing driven partial routing.
      * The picoblaze design is from one of the RapidWright tutorials with nets between computing kernels not routed.
      * Other nets within each kernel are fully routed.
