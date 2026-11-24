@@ -1528,6 +1528,12 @@ public class RWRoute {
                 }
             }
 
+            if (!source.isRouted() && (altSource == null || !altSource.isRouted())) {
+                // No connection of this net was routed (they are all unroutable), so neither source
+                // replaced the other: keep both on the net
+                continue;
+            }
+
             // If the alt source was previously routed, and is no longer, let's remove it
             if (altSource != null && altSourcePreviouslyRouted && !altSource.isRouted()) {
                 // If altSource is not routed, then source must be routed
