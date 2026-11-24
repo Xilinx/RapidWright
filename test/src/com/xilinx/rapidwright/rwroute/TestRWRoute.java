@@ -2836,13 +2836,24 @@ public class TestRWRoute {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"picoblaze_2022.2.dcp", "versal_slr_crossing.dcp"})
-    public void testTimingDrivenRoutingOnVersalDevice(String dcpName) {
+    @CsvSource({
+            // picoblaze_2022.2 has 8 nets driven from a black box cell, which Vivado reports as unrouted
+            // (as in testNonTimingDrivenRoutingOnVersalDevice())
+            "picoblaze_2022.2.dcp,8",
+            "versal_slr_crossing.dcp,0",
+    })
+    public void testTimingDrivenRoutingOnVersalDevice(String dcpName, int unroutedNets) {
         Design design = RapidWrightDCP.loadDCP(dcpName);
         RWRoute.routeDesignFullTimingDriven(design);
         assertAllSourcesRoutedFlagSet(design);
         assertAllPinsRouted(design);
-        VivadoToolsHelper.assertFullyRouted(design);
+        if (FileTools.isVivadoOnPath()) {
+            ReportRouteStatusResult rrs = VivadoToolsHelper.reportRouteStatus(design);
+            Assertions.assertEquals(0, rrs.netsWithRoutingErrors);
+            Assertions.assertEquals(0, rrs.netsWithNoPlacedPins);
+            Assertions.assertEquals(unroutedNets, rrs.unroutedNets);
+            Assertions.assertTrue(rrs.fullyRoutedNets > 0);
+        }
     }
 
     @Test

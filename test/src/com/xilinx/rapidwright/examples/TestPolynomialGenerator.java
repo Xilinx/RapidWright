@@ -82,8 +82,8 @@ public class TestPolynomialGenerator {
                 Arguments.of("8*x^4+43*x^3+7*x^2-14", 18, false),
                 Arguments.of("8*y^4+43*y*x^3+7*x^2-14", 18, true),   // Section 3: "More Complex Polynomial"
                 Arguments.of("8*y^4+43*y*x^3+7*x^2-14", 18, false),
-                Arguments.of("3*x^2+x-2 16", 16, true),              // Section 2: "Simple Polynomial Circuit"
-                Arguments.of("3*x^2+x-2 16", 16, false)
+                Arguments.of("3*x^2+x-2", 16, true),                 // Section 2: "Simple Polynomial Circuit"
+                Arguments.of("3*x^2+x-2", 16, false)
                 );
     }
 }
