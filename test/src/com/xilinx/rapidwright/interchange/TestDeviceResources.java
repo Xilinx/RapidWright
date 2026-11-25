@@ -43,7 +43,7 @@ public class TestDeviceResources {
         DeviceResourcesWriter.writeDeviceResourcesFile(
                 TEST_DEVICE, device, CodePerfTracker.SILENT, capnProtoFile.toString());
         Device.releaseDeviceReferences();
-        DeviceResourcesVerifier.verifyDeviceResources(capnProtoFile.toString(), TEST_DEVICE);
+        DeviceResourcesVerifier.verifyDeviceResources(capnProtoFile.toString(), TEST_DEVICE, CodePerfTracker.SILENT);
     }
 
 
