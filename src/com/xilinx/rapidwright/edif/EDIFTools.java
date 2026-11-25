@@ -321,10 +321,16 @@ public class EDIFTools {
 
         EDIFCellInst currInst = e.getTopCellInst();
         for (int i=0; i < parts.length-1; i++) {
-            currInst = currInst.getCellType().getCellInst(EDIFTools.makeNameEDIFCompatible(parts[i]));
+            EDIFCell cell = currInst.getCellType();
+            currInst = cell.getCellInst(parts[i]);
+            if (currInst == null) {
+                currInst = cell.getCellInst(makeNameEDIFCompatible(parts[i]));
+            }
         }
-        String netName = makeNameEDIFCompatible(parts[parts.length-1]);
-        return currInst.getCellType().getNet(netName);
+        EDIFCell cell = currInst.getCellType();
+        String netName = parts[parts.length-1];
+        EDIFNet net = cell.getNet(netName);
+        return net != null ? net : cell.getNet(makeNameEDIFCompatible(netName));
     }
 
     public static EDIFNet addNet(EDIFNetlist e, String hierarchicalName) {

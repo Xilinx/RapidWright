@@ -60,6 +60,27 @@ public class TestEDIFTools {
     public static final String TEST_SNK2 = "u_ila_0/inst/PROBE_PIPE.shift_probes_reg[0][8]/D";
 
     @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    public void testGetNetWithOriginalNames(boolean renamed) {
+        EDIFNetlist netlist = EDIFTools.createNewNetlist("top", false);
+        EDIFCell top = netlist.getTopCell();
+        String netName = renamed ? "data.out" : "data_out";
+        String instName = renamed ? "module.inst" : "module_inst";
+        EDIFNet topNet = top.createNet(netName);
+        EDIFCell module = new EDIFCell(netlist.getWorkLibrary(), "module");
+        EDIFNet inside = module.createNet("inside");
+        top.createChildCellInst(instName, module);
+        // addNet() legalizes the name it creates; getNet() must still find it by the same path
+        EDIFNet added = EDIFTools.addNet(netlist, netName + "2");
+
+        Assertions.assertAll(
+                () -> Assertions.assertSame(topNet, EDIFTools.getNet(netlist, netName)),
+                () -> Assertions.assertSame(inside, EDIFTools.getNet(netlist, instName + "/inside")),
+                () -> Assertions.assertSame(added, EDIFTools.getNet(netlist, netName + "2"))
+        );
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = {true, false})
     public void testConnectPortInstsThruHier(boolean netToPin) {
         Design d = Design.readCheckpoint(RapidWrightDCP.getPath("microblazeAndILA_3pblocks.dcp"), true);
