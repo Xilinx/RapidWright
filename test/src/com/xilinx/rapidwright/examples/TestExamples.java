@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Advanced Micro Devices, Inc.
+ * Copyright (c) 2023, 2025, Advanced Micro Devices, Inc.
  * All rights reserved.
  *
  * Author: Eddie Hung, Advanced Micro Devices, Inc.
@@ -33,6 +33,9 @@ import com.xilinx.rapidwright.edif.EDIFNet;
 import com.xilinx.rapidwright.edif.EDIFPortInst;
 import com.xilinx.rapidwright.edif.EDIFTools;
 import com.xilinx.rapidwright.rwroute.RWRoute;
+import com.xilinx.rapidwright.util.FileTools;
+import com.xilinx.rapidwright.util.ReportRouteStatusResult;
+import com.xilinx.rapidwright.util.VivadoTools;
 import org.capnproto.PrimitiveList;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -53,17 +56,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class TestExamples {
     @Test
-    public void testPipelineGenerator() {
+    public void testPipelineGenerator(@TempDir Path tempDir) {
+        Path dcp = tempDir.resolve("output.dcp");
         PipelineGenerator.main(new String[]{
-                "-o", "/dev/null"
+                "-o", dcp.toString()
         });
+        if (FileTools.isVivadoOnPath()) {
+            ReportRouteStatusResult rrs = VivadoTools.reportRouteStatus(dcp);
+            Assertions.assertEquals(rrs.unroutedNets, 0);
+            Assertions.assertEquals(rrs.netsWithRoutingErrors, 0);
+        }
     }
 
     @Test
-    public void testPipelineGeneratorWithRouting() {
+    public void testPipelineGeneratorWithRouting(@TempDir Path tempDir) {
+        Path dcp = tempDir.resolve("output.dcp");
         PipelineGeneratorWithRouting.main(new String[]{
-                "-o", "/dev/null"
+                "-o", dcp.toString()
         });
+        if (FileTools.isVivadoOnPath()) {
+            Assertions.assertTrue(VivadoTools.reportRouteStatus(dcp).isFullyRouted());
+        }
     }
 
     /*
